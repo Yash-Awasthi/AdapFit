@@ -7,6 +7,7 @@ import {
   Target, Dumbbell, Calendar, AlertCircle, ChevronRight, ChevronLeft,
   Zap, Moon, Heart, Activity
 } from "lucide-react-native";
+import { useTheme } from "../src/services/theme";
 
 const { width } = Dimensions.get("window");
 
@@ -53,6 +54,8 @@ const INJURY_OPTIONS = [
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const s = makeStyles(theme);
   const [step, setStep] = useState(0);
   const [goals, setGoals] = useState<string[]>([]);
   const [experience, setExperience] = useState("");
@@ -77,19 +80,19 @@ export default function OnboardingScreen() {
       case 0:
         return (
           <View>
-            <Text style={styles.stepTitle}>What are your goals?</Text>
-            <Text style={styles.stepSub}>Select one or more</Text>
+            <Text style={s.stepTitle}>What are your goals?</Text>
+            <Text style={s.stepSub}>Select one or more</Text>
             {GOALS.map((g) => {
               const Icon = g.icon;
               const sel = goals.includes(g.id);
               return (
                 <TouchableOpacity
                   key={g.id}
-                  style={[styles.optionCard, sel && styles.optionSelected]}
+                  style={[s.optionCard, sel && s.optionSelected]}
                   onPress={() => toggleItem(goals, setGoals, g.id)}
                 >
-                  <Icon size={20} color={sel ? "#818CF8" : "#64748B"} />
-                  <Text style={[styles.optionText, sel && styles.optionTextSelected]}>{g.label}</Text>
+                  <Icon size={20} color={sel ? theme.primaryLight : theme.textMuted} />
+                  <Text style={[s.optionText, sel && s.optionTextSelected]}>{g.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -98,18 +101,18 @@ export default function OnboardingScreen() {
       case 1:
         return (
           <View>
-            <Text style={styles.stepTitle}>Your experience level</Text>
-            <Text style={styles.stepSub}>This helps us calibrate intensity</Text>
+            <Text style={s.stepTitle}>Your experience level</Text>
+            <Text style={s.stepSub}>This helps us calibrate intensity</Text>
             {EXPERIENCE.map((e) => (
               <TouchableOpacity
                 key={e.id}
-                style={[styles.optionCard, experience === e.id && styles.optionSelected]}
+                style={[s.optionCard, experience === e.id && s.optionSelected]}
                 onPress={() => setExperience(e.id)}
               >
-                <Text style={[styles.optionText, experience === e.id && styles.optionTextSelected]}>
+                <Text style={[s.optionText, experience === e.id && s.optionTextSelected]}>
                   {e.label}
                 </Text>
-                <Text style={styles.optionDesc}>{e.desc}</Text>
+                <Text style={s.optionDesc}>{e.desc}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -117,15 +120,15 @@ export default function OnboardingScreen() {
       case 2:
         return (
           <View>
-            <Text style={styles.stepTitle}>Equipment available</Text>
-            <Text style={styles.stepSub}>Select all that apply</Text>
+            <Text style={s.stepTitle}>Equipment available</Text>
+            <Text style={s.stepSub}>Select all that apply</Text>
             {EQUIPMENT.map((e) => (
               <TouchableOpacity
                 key={e.id}
-                style={[styles.optionCard, equipment.includes(e.id) && styles.optionSelected]}
+                style={[s.optionCard, equipment.includes(e.id) && s.optionSelected]}
                 onPress={() => toggleItem(equipment, setEquipment, e.id)}
               >
-                <Text style={[styles.optionText, equipment.includes(e.id) && styles.optionTextSelected]}>
+                <Text style={[s.optionText, equipment.includes(e.id) && s.optionTextSelected]}>
                   {e.label}
                 </Text>
               </TouchableOpacity>
@@ -135,16 +138,16 @@ export default function OnboardingScreen() {
       case 3:
         return (
           <View>
-            <Text style={styles.stepTitle}>Training schedule</Text>
-            <Text style={styles.stepSub}>How many days per week?</Text>
-            {SCHEDULE.map((s) => (
+            <Text style={s.stepTitle}>Training schedule</Text>
+            <Text style={s.stepSub}>How many days per week?</Text>
+            {SCHEDULE.map((sc) => (
               <TouchableOpacity
-                key={s.id}
-                style={[styles.optionCard, schedule === s.id && styles.optionSelected]}
-                onPress={() => setSchedule(s.id)}
+                key={sc.id}
+                style={[s.optionCard, schedule === sc.id && s.optionSelected]}
+                onPress={() => setSchedule(sc.id)}
               >
-                <Text style={[styles.optionText, schedule === s.id && styles.optionTextSelected]}>
-                  {s.label}
+                <Text style={[s.optionText, schedule === sc.id && s.optionTextSelected]}>
+                  {sc.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -153,16 +156,16 @@ export default function OnboardingScreen() {
       case 4:
         return (
           <View>
-            <Text style={styles.stepTitle}>Any injuries?</Text>
-            <Text style={styles.stepSub}>We'll modify exercises accordingly</Text>
+            <Text style={s.stepTitle}>Any injuries?</Text>
+            <Text style={s.stepSub}>We'll modify exercises accordingly</Text>
             {INJURY_OPTIONS.map((i) => (
               <TouchableOpacity
                 key={i.id}
-                style={[styles.optionCard, injuries.includes(i.id) && styles.optionSelected]}
+                style={[s.optionCard, injuries.includes(i.id) && s.optionSelected]}
                 onPress={() => toggleItem(injuries, setInjuries, i.id)}
               >
-                <AlertCircle size={18} color={injuries.includes(i.id) ? "#818CF8" : "#64748B"} />
-                <Text style={[styles.optionText, injuries.includes(i.id) && styles.optionTextSelected]}>
+                <AlertCircle size={18} color={injuries.includes(i.id) ? theme.primaryLight : theme.textMuted} />
+                <Text style={[s.optionText, injuries.includes(i.id) && s.optionTextSelected]}>
                   {i.label}
                 </Text>
               </TouchableOpacity>
@@ -173,71 +176,73 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={s.container}>
       {/* Progress bar */}
-      <View style={styles.progressRow}>
+      <View style={s.progressRow}>
         {[0, 1, 2, 3, 4].map((i) => (
-          <View key={i} style={[styles.progressDot, i <= step && styles.progressDotActive]} />
+          <View key={i} style={[s.progressDot, i <= step && s.progressDotActive]} />
         ))}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={s.content} showsVerticalScrollIndicator={false}>
         {renderStep()}
       </ScrollView>
 
-      <View style={styles.navRow}>
+      <View style={s.navRow}>
         {step > 0 ? (
-          <TouchableOpacity style={styles.navBtnSecondary} onPress={prev}>
-            <ChevronLeft size={18} color="#94A3B8" />
-            <Text style={styles.navBtnText}>Back</Text>
+          <TouchableOpacity style={s.navBtnSecondary} onPress={prev}>
+            <ChevronLeft size={18} color={theme.textSecondary} />
+            <Text style={s.navBtnText}>Back</Text>
           </TouchableOpacity>
         ) : (
           <View />
         )}
 
         <TouchableOpacity
-          style={[styles.navBtnPrimary, step === 4 && styles.navBtnComplete]}
+          style={[s.navBtnPrimary, step === 4 && s.navBtnComplete]}
           onPress={step === 4 ? complete : next}
         >
-          <Text style={styles.navBtnText}>
+          <Text style={s.navBtnText}>
             {step === 4 ? "Get Started" : "Next"}
           </Text>
-          {step < 4 && <ChevronRight size={18} color="#F8FAFC" />}
+          {step < 4 && <ChevronRight size={18} color={theme.text} />}
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A", paddingTop: 60 },
-  progressRow: { flexDirection: "row", justifyContent: "center", gap: 8, marginBottom: 24 },
-  progressDot: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#334155" },
-  progressDotActive: { backgroundColor: "#818CF8" },
-  content: { flex: 1, paddingHorizontal: 20 },
-  stepTitle: { color: "#F8FAFC", fontSize: 24, fontWeight: "700", marginBottom: 6 },
-  stepSub: { color: "#94A3B8", fontSize: 14, marginBottom: 20 },
-  optionCard: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: "#1E293B", borderRadius: 12, padding: 16, marginBottom: 10,
-    borderWidth: 2, borderColor: "transparent",
-  },
-  optionSelected: { borderColor: "#818CF8", backgroundColor: "#1E1B4B" },
-  optionText: { color: "#CBD5E1", fontSize: 15, flex: 1 },
-  optionTextSelected: { color: "#F8FAFC", fontWeight: "600" },
-  optionDesc: { color: "#64748B", fontSize: 12 },
-  navRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    padding: 20, paddingBottom: 40,
-  },
-  navBtnPrimary: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "#4F46E5", borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12,
-  },
-  navBtnComplete: { backgroundColor: "#10B981" },
-  navBtnSecondary: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 16, paddingVertical: 12,
-  },
-  navBtnText: { color: "#F8FAFC", fontSize: 15, fontWeight: "600" },
-});
+function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background, paddingTop: 60 },
+    progressRow: { flexDirection: "row", justifyContent: "center", gap: 8, marginBottom: 24 },
+    progressDot: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.surfaceHover },
+    progressDotActive: { backgroundColor: theme.primaryLight },
+    content: { flex: 1, paddingHorizontal: 20 },
+    stepTitle: { color: theme.text, fontSize: 24, fontWeight: "700", marginBottom: 6 },
+    stepSub: { color: theme.textSecondary, fontSize: 14, marginBottom: 20 },
+    optionCard: {
+      flexDirection: "row", alignItems: "center", gap: 12,
+      backgroundColor: theme.surface, borderRadius: 12, padding: 16, marginBottom: 10,
+      borderWidth: 2, borderColor: "transparent",
+    },
+    optionSelected: { borderColor: theme.primaryLight, backgroundColor: theme.primaryBg },
+    optionText: { color: "#CBD5E1", fontSize: 15, flex: 1 },
+    optionTextSelected: { color: theme.text, fontWeight: "600" },
+    optionDesc: { color: theme.textMuted, fontSize: 12 },
+    navRow: {
+      flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+      padding: 20, paddingBottom: 40,
+    },
+    navBtnPrimary: {
+      flexDirection: "row", alignItems: "center", gap: 6,
+      backgroundColor: theme.primary, borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12,
+    },
+    navBtnComplete: { backgroundColor: theme.success },
+    navBtnSecondary: {
+      flexDirection: "row", alignItems: "center", gap: 4,
+      paddingHorizontal: 16, paddingVertical: 12,
+    },
+    navBtnText: { color: theme.text, fontSize: 15, fontWeight: "600" },
+  });
+}

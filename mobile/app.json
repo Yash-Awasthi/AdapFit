@@ -5,7 +5,7 @@
     "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -13,7 +13,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.adapfit.app"
+      "bundleIdentifier": "com.adapfit.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "AdapFit uses the microphone for hands-free voice workout logging.",
+        "NSSpeechRecognitionUsageDescription": "AdapFit transcribes your voice to log sets hands-free.",
+        "NSBluetoothAlwaysUsageDescription": "AdapFit connects to Bluetooth heart-rate straps during workouts."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,14 +26,36 @@
         "backgroundColor": "#0F172A"
       },
       "package": "com.adapfit.app",
-      "permissions": ["CAMERA"]
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "plugins": [
       "expo-router",
+      "expo-system-ui",
       [
         "expo-camera",
         {
           "cameraPermission": "AdapFit uses the camera to check your exercise form during form-checker sessions."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "AdapFit uses the microphone for hands-free voice workout logging.",
+          "speechRecognitionPermission": "AdapFit transcribes your voice to log sets hands-free."
+        }
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermission": "AdapFit connects to Bluetooth heart-rate straps during workouts."
         }
       ],
       [

@@ -6,7 +6,7 @@ import { WorkoutCard, Button, SectionHeader, LoadingScreen, EmptyState } from '.
 import { WorkoutCalendar } from '../../src/components/WorkoutCalendar';
 import { api } from '../../src/services/api';
 import * as Haptics from 'expo-haptics';
-import { useUserStore } from '../../src/stores';
+import { useUserStore, useWorkoutStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
 
 interface Exercise {
@@ -31,6 +31,7 @@ export default function WorkoutScreen() {
   const { theme } = useTheme();
   const s = makeStyles(theme);
   const userId = useUserStore((s) => s.userId);
+  const startWorkout = useWorkoutStore((s) => s.startWorkout);
   const router = useRouter();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [warmupData, setWarmupData] = useState<any | null>(null);
@@ -227,6 +228,17 @@ export default function WorkoutScreen() {
               {item.exercises.map((ex) => (
                 <WorkoutCard key={ex.exercise_id} exercise={ex} />
               ))}
+              <TouchableOpacity
+                style={s.startBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  startWorkout(item);
+                  router.push('/workout-active');
+                }}
+              >
+                <Dumbbell size={16} color={theme.background} />
+                <Text style={s.startBtnText}>Start Workout</Text>
+              </TouchableOpacity>
             </View>
           )}
           contentContainerStyle={s.list}
@@ -314,5 +326,10 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     rationale: { fontSize: 13, color: theme.textSecondary, marginBottom: 8, lineHeight: 18 },
     exerciseCount: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
     exerciseCountText: { fontSize: 12, color: theme.primaryLight, fontWeight: '500' },
+    startBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      backgroundColor: theme.primaryLight, borderRadius: 12, padding: 12, marginTop: 8,
+    },
+    startBtnText: { color: theme.background, fontSize: 14, fontWeight: '700' },
   });
 }

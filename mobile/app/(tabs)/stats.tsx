@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { TrendingUp, Trophy, Dumbbell, Clock, Zap } from 'lucide-react-native';
 import { API_BASE_URL as API } from '../../src/services/config';
+import { useTheme } from '../../src/services/theme';
 const SCREEN_WIDTH = Dimensions.get('window').width - 40;
 
 interface WorkoutStats {
@@ -41,6 +42,8 @@ const MUSCLE_COLORS: Record<string, string> = {
 };
 
 export default function StatsScreen() {
+  const { theme } = useTheme();
+  const s = makeStyles(theme);
   const [stats, setStats] = useState<WorkoutStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,62 +58,62 @@ export default function StatsScreen() {
   }
 
   if (loading) {
-    return <View style={styles.container}><Text style={styles.loadingText}>Loading stats...</Text></View>;
+    return <View style={s.container}><Text style={s.loadingText}>Loading stats...</Text></View>;
   }
 
   if (!stats || stats.total_workouts === 0) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Workout Stats</Text>
-        <View style={styles.emptyCard}>
-          <Dumbbell size={40} color="#334155" />
-          <Text style={styles.emptyText}>No workouts yet</Text>
-          <Text style={styles.emptySubtext}>Complete workouts to see your stats here</Text>
+      <View style={s.container}>
+        <Text style={s.title}>Workout Stats</Text>
+        <View style={s.emptyCard}>
+          <Dumbbell size={40} color={theme.border} />
+          <Text style={s.emptyText}>No workouts yet</Text>
+          <Text style={s.emptySubtext}>Complete workouts to see your stats here</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-      <Text style={styles.title}>Workout Stats</Text>
+    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 100 }}>
+      <Text style={s.title}>Workout Stats</Text>
 
       {/* Summary Cards */}
-      <View style={styles.summaryGrid}>
-        <View style={styles.summaryCard}>
-          <Dumbbell size={20} color="#818CF8" />
-          <Text style={styles.summaryValue}>{stats.total_workouts}</Text>
-          <Text style={styles.summaryLabel}>Workouts</Text>
+      <View style={s.summaryGrid}>
+        <View style={s.summaryCard}>
+          <Dumbbell size={20} color={theme.primaryLight} />
+          <Text style={s.summaryValue}>{stats.total_workouts}</Text>
+          <Text style={s.summaryLabel}>Workouts</Text>
         </View>
-        <View style={styles.summaryCard}>
-          <TrendingUp size={20} color="#22C55E" />
-          <Text style={styles.summaryValue}>{(stats.total_volume_kg / 1000).toFixed(1)}k</Text>
-          <Text style={styles.summaryLabel}>kg Volume</Text>
+        <View style={s.summaryCard}>
+          <TrendingUp size={20} color={theme.success} />
+          <Text style={s.summaryValue}>{(stats.total_volume_kg / 1000).toFixed(1)}k</Text>
+          <Text style={s.summaryLabel}>kg Volume</Text>
         </View>
-        <View style={styles.summaryCard}>
-          <Clock size={20} color="#F59E0B" />
-          <Text style={styles.summaryValue}>{Math.round(stats.total_duration_minutes / 60)}h</Text>
-          <Text style={styles.summaryLabel}>Total Time</Text>
+        <View style={s.summaryCard}>
+          <Clock size={20} color={theme.warning} />
+          <Text style={s.summaryValue}>{Math.round(stats.total_duration_minutes / 60)}h</Text>
+          <Text style={s.summaryLabel}>Total Time</Text>
         </View>
-        <View style={styles.summaryCard}>
-          <Zap size={20} color="#EF4444" />
-          <Text style={styles.summaryValue}>{stats.avg_session_rpe}</Text>
-          <Text style={styles.summaryLabel}>Avg RPE</Text>
+        <View style={s.summaryCard}>
+          <Zap size={20} color={theme.danger} />
+          <Text style={s.summaryValue}>{stats.avg_session_rpe}</Text>
+          <Text style={s.summaryLabel}>Avg RPE</Text>
         </View>
       </View>
 
       {/* Muscle Distribution */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Muscle Distribution</Text>
-        <View style={styles.muscleChart}>
+      <View style={s.section}>
+        <Text style={s.sectionTitle}>Muscle Distribution</Text>
+        <View style={s.muscleChart}>
           {Object.entries(stats.muscle_distribution).slice(0, 8).map(([muscle, pct]) => (
-            <View key={muscle} style={styles.muscleRow}>
-              <View style={[styles.muscleDot, { backgroundColor: MUSCLE_COLORS[muscle] || '#64748B' }]} />
-              <Text style={styles.muscleName}>{muscle}</Text>
-              <View style={styles.muscleBarBg}>
-                <View style={[styles.muscleBarFill, { width: `${pct}%`, backgroundColor: MUSCLE_COLORS[muscle] || '#64748B' }]} />
+            <View key={muscle} style={s.muscleRow}>
+              <View style={[s.muscleDot, { backgroundColor: MUSCLE_COLORS[muscle] || '#64748B' }]} />
+              <Text style={s.muscleName}>{muscle}</Text>
+              <View style={s.muscleBarBg}>
+                <View style={[s.muscleBarFill, { width: `${pct}%`, backgroundColor: MUSCLE_COLORS[muscle] || '#64748B' }]} />
               </View>
-              <Text style={styles.musclePct}>{pct}%</Text>
+              <Text style={s.musclePct}>{pct}%</Text>
             </View>
           ))}
         </View>
@@ -118,16 +121,16 @@ export default function StatsScreen() {
 
       {/* Personal Records */}
       {stats.personal_records.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Records</Text>
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Personal Records</Text>
           {stats.personal_records.slice(0, 5).map((pr, i) => (
-            <View key={i} style={styles.prRow}>
-              <Trophy size={16} color={i === 0 ? '#F59E0B' : i === 1 ? '#94A3B8' : '#CD7F32'} />
-              <View style={styles.prInfo}>
-                <Text style={styles.prExercise}>{pr.exercise_id.replace(/-/g, ' ')}</Text>
-                <Text style={styles.prDate}>{pr.date}</Text>
+            <View key={i} style={s.prRow}>
+              <Trophy size={16} color={i === 0 ? theme.warning : i === 1 ? theme.textSecondary : '#CD7F32'} />
+              <View style={s.prInfo}>
+                <Text style={s.prExercise}>{pr.exercise_id.replace(/-/g, ' ')}</Text>
+                <Text style={s.prDate}>{pr.date}</Text>
               </View>
-              <Text style={styles.prWeight}>{pr.weight_kg}kg × {pr.reps}</Text>
+              <Text style={s.prWeight}>{pr.weight_kg}kg × {pr.reps}</Text>
             </View>
           ))}
         </View>
@@ -135,17 +138,17 @@ export default function StatsScreen() {
 
       {/* Monthly Comparison */}
       {stats.monthly_comparison.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Monthly Trend</Text>
-          <View style={styles.monthlyChart}>
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Monthly Trend</Text>
+          <View style={s.monthlyChart}>
             {stats.monthly_comparison.slice(0, 6).reverse().map((m, i) => {
               const maxWorkouts = Math.max(...stats.monthly_comparison.map(x => x.workouts), 1);
               const barHeight = (m.workouts / maxWorkouts) * 80;
               return (
-                <View key={i} style={styles.monthBar}>
-                  <Text style={styles.monthValue}>{m.workouts}</Text>
-                  <View style={[styles.monthFill, { height: barHeight }]} />
-                  <Text style={styles.monthLabel}>{m.month.slice(5)}</Text>
+                <View key={i} style={s.monthBar}>
+                  <Text style={s.monthValue}>{m.workouts}</Text>
+                  <View style={[s.monthFill, { height: barHeight }]} />
+                  <Text style={s.monthLabel}>{m.month.slice(5)}</Text>
                 </View>
               );
             })}
@@ -155,13 +158,13 @@ export default function StatsScreen() {
 
       {/* Top Exercises */}
       {stats.top_exercises.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Exercises by Volume</Text>
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Top Exercises by Volume</Text>
           {stats.top_exercises.map((ex, i) => (
-            <View key={i} style={styles.topExRow}>
-              <Text style={styles.topExRank}>#{i + 1}</Text>
-              <Text style={styles.topExName}>{ex.exercise_id.replace(/-/g, ' ')}</Text>
-              <Text style={styles.topExVol}>{(ex.total_volume / 1000).toFixed(1)}k kg</Text>
+            <View key={i} style={s.topExRow}>
+              <Text style={s.topExRank}>#{i + 1}</Text>
+              <Text style={s.topExName}>{ex.exercise_id.replace(/-/g, ' ')}</Text>
+              <Text style={s.topExVol}>{(ex.total_volume / 1000).toFixed(1)}k kg</Text>
             </View>
           ))}
         </View>
@@ -170,81 +173,83 @@ export default function StatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A', padding: 20 },
-  title: { fontSize: 28, fontWeight: '700', color: '#F8FAFC', marginTop: 48, marginBottom: 16 },
-  loadingText: { color: '#8B96AB', textAlign: 'center', marginTop: 100 },
+function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background, padding: 20 },
+    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 48, marginBottom: 16 },
+    loadingText: { color: theme.textMuted, textAlign: 'center', marginTop: 100 },
 
-  // Empty state
-  emptyCard: { backgroundColor: '#1E293B', borderRadius: 16, padding: 40, alignItems: 'center' },
-  emptyText: { fontSize: 18, fontWeight: '600', color: '#F8FAFC', marginTop: 12 },
-  emptySubtext: { fontSize: 13, color: '#8B96AB', marginTop: 4 },
+    // Empty state
+    emptyCard: { backgroundColor: theme.surface, borderRadius: 16, padding: 40, alignItems: 'center' },
+    emptyText: { fontSize: 18, fontWeight: '600', color: theme.text, marginTop: 12 },
+    emptySubtext: { fontSize: 13, color: theme.textMuted, marginTop: 4 },
 
-  // Summary grid
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  summaryCard: {
-    width: (SCREEN_WIDTH - 8) / 2,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-  },
-  summaryValue: { fontSize: 22, fontWeight: '800', color: '#F8FAFC', marginTop: 6 },
-  summaryLabel: { fontSize: 11, color: '#8B96AB', marginTop: 2 },
+    // Summary grid
+    summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+    summaryCard: {
+      width: (SCREEN_WIDTH - 8) / 2,
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      padding: 14,
+      alignItems: 'center',
+    },
+    summaryValue: { fontSize: 22, fontWeight: '800', color: theme.text, marginTop: 6 },
+    summaryLabel: { fontSize: 11, color: theme.textMuted, marginTop: 2 },
 
-  // Sections
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#F8FAFC', marginBottom: 10 },
+    // Sections
+    section: { marginBottom: 20 },
+    sectionTitle: { fontSize: 16, fontWeight: '600', color: theme.text, marginBottom: 10 },
 
-  // Muscle distribution
-  muscleChart: { backgroundColor: '#1E293B', borderRadius: 12, padding: 14 },
-  muscleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  muscleDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  muscleName: { fontSize: 12, color: '#CBD5E1', width: 80, textTransform: 'capitalize' },
-  muscleBarBg: { flex: 1, height: 8, backgroundColor: '#334155', borderRadius: 4, overflow: 'hidden' },
-  muscleBarFill: { height: 8, borderRadius: 4 },
-  musclePct: { fontSize: 11, color: '#8B96AB', width: 40, textAlign: 'right' },
+    // Muscle distribution
+    muscleChart: { backgroundColor: theme.surface, borderRadius: 12, padding: 14 },
+    muscleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    muscleDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+    muscleName: { fontSize: 12, color: theme.textSecondary, width: 80, textTransform: 'capitalize' },
+    muscleBarBg: { flex: 1, height: 8, backgroundColor: theme.surfaceHover, borderRadius: 4, overflow: 'hidden' },
+    muscleBarFill: { height: 8, borderRadius: 4 },
+    musclePct: { fontSize: 11, color: theme.textMuted, width: 40, textAlign: 'right' },
 
-  // PRs
-  prRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 6,
-    gap: 8,
-  },
-  prInfo: { flex: 1 },
-  prExercise: { fontSize: 13, fontWeight: '600', color: '#F8FAFC', textTransform: 'capitalize' },
-  prDate: { fontSize: 10, color: '#8B96AB' },
-  prWeight: { fontSize: 14, fontWeight: '700', color: '#F59E0B' },
+    // PRs
+    prRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderRadius: 8,
+      padding: 10,
+      marginBottom: 6,
+      gap: 8,
+    },
+    prInfo: { flex: 1 },
+    prExercise: { fontSize: 13, fontWeight: '600', color: theme.text, textTransform: 'capitalize' },
+    prDate: { fontSize: 10, color: theme.textMuted },
+    prWeight: { fontSize: 14, fontWeight: '700', color: theme.warning },
 
-  // Monthly chart
-  monthlyChart: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 14,
-    height: 130,
-  },
-  monthBar: { alignItems: 'center', flex: 1 },
-  monthValue: { fontSize: 10, color: '#8B96AB', marginBottom: 4 },
-  monthFill: { width: 24, backgroundColor: '#818CF8', borderRadius: 4, minHeight: 4 },
-  monthLabel: { fontSize: 10, color: '#8B96AB', marginTop: 4 },
+    // Monthly chart
+    monthlyChart: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      padding: 14,
+      height: 130,
+    },
+    monthBar: { alignItems: 'center', flex: 1 },
+    monthValue: { fontSize: 10, color: theme.textMuted, marginBottom: 4 },
+    monthFill: { width: 24, backgroundColor: theme.primaryLight, borderRadius: 4, minHeight: 4 },
+    monthLabel: { fontSize: 10, color: theme.textMuted, marginTop: 4 },
 
-  // Top exercises
-  topExRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 4,
-  },
-  topExRank: { fontSize: 14, fontWeight: '700', color: '#818CF8', width: 30 },
-  topExName: { flex: 1, fontSize: 13, color: '#CBD5E1', textTransform: 'capitalize' },
-  topExVol: { fontSize: 12, fontWeight: '600', color: '#F8FAFC' },
-});
+    // Top exercises
+    topExRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderRadius: 8,
+      padding: 10,
+      marginBottom: 4,
+    },
+    topExRank: { fontSize: 14, fontWeight: '700', color: theme.primaryLight, width: 30 },
+    topExName: { flex: 1, fontSize: 13, color: theme.textSecondary, textTransform: 'capitalize' },
+    topExVol: { fontSize: 12, fontWeight: '600', color: theme.text },
+  });
+}

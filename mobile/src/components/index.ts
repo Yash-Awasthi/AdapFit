@@ -7,3 +7,4 @@ export { LoadingScreen } from './LoadingScreen';
 export { EmptyState } from './EmptyState';
 export { ScreenHeader } from './ScreenHeader';
 export { VoiceLoggerModal } from './VoiceLoggerModal';
+export { SyncStatusBadge } from './SyncStatusBadge';

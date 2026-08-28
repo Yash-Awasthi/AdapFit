@@ -1,18 +1,30 @@
 import { create } from 'zustand';
 import { api } from '../services/api';
 
+export interface Exercise {
+  exercise_id: string;
+  name: string;
+  target_muscle: string;
+  sets: number;
+  target_reps: string;
+  target_rpe?: number;
+  gif_url?: string;
+}
+
 interface Workout {
   workout_id: string;
   title: string;
-  exercises: {
-    exercise_id: string;
-    name: string;
-    target_muscle: string;
-    sets: number;
-    target_reps: string;
-    gif_url?: string;
-  }[];
+  exercises: Exercise[];
   adaptation_rationale: string;
+}
+
+export interface LoggedSet {
+  exercise_id: string;
+  name: string;
+  set_number: number;
+  weight_kg: number;
+  reps_completed: number;
+  rpe: number;
 }
 
 interface WorkoutStore {
@@ -23,6 +35,13 @@ interface WorkoutStore {
   fetchWorkouts: (userId: string) => Promise<void>;
   generateWorkout: (userId: string, duration?: number) => Promise<Workout | null>;
   clear: () => void;
+
+  // Active session — the workout currently being logged in workout-active.tsx
+  activeWorkout: Workout | null;
+  loggedSets: LoggedSet[];
+  startWorkout: (workout: Workout) => void;
+  logSet: (set: LoggedSet) => void;
+  endWorkout: () => void;
 }
 
 export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
@@ -30,6 +49,8 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
   loading: false,
   generating: false,
   error: null,
+  activeWorkout: null,
+  loggedSets: [],
 
   fetchWorkouts: async (userId: string) => {
     set({ loading: true, error: null });
@@ -61,4 +82,11 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
   },
 
   clear: () => set({ workouts: [], loading: false, generating: false, error: null }),
+
+  startWorkout: (workout: Workout) => set({ activeWorkout: workout, loggedSets: [] }),
+
+  logSet: (loggedSet: LoggedSet) =>
+    set((state) => ({ loggedSets: [...state.loggedSets, loggedSet] })),
+
+  endWorkout: () => set({ activeWorkout: null, loggedSets: [] }),
 }));

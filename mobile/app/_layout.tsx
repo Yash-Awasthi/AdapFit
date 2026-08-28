@@ -1,11 +1,13 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, useTheme } from "../src/services/theme";
 import { DevSettingsProvider } from "../src/services/devSettings";
 import { useUserStore } from "../src/stores";
 import { useEffect } from "react";
-import { LoadingScreen } from "../src/components";
+import { LoadingScreen, SyncStatusBadge } from "../src/components";
+import { startSyncDaemon } from "../src/services/sync";
 
 function RootStack() {
   const { theme, isDark } = useTheme();
@@ -20,6 +22,7 @@ function RootStack() {
   // (and the gender-aware tab bar) reads the same user id.
   useEffect(() => {
     hydrate();
+    startSyncDaemon();
   }, [hydrate]);
 
   // Route new (no saved profile) users to onboarding, everyone else to the
@@ -56,6 +59,11 @@ function RootStack() {
         <Stack.Screen name="workout-detail" options={{ headerShown: false }} />
         <Stack.Screen name="form-checker" options={{ headerShown: false }} />
       </Stack>
+      {profile && (
+        <View style={{ position: "absolute", top: 54, right: 12 }} pointerEvents="none">
+          <SyncStatusBadge />
+        </View>
+      )}
     </>
   );
 }
