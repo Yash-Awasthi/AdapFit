@@ -7,8 +7,13 @@ import {
   Shield, Stethoscope, Calendar,
 } from "lucide-react-native";
 import { useTheme } from "../../src/services/theme";
+import { API_BASE_URL } from "../../src/services/config";
+import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync } from "expo-audio";
+import { File } from "expo-file-system";
+import { api } from "../../src/services/api";
+import { useUserStore } from "../../src/stores";
 
-const API = "http://localhost:8000";
+const API = API_BASE_URL;
 
 interface Condition {
   condition_id: string;
@@ -60,13 +65,14 @@ const CONDITION_LABELS: Record<string, string> = {
 export default function HealthScreen() {
   const { theme } = useTheme();
   const s = makeStyles(theme);
-  const [userId] = useState("default");
+  const userId = useUserStore((st) => st.userId);
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [medications, setMedications] = useState<Medication[]>([]);
   const [restrictions, setRestrictions] = useState<Restrictions | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [voiceText, setVoiceText] = useState("");
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [showAddCondition, setShowAddCondition] = useState(false);
   const [showAddMed, setShowAddMed] = useState(false);
 
@@ -87,16 +93,34 @@ export default function HealthScreen() {
     } catch {}
   };
 
-  const toggleVoice = () => {
+  const toggleVoice = async () => {
     if (isListening) {
       setIsListening(false);
+      try {
+        await recorder.stop();
+        const uri = recorder.uri;
+        if (uri) {
+          const b64 = await new File(uri).base64();
+          const stt = await api.transcribeAudio(b64, userId);
+          if (stt?.text?.trim()) setVoiceText(stt.text.trim());
+        }
+      } catch {
+        AccessibilityInfo.announceForAccessibility("Could not transcribe — type instead.");
+      }
     } else {
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        AccessibilityInfo.announceForAccessibility("Microphone permission is required for voice input.");
+        return;
+      }
       setIsListening(true);
       AccessibilityInfo.announceForAccessibility("Voice input activated. Say your symptom or question.");
-      setTimeout(() => {
+      try {
+        await recorder.prepareToRecordAsync();
+        recorder.record();
+      } catch {
         setIsListening(false);
-        setVoiceText("Voice input placeholder — integrate expo-speech");
-      }, 3000);
+      }
     }
   };
 

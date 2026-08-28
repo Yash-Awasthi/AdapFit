@@ -4,8 +4,10 @@ import {
 } from "react-native";
 import { Plus, Camera, Utensils, Flame, Dumbbell, Droplets, Target, X } from "lucide-react-native";
 import { useTheme } from "../../src/services/theme";
+import { API_BASE_URL } from "../../src/services/config";
+import { useUserStore } from "../../src/stores";
 
-const API = "http://localhost:8000";
+const API = API_BASE_URL;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface Meal {
@@ -78,7 +80,7 @@ function MiniChart({ data, color, styles }: { data: number[]; color: string; sty
 
 export default function DietScreen() {
   const { theme } = useTheme();
-  const [userId] = useState("default");
+  const userId = useUserStore((st) => st.userId);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [totals, setTotals] = useState<DailyTotals>({ calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, meal_count: 0 });
   const [showQuickAdd, setShowQuickAdd] = useState(false);

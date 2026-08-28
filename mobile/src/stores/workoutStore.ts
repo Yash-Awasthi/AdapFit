@@ -39,6 +39,7 @@ interface WorkoutStore {
   // Active session — the workout currently being logged in workout-active.tsx
   activeWorkout: Workout | null;
   loggedSets: LoggedSet[];
+  startedAt: number | null;
   startWorkout: (workout: Workout) => void;
   logSet: (set: LoggedSet) => void;
   endWorkout: () => void;
@@ -51,6 +52,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
   error: null,
   activeWorkout: null,
   loggedSets: [],
+  startedAt: null,
 
   fetchWorkouts: async (userId: string) => {
     set({ loading: true, error: null });
@@ -83,10 +85,11 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
 
   clear: () => set({ workouts: [], loading: false, generating: false, error: null }),
 
-  startWorkout: (workout: Workout) => set({ activeWorkout: workout, loggedSets: [] }),
+  startWorkout: (workout: Workout) =>
+    set({ activeWorkout: workout, loggedSets: [], startedAt: Date.now() }),
 
   logSet: (loggedSet: LoggedSet) =>
     set((state) => ({ loggedSets: [...state.loggedSets, loggedSet] })),
 
-  endWorkout: () => set({ activeWorkout: null, loggedSets: [] }),
+  endWorkout: () => set({ activeWorkout: null, loggedSets: [], startedAt: null }),
 }));

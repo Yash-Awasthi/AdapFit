@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { Moon, Plus, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
+import { Moon, Plus, Trash2, TrendingUp, TrendingDown, Minus, MinusCircle, PlusCircle } from 'lucide-react-native';
 import Svg, { Circle, Rect } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { LoadingScreen } from '../../src/components';
@@ -38,6 +38,9 @@ export default function SleepScreen() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [logs, setLogs] = useState<SleepLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [hoursSlept, setHoursSlept] = useState(8);
+  const [quality, setQuality] = useState(3);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -54,18 +57,33 @@ export default function SleepScreen() {
     setLoading(false);
   }
 
-  async function quickLog() {
+  async function logSleep() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const wake = new Date();
+    const bed = new Date(wake.getTime() - hoursSlept * 60 * 60 * 1000);
+    const fmtClock = (d: Date) => `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    const efficiency = quality * 20; // 1-5 rating -> 20-100%
+    const awake_pct = 100 - efficiency;
+    const restPct = efficiency; // deep/rem/light split proportionally within the "asleep" share
     try {
       const res = await fetch(`${API}/api/v1/sleep/logs?user_id=${userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bedtime: '23:00', wake_time: '07:00', total_minutes: 480,
-          efficiency_pct: 90, deep_pct: 20, rem_pct: 22, light_pct: 45, awake_pct: 13,
+          bedtime: fmtClock(bed),
+          wake_time: fmtClock(wake),
+          total_minutes: Math.round(hoursSlept * 60),
+          efficiency_pct: efficiency,
+          deep_pct: Math.round(restPct * 0.23),
+          rem_pct: Math.round(restPct * 0.25),
+          light_pct: Math.round(restPct * 0.52),
+          awake_pct,
         }),
       });
-      if (res.ok) fetchData();
+      if (res.ok) {
+        setShowForm(false);
+        fetchData();
+      }
     } catch {}
   }
 
@@ -154,10 +172,44 @@ export default function SleepScreen() {
         </View>
       )}
 
-      <TouchableOpacity style={s.addBtn} onPress={quickLog}>
-        <Plus size={16} color="#fff" />
-        <Text style={s.addBtnText}>Log Sleep</Text>
-      </TouchableOpacity>
+      {showForm ? (
+        <View style={s.logForm}>
+          <Text style={s.formLabel}>Hours Slept</Text>
+          <View style={s.formRow}>
+            <TouchableOpacity onPress={() => setHoursSlept((h) => Math.max(1, h - 0.5))}>
+              <MinusCircle size={26} color={theme.textSecondary} />
+            </TouchableOpacity>
+            <Text style={s.formValue}>{hoursSlept}h</Text>
+            <TouchableOpacity onPress={() => setHoursSlept((h) => Math.min(14, h + 0.5))}>
+              <PlusCircle size={26} color={theme.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={s.formLabel}>Sleep Quality</Text>
+          <View style={s.formRow}>
+            {[1, 2, 3, 4, 5].map((v) => (
+              <TouchableOpacity
+                key={v}
+                style={[s.qualityDot, quality === v && s.qualityDotActive]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setQuality(v);
+                }}
+              >
+                <Text style={[s.qualityDotText, quality === v && s.qualityDotTextActive]}>{v}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity style={s.addBtn} onPress={logSleep}>
+            <Plus size={16} color="#fff" />
+            <Text style={s.addBtnText}>Save Sleep Log</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={s.addBtn} onPress={() => setShowForm(true)}>
+          <Plus size={16} color="#fff" />
+          <Text style={s.addBtnText}>Log Sleep</Text>
+        </TouchableOpacity>
+      )}
 
       <Text style={s.sectionTitle}>Recent Logs</Text>
       {logs.map((l) => (
@@ -204,6 +256,17 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: theme.primary, borderRadius: 12, padding: 12, marginVertical: 12,
     },
     addBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+    logForm: { backgroundColor: theme.surface, borderRadius: 12, padding: 14, marginVertical: 12 },
+    formLabel: { fontSize: 13, fontWeight: '600', color: theme.textSecondary, marginBottom: 8, marginTop: 4 },
+    formRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 },
+    formValue: { fontSize: 18, fontWeight: '700', color: theme.text, minWidth: 50, textAlign: 'center' },
+    qualityDot: {
+      width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: theme.surfaceHover, borderWidth: 1, borderColor: theme.border,
+    },
+    qualityDotActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+    qualityDotText: { fontSize: 13, fontWeight: '600', color: theme.textMuted },
+    qualityDotTextActive: { color: '#fff' },
     logCard: {
       flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surface,
       borderRadius: 12, padding: 12, marginBottom: 8,
