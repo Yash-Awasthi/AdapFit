@@ -4,49 +4,64 @@ import { useRouter } from 'expo-router';
 import { Trophy, Send, ArrowRight, Share2 } from 'lucide-react-native';
 import { Share } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { API_BASE_URL } from '../src/services/config';
-import { useUserStore } from '../src/stores';
+import { useUserStore, useWorkoutStore } from '../src/stores';
 import { useTheme } from '../src/services/theme';
+import { api } from '../src/services/api';
+import { addSyncMutation } from '../src/services/sync';
 
 export default function WorkoutComplete() {
   const { theme } = useTheme();
   const userId = useUserStore((s) => s.userId);
+  const { activeWorkout, loggedSets, startedAt, endWorkout } = useWorkoutStore();
   const [rpe, setRpe] = useState(7);
   const [enj, setEnj] = useState(8);
   const [notes, setNotes] = useState('');
   const [done, setDone] = useState(false);
   const router = useRouter();
 
+  const durationMinutes = startedAt ? Math.max(1, Math.round((Date.now() - startedAt) / 60000)) : 45;
+
   const submit = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    try {
-      // Complete the most recent workout (PATCH /workouts/{id} is the real
-      // completion endpoint — it updates ACWR, workload history and memory).
-      const listRes = await fetch(`${API_BASE_URL}/api/v1/workouts?user_id=${userId}&days=30`);
-      const list = listRes.ok ? await listRes.json() : { items: [] };
-      const latest = list.items?.[list.items.length - 1];
-      const workoutId = latest?.workout_id || latest?.id || 'adhoc';
 
-      await fetch(`${API_BASE_URL}/api/v1/workouts/${workoutId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          actual_duration_minutes: 45,
-          session_rpe: rpe,
-          logged_exercises: [
-            {
-              exercise_id: 'bench',
-              name: 'Bench Press',
-              sets: [{ set_number: 1, weight_kg: 80, reps_completed: 10, rpe: 7.5 }],
-            },
-          ],
-          user_feedback_notes: notes,
-        }),
+    const loggedExercises = Object.values(
+      loggedSets.reduce<Record<string, { exercise_id: string; name: string; sets: any[] }>>((acc, s) => {
+        if (!acc[s.exercise_id]) acc[s.exercise_id] = { exercise_id: s.exercise_id, name: s.name, sets: [] };
+        acc[s.exercise_id].sets.push({
+          set_number: s.set_number,
+          weight_kg: s.weight_kg,
+          reps_completed: s.reps_completed,
+          rpe: s.rpe,
+        });
+        return acc;
+      }, {})
+    );
+
+    const workoutId = activeWorkout?.workout_id || 'adhoc';
+    const payload = {
+      user_id: userId,
+      actual_duration_minutes: durationMinutes,
+      session_rpe: rpe,
+      enjoyment: enj,
+      logged_exercises: loggedExercises,
+      user_feedback_notes: notes,
+    };
+
+    try {
+      await api.completeWorkout(workoutId, payload);
+    } catch {
+      // Offline or server unreachable — queue for the background sync daemon.
+      await addSyncMutation({
+        table_name: 'workouts',
+        record_id: workoutId,
+        operation: 'update',
+        payload,
       });
-    } catch {}
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setDone(true);
+    endWorkout();
   };
 
   const s = makeStyles(theme);
@@ -68,7 +83,7 @@ export default function WorkoutComplete() {
               <Text style={s.statLabel}>RPE</Text>
             </View>
             <View style={s.stat}>
-              <Text style={s.statValue}>45</Text>
+              <Text style={s.statValue}>{durationMinutes}</Text>
               <Text style={s.statLabel}>Minutes</Text>
             </View>
             <View style={s.stat}>
@@ -81,7 +96,7 @@ export default function WorkoutComplete() {
             onPress={() => {
               Haptics.selectionAsync();
               Share.share({
-                message: `Just completed a workout on AdapFit! RPE: ${rpe}/10, Duration: 45min. #AdapFit #Fitness`,
+                message: `Just completed a workout on AdapFit! RPE: ${rpe}/10, Duration: ${durationMinutes}min. #AdapFit #Fitness`,
               });
             }}
           >
@@ -103,7 +118,9 @@ export default function WorkoutComplete() {
   return (
     <ScrollView style={s.container}>
       <Text style={s.title}>Post-Workout Feedback</Text>
-      <Text style={s.subtitle}>Help the AI learn what works for you</Text>
+      <Text style={s.subtitle}>
+        {loggedSets.length} sets logged · Help the AI learn what works for you
+      </Text>
 
       <Text style={s.label}>Session RPE (1-10)</Text>
       <View style={s.ratingRow}>

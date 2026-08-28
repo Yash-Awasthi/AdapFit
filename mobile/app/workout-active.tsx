@@ -1,26 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Timer, Check, ArrowRight, SkipForward, Mic } from 'lucide-react-native';
+import { Timer, Check, ArrowRight, SkipForward, Mic, Minus, Plus } from 'lucide-react-native';
 import { SmartMusicPlayer } from '../src/components/SmartMusicPlayer';
 import { VoiceLoggerModal } from '../src/components/VoiceLoggerModal';
 import { speak } from '../src/services/tts';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../src/services/theme';
+import { useWorkoutStore } from '../src/stores';
+
+const FALLBACK_IMAGE =
+  'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/0.jpg';
+
+function defaultReps(targetReps?: string): number {
+  const match = targetReps?.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 10;
+}
 
 export default function WorkoutActive() {
   const { theme } = useTheme();
-  const [cur, setCur] = useState(1);
-  const [tot] = useState(3);
+  const router = useRouter();
+  const { activeWorkout, loggedSets, logSet } = useWorkoutStore();
+
+  const exercises = activeWorkout?.exercises ?? [];
+  const totalSets = exercises.reduce((sum, ex) => sum + (ex.sets || 1), 0);
+
+  const [exIdx, setExIdx] = useState(0);
+  const [setNum, setSetNum] = useState(1);
   const [rest, setRest] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
-  const [loggedWeight, setLoggedWeight] = useState<number | null>(80);
-  const [loggedReps, setLoggedReps] = useState<number | null>(10);
-  const [loggedRpe, setLoggedRpe] = useState<number | null>(8.0);
-  const router = useRouter();
+
+  const currentExercise = exercises[exIdx];
+  const [weight, setWeight] = useState(20);
+  const [reps, setReps] = useState(defaultReps(currentExercise?.target_reps));
+  const [rpe, setRpe] = useState(currentExercise?.target_rpe ?? 8);
 
   const spokeMilestones = useRef(new Set<number>());
+
+  // Redirect back if this screen is opened without an active session
+  // (deep link, stale nav state, or app restart mid-workout).
+  useEffect(() => {
+    if (!activeWorkout) router.replace('/(tabs)/workout');
+  }, [activeWorkout, router]);
+
+  useEffect(() => {
+    setReps(defaultReps(currentExercise?.target_reps));
+    setRpe(currentExercise?.target_rpe ?? 8);
+  }, [exIdx]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -32,7 +59,6 @@ export default function WorkoutActive() {
             spokeMilestones.current.clear();
             return 0;
           }
-          // TTS coaching cues at milestones
           if (r === 30 && !spokeMilestones.current.has(30)) {
             spokeMilestones.current.add(30);
             speak('30 seconds remaining. Get ready.');
@@ -51,16 +77,27 @@ export default function WorkoutActive() {
   }, [rest]);
 
   const fmt = (n: number) =>
-    Math.floor(n / 60)
-      .toString()
-      .padStart(2, '0') +
-    ':' +
-    (n % 60).toString().padStart(2, '0');
+    Math.floor(n / 60).toString().padStart(2, '0') + ':' + (n % 60).toString().padStart(2, '0');
 
-  const completeSet = () => {
+  if (!activeWorkout || !currentExercise) return null;
+
+  const completeSet = (loggedWeight = weight, loggedReps = reps, loggedRpe = rpe) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    if (cur < tot) {
-      setCur((c) => c + 1);
+    logSet({
+      exercise_id: currentExercise.exercise_id,
+      name: currentExercise.name,
+      set_number: setNum,
+      weight_kg: loggedWeight,
+      reps_completed: loggedReps,
+      rpe: loggedRpe,
+    });
+
+    if (setNum < (currentExercise.sets || 1)) {
+      setSetNum((n) => n + 1);
+      setRest(90);
+    } else if (exIdx < exercises.length - 1) {
+      setExIdx((i) => i + 1);
+      setSetNum(1);
       setRest(90);
     } else {
       router.push('/workout-complete');
@@ -73,10 +110,13 @@ export default function WorkoutActive() {
     reps?: number | null;
     rpe?: number | null;
   }) => {
-    if (setDetails.weight_kg) setLoggedWeight(setDetails.weight_kg);
-    if (setDetails.reps) setLoggedReps(setDetails.reps);
-    if (setDetails.rpe) setLoggedRpe(setDetails.rpe);
-    completeSet();
+    const w = setDetails.weight_kg ?? weight;
+    const r = setDetails.reps ?? reps;
+    const p = setDetails.rpe ?? rpe;
+    setWeight(w);
+    setReps(r);
+    setRpe(p);
+    completeSet(w, r, p);
   };
 
   const skipRest = () => {
@@ -85,6 +125,7 @@ export default function WorkoutActive() {
   };
 
   const s = makeStyles(theme);
+  const completedSets = loggedSets.length;
 
   return (
     <View style={s.container}>
@@ -95,10 +136,7 @@ export default function WorkoutActive() {
           <Text style={s.timerText}>{fmt(elapsed)}</Text>
         </View>
 
-        <TouchableOpacity
-          style={s.voiceMicBtn}
-          onPress={() => setShowVoiceModal(true)}
-        >
+        <TouchableOpacity style={s.voiceMicBtn} onPress={() => setShowVoiceModal(true)}>
           <Mic size={18} color={theme.primaryLight} />
           <Text style={s.voiceMicText}>Voice Log</Text>
         </TouchableOpacity>
@@ -106,25 +144,60 @@ export default function WorkoutActive() {
 
       {/* Exercise Info */}
       <View style={s.exerciseInfo}>
-        <Text style={s.exerciseName}>Barbell Bench Press</Text>
+        <Text style={s.exerciseName}>{currentExercise.name}</Text>
         <Text style={s.exerciseMuscle}>
-          Chest · Target: {loggedWeight}kg × {loggedReps} reps (RPE {loggedRpe})
+          {currentExercise.target_muscle} · Set {setNum} of {currentExercise.sets}
         </Text>
-        <Image
-          source={{
-            uri: 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/0.jpg',
-          }}
-          style={s.exerciseGif}
-        />
+        <Image source={{ uri: currentExercise.gif_url || FALLBACK_IMAGE }} style={s.exerciseGif} />
+      </View>
+
+      {/* Manual set adjusters */}
+      <View style={s.adjusterRow}>
+        <View style={s.adjuster}>
+          <Text style={s.adjusterLabel}>Weight (kg)</Text>
+          <View style={s.stepper}>
+            <TouchableOpacity onPress={() => setWeight((w) => Math.max(0, w - 2.5))} style={s.stepBtn}>
+              <Minus size={14} color={theme.text} />
+            </TouchableOpacity>
+            <Text style={s.stepValue}>{weight}</Text>
+            <TouchableOpacity onPress={() => setWeight((w) => w + 2.5)} style={s.stepBtn}>
+              <Plus size={14} color={theme.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={s.adjuster}>
+          <Text style={s.adjusterLabel}>Reps</Text>
+          <View style={s.stepper}>
+            <TouchableOpacity onPress={() => setReps((r) => Math.max(0, r - 1))} style={s.stepBtn}>
+              <Minus size={14} color={theme.text} />
+            </TouchableOpacity>
+            <Text style={s.stepValue}>{reps}</Text>
+            <TouchableOpacity onPress={() => setReps((r) => r + 1)} style={s.stepBtn}>
+              <Plus size={14} color={theme.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={s.adjuster}>
+          <Text style={s.adjusterLabel}>RPE</Text>
+          <View style={s.stepper}>
+            <TouchableOpacity onPress={() => setRpe((p) => Math.max(1, p - 0.5))} style={s.stepBtn}>
+              <Minus size={14} color={theme.text} />
+            </TouchableOpacity>
+            <Text style={s.stepValue}>{rpe}</Text>
+            <TouchableOpacity onPress={() => setRpe((p) => Math.min(10, p + 0.5))} style={s.stepBtn}>
+              <Plus size={14} color={theme.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {/* Set Progress */}
       <View style={s.progress}>
         <Text style={s.progressText}>
-          Set {cur} of {tot}
+          Set {completedSets + 1} of {totalSets}
         </Text>
         <View style={s.progressBar}>
-          <View style={[s.progressFill, { width: `${(cur / tot) * 100}%` }]} />
+          <View style={[s.progressFill, { width: `${(completedSets / totalSets) * 100}%` }]} />
         </View>
       </View>
 
@@ -139,20 +212,17 @@ export default function WorkoutActive() {
           </TouchableOpacity>
         </View>
       ) : (
-        <TouchableOpacity style={s.completeButton} onPress={completeSet}>
+        <TouchableOpacity style={s.completeButton} onPress={() => completeSet()}>
           <Check size={24} color={theme.background} />
           <Text style={s.completeText}>Complete Set</Text>
         </TouchableOpacity>
       )}
 
       {/* Music Player */}
-      <SmartMusicPlayer compact currentSet={cur} totalSets={tot} />
+      <SmartMusicPlayer compact currentSet={completedSets + 1} totalSets={totalSets} />
 
-      {/* Finish Workout */}
-      <TouchableOpacity
-        style={s.finishButton}
-        onPress={() => router.push('/workout-complete')}
-      >
+      {/* Finish Workout early */}
+      <TouchableOpacity style={s.finishButton} onPress={() => router.push('/workout-complete')}>
         <Text style={s.finishText}>Finish Workout</Text>
         <ArrowRight size={16} color={theme.textSecondary} />
       </TouchableOpacity>
@@ -195,7 +265,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      backgroundColor: '#1E1B4B',
+      backgroundColor: theme.primaryBg,
       borderColor: theme.primary,
       borderWidth: 1,
       paddingHorizontal: 12,
@@ -209,13 +279,14 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     },
     exerciseInfo: {
       alignItems: 'center',
-      marginBottom: 24,
+      marginBottom: 16,
     },
     exerciseName: {
       fontSize: 22,
       fontWeight: '700',
       color: theme.text,
       marginBottom: 4,
+      textAlign: 'center',
     },
     exerciseMuscle: {
       fontSize: 13,
@@ -223,12 +294,50 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
       marginBottom: 16,
     },
     exerciseGif: {
-      width: 180,
-      height: 180,
+      width: 150,
+      height: 150,
       borderRadius: 12,
     },
+    adjusterRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 8,
+      marginBottom: 16,
+    },
+    adjuster: {
+      flex: 1,
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      paddingVertical: 8,
+    },
+    adjusterLabel: {
+      fontSize: 11,
+      color: theme.textMuted,
+      marginBottom: 6,
+    },
+    stepper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    stepBtn: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: theme.surfaceHover,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepValue: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.text,
+      minWidth: 30,
+      textAlign: 'center',
+    },
     progress: {
-      marginBottom: 24,
+      marginBottom: 20,
     },
     progressText: {
       fontSize: 16,
@@ -250,7 +359,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     },
     restTimer: {
       alignItems: 'center',
-      marginBottom: 24,
+      marginBottom: 20,
     },
     restLabel: {
       fontSize: 14,

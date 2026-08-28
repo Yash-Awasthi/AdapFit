@@ -8,6 +8,32 @@ import {
   Zap, Moon, Heart, Activity
 } from "lucide-react-native";
 import { useTheme } from "../src/services/theme";
+import { useUserStore } from "../src/stores";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const GOAL_TO_BACKEND: Record<string, string> = {
+  strength: "strength",
+  hypertrophy: "hypertrophy",
+  fat_loss: "fat_loss",
+  endurance: "endurance",
+  recovery: "general_fitness",
+  general: "general_fitness",
+};
+
+const EXPERIENCE_TO_BACKEND: Record<string, string> = {
+  beginner: "beginner",
+  intermediate: "intermediate",
+  advanced: "advanced",
+  elite: "advanced",
+};
+
+const EQUIPMENT_TO_BACKEND: Record<string, string[]> = {
+  full_gym: ["barbell", "dumbbells", "machines", "bodyweight"],
+  home_gym: ["dumbbells", "bodyweight", "bands"],
+  dumbbells_only: ["dumbbells", "bodyweight"],
+  bodyweight: ["bodyweight"],
+  resistance_bands: ["bands", "bodyweight"],
+};
 
 const { width } = Dimensions.get("window");
 
@@ -56,12 +82,14 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const s = makeStyles(theme);
+  const updateProfile = useUserStore((st) => st.updateProfile);
   const [step, setStep] = useState(0);
   const [goals, setGoals] = useState<string[]>([]);
   const [experience, setExperience] = useState("");
   const [equipment, setEquipment] = useState<string[]>([]);
   const [schedule, setSchedule] = useState("");
   const [injuries, setInjuries] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const toggleItem = (arr: string[], setArr: (v: string[]) => void, id: string) => {
     setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
@@ -70,8 +98,24 @@ export default function OnboardingScreen() {
   const next = () => setStep(Math.min(step + 1, 4));
   const prev = () => setStep(Math.max(step - 1, 0));
 
-  const complete = () => {
-    // TODO: POST to /api/v1/users onboarding endpoint
+  const complete = async () => {
+    setSaving(true);
+    const equipmentAccess = Array.from(new Set(equipment.flatMap((id) => EQUIPMENT_TO_BACKEND[id] || [id])));
+    try {
+      await updateProfile({
+        primary_goal: GOAL_TO_BACKEND[goals[0]] || "general_fitness",
+        fitness_level: EXPERIENCE_TO_BACKEND[experience] || "intermediate",
+        preferred_days_per_week: schedule ? parseInt(schedule, 10) : 4,
+        equipment_access: equipmentAccess.length ? equipmentAccess : ["bodyweight"],
+      });
+    } catch {
+      // Offline or server unreachable — the sync daemon will pick this up
+      // once the profile screen re-saves it; onboarding still completes.
+    }
+    // No backend field for injury history yet — kept on-device and passed
+    // directly to injury-risk calls that already accept it per-request.
+    await AsyncStorage.setItem("@adapfit/injury_history", JSON.stringify(injuries.filter((i) => i !== "none")));
+    setSaving(false);
     router.replace("/(tabs)");
   };
 
@@ -201,9 +245,10 @@ export default function OnboardingScreen() {
         <TouchableOpacity
           style={[s.navBtnPrimary, step === 4 && s.navBtnComplete]}
           onPress={step === 4 ? complete : next}
+          disabled={saving}
         >
           <Text style={s.navBtnText}>
-            {step === 4 ? "Get Started" : "Next"}
+            {step === 4 ? (saving ? "Saving..." : "Get Started") : "Next"}
           </Text>
           {step < 4 && <ChevronRight size={18} color={theme.text} />}
         </TouchableOpacity>

@@ -11,6 +11,7 @@ __pycache__/
 !.env.example
 *.keystore
 !debug.keystore
+mobile/android/keystore.properties
 google-service-account.json
 
 # Build outputs
@@ -20,6 +21,7 @@ mobile/android/.gradle/
 mobile/.expo/
 backend/*.db
 backend/data/
+backend/app/data/store.json
 dist/
 build/
 
