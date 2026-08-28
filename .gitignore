@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.keystore
+!debug.keystore
+google-service-account.json
+
+# Build outputs
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.gradle/
+mobile/.expo/
+backend/*.db
+backend/data/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+/nul
+.pytest_cache/
+*.log

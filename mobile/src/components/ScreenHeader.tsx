@@ -1,0 +1,28 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
+import { useTheme } from '../services/theme';
+
+export function ScreenHeader({ title }: { title: string }) {
+  const router = useRouter();
+  const { theme } = useTheme();
+  return (
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
+        <ChevronLeft size={22} color={theme.text} />
+      </TouchableOpacity>
+      <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
+      <View style={styles.backBtn} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingTop: 56, paddingBottom: 8,
+  },
+  backBtn: { padding: 8, width: 38 },
+  title: { fontSize: 20, fontWeight: '700', flex: 1, textAlign: 'center' },
+});

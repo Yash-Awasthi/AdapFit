@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PROJECT_NAME=AdapFit
+      - VERSION=2.0.0
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+    volumes:
+      - backend-data:/app/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: n8n-style external workflow orchestrator
+  # Uncomment to run external automation
+  # n8n:
+  #   image: n8nio/n8n:latest
+  #   ports:
+  #     - "5678:5678"
+  #   volumes:
+  #     - n8n-data:/home/node/.n8n
+
+volumes:
+  backend-data:
+  # n8n-data:

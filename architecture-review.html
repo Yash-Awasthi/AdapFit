@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdapFit Architecture Review</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'dark'});</script>
+<style>
+  body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+  .badge-strong { background: #059669; color: #fff; }
+  .badge-explore { background: #d97706; color: #fff; }
+  .badge-speculative { background: #6366f1; color: #fff; }
+  .diagram { background: #0f172a; border-radius: 8px; padding: 16px; margin: 16px 0; overflow-x: auto; }
+  .friction { color: #ef4444; font-weight: 600; }
+  .fix { color: #22c55e; font-weight: 600; }
+  .arrow { color: #f59e0b; }
+  h1 { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  h2 { font-size: 1.5rem; font-weight: 700; color: #f1f5f9; }
+  h3 { font-size: 1.1rem; font-weight: 600; color: #94a3b8; }
+  .file-tag { background: #334155; color: #94a3b8; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-family: monospace; }
+  .top-rec { background: linear-gradient(135deg, #1e293b, #0f172a); border: 2px solid #6366f1; }
+  .mermaid { background: transparent !important; }
+</style>
+</head>
+<body class="max-w-5xl mx-auto px-6 py-12">
+
+<h1>AdapFit Architecture Review</h1>
+<p class="text-slate-400 mt-2 mb-8">Deepening opportunities — where shallow modules can become deep, testable, and AI-navigable.</p>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 1: Storage God Object -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2>1. Storage God Object</h2>
+    <span class="badge badge-strong">Strong</span>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mb-4">
+    <span class="file-tag">core/storage.py</span>
+    <span class="file-tag">core/repository.py</span>
+    <span class="file-tag">core/database.py</span>
+  </div>
+
+  <h3>Problem</h3>
+  <p class="text-slate-300 mb-4">
+    <span class="friction">StorageEngine</span> is a 200-line God Object that handles 7 data types
+    (users, baselines, recovery_logs, workouts, workout_logs, workload_history, agent_memory) with
+    <strong>two parallel implementations</strong> in every method: in-memory dict + Supabase fallback via lazy import.
+    The <span class="friction">repository.py</span> duplicates the same 7-type interface. Understanding one data type
+    requires reading the entire 200-line file. There's <strong>no locality</strong> — changing how recovery logs are
+    stored means touching a method buried between workout and agent memory methods.
+  </p>
+
+  <h3>Before / After</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="diagram">
+      <h3 class="text-red-400 mb-2">Before — Shallow God Object</h3>
+      <pre class="mermaid">
+flowchart TD
+  A[StorageEngine] --> B[create_user]
+  A --> C[get_user]
+  A --> D[add_recovery_log]
+  A --> E[get_recovery_logs]
+  A --> F[save_workout]
+  A --> G[get_workouts]
+  A --> H[add_workload_entry]
+  A --> I[get_agent_memory]
+  A --> J[... 14 more methods]
+  B --> K{if _USE_SUPABASE}
+  K -->|yes| L[user_repo.create]
+  K -->|no| M[self.users dict]
+  style A fill:#dc2626,stroke:#991b1b,color:#fff
+      </pre>
+    </div>
+    <div class="diagram">
+      <h3 class="text-green-400 mb-2">After — Deep, Type-Scoped Modules</h3>
+      <pre class="mermaid">
+flowchart TD
+  U[RecoveryStore] --> U1[create_log]
+  U --> U2[get_logs]
+  U --> U3[get_baseline]
+  W[WorkoutStore] --> W1[save]
+  W --> W2[list]
+  W --> W3[complete]
+  M[MemoryStore] --> M1[get]
+  M --> M2[update_preferences]
+  U1 --> S{StorageBackend}
+  W1 --> S
+  M1 --> S
+  S -->|in-memory| I[InMemoryAdapter]
+  S -->|supabase| P[SupabaseAdapter]
+  style S fill:#6366f1,stroke:#4f46e5,color:#fff
+  style I fill:#334155,stroke:#475569,color:#fff
+  style P fill:#334155,stroke:#475569,color:#fff
+      </pre>
+    </div>
+  </div>
+
+  <h3>Solution</h3>
+  <p class="text-slate-300 mb-4">
+    Extract a <strong>StorageBackend</strong> protocol with <code>get_user()</code>, <code>save_recovery_log()</code>,
+    etc. Create two adapters: <code>InMemoryAdapter</code> and <code>SupabaseAdapter</code>. Then split the
+    God Object into domain-scoped stores: <code>RecoveryStore</code>, <code>WorkoutStore</code>,
+    <code>MemoryStore</code> — each owns only its data type and delegates to the backend adapter.
+  </p>
+
+  <h3>Benefits</h3>
+  <ul class="text-slate-300 list-disc list-inside mb-4">
+    <li><span class="fix">Locality</span>: Changing recovery log storage only touches <code>RecoveryStore</code></li>
+    <li><span class="fix">Testability</span>: Each store can be tested with a mock backend adapter independently</li>
+    <li><span class="fix">Deletion test</span>: Deleting <code>WorkoutStore</code> doesn't affect recovery or memory — concentrates complexity correctly</li>
+    <li><span class="fix">Leverage</span>: Adding SQLite or Postgres direct adapter is one new class, not editing 20 methods</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 2: Recovery Duplication -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2>2. Recovery Score Duplication</h2>
+    <span class="badge badge-strong">Strong</span>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mb-4">
+    <span class="file-tag">services/recovery_engine.py</span>
+    <span class="file-tag">services/agent/orchestrator.py</span>
+    <span class="file-tag">core_engine/__init__.py</span>
+    <span class="file-tag">services/workflow_engine.py</span>
+  </div>
+
+  <h3>Problem</h3>
+  <p class="text-slate-300 mb-4">
+    Recovery score is computed <span class="friction">three separate ways</span>:
+    <code>RecoveryEngine.compute_daily_recovery()</code> (Pydantic-based), 
+    <code>agent_orchestrator.execute_recovery_analysis()</code> (dict-based, calls core_engine directly),
+    and <code>workflow_engine.morning_recovery()</code> (also calls core_engine directly).
+    Each recomputes the same HRV Z-score, sleep score, subjective score, and ACWR —
+    but with slightly different default values and data access patterns.
+    The orchestrator duplicates recovery_engine's work but <strong>also fetches from storage</strong>,
+    creating a split-brain: pure function vs. storage-dependent function doing the same math.
+  </p>
+
+  <h3>Before / After</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="diagram">
+      <h3 class="text-red-400 mb-2">Before — 3 Compute Paths</h3>
+      <pre class="mermaid">
+flowchart TD
+  E1[recovery.py endpoint] --> R1[RecoveryEngine.compute_daily_recovery]
+  E1 --> O1[agent_orchestrator.execute_recovery_analysis]
+  W1[workflow_engine] --> O1
+  R1 --> C1[core_engine functions]
+  O1 --> C1
+  R1 -->|Pydantic models| S1[RecoveryCalculationResponse]
+  O1 -->|raw dicts| S2[state dict]
+  style R1 fill:#dc2626,stroke:#991b1b,color:#fff
+  style O1 fill:#dc2626,stroke:#991b1b,color:#fff
+      </pre>
+    </div>
+    <div class="diagram">
+      <h3 class="text-green-400 mb-2">After — Single Compute Path</h3>
+      <pre class="mermaid">
+flowchart TD
+  E2[recovery.py endpoint] --> R2[recovery_engine.compute_daily_recovery]
+  E2 --> M2[ml_engine.predict_readiness]
+  W2[workflow_engine] --> R2
+  R2 --> C2[core_engine functions]
+  R2 -->|Pydantic| S3[RecoveryCalculationResponse]
+  style R2 fill:#22c55e,stroke:#16a34a,color:#fff
+      </pre>
+    </div>
+  </div>
+
+  <h3>Solution</h3>
+  <p class="text-slate-300 mb-4">
+    Delete <code>orchestrator.execute_recovery_analysis()</code> entirely — it duplicates recovery_engine.
+    The workflow_engine already calls core_engine directly (which is fine — it's a thin pipeline).
+    The endpoint calls RecoveryEngine for pure computation + ml_engine for predictions. One path.
+  </p>
+
+  <h3>Benefits</h3>
+  <ul class="text-slate-300 list-disc list-inside mb-4">
+    <li><span class="fix">Locality</span>: All recovery math lives in one place (recovery_engine + core_engine)</li>
+    <li><span class="fix">Testability</span>: RecoveryEngine is already tested — orchestrator's copy was never tested independently</li>
+    <li><span class="fix">Deletion test</span>: Deleting orchestrator's recovery method concentrates, not scatters — the endpoint already does the same work</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 3: Endpoint Orchestration -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2>3. Endpoint Orchestration Bloat</h2>
+    <span class="badge badge-explore">Worth exploring</span>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mb-4">
+    <span class="file-tag">api/v1/endpoints/workouts.py</span>
+    <span class="file-tag">api/v1/endpoints/recovery.py</span>
+  </div>
+
+  <h3>Problem</h3>
+  <p class="text-slate-300 mb-4">
+    <code>complete_workout()</code> in workouts.py is <span class="friction">80 lines</span> of orchestration:
+    compute Foster load → fetch history → EWMA → store workload → store log → NLP sentiment →
+    agent memory → ML injury risk → return response. This is a <strong>use case</strong>, not an endpoint handler.
+    The endpoint mixes HTTP concerns (request/response, status codes) with business logic (ACWR computation,
+    NLP analysis, agent memory updates). Testing this requires spinning up the full FastAPI test client.
+  </p>
+
+  <h3>Before / After</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="diagram">
+      <h3 class="text-red-400 mb-2">Before — Endpoint = Use Case</h3>
+      <pre class="mermaid">
+flowchart TD
+  EP[PATCH /workouts/id] --> AC[Foster Load Calc]
+  EP --> WH[Fetch Workload History]
+  EP --> EW[EWMA Computation]
+  EP --> SW[Store Workload]
+  EP --> SL[Store Workout Log]
+  EP --> NL[NLP Sentiment]
+  EP --> AM[Agent Memory Update]
+  EP --> ML[ML Injury Risk]
+  EP --> RT[Build Response]
+  style EP fill:#dc2626,stroke:#991b1b,color:#fff
+      </pre>
+    </div>
+    <div class="diagram">
+      <h3 class="text-green-400 mb-2">After — Thin Endpoint → Use Case</h3>
+      <pre class="mermaid">
+flowchart TD
+  EP2[PATCH /workouts/id] --> UC[CompleteWorkoutUseCase]
+  UC --> AC2[Foster Load]
+  UC --> EW2[EWMA + ACWR]
+  UC --> NLP2[NLP + Agent Memory]
+  UC --> ML2[ML Injury Risk]
+  EP2 -->|HTTP only| RT2[Serialize Response]
+  style EP2 fill:#22c55e,stroke:#16a34a,color:#fff
+  style UC fill:#6366f1,stroke:#4f46e5,color:#fff
+      </pre>
+    </div>
+  </div>
+
+  <h3>Solution</h3>
+  <p class="text-slate-300 mb-4">
+    Extract a <code>CompleteWorkoutUseCase</code> class that owns the 80-line orchestration.
+    The endpoint becomes 5 lines: parse request → call use case → serialize response.
+    The use case can be tested with mocked storage/ml/nlp — no HTTP layer needed.
+  </p>
+
+  <h3>Benefits</h3>
+  <ul class="text-slate-300 list-disc list-inside mb-4">
+    <li><span class="fix">Testability</span>: Use case testable without FastAPI TestClient, with injected mocks</li>
+    <li><span class="fix">Leverage</span>: Same use case callable from CLI, background job, or mobile app</li>
+    <li><span class="fix">Locality</span>: All "complete workout" logic in one place, not scattered across endpoint</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 4: ML Engine Monolith -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2>4. ML Engine Monolith</h2>
+    <span class="badge badge-explore">Worth exploring</span>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mb-4">
+    <span class="file-tag">services/ml_engine.py</span>
+  </div>
+
+  <h3>Problem</h3>
+  <p class="text-slate-300 mb-4">
+    <code>MLEngine</code> is a 200-line monolith combining 5 unrelated concerns:
+    feature extraction, PyTorch neural net training/prediction, HRV forecasting (linear regression),
+    anomaly detection (z-score), and injury risk scoring. Each method is <span class="friction">shallow</span> —
+    the interface is nearly as complex as the implementation. The class holds mutable training state
+    (<code>is_trained</code>, <code>_feature_history</code>) alongside stateless functions like
+    <code>detect_anomalies()</code>.
+  </p>
+
+  <h3>Before / After</h3>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="diagram">
+      <h3 class="text-red-400 mb-2">Before — One Monolith</h3>
+      <pre class="mermaid">
+flowchart TD
+  M[MLEngine] --> F[extract_features]
+  M --> P[predict_readiness]
+  M --> H[forecast_hrv]
+  M --> D[detect_anomalies]
+  M --> I[compute_injury_risk]
+  M --> T[train_readiness_model]
+  style M fill:#dc2626,stroke:#991b1b,color:#fff
+      </pre>
+    </div>
+    <div class="diagram">
+      <h3 class="text-green-400 mb-2">After — Focused Modules</h3>
+      <pre class="mermaid">
+flowchart TD
+  FE[FeatureExtractor] --> FE1[extract_from_logs]
+  RP[ReadinessPredictor] --> RP1[predict]
+  RP --> RP2[train]
+  HF[HRVForecaster] --> HF1[forecast]
+  AD[AnomalyDetector] --> AD1[detect]
+  IR[InjuryRiskScorer] --> IR1[score]
+  style FE fill:#6366f1,stroke:#4f46e5,color:#fff
+  style RP fill:#6366f1,stroke:#4f46e5,color:#fff
+  style HF fill:#6366f1,stroke:#4f46e5,color:#fff
+  style AD fill:#6366f1,stroke:#4f46e5,color:#fff
+  style IR fill:#6366f1,stroke:#4f46e5,color:#fff
+      </pre>
+    </div>
+  </div>
+
+  <h3>Solution</h3>
+  <p class="text-slate-300 mb-4">
+    Split into 5 focused modules: <code>FeatureExtractor</code>, <code>ReadinessPredictor</code>,
+    <code>HRVForecaster</code>, <code>AnomalyDetector</code>, <code>InjuryRiskScorer</code>.
+    Each is independently testable with minimal setup.
+  </p>
+
+  <h3>Benefits</h3>
+  <ul class="text-slate-300 list-disc list-inside mb-4">
+    <li><span class="fix">Testability</span>: Each module testable in isolation — no need to mock PyTorch to test anomaly detection</li>
+    <li><span class="fix">Locality</span>: HRV forecasting logic lives in one file, not buried in a 200-line class</li>
+    <li><span class="fix">Deletion test</span>: Deleting <code>AnomalyDetector</code> doesn't affect prediction — concentrates correctly</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 5: NLP Pipeline Mixed Concerns -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2>5. NLP Pipeline Mixed Concerns</h2>
+    <span class="badge badge-speculative">Speculative</span>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mb-4">
+    <span class="file-tag">services/nlp_pipeline.py</span>
+  </div>
+
+  <h3>Problem</h3>
+  <p class="text-slate-300 mb-4">
+    <code>NLPPipeline</code> mixes 4 unrelated concerns: sentiment analysis (with HuggingFace + keyword fallback),
+    exercise feedback extraction (pain detection), muscle group NER (synonym matching), and LLM-powered
+    goal parsing + weekly summaries (Gemini API calls). The Gemini API calls are async, the sentiment
+    is sync, and the muscle extraction is pure string matching — three different execution models in one class.
+  </p>
+
+  <h3>Solution</h3>
+  <p class="text-slate-300 mb-4">
+    Split into: <code>SentimentAnalyzer</code> (sync, keyword-based), <code>GoalParser</code> (async, LLM-backed),
+    <code>MuscleExtractor</code> (pure function, no class needed). The weekly summary generator
+    is already thin enough to stay in the orchestrator or a small helper.
+  </p>
+
+  <h3>Benefits</h3>
+  <ul class="text-slate-300 list-disc list-inside mb-4">
+    <li><span class="fix">Testability</span>: MuscleExtractor is a pure function — trivial to test</li>
+    <li><span class="fix">Locality</span>: LLM dependency isolated in GoalParser, not infecting sentiment analysis</li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<!-- TOP RECOMMENDATION -->
+<!-- ============================================================ -->
+<div class="card top-rec">
+  <h2 class="mb-4">🏆 Top Recommendation</h2>
+  <p class="text-lg text-slate-200 mb-4">
+    <strong>Candidate 1: Storage God Object</strong> — tackle first.
+  </p>
+  <p class="text-slate-300 mb-4">
+    The StorageEngine is the <span class="friction">most tangled seam</span> in the codebase. Every service,
+    every endpoint, and every test touches it. Splitting it into domain-scoped stores with a backend adapter
+    protocol would:
+  </p>
+  <ul class="text-slate-300 list-disc list-inside mb-4">
+    <li>Unblock testing of every other candidate (they all depend on storage)</li>
+    <li>Create a real <strong>seam</strong> where the in-memory ↔ Supabase switch lives — currently it's
+        scattered across 14 methods with lazy imports</li>
+    <li>Make the repository.py redundant (it duplicates the same interface)</li>
+    <li>Enable adding new storage backends (SQLite, Postgres direct) without touching 200 lines</li>
+  </ul>
+  <p class="text-slate-400 text-sm">
+    After Candidate 1, Candidate 2 (recovery duplication) is the quick win — just delete the orchestrator's
+    duplicate recovery method. Candidates 3-5 are deeper refactorings that become easier once storage is clean.
+  </p>
+</div>
+
+<div class="text-center text-slate-500 mt-12 text-sm">
+  Generated by improve-codebase-architecture skill • AdapFit v2.0
+</div>
+
+</body>
+</html>
