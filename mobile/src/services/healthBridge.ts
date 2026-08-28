@@ -97,7 +97,7 @@ async function fetchAndroid(): Promise<HealthBiometrics> {
     // HRV
     let hrv: number | undefined;
     try {
-      const hrvRec = await readRecords('HeartRateVariabilityRmssd', { timeRangeFilter });
+      const hrvRec = await readRecords('HeartRateVariabilityRmssd', { timeRangeFilter: timeFilter });
       if (hrvRec.records.length > 0) {
         hrv = hrvRec.records.reduce((a: number, r: any) => a + r.heartRateVariabilityMillis, 0) / hrvRec.records.length;
       }
@@ -106,7 +106,7 @@ async function fetchAndroid(): Promise<HealthBiometrics> {
     // RHR
     let rhr: number | undefined;
     try {
-      const rhrRec = await readRecords('RestingHeartRate', { timeRangeFilter });
+      const rhrRec = await readRecords('RestingHeartRate', { timeRangeFilter: timeFilter });
       if (rhrRec.records.length > 0) rhr = rhrRec.records[rhrRec.records.length - 1].beatsPerMinute;
     } catch {}
 

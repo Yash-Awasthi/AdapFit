@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Moon, Flame, Zap, Wind } from 'lucide-react-native';
+import { Moon, Flame, Zap, Wind, Watch } from 'lucide-react-native';
 import { Button } from '../src/components';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../src/services/config';
 import { useUserStore } from '../src/stores';
 import { useTheme } from '../src/services/theme';
+import { fetchHealthData, HealthBiometrics } from '../src/services/healthBridge';
 
 const API = API_BASE_URL;
 
@@ -86,7 +87,15 @@ export default function CheckinScreen() {
   const [fatigue, setFatigue] = useState(5);
   const [stress, setStress] = useState(5);
   const [loading, setLoading] = useState(false);
+  const [health, setHealth] = useState<HealthBiometrics | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    fetchHealthData().then((data) => {
+      setHealth(data);
+      if (data.source !== 'simulated') setSleep(Math.round(data.sleepHours));
+    });
+  }, []);
 
   async function handleSubmit() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -106,14 +115,24 @@ export default function CheckinScreen() {
           },
           wearable_data: {
             sleep_duration_hours: sleep,
+            sleep_efficiency_pct: health?.source !== 'simulated' ? health?.sleepEfficiency : undefined,
+            hrv_rmssd: health?.source !== 'simulated' ? health?.hrvRmssd : undefined,
+            resting_heart_rate: health?.source !== 'simulated' ? health?.restingHeartRate : undefined,
+            steps: health?.source !== 'simulated' ? health?.steps : undefined,
+            active_calories: health?.source !== 'simulated' ? health?.activeCalories : undefined,
           },
         }),
       });
       if (res.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
+      } else {
+        const detail = await res.text().catch(() => '');
+        Alert.alert('Check-in failed', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
       }
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', `${API}\n\n${err?.message || String(err)}`);
+    }
     setLoading(false);
   }
 
@@ -121,6 +140,16 @@ export default function CheckinScreen() {
     <ScrollView style={s.container}>
       <Text style={s.title} accessibilityRole="header">Morning Check-in</Text>
       <Text style={s.subtitle}>Rate how you're feeling right now</Text>
+
+      {health && health.source !== 'simulated' && (
+        <View style={s.syncBadge}>
+          <Watch size={14} color={theme.success} />
+          <Text style={[s.syncBadgeText, { color: theme.success }]}>
+            Synced from {health.source === 'healthconnect' ? 'Health Connect' : 'Apple Health'}
+            {health.steps != null ? ` · ${health.steps.toLocaleString()} steps today` : ''}
+          </Text>
+        </View>
+      )}
 
       <SliderField
         label="Sleep Hours"
@@ -187,7 +216,9 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, padding: 20 },
     title: { fontSize: 24, fontWeight: '700', color: theme.text, marginTop: 48, marginBottom: 4 },
-    subtitle: { fontSize: 14, color: theme.textMuted, marginBottom: 24 },
+    subtitle: { fontSize: 14, color: theme.textMuted, marginBottom: 16 },
+    syncBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
+    syncBadgeText: { fontSize: 12, fontWeight: '600' },
   });
 }
 

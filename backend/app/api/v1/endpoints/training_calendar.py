@@ -238,7 +238,7 @@ async def bulk_schedule(
 
 @router.patch("/{entry_id}/status")
 async def update_status(
-    entry_id: str, status: str = Query(..., regex="^(completed|missed|skipped)$"),
+    entry_id: str, status: str = Query(..., pattern="^(completed|missed|skipped)$"),
     user_id: str = Query("default"),
 ):
     """Update workout status (completed, missed, skipped)."""

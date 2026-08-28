@@ -26,6 +26,7 @@ async def create_recovery_log(req: RecoveryCalculationRequest):
         injury_risk = ml_engine.compute_injury_risk(acwr, 0.0, 0.0, 0)
 
         wd = req.wearable_data
+        sc = req.subjective_checkin
         await storage.add_recovery_log(req.user_id, {
             "recovery_score": response.recovery_score,
             "readiness_state": response.readiness_state.value,
@@ -36,7 +37,12 @@ async def create_recovery_log(req: RecoveryCalculationRequest):
             "sleep_score": response.metrics_breakdown.sleep_score,
             "subjective_score": response.metrics_breakdown.subjective_score,
             "resting_heart_rate": wd.resting_heart_rate if wd else None,
-            "sore_muscle_groups": req.subjective_checkin.sore_muscle_groups if req.subjective_checkin else [],
+            "steps": wd.steps if wd else None,
+            "active_calories": wd.active_calories if wd else None,
+            "soreness_score": sc.soreness if sc else None,
+            "fatigue_score": sc.fatigue if sc else None,
+            "stress_score": sc.stress if sc else None,
+            "sore_muscle_groups": sc.sore_muscle_groups if sc else [],
             "log_date": req.log_date,
         })
 

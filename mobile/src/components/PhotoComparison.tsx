@@ -13,6 +13,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Calendar } from 'lucide-react-native';
+import { useTheme } from '../services/theme';
 
 interface PhotoComparisonProps {
   beforeUri?: string;
@@ -37,6 +38,7 @@ export function PhotoComparison({
   beforeBodyFat,
   afterBodyFat,
 }: PhotoComparisonProps) {
+  const { theme } = useTheme();
   const [sliderPosition, setSliderPosition] = useState(SCREEN_WIDTH / 2);
   const panResponder = useRef(
     PanResponder.create({
@@ -53,23 +55,23 @@ export function PhotoComparison({
   const bodyFatDelta = beforeBodyFat && afterBodyFat ? afterBodyFat - beforeBodyFat : null;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Progress Photos</Text>
+    <View style={[styles.container, { backgroundColor: theme.surface }]}>
+      <Text style={[styles.title, { color: theme.text }]}>Progress Photos</Text>
 
       {/* Photo Comparison */}
-      <View style={styles.photoContainer} {...panResponder.panHandlers}>
+      <View style={[styles.photoContainer, { backgroundColor: theme.background }]} {...panResponder.panHandlers}>
         {/* Before Photo (left side) */}
         <View style={[styles.photoSide, { width: sliderPosition }]}>
           {beforeUri ? (
             <Image source={{ uri: beforeUri }} style={styles.photo} />
           ) : (
-            <View style={[styles.photo, styles.placeholder]}>
-              <Text style={styles.placeholderText}>Before</Text>
+            <View style={[styles.photo, styles.placeholder, { backgroundColor: theme.border }]}>
+              <Text style={[styles.placeholderText, { color: theme.textMuted }]}>Before</Text>
             </View>
           )}
           <View style={styles.dateBadge}>
-            <Calendar size={10} color="#F8FAFC" />
-            <Text style={styles.dateText}>{beforeDate}</Text>
+            <Calendar size={10} color={theme.text} />
+            <Text style={[styles.dateText, { color: theme.text }]}>{beforeDate}</Text>
           </View>
         </View>
 
@@ -79,21 +81,21 @@ export function PhotoComparison({
             <Image source={{ uri: afterUri }} style={styles.photo} />
           ) : (
             <View style={[styles.photo, styles.placeholder, { backgroundColor: '#1E3A1E' }]}>
-              <Text style={styles.placeholderText}>After</Text>
+              <Text style={[styles.placeholderText, { color: theme.textMuted }]}>After</Text>
             </View>
           )}
           <View style={styles.dateBadge}>
-            <Calendar size={10} color="#F8FAFC" />
-            <Text style={styles.dateText}>{afterDate}</Text>
+            <Calendar size={10} color={theme.text} />
+            <Text style={[styles.dateText, { color: theme.text }]}>{afterDate}</Text>
           </View>
         </View>
 
         {/* Slider Handle */}
         <View style={[styles.slider, { left: sliderPosition - 2 }]}>
-          <View style={styles.sliderLine} />
-          <View style={styles.sliderHandle}>
-            <Text style={styles.sliderIcon}>{'<'}</Text>
-            <Text style={styles.sliderIcon}>{'>'}</Text>
+          <View style={[styles.sliderLine, { backgroundColor: theme.text }]} />
+          <View style={[styles.sliderHandle, { backgroundColor: theme.text }]}>
+            <Text style={[styles.sliderIcon, { color: theme.background }]}>{'<'}</Text>
+            <Text style={[styles.sliderIcon, { color: theme.background }]}>{'>'}</Text>
           </View>
         </View>
       </View>
@@ -101,17 +103,17 @@ export function PhotoComparison({
       {/* Stats Comparison */}
       <View style={styles.statsRow}>
         {weightDelta !== null && (
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Weight</Text>
+          <View style={[styles.statCard, { backgroundColor: theme.background }]}>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Weight</Text>
             <View style={styles.statComparison}>
-              <Text style={styles.statBefore}>{beforeWeight}kg</Text>
-              <Text style={styles.statArrow}>→</Text>
-              <Text style={styles.statAfter}>{afterWeight}kg</Text>
+              <Text style={[styles.statBefore, { color: theme.textSecondary }]}>{beforeWeight}kg</Text>
+              <Text style={[styles.statArrow, { color: theme.textMuted }]}>→</Text>
+              <Text style={[styles.statAfter, { color: theme.text }]}>{afterWeight}kg</Text>
             </View>
             <Text
               style={[
                 styles.statDelta,
-                { color: weightDelta <= 0 ? '#22C55E' : '#EF4444' },
+                { color: weightDelta <= 0 ? theme.success : theme.danger },
               ]}
             >
               {weightDelta > 0 ? '+' : ''}{weightDelta.toFixed(1)}kg
@@ -120,17 +122,17 @@ export function PhotoComparison({
         )}
 
         {bodyFatDelta !== null && (
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Body Fat</Text>
+          <View style={[styles.statCard, { backgroundColor: theme.background }]}>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Body Fat</Text>
             <View style={styles.statComparison}>
-              <Text style={styles.statBefore}>{beforeBodyFat}%</Text>
-              <Text style={styles.statArrow}>→</Text>
-              <Text style={styles.statAfter}>{afterBodyFat}%</Text>
+              <Text style={[styles.statBefore, { color: theme.textSecondary }]}>{beforeBodyFat}%</Text>
+              <Text style={[styles.statArrow, { color: theme.textMuted }]}>→</Text>
+              <Text style={[styles.statAfter, { color: theme.text }]}>{afterBodyFat}%</Text>
             </View>
             <Text
               style={[
                 styles.statDelta,
-                { color: bodyFatDelta <= 0 ? '#22C55E' : '#EF4444' },
+                { color: bodyFatDelta <= 0 ? theme.success : theme.danger },
               ]}
             >
               {bodyFatDelta > 0 ? '+' : ''}{bodyFatDelta.toFixed(1)}%
@@ -144,7 +146,6 @@ export function PhotoComparison({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#1E293B',
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -152,7 +153,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#F8FAFC',
     marginBottom: 12,
   },
   photoContainer: {
@@ -161,7 +161,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#0F172A',
   },
   photoSide: {
     position: 'absolute',
@@ -180,13 +179,11 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   placeholder: {
-    backgroundColor: '#334155',
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderText: {
     fontSize: 14,
-    color: '#8B96AB',
     fontWeight: '600',
   },
   dateBadge: {
@@ -203,7 +200,6 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 11,
-    color: '#F8FAFC',
     fontWeight: '500',
   },
   slider: {
@@ -216,7 +212,6 @@ const styles = StyleSheet.create({
   sliderLine: {
     flex: 1,
     width: 2,
-    backgroundColor: '#F8FAFC',
     marginLeft: 1,
   },
   sliderHandle: {
@@ -226,7 +221,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -234,7 +228,6 @@ const styles = StyleSheet.create({
   },
   sliderIcon: {
     fontSize: 10,
-    color: '#0F172A',
     fontWeight: '700',
   },
   statsRow: {
@@ -244,14 +237,12 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#0F172A',
     borderRadius: 8,
     padding: 10,
     alignItems: 'center',
   },
   statLabel: {
     fontSize: 11,
-    color: '#8B96AB',
     marginBottom: 4,
   },
   statComparison: {
@@ -261,16 +252,13 @@ const styles = StyleSheet.create({
   },
   statBefore: {
     fontSize: 13,
-    color: '#94A3B8',
     fontWeight: '500',
   },
   statArrow: {
     fontSize: 12,
-    color: '#8B96AB',
   },
   statAfter: {
     fontSize: 13,
-    color: '#F8FAFC',
     fontWeight: '700',
   },
   statDelta: {

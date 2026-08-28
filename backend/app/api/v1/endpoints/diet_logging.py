@@ -13,6 +13,9 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from app.core.config import settings
+from app.services.food_vision import analyze_food_from_gemini_vision
+
 router = APIRouter()
 
 _meals: dict[str, list[dict]] = {}
@@ -32,6 +35,11 @@ class MealLogRequest(BaseModel):
     photo_url: Optional[str] = None
     notes: str = Field(max_length=200, default="")
     date: Optional[str] = None
+
+
+class PhotoLogRequest(BaseModel):
+    image_base64: str
+    meal_type: str = Field(default="snack")
 
 
 class DailyTargetRequest(BaseModel):
@@ -77,6 +85,38 @@ async def log_meal(req: MealLogRequest, user_id: str = Query("default")):
     }
     _meals.setdefault(user_id, []).append(record)
     return {"logged": True, "record": record, "daily_totals": _get_daily_totals(user_id, today)}
+
+
+@router.post("/photo-log")
+async def photo_log_meal(req: PhotoLogRequest, user_id: str = Query("default")):
+    """Analyze a meal photo with Gemini Vision (falls back to a rough estimate
+    without an API key) and log the result as today's meal."""
+    analysis = analyze_food_from_gemini_vision(req.image_base64, settings.GEMINI_API_KEY)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    record = {
+        "name": ", ".join(f.name for f in analysis.foods) or "Photo meal",
+        "calories": analysis.total_calories,
+        "protein_g": analysis.total_protein,
+        "carbs_g": analysis.total_carbs,
+        "fat_g": analysis.total_fat,
+        "fiber_g": analysis.total_fiber,
+        "meal_type": req.meal_type,
+        "quantity": 1,
+        "unit": "serving",
+        "notes": "",
+        "id": str(uuid.uuid4())[:10],
+        "date": today,
+        "logged_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _meals.setdefault(user_id, []).append(record)
+    return {
+        "logged": True,
+        "record": record,
+        "foods": [f.__dict__ for f in analysis.foods],
+        "confidence": analysis.confidence,
+        "suggestions": analysis.suggestions,
+        "daily_totals": _get_daily_totals(user_id, today),
+    }
 
 
 @router.get("/daily")

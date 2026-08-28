@@ -117,16 +117,28 @@ export default function NutritionScreen() {
         setShowForm(false);
         setName(''); setCalories(''); setProtein(''); setCarbs(''); setFat('');
         fetchData();
+      } else {
+        const detail = await res.text().catch(() => '');
+        Alert.alert('Could not log meal', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
       }
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', err?.message || String(err));
+    }
   }
 
   async function deleteMeal(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const res = await fetch(`${API}/api/v1/nutrition/meals/${id}?user_id=${userId}`, { method: 'DELETE' });
-      if (res.ok) fetchData();
-    } catch {}
+      if (res.ok) {
+        fetchData();
+      } else {
+        const detail = await res.text().catch(() => '');
+        Alert.alert('Could not delete meal', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', err?.message || String(err));
+    }
   }
 
   function MacroBar({ label, current, target, color }: { label: string; current: number; target: number; color: string }) {

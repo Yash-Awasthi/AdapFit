@@ -71,6 +71,7 @@ export default function TrendsScreen() {
   const [data, setData] = useState<TrendData | null>(null);
   const [hrv, setHrv] = useState<HrvData | null>(null);
   const [injuryRisk, setInjuryRisk] = useState<InjuryRiskData | null>(null);
+  const [sleep, setSleep] = useState<Awaited<ReturnType<typeof api.getSleepAnalysis>> | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -79,14 +80,16 @@ export default function TrendsScreen() {
 
   async function fetchTrends() {
     try {
-      const [acwrData, hrvData, riskData] = await Promise.all([
+      const [acwrData, hrvData, riskData, sleepData] = await Promise.all([
         api.getAcwr(userId).catch(() => null),
         api.getHrvTrend(userId, 14).catch(() => null),
         api.getInjuryRisk(userId).catch(() => null),
+        api.getSleepAnalysis(userId, 7).catch(() => null),
       ]);
       if (acwrData) setData(acwrData);
       if (hrvData) setHrv(hrvData);
       if (riskData) setInjuryRisk(riskData);
+      if (sleepData) setSleep(sleepData);
     } catch {}
     setLoading(false);
   }
@@ -189,11 +192,27 @@ export default function TrendsScreen() {
 
       <Animated.View entering={enter(200)}>
         <SectionHeader title="Sleep Pattern" />
-        <View style={[styles.placeholder, CARD_SHADOW, { backgroundColor: theme.surface }]}>
-          <Text style={[styles.placeholderText, { color: theme.textMuted }]}>
-            Sleep analysis will appear after 3+ days of data.
-          </Text>
-        </View>
+        {sleep && sleep.score > 0 ? (
+          <View style={[styles.chartCard, CARD_SHADOW, { backgroundColor: theme.surface }]}>
+            <View style={styles.metrics}>
+              <MetricCard label="Sleep Score" value={`${sleep.score}`} />
+              <MetricCard label="Grade" value={sleep.grade} />
+              <MetricCard label="Avg Duration" value={`${sleep.avg_duration_hours}h`} />
+              <MetricCard label="Efficiency" value={`${sleep.avg_efficiency}%`} />
+            </View>
+            {sleep.recommendations.length > 0 && (
+              <View style={[styles.recommendationBox, { backgroundColor: theme.background }]}>
+                <Text style={[styles.recText, { color: theme.textSecondary }]}>• {sleep.recommendations[0]}</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={[styles.placeholder, CARD_SHADOW, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.placeholderText, { color: theme.textMuted }]}>
+              Sleep analysis will appear after 3+ days of data.
+            </Text>
+          </View>
+        )}
       </Animated.View>
     </ScrollView>
   );

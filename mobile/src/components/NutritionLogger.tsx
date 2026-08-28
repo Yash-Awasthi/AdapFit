@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Plus, Camera, Zap, Coffee, Utensils, Apple, Moon } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { useTheme } from '../services/theme';
 
 interface MealEntry {
   id: string;
@@ -54,6 +55,7 @@ interface NutritionLoggerProps {
 }
 
 export function NutritionLogger({ onLogMeal, dailyGoal }: NutritionLoggerProps) {
+  const { theme } = useTheme();
   const [selectedMealType, setSelectedMealType] = useState('lunch');
   const [customName, setCustomName] = useState('');
   const [customCal, setCustomCal] = useState('');
@@ -109,31 +111,31 @@ export function NutritionLogger({ onLogMeal, dailyGoal }: NutritionLoggerProps) 
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Daily Summary */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Today's Intake</Text>
+      <View style={[styles.summaryCard, { backgroundColor: theme.surface }]}>
+        <Text style={[styles.summaryTitle, { color: theme.text }]}>Today's Intake</Text>
         <View style={styles.macroRow}>
           <View style={styles.macroItem}>
-            <Text style={[styles.macroValue, totalCal > calGoal && { color: '#EF4444' }]}>{totalCal}</Text>
-            <Text style={styles.macroLabel}>/ {calGoal} cal</Text>
+            <Text style={[styles.macroValue, { color: theme.text }, totalCal > calGoal && { color: theme.danger }]}>{totalCal}</Text>
+            <Text style={[styles.macroLabel, { color: theme.textMuted }]}>/ {calGoal} cal</Text>
           </View>
           <View style={styles.macroItem}>
             <Text style={[styles.macroValue, { color: '#3B82F6' }]}>{totalProtein}g</Text>
-            <Text style={styles.macroLabel}>/ {proteinGoal}g protein</Text>
+            <Text style={[styles.macroLabel, { color: theme.textMuted }]}>/ {proteinGoal}g protein</Text>
           </View>
           <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{totalCarbs}g</Text>
-            <Text style={styles.macroLabel}>carbs</Text>
+            <Text style={[styles.macroValue, { color: theme.text }]}>{totalCarbs}g</Text>
+            <Text style={[styles.macroLabel, { color: theme.textMuted }]}>carbs</Text>
           </View>
           <View style={styles.macroItem}>
-            <Text style={styles.macroValue}>{totalFat}g</Text>
-            <Text style={styles.macroLabel}>fat</Text>
+            <Text style={[styles.macroValue, { color: theme.text }]}>{totalFat}g</Text>
+            <Text style={[styles.macroLabel, { color: theme.textMuted }]}>fat</Text>
           </View>
         </View>
         {/* Progress bar */}
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${Math.min(100, (totalCal / calGoal) * 100)}%` }]} />
+        <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
+          <View style={[styles.progressFill, { backgroundColor: theme.success, width: `${Math.min(100, (totalCal / calGoal) * 100)}%` }]} />
         </View>
       </View>
 
@@ -142,14 +144,18 @@ export function NutritionLogger({ onLogMeal, dailyGoal }: NutritionLoggerProps) 
         {MEAL_TYPES.map((mt) => (
           <TouchableOpacity
             key={mt.id}
-            style={[styles.mealTypeBtn, selectedMealType === mt.id && { backgroundColor: mt.color + '20', borderColor: mt.color }]}
+            style={[
+              styles.mealTypeBtn,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              selectedMealType === mt.id && { backgroundColor: mt.color + '20', borderColor: mt.color },
+            ]}
             onPress={() => {
               Haptics.selectionAsync();
               setSelectedMealType(mt.id);
             }}
           >
-            <mt.icon size={16} color={selectedMealType === mt.id ? mt.color : '#8B96AB'} />
-            <Text style={[styles.mealTypeText, selectedMealType === mt.id && { color: mt.color }]}>
+            <mt.icon size={16} color={selectedMealType === mt.id ? mt.color : theme.textMuted} />
+            <Text style={[styles.mealTypeText, { color: theme.textMuted }, selectedMealType === mt.id && { color: mt.color }]}>
               {mt.label}
             </Text>
           </TouchableOpacity>
@@ -157,62 +163,62 @@ export function NutritionLogger({ onLogMeal, dailyGoal }: NutritionLoggerProps) 
       </View>
 
       {/* Quick Add */}
-      <Text style={styles.sectionTitle}>Quick Add</Text>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Add</Text>
       <View style={styles.quickGrid}>
         {QUICK_MEALS.map((meal, i) => (
-          <TouchableOpacity key={i} style={styles.quickCard} onPress={() => addQuickMeal(meal)}>
-            <Text style={styles.quickName} numberOfLines={1}>{meal.name}</Text>
-            <Text style={styles.quickCal}>{meal.cal} cal</Text>
-            <Text style={styles.quickMacro}>P:{meal.p} C:{meal.c} F:{meal.f}</Text>
+          <TouchableOpacity key={i} style={[styles.quickCard, { backgroundColor: theme.surface }]} onPress={() => addQuickMeal(meal)}>
+            <Text style={[styles.quickName, { color: theme.text }]} numberOfLines={1}>{meal.name}</Text>
+            <Text style={[styles.quickCal, { color: theme.success }]}>{meal.cal} cal</Text>
+            <Text style={[styles.quickMacro, { color: theme.textMuted }]}>P:{meal.p} C:{meal.c} F:{meal.f}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {/* Custom Entry */}
-      <Text style={styles.sectionTitle}>Custom Entry</Text>
-      <View style={styles.customCard}>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Custom Entry</Text>
+      <View style={[styles.customCard, { backgroundColor: theme.surface }]}>
         <TextInput
-          style={styles.customInput}
+          style={[styles.customInput, { backgroundColor: theme.background, color: theme.text }]}
           placeholder="Food name"
-          placeholderTextColor="#475569"
+          placeholderTextColor={theme.textMuted}
           value={customName}
           onChangeText={setCustomName}
         />
         <View style={styles.customRow}>
           <TextInput
-            style={[styles.customInput, styles.customSmall]}
+            style={[styles.customInput, styles.customSmall, { backgroundColor: theme.background, color: theme.text }]}
             placeholder="Cal"
-            placeholderTextColor="#475569"
+            placeholderTextColor={theme.textMuted}
             keyboardType="numeric"
             value={customCal}
             onChangeText={setCustomCal}
           />
           <TextInput
-            style={[styles.customInput, styles.customSmall]}
+            style={[styles.customInput, styles.customSmall, { backgroundColor: theme.background, color: theme.text }]}
             placeholder="Protein"
-            placeholderTextColor="#475569"
+            placeholderTextColor={theme.textMuted}
             keyboardType="numeric"
             value={customProtein}
             onChangeText={setCustomProtein}
           />
           <TextInput
-            style={[styles.customInput, styles.customSmall]}
+            style={[styles.customInput, styles.customSmall, { backgroundColor: theme.background, color: theme.text }]}
             placeholder="Carbs"
-            placeholderTextColor="#475569"
+            placeholderTextColor={theme.textMuted}
             keyboardType="numeric"
             value={customCarbs}
             onChangeText={setCustomCarbs}
           />
           <TextInput
-            style={[styles.customInput, styles.customSmall]}
+            style={[styles.customInput, styles.customSmall, { backgroundColor: theme.background, color: theme.text }]}
             placeholder="Fat"
-            placeholderTextColor="#475569"
+            placeholderTextColor={theme.textMuted}
             keyboardType="numeric"
             value={customFat}
             onChangeText={setCustomFat}
           />
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={addCustomMeal}>
+        <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.success }]} onPress={addCustomMeal}>
           <Plus size={18} color="#fff" />
           <Text style={styles.addBtnText}>Add Meal</Text>
         </TouchableOpacity>
@@ -221,14 +227,14 @@ export function NutritionLogger({ onLogMeal, dailyGoal }: NutritionLoggerProps) 
       {/* Today's Log */}
       {todayMeals.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>Today's Log ({todayMeals.length})</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Today's Log ({todayMeals.length})</Text>
           {todayMeals.map((meal) => (
-            <View key={meal.id} style={styles.logRow}>
+            <View key={meal.id} style={[styles.logRow, { backgroundColor: theme.surface }]}>
               <View style={styles.logInfo}>
-                <Text style={styles.logName}>{meal.name}</Text>
-                <Text style={styles.logType}>{meal.meal_type}</Text>
+                <Text style={[styles.logName, { color: theme.text }]}>{meal.name}</Text>
+                <Text style={[styles.logType, { color: theme.textMuted }]}>{meal.meal_type}</Text>
               </View>
-              <Text style={styles.logCal}>{meal.calories} cal</Text>
+              <Text style={[styles.logCal, { color: theme.success }]}>{meal.calories} cal</Text>
             </View>
           ))}
         </>
@@ -238,20 +244,19 @@ export function NutritionLogger({ onLogMeal, dailyGoal }: NutritionLoggerProps) 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A', padding: 20 },
+  container: { flex: 1, padding: 20 },
   summaryCard: {
-    backgroundColor: '#1E293B',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
   },
-  summaryTitle: { fontSize: 14, fontWeight: '600', color: '#F8FAFC', marginBottom: 12 },
+  summaryTitle: { fontSize: 14, fontWeight: '600', marginBottom: 12 },
   macroRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 12 },
   macroItem: { alignItems: 'center' },
-  macroValue: { fontSize: 18, fontWeight: '800', color: '#F8FAFC' },
-  macroLabel: { fontSize: 10, color: '#8B96AB' },
-  progressBar: { height: 6, backgroundColor: '#334155', borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: 6, backgroundColor: '#22C55E', borderRadius: 3 },
+  macroValue: { fontSize: 18, fontWeight: '800' },
+  macroLabel: { fontSize: 10 },
+  progressBar: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: 6, borderRadius: 3 },
 
   mealTypeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   mealTypeBtn: {
@@ -262,31 +267,26 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#1E293B',
     borderWidth: 1,
-    borderColor: '#334155',
   },
-  mealTypeText: { fontSize: 11, fontWeight: '600', color: '#8B96AB' },
+  mealTypeText: { fontSize: 11, fontWeight: '600' },
 
-  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#F8FAFC', marginBottom: 8, marginTop: 8 },
+  sectionTitle: { fontSize: 14, fontWeight: '600', marginBottom: 8, marginTop: 8 },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
   quickCard: {
     width: '48%',
-    backgroundColor: '#1E293B',
     borderRadius: 8,
     padding: 10,
   },
-  quickName: { fontSize: 12, fontWeight: '600', color: '#F8FAFC', marginBottom: 2 },
-  quickCal: { fontSize: 14, fontWeight: '700', color: '#22C55E' },
-  quickMacro: { fontSize: 10, color: '#8B96AB' },
+  quickName: { fontSize: 12, fontWeight: '600', marginBottom: 2 },
+  quickCal: { fontSize: 14, fontWeight: '700' },
+  quickMacro: { fontSize: 10 },
 
-  customCard: { backgroundColor: '#1E293B', borderRadius: 12, padding: 12, marginBottom: 16 },
+  customCard: { borderRadius: 12, padding: 12, marginBottom: 16 },
   customInput: {
-    backgroundColor: '#0F172A',
     borderRadius: 8,
     padding: 10,
     fontSize: 13,
-    color: '#F8FAFC',
     marginBottom: 8,
   },
   customRow: { flexDirection: 'row', gap: 6 },
@@ -296,7 +296,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#22C55E',
     borderRadius: 8,
     padding: 10,
   },
@@ -305,13 +304,12 @@ const styles = StyleSheet.create({
   logRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
     borderRadius: 8,
     padding: 10,
     marginBottom: 4,
   },
   logInfo: { flex: 1 },
-  logName: { fontSize: 13, fontWeight: '600', color: '#F8FAFC' },
-  logType: { fontSize: 10, color: '#8B96AB', textTransform: 'capitalize' },
-  logCal: { fontSize: 13, fontWeight: '700', color: '#22C55E' },
+  logName: { fontSize: 13, fontWeight: '600' },
+  logType: { fontSize: 10, textTransform: 'capitalize' },
+  logCal: { fontSize: 13, fontWeight: '700' },
 });

@@ -34,6 +34,11 @@ Rules:
 - When uncertain, acknowledge it rather than fabricate.
 """
 
+    # Minimal system prompt for bring-your-own-key sessions — the user is
+    # paying for their own model call, so they get a plain assistant
+    # instead of the full AdapFit persona and rule set.
+    MINIMAL_SYSTEM = "You are a helpful companion. Tell the ground truth. Support the user on mental health topics."
+
     # Context injection blocks
     RECOVERY_CONTEXT = """
 USER'S CURRENT STATE:

@@ -6,7 +6,7 @@
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
--- pgvector: CREATE EXTENSION IF NOT EXISTS vector;  -- run after enabling in Supabase dashboard
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ============================================================
 -- 1. USERS & BASELINES
@@ -17,12 +17,15 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE,
     name TEXT,
     age INT CHECK (age > 0 AND age < 150),
-    weight_kg NUMERIC(5,1) CHECK (weight_kg > 0),
     height_cm NUMERIC(5,1) CHECK (height_cm > 0),
-    sex TEXT CHECK (sex IN ('male', 'female', 'other')),
+    gender TEXT,
     fitness_level TEXT CHECK (fitness_level IN ('beginner', 'intermediate', 'advanced')) DEFAULT 'intermediate',
     primary_goal TEXT CHECK (primary_goal IN ('strength', 'hypertrophy', 'endurance', 'fat_loss', 'general')) DEFAULT 'general',
+    preferred_days_per_week INT CHECK (preferred_days_per_week BETWEEN 1 AND 7) DEFAULT 4,
     equipment_access TEXT[] DEFAULT ARRAY['bodyweight', 'dumbbells', 'barbell'],
+    health_connect_enabled BOOLEAN DEFAULT FALSE,
+    work_start TEXT,
+    work_end TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -30,11 +33,11 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS user_baselines (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    baseline_hrv_rmssd NUMERIC(6,2),
-    baseline_rhr NUMERIC(4,1),
-    baseline_sleep_score NUMERIC(4,1),
+    hrv_mean_rmssd NUMERIC(6,2) DEFAULT 50.0,
+    hrv_std_rmssd NUMERIC(6,2) DEFAULT 10.0,
+    rhr_baseline NUMERIC(4,1) DEFAULT 65.0,
+    sleep_target_hours NUMERIC(4,1) DEFAULT 8.0,
     chronic_load_28d NUMERIC(8,2) DEFAULT 500,
-    chronic_load_7d NUMERIC(8,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id)
 );
@@ -48,12 +51,15 @@ CREATE TABLE IF NOT EXISTS daily_recovery_logs (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     log_date DATE NOT NULL,
     hrv_rmssd NUMERIC(6,2),
+    hrv_z_score NUMERIC(6,3),
     resting_heart_rate NUMERIC(4,1),
     sleep_score NUMERIC(4,1),
     sleep_duration_hours NUMERIC(4,2),
-    soreness_score INT CHECK (soreness_score >= 1 AND soreness_score <= 5),
-    fatigue_score INT CHECK (fatigue_score >= 1 AND fatigue_score <= 5),
-    stress_score INT CHECK (stress_score >= 1 AND stress_score <= 5),
+    sleep_efficiency_pct NUMERIC(4,1),
+    subjective_score NUMERIC(4,1),
+    soreness_score INT CHECK (soreness_score >= 1 AND soreness_score <= 10),
+    fatigue_score INT CHECK (fatigue_score >= 1 AND fatigue_score <= 10),
+    stress_score INT CHECK (stress_score >= 1 AND stress_score <= 10),
     sore_muscle_groups TEXT[],
     readiness_state TEXT CHECK (readiness_state IN ('OPTIMAL', 'MODERATE', 'REDUCED', 'DEPLETED')),
     recovery_score NUMERIC(5,1) CHECK (recovery_score >= 0 AND recovery_score <= 100),
@@ -399,5 +405,43 @@ CREATE TABLE IF NOT EXISTS workout_templates (
     exercises JSONB DEFAULT '[]',
     is_builtin BOOLEAN DEFAULT FALSE,
     use_count INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
+-- 16. WORKOUT COMPLETION LOGS, WORKLOAD HISTORY, AGENT MEMORY
+-- Free-form log shapes (varies per caller) stored as JSONB payload
+-- plus indexed user_id/timestamp for querying.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS workout_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    completed_at TIMESTAMPTZ DEFAULT NOW(),
+    data JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_workout_logs_user_date ON workout_logs(user_id, completed_at DESC);
+
+CREATE TABLE IF NOT EXISTS workload_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    recorded_at TIMESTAMPTZ DEFAULT NOW(),
+    data JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_workload_history_user_date ON workload_history(user_id, recorded_at DESC);
+
+CREATE TABLE IF NOT EXISTS agent_memory (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    exercise_preferences JSONB DEFAULT '{}'::jsonb,
+    accepted_workouts INT DEFAULT 0,
+    rejected_workouts INT DEFAULT 0,
+    pain_flags JSONB DEFAULT '[]'::jsonb,
+    great_exercises JSONB DEFAULT '[]'::jsonb,
+    adaptation_history JSONB DEFAULT '[]'::jsonb,
+    nlp_feedback_history JSONB DEFAULT '[]'::jsonb,
+    evolution_version INT DEFAULT 1,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

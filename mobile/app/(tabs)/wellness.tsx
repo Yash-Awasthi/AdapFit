@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   Animated,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Wind, Brain, TrendingUp, TrendingDown, Minus, Droplets, Plus } from 'lucide-react-native';
+import { Wind, Brain, TrendingUp, TrendingDown, Minus, Droplets, Plus, Clock } from 'lucide-react-native';
 import { SectionHeader } from '../../src/components';
+import MeditationPlayer from '../../src/components/MeditationPlayer';
 import { api } from '../../src/services/api';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
@@ -36,6 +38,18 @@ interface MoodTrend {
   count: number;
 }
 
+interface MeditationSessionSummary {
+  id: string;
+  name: string;
+  category: string;
+  duration_minutes: number;
+  difficulty: string;
+  benefits: string[];
+  best_time: string;
+  tags: string[];
+  steps_count: number;
+}
+
 const MOOD_EMOJIS = ['', '😢', '😔', '😐', '🙂', '😊', '😄', '😁', '🤩', '🥳', '🌟'];
 const TAGS = ['work_stress', 'good_sleep', 'social', 'exercise', 'meditation', 'nature'];
 const QUICK_DRINKS = [
@@ -59,6 +73,8 @@ export default function WellnessScreen() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [logged, setLogged] = useState(false);
   const [activeBreathing, setActiveBreathing] = useState<string | null>(null);
+  const [meditations, setMeditations] = useState<MeditationSessionSummary[]>([]);
+  const [activeMeditation, setActiveMeditation] = useState<Awaited<ReturnType<typeof api.getMeditationSession>> | null>(null);
   const breathAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -67,14 +83,23 @@ export default function WellnessScreen() {
 
   async function fetchData() {
     try {
-      const [exRes, trendRes, hydData] = await Promise.all([
+      const [exRes, trendRes, hydData, medData] = await Promise.all([
         fetch(`${API}/api/v1/mental-health/breathing-exercises`),
         fetch(`${API}/api/v1/mental-health?user_id=${userId}&days=7`),
         api.getHydrationToday(userId).catch(() => null),
+        api.getMeditationSessions().catch(() => null),
       ]);
       if (exRes.ok) setExercises(await exRes.json());
       if (trendRes.ok) setTrend(await trendRes.json());
       if (hydData) setHydration(hydData);
+      if (medData) setMeditations(medData.sessions);
+    } catch {}
+  }
+
+  async function openMeditation(id: string) {
+    try {
+      const full = await api.getMeditationSession(id);
+      setActiveMeditation(full);
     } catch {}
   }
 
@@ -84,7 +109,9 @@ export default function WellnessScreen() {
       await api.logHydration(userId, amount, 'water');
       const updated = await api.getHydrationToday(userId);
       setHydration(updated);
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not log water', err?.message || String(err));
+    }
   }
 
   async function logMood() {
@@ -103,8 +130,12 @@ export default function WellnessScreen() {
       if (res.ok) {
         setLogged(true);
         fetchData();
+      } else {
+        Alert.alert('Check-in failed', `Server returned ${res.status}.`);
       }
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', err?.message || String(err));
+    }
   }
 
   function toggleTag(tag: string) {
@@ -161,6 +192,16 @@ export default function WellnessScreen() {
     if (trendStatus === 'declining') return <TrendingDown size={16} color={theme.danger} />;
     return <Minus size={16} color={theme.textMuted} />;
   };
+
+  if (activeMeditation) {
+    return (
+      <MeditationPlayer
+        session={activeMeditation}
+        onComplete={() => setActiveMeditation(null)}
+        onClose={() => setActiveMeditation(null)}
+      />
+    );
+  }
 
   return (
     <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -321,6 +362,22 @@ export default function WellnessScreen() {
           )}
         </TouchableOpacity>
       ))}
+
+      {/* Meditation Sessions */}
+      <SectionHeader title="Meditation" />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+        {meditations.map((m) => (
+          <TouchableOpacity key={m.id} style={s.medCard} onPress={() => openMeditation(m.id)}>
+            <Brain size={20} color={theme.primaryLight} />
+            <Text style={s.medName}>{m.name}</Text>
+            <View style={s.medMetaRow}>
+              <Clock size={12} color={theme.textMuted} />
+              <Text style={s.medMeta}>{m.duration_minutes} min</Text>
+            </View>
+            <Text style={s.medMeta}>{m.difficulty}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </ScrollView>
   );
 }
@@ -441,5 +498,16 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
       marginTop: 12,
       fontWeight: '500',
     },
+    medCard: {
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginRight: 12,
+      width: 140,
+      gap: 6,
+    },
+    medName: { fontSize: 14, fontWeight: '600', color: theme.text },
+    medMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    medMeta: { fontSize: 12, color: theme.textMuted, textTransform: 'capitalize' },
   });
 }

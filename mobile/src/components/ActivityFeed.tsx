@@ -22,6 +22,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
 import { useUserStore } from '../stores';
+import { useTheme } from '../services/theme';
 
 const API = API_BASE_URL;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -46,6 +47,7 @@ interface ActivityFeedProps {
 }
 
 export function ActivityFeed({ userId = 'default' }: ActivityFeedProps) {
+  const { theme } = useTheme();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [commentingPost, setCommentingPost] = useState<string | null>(null);
@@ -134,53 +136,53 @@ export function ActivityFeed({ userId = 'default' }: ActivityFeedProps) {
     }
 
     return (
-      <View style={styles.postCard}>
+      <View style={[styles.postCard, { backgroundColor: theme.surface }]}>
         {/* User Header */}
         <View style={styles.postHeader}>
-          <View style={styles.avatar}>
+          <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
             <Text style={styles.avatarText}>{item.user_name.charAt(0).toUpperCase()}</Text>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{item.user_name}</Text>
-            <Text style={styles.timeAgo}>{formatTimeAgo(item.created_at)}</Text>
+            <Text style={[styles.userName, { color: theme.text }]}>{item.user_name}</Text>
+            <Text style={[styles.timeAgo, { color: theme.textMuted }]}>{formatTimeAgo(item.created_at)}</Text>
           </View>
-          <Dumbbell size={16} color="#818CF8" />
+          <Dumbbell size={16} color={theme.primaryLight} />
         </View>
 
         {/* Workout Content */}
         <View style={styles.workoutContent}>
-          <Text style={styles.workoutTitle}>{item.workout_title}</Text>
-          <Text style={styles.exercisesSummary}>{item.exercises_summary}</Text>
+          <Text style={[styles.workoutTitle, { color: theme.text }]}>{item.workout_title}</Text>
+          <Text style={[styles.exercisesSummary, { color: theme.textSecondary }]}>{item.exercises_summary}</Text>
 
           {/* Stats Row */}
           <View style={styles.statsRow}>
-            <View style={styles.statChip}>
-              <Clock size={12} color="#F59E0B" />
-              <Text style={styles.statText}>{item.duration_minutes}m</Text>
+            <View style={[styles.statChip, { backgroundColor: theme.background }]}>
+              <Clock size={12} color={theme.orange} />
+              <Text style={[styles.statText, { color: theme.textSecondary }]}>{item.duration_minutes}m</Text>
             </View>
-            <View style={styles.statChip}>
-              <Flame size={12} color="#EF4444" />
-              <Text style={styles.statText}>{(item.total_volume / 1000).toFixed(1)}k kg</Text>
+            <View style={[styles.statChip, { backgroundColor: theme.background }]}>
+              <Flame size={12} color={theme.danger} />
+              <Text style={[styles.statText, { color: theme.textSecondary }]}>{(item.total_volume / 1000).toFixed(1)}k kg</Text>
             </View>
           </View>
 
           {/* Caption */}
           {item.caption ? (
-            <Text style={styles.caption}>{item.caption}</Text>
+            <Text style={[styles.caption, { color: theme.textSecondary }]}>{item.caption}</Text>
           ) : null}
         </View>
 
         {/* Action Bar */}
-        <View style={styles.actionBar}>
+        <View style={[styles.actionBar, { borderTopColor: theme.border }]}>
           <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
             <Animated.View style={{ transform: [{ scale: likeAnim }] }}>
               <Heart
                 size={20}
-                color={item.is_liked ? '#EF4444' : '#94A3B8'}
-                fill={item.is_liked ? '#EF4444' : 'transparent'}
+                color={item.is_liked ? theme.danger : theme.textSecondary}
+                fill={item.is_liked ? theme.danger : 'transparent'}
               />
             </Animated.View>
-            <Text style={[styles.actionCount, item.is_liked && { color: '#EF4444' }]}>
+            <Text style={[styles.actionCount, { color: item.is_liked ? theme.danger : theme.textSecondary }]}>
               {item.likes_count}
             </Text>
           </TouchableOpacity>
@@ -189,30 +191,30 @@ export function ActivityFeed({ userId = 'default' }: ActivityFeedProps) {
             style={styles.actionBtn}
             onPress={() => setCommentingPost(commentingPost === item.post_id ? null : item.post_id)}
           >
-            <MessageCircle size={20} color="#94A3B8" />
-            <Text style={styles.actionCount}>{item.comments_count}</Text>
+            <MessageCircle size={20} color={theme.textSecondary} />
+            <Text style={[styles.actionCount, { color: theme.textSecondary }]}>{item.comments_count}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionBtn}>
-            <Share2 size={20} color="#94A3B8" />
+            <Share2 size={20} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
 
         {/* Comment Input */}
         {commentingPost === item.post_id && (
-          <View style={styles.commentRow}>
+          <View style={[styles.commentRow, { borderTopColor: theme.border }]}>
             <TextInput
-              style={styles.commentInput}
+              style={[styles.commentInput, { backgroundColor: theme.background, color: theme.text }]}
               value={commentText}
               onChangeText={setCommentText}
               placeholder="Add a comment..."
-              placeholderTextColor="#475569"
+              placeholderTextColor={theme.textMuted}
             />
             <TouchableOpacity
               style={styles.sendBtn}
               onPress={() => addComment(item.post_id)}
             >
-              <Send size={16} color="#818CF8" />
+              <Send size={16} color={theme.primaryLight} />
             </TouchableOpacity>
           </View>
         )}
@@ -223,7 +225,7 @@ export function ActivityFeed({ userId = 'default' }: ActivityFeedProps) {
   if (loading) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Loading feed...</Text>
+        <Text style={[styles.emptyText, { color: theme.textMuted }]}>Loading feed...</Text>
       </View>
     );
   }
@@ -231,9 +233,9 @@ export function ActivityFeed({ userId = 'default' }: ActivityFeedProps) {
   if (posts.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <TrendingUp size={40} color="#334155" />
-        <Text style={styles.emptyTitle}>No Posts Yet</Text>
-        <Text style={styles.emptySubtext}>Complete a workout and share it to see activity here.</Text>
+        <TrendingUp size={40} color={theme.border} />
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>No Posts Yet</Text>
+        <Text style={[styles.emptySubtext, { color: theme.textMuted }]}>Complete a workout and share it to see activity here.</Text>
       </View>
     );
   }
@@ -252,12 +254,11 @@ export function ActivityFeed({ userId = 'default' }: ActivityFeedProps) {
 const styles = StyleSheet.create({
   list: { padding: 12 },
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyText: { color: '#8B96AB', fontSize: 14 },
-  emptyTitle: { fontSize: 18, fontWeight: '600', color: '#F8FAFC', marginTop: 12 },
-  emptySubtext: { fontSize: 13, color: '#8B96AB', marginTop: 4, textAlign: 'center' },
+  emptyText: { fontSize: 14 },
+  emptyTitle: { fontSize: 18, fontWeight: '600', marginTop: 12 },
+  emptySubtext: { fontSize: 13, marginTop: 4, textAlign: 'center' },
 
   postCard: {
-    backgroundColor: '#1E293B',
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
@@ -267,41 +268,38 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#4F46E5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   avatarText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   userInfo: { flex: 1 },
-  userName: { fontSize: 14, fontWeight: '600', color: '#F8FAFC' },
-  timeAgo: { fontSize: 11, color: '#8B96AB' },
+  userName: { fontSize: 14, fontWeight: '600' },
+  timeAgo: { fontSize: 11 },
 
   workoutContent: { marginBottom: 10 },
-  workoutTitle: { fontSize: 16, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 },
-  exercisesSummary: { fontSize: 13, color: '#CBD5E1', marginBottom: 8 },
+  workoutTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  exercisesSummary: { fontSize: 13, marginBottom: 8 },
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   statChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#0F172A',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
-  statText: { fontSize: 11, color: '#CBD5E1', fontWeight: '600' },
-  caption: { fontSize: 13, color: '#94A3B8', fontStyle: 'italic' },
+  statText: { fontSize: 11, fontWeight: '600' },
+  caption: { fontSize: 13, fontStyle: 'italic' },
 
   actionBar: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#334155',
     paddingTop: 10,
     gap: 20,
   },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  actionCount: { fontSize: 13, color: '#94A3B8' },
+  actionCount: { fontSize: 13 },
 
   commentRow: {
     flexDirection: 'row',
@@ -309,17 +307,14 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#334155',
     paddingTop: 10,
   },
   commentInput: {
     flex: 1,
-    backgroundColor: '#0F172A',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13,
-    color: '#F8FAFC',
   },
   sendBtn: { padding: 8 },
 });

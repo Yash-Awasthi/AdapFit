@@ -53,7 +53,7 @@ community_likes: dict = {}  # share_id -> set of user_ids
 async def get_community_feed(
     user_id: str = Query("default"),
     limit: int = Query(20, ge=1, le=100),
-    sort: str = Query("recent", regex="^(recent|popular|following)$"),
+    sort: str = Query("recent", pattern="^(recent|popular|following)$"),
 ):
     """Get the community feed of shared workouts."""
     public_shares = [s for s in shared_workouts.values() if s["is_public"]]

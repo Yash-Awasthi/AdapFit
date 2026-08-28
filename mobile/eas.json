@@ -13,7 +13,10 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://adapfit-production.up.railway.app"
       }
     },
     "production": {
@@ -21,7 +24,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "API_URL": "https://api.adapfit.app"
+        "EXPO_PUBLIC_API_URL": "https://adapfit-production.up.railway.app"
       }
     }
   },

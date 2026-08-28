@@ -335,12 +335,13 @@ async def chat(request: Request, req: ChatRequest):
     llm_source = None
     if req.llm_override:
         ov = req.llm_override
+        override_system = coach_prompts.MINIMAL_SYSTEM
         if ov.provider == "gemini":
-            reply = await _call_gemini(full_prompt, history_dicts, system=system_prompt, api_key=ov.api_key, model=ov.model)
+            reply = await _call_gemini(full_prompt, history_dicts, system=override_system, api_key=ov.api_key, model=ov.model)
         elif ov.provider == "groq":
-            reply = await _call_groq(full_prompt, system=system_prompt, api_key=ov.api_key, model=ov.model)
+            reply = await _call_groq(full_prompt, system=override_system, api_key=ov.api_key, model=ov.model)
         elif ov.provider == "custom":
-            reply = await _call_custom(full_prompt, system=system_prompt, api_key=ov.api_key, base_url=ov.base_url or "", model=ov.model or "")
+            reply = await _call_custom(full_prompt, system=override_system, api_key=ov.api_key, base_url=ov.base_url or "", model=ov.model or "")
         llm_source = ov.provider if reply else "rule_based"
     else:
         reply = await _call_gemini(full_prompt, history_dicts, system=system_prompt)

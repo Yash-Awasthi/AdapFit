@@ -141,6 +141,24 @@ export const api = {
       LONG_CACHE_TTL // 5 min - breathing exercises never change
     ),
 
+  // Meditation
+  getMeditationSessions: () =>
+    request<{
+      sessions: {
+        id: string; name: string; category: string; duration_minutes: number;
+        difficulty: string; benefits: string[]; best_time: string; tags: string[];
+        steps_count: number;
+      }[];
+    }>('/api/v1/meditation', undefined, LONG_CACHE_TTL),
+
+  getMeditationSession: (sessionId: string) =>
+    request<{
+      id: string; name: string; category: string; duration_minutes: number;
+      difficulty: string;
+      steps: { step: number; instruction: string; duration_seconds: number }[];
+      benefits: string[]; best_time: string; tags: string[];
+    }>(`/api/v1/meditation/${sessionId}`, undefined, LONG_CACHE_TTL),
+
   // Trends & Injury Risk
   getAcwr: (userId: string) =>
     request<{ acwr: number; acwr_status: string; acute_workload_7d: number; chronic_workload_28d: number }>(
@@ -235,6 +253,19 @@ export const api = {
   getFullRoutine: (muscles: string[] = ['chest', 'back', 'quadriceps']) =>
     request<any>(`/api/v1/routine/full?target_muscles=${encodeURIComponent(muscles.join(','))}`),
 
+  // Photo-based meal logging
+  photoLogMeal: (imageBase64: string, mealType = 'snack', userId = 'default') =>
+    request<{
+      logged: boolean;
+      record: any;
+      foods: { name: string; portion_grams: number; calories: number }[];
+      confidence: number;
+      suggestions: string[];
+    }>(`/api/v1/diet/photo-log?user_id=${userId}`, {
+      method: 'POST',
+      body: JSON.stringify({ image_base64: imageBase64, meal_type: mealType }),
+    }),
+
   // Voice & Natural Language Workout Logging
   parseVoiceWorkout: (text: string) =>
     request<{
@@ -315,6 +346,16 @@ export const api = {
       '/api/v1/voice-engine/speak',
       { method: 'POST', body: JSON.stringify({ text, voice }) }
     ),
+
+  // Sleep
+  getSleepAnalysis: (userId: string, days = 7) =>
+    request<{
+      score: number; grade: string; consistency_score: number;
+      avg_duration_hours: number; avg_efficiency: number;
+      deep_sleep_pct: number; rem_sleep_pct: number;
+      consistency_trend: string; recommendations: string[];
+      stage_breakdown: { name: string; minutes: number; percentage: number }[];
+    }>(`/api/v1/sleep/analysis?user_id=${userId}&days=${days}`),
 
   // Health Status
   health: () =>

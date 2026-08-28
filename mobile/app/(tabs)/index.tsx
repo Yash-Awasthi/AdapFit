@@ -7,6 +7,7 @@ import { useTheme, CARD_SHADOW } from '../../src/services/theme';
 import { useEnterAnimation } from '../../src/services/devSettings';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
+import { fetchHealthData, HealthBiometrics } from '../../src/services/healthBridge';
 
 const API = API_BASE_URL;
 
@@ -29,11 +30,13 @@ export default function RecoveryScreen() {
   const [loading, setLoading] = useState(true);
   const [hrvTrend] = useState<number[]>([45, 48, 42, 50, 47, 52, 49]);
   const [workoutStreak] = useState(5);
+  const [activity, setActivity] = useState<HealthBiometrics | null>(null);
   const router = useRouter();
   const enter = useEnterAnimation();
 
   useEffect(() => {
     fetchRecovery();
+    fetchHealthData().then(setActivity);
   }, []);
 
   async function fetchRecovery() {
@@ -62,6 +65,22 @@ export default function RecoveryScreen() {
             day: 'numeric',
           })}
         </Text>
+      </Animated.View>
+
+      <Animated.View entering={enter(30)}>
+        <SectionHeader title="Today's Activity" />
+        <View style={styles.metrics}>
+          <MetricCard
+            label="Steps"
+            value={activity?.steps != null ? activity.steps.toLocaleString() : '--'}
+            color={theme.primaryLight}
+          />
+          <MetricCard
+            label="Active Calories"
+            value={activity?.activeCalories != null ? `${activity.activeCalories.toFixed(0)} kcal` : '--'}
+            color={theme.orange}
+          />
+        </View>
       </Animated.View>
 
       <Animated.View entering={enter(60)}>

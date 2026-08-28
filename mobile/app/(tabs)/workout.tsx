@@ -39,11 +39,30 @@ export default function WorkoutScreen() {
   const [showRoutines, setShowRoutines] = useState(false);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [activeTimer, setActiveTimer] = useState<{ section: 'warmup' | 'cooldown'; index: number; remaining: number } | null>(null);
 
   useEffect(() => {
     fetchWorkouts();
     fetchRoutines();
   }, []);
+
+  useEffect(() => {
+    if (!activeTimer) return;
+    if (activeTimer.remaining <= 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setActiveTimer(null);
+      return;
+    }
+    const id = setTimeout(() => {
+      setActiveTimer((t) => (t ? { ...t, remaining: t.remaining - 1 } : t));
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [activeTimer]);
+
+  function startItemTimer(section: 'warmup' | 'cooldown', index: number, duration?: number) {
+    Haptics.selectionAsync();
+    setActiveTimer({ section, index, remaining: duration || 30 });
+  }
 
   async function fetchWorkouts() {
     try {
@@ -153,13 +172,14 @@ export default function WorkoutScreen() {
                     </View>
                     <TouchableOpacity
                       style={s.timerChip}
-                      onPress={() => {
-                        Haptics.selectionAsync();
-                        // Timer would count down from duration
-                      }}
+                      onPress={() => startItemTimer('warmup', idx, item.duration)}
                     >
                       <Timer size={12} color={theme.warning} />
-                      <Text style={s.timerChipText}>Start</Text>
+                      <Text style={s.timerChipText}>
+                        {activeTimer?.section === 'warmup' && activeTimer.index === idx
+                          ? `${activeTimer.remaining}s`
+                          : 'Start'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -184,10 +204,14 @@ export default function WorkoutScreen() {
                     </View>
                     <TouchableOpacity
                       style={[s.timerChip, { backgroundColor: '#1E3A5F' }]}
-                      onPress={() => Haptics.selectionAsync()}
+                      onPress={() => startItemTimer('cooldown', idx, item.duration)}
                     >
                       <Timer size={12} color="#38BDF8" />
-                      <Text style={[s.timerChipText, { color: '#38BDF8' }]}>Start</Text>
+                      <Text style={[s.timerChipText, { color: '#38BDF8' }]}>
+                        {activeTimer?.section === 'cooldown' && activeTimer.index === idx
+                          ? `${activeTimer.remaining}s`
+                          : 'Start'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 ))}

@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../src/services/config';
 import { useUserStore } from '../src/stores';
 import { useTheme } from '../src/services/theme';
+import { ScreenHeader } from '../src/components';
 
 const API = API_BASE_URL;
 
@@ -140,14 +141,7 @@ export default function WorkoutDetailScreen() {
 
   return (
     <ScrollView style={s.container}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <ArrowLeft size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Workout Detail</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Workout Detail" />
 
       {/* Workout Summary */}
       <View style={s.summaryCard}>
@@ -296,15 +290,6 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, padding: 20 },
     loadingText: { color: theme.textMuted, textAlign: 'center', marginTop: 100 },
-
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginTop: 48,
-      marginBottom: 16,
-    },
-    headerTitle: { fontSize: 18, fontWeight: '700', color: theme.text },
 
     // Summary
     summaryCard: {

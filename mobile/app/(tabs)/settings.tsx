@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme, AccentName } from '../../src/services/theme';
+import { NotificationSetup } from '../../src/components/NotificationSetup';
 
 const API = API_BASE_URL;
 
@@ -67,9 +68,12 @@ export default function SettingsScreen() {
         const data = await res.json();
         setApiKey(data.api_key);
         setShowApiKey(true);
+      } else {
+        const detail = await res.text().catch(() => '');
+        Alert.alert('Could not create API key', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
       }
-    } catch {
-      Alert.alert('Could not reach server', 'Backend is unreachable — try again once connected.');
+    } catch (err: any) {
+      Alert.alert('Could not reach server', err?.message || String(err));
     }
   }
 
@@ -202,6 +206,7 @@ export default function SettingsScreen() {
             thumbColor="#fff"
           />
         </View>
+        <NotificationSetup />
       </View>
 
       {/* Data Export */}

@@ -16,6 +16,7 @@ import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync } 
 import { File } from 'expo-file-system';
 import { api } from '../services/api';
 import { speak } from '../services/tts';
+import { useTheme } from '../services/theme';
 
 interface VoiceLoggerModalProps {
   visible: boolean;
@@ -36,6 +37,7 @@ const PRESET_PHRASES = [
 
 // Soundwave bar component
 function SoundwaveBar({ index, isActive }: { index: number; isActive: boolean }) {
+  const { theme } = useTheme();
   const animValue = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
@@ -78,7 +80,7 @@ function SoundwaveBar({ index, isActive }: { index: number; isActive: boolean })
         styles.waveBar,
         {
           height,
-          backgroundColor: isActive ? '#818CF8' : '#334155',
+          backgroundColor: isActive ? theme.primaryLight : theme.border,
         },
       ]}
     />
@@ -86,6 +88,7 @@ function SoundwaveBar({ index, isActive }: { index: number; isActive: boolean })
 }
 
 export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerModalProps) {
+  const { theme } = useTheme();
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [parsedResult, setParsedResult] = useState<any | null>(null);
@@ -216,25 +219,25 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.overlay}>
-        <View style={styles.card}>
+      <View style={[styles.overlay, { backgroundColor: `${theme.background}D9` }]}>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerTitle}>
-              <Mic size={20} color="#818CF8" />
-              <Text style={styles.title}>Voice Workout Logger</Text>
+              <Mic size={20} color={theme.primaryLight} />
+              <Text style={[styles.title, { color: theme.text }]}>Voice Workout Logger</Text>
             </View>
             <TouchableOpacity onPress={onClose}>
-              <X size={20} color="#94A3B8" />
+              <X size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
             Speak or type: "3x10 bench press at 80kg RPE 8"
           </Text>
 
           {/* Soundwave Visualizer */}
-          <View style={styles.waveContainer}>
+          <View style={[styles.waveContainer, { backgroundColor: theme.background }]}>
             {Array.from({ length: 20 }).map((_, i) => (
               <SoundwaveBar key={i} index={i} isActive={isRecording} />
             ))}
@@ -246,8 +249,9 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
               <TouchableOpacity
                 style={[
                   styles.recordBtn,
-                  isRecording && styles.recordBtnActive,
-                  transcribing && styles.recordBtnDisabled,
+                  { backgroundColor: theme.primary },
+                  isRecording && { backgroundColor: theme.danger },
+                  transcribing && { backgroundColor: theme.border },
                 ]}
                 onPress={toggleRecording}
                 disabled={transcribing}
@@ -259,7 +263,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
                 )}
               </TouchableOpacity>
             </Animated.View>
-            <Text style={styles.recordStatus}>
+            <Text style={[styles.recordStatus, { color: theme.textSecondary }]}>
               {transcribing
                 ? 'Transcribing…'
                 : isRecording
@@ -270,42 +274,46 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
 
           {/* Text Input */}
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
             value={inputText}
             onChangeText={setInputText}
             placeholder="Or type your set here..."
-            placeholderTextColor="#475569"
+            placeholderTextColor={theme.textMuted}
             multiline
           />
 
           {/* Presets */}
           <View style={styles.presetContainer}>
-            <Text style={styles.presetLabel}>Quick Presets:</Text>
+            <Text style={[styles.presetLabel, { color: theme.textMuted }]}>Quick Presets:</Text>
             {PRESET_PHRASES.map((phrase, i) => (
               <TouchableOpacity
                 key={i}
-                style={styles.presetChip}
+                style={[styles.presetChip, { backgroundColor: theme.background }]}
                 onPress={() => {
                   setInputText(phrase);
                   handleParse(phrase);
                 }}
               >
-                <Sparkles size={12} color="#818CF8" />
-                <Text style={styles.presetText}>{phrase}</Text>
+                <Sparkles size={12} color={theme.primaryLight} />
+                <Text style={[styles.presetText, { color: theme.textSecondary }]}>{phrase}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {errorText && (
-            <View style={styles.errorBox}>
-              <X size={14} color="#F87171" />
-              <Text style={styles.errorText}>{errorText}</Text>
+            <View style={[styles.errorBox, { backgroundColor: `${theme.danger}1F` }]}>
+              <X size={14} color={theme.danger} />
+              <Text style={[styles.errorText, { color: theme.danger }]}>{errorText}</Text>
             </View>
           )}
 
           {/* Parse Button */}
           <TouchableOpacity
-            style={[styles.parseBtn, (!inputText.trim() || loading || transcribing) && styles.parseBtnDisabled]}
+            style={[
+              styles.parseBtn,
+              { backgroundColor: theme.primary },
+              (!inputText.trim() || loading || transcribing) && styles.parseBtnDisabled,
+            ]}
             onPress={() => handleParse(inputText)}
             disabled={loading || transcribing || !inputText.trim()}
           >
@@ -322,9 +330,9 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
 
           {/* Parsed Result */}
           {parsedResult?.parsed_set && (
-            <View style={styles.resultBox}>
+            <View style={[styles.resultBox, { backgroundColor: theme.background, borderLeftColor: theme.success }]}>
               <View style={styles.resultHeaderRow}>
-                <Text style={styles.resultHeader}>Parsed Set:</Text>
+                <Text style={[styles.resultHeader, { color: theme.text }]}>Parsed Set:</Text>
                 <TouchableOpacity
                   style={styles.playBtn}
                   onPress={() => {
@@ -334,26 +342,26 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
                     );
                   }}
                 >
-                  <Volume2 size={16} color="#818CF8" />
+                  <Volume2 size={16} color={theme.primaryLight} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.resultText}>
+              <Text style={[styles.resultText, { color: theme.textSecondary }]}>
                 Exercise: {parsedResult.parsed_set.exercise_name ?? 'Current'}
               </Text>
-              <Text style={styles.resultText}>
+              <Text style={[styles.resultText, { color: theme.textSecondary }]}>
                 Weight: {parsedResult.parsed_set.weight_kg ?? '--'} kg
               </Text>
-              <Text style={styles.resultText}>
+              <Text style={[styles.resultText, { color: theme.textSecondary }]}>
                 Reps: {parsedResult.parsed_set.reps ?? '--'}
               </Text>
-              <Text style={styles.resultText}>
+              <Text style={[styles.resultText, { color: theme.textSecondary }]}>
                 RPE: {parsedResult.parsed_set.rpe ?? '--'}
               </Text>
-              <Text style={styles.confidenceText}>
+              <Text style={[styles.confidenceText, { color: theme.success }]}>
                 Confidence: {((parsedResult.confidence || 0) * 100).toFixed(0)}%
               </Text>
 
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
+              <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: theme.success }]} onPress={handleConfirm}>
                 <Check size={18} color="#0F172A" />
                 <Text style={styles.confirmBtnText}>Apply & Complete Set</Text>
               </TouchableOpacity>
@@ -368,16 +376,13 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
     justifyContent: 'flex-end',
   },
   card: {
-    backgroundColor: '#1E293B',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
     borderTopWidth: 1,
-    borderTopColor: '#334155',
   },
   header: {
     flexDirection: 'row',
@@ -386,8 +391,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   headerTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { fontSize: 18, fontWeight: '700', color: '#F8FAFC' },
-  subtitle: { fontSize: 13, color: '#94A3B8', marginBottom: 16 },
+  title: { fontSize: 18, fontWeight: '700' },
+  subtitle: { fontSize: 13, marginBottom: 16 },
 
   // Soundwave
   waveContainer: {
@@ -397,7 +402,6 @@ const styles = StyleSheet.create({
     gap: 3,
     height: 50,
     marginBottom: 16,
-    backgroundColor: '#0F172A',
     borderRadius: 12,
     paddingHorizontal: 12,
   },
@@ -416,61 +420,48 @@ const styles = StyleSheet.create({
   },
   errorBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)', borderRadius: 10, padding: 10, marginBottom: 10,
+    borderRadius: 10, padding: 10, marginBottom: 10,
   },
-  errorText: { color: '#F87171', fontSize: 12, flex: 1 },
+  errorText: { fontSize: 12, flex: 1 },
 
   recordBtn: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#4F46E5',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  recordBtnActive: {
-    backgroundColor: '#EF4444',
-  },
-  recordBtnDisabled: {
-    backgroundColor: '#475569',
-  },
   recordStatus: {
     fontSize: 13,
-    color: '#94A3B8',
     flex: 1,
   },
 
   // Input
   input: {
-    backgroundColor: '#0F172A',
     borderRadius: 12,
     padding: 14,
     fontSize: 14,
-    color: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#334155',
     minHeight: 60,
     marginBottom: 12,
   },
 
   // Presets
   presetContainer: { marginBottom: 16 },
-  presetLabel: { fontSize: 12, color: '#8B96AB', marginBottom: 6 },
+  presetLabel: { fontSize: 12, marginBottom: 6 },
   presetChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#0F172A',
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
     marginBottom: 6,
   },
-  presetText: { fontSize: 12, color: '#CBD5E1' },
+  presetText: { fontSize: 12 },
 
   // Parse button
   parseBtn: {
-    backgroundColor: '#4F46E5',
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
@@ -485,11 +476,9 @@ const styles = StyleSheet.create({
 
   // Result
   resultBox: {
-    backgroundColor: '#0F172A',
     borderRadius: 12,
     padding: 14,
     borderLeftWidth: 4,
-    borderLeftColor: '#22C55E',
     marginTop: 8,
   },
   resultHeaderRow: {
@@ -498,16 +487,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  resultHeader: { fontSize: 14, fontWeight: '700', color: '#F8FAFC' },
+  resultHeader: { fontSize: 14, fontWeight: '700' },
   playBtn: { padding: 4 },
-  resultText: { fontSize: 13, color: '#CBD5E1', marginBottom: 2 },
-  confidenceText: { fontSize: 11, color: '#22C55E', marginTop: 4, fontWeight: '600' },
+  resultText: { fontSize: 13, marginBottom: 2 },
+  confidenceText: { fontSize: 11, marginTop: 4, fontWeight: '600' },
   confirmBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#22C55E',
     borderRadius: 8,
     padding: 12,
     marginTop: 10,

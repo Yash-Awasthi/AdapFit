@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Calendar, TrendingUp, Zap, Dumbbell, Coffee } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { LoadingScreen } from '../../src/components';
@@ -75,8 +75,15 @@ export default function PeriodizationScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ goal, current_readiness: 'MODERATE' }),
       });
-      if (res.ok) setPlan(await res.json());
-    } catch {}
+      if (res.ok) {
+        setPlan(await res.json());
+      } else {
+        const detail = await res.text().catch(() => '');
+        Alert.alert('Could not generate plan', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', err?.message || String(err));
+    }
   }
 
   if (loading) return <LoadingScreen />;

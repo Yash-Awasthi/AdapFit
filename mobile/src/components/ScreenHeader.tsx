@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useTheme } from '../services/theme';
 
-export function ScreenHeader({ title }: { title: string }) {
+export function ScreenHeader({ title, right }: { title: string; right?: React.ReactNode }) {
   const router = useRouter();
   const { theme } = useTheme();
   return (
@@ -13,7 +13,7 @@ export function ScreenHeader({ title }: { title: string }) {
         <ChevronLeft size={22} color={theme.text} />
       </TouchableOpacity>
       <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
-      <View style={styles.backBtn} />
+      <View style={styles.backBtn}>{right}</View>
     </View>
   );
 }
