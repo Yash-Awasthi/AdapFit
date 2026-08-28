@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Switch, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Check, Trash2, Zap } from 'lucide-react-native';
+import { Check, Trash2, Zap } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../src/services/theme';
 import { useDevSettings, LlmProvider } from '../../src/services/devSettings';
 import { api } from '../../src/services/api';
+import { ScreenHeader } from '../../src/components';
 
 const PROVIDERS: { id: LlmProvider; label: string; hint: string }[] = [
   { id: 'gemini', label: 'Gemini', hint: 'Google AI Studio key — free tier available' },
@@ -79,15 +80,14 @@ export default function DevToolsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronLeft size={22} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Dev Tools</Text>
-        <TouchableOpacity onPress={handleSave} style={styles.backBtn}>
-          <Check size={22} color={theme.primaryLight} />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Dev Tools"
+        right={
+          <TouchableOpacity onPress={handleSave} hitSlop={10}>
+            <Check size={22} color={theme.primaryLight} />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>AI Coach — bring your own key</Text>
@@ -167,12 +167,6 @@ export default function DevToolsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingTop: 56, paddingBottom: 12,
-  },
-  backBtn: { padding: 8, width: 38 },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
   content: { padding: 20, paddingBottom: 100 },
   sectionLabel: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   sectionHint: { fontSize: 12, lineHeight: 17, marginBottom: 16 },

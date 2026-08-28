@@ -21,21 +21,21 @@ class UserRepository:
         client = await db.get_async_client()
         if not client:
             return user_data
-        result = client.table("users").insert(user_data).execute()
+        result = await client.table("users").insert(user_data).execute()
         return result.data[0] if result.data else user_data
 
     async def get(self, user_id: int) -> Optional[dict]:
         client = await db.get_async_client()
         if not client:
             return None
-        result = client.table("users").select("*").eq("id", user_id).execute()
+        result = await client.table("users").select("*").eq("id", user_id).execute()
         return result.data[0] if result.data else None
 
     async def update(self, user_id: int, updates: dict) -> Optional[dict]:
         client = await db.get_async_client()
         if not client:
             return None
-        result = client.table("users").update(updates).eq("id", user_id).execute()
+        result = await client.table("users").update(updates).eq("id", user_id).execute()
         return result.data[0] if result.data else None
 
 
@@ -45,14 +45,14 @@ class BaselineRepository:
         if not client:
             return baseline
         baseline["user_id"] = user_id
-        result = client.table("user_baselines").upsert(baseline).execute()
+        result = await client.table("user_baselines").upsert(baseline).execute()
         return result.data[0] if result.data else baseline
 
     async def get(self, user_id: int) -> Optional[dict]:
         client = await db.get_async_client()
         if not client:
             return None
-        result = client.table("user_baselines").select("*").eq("user_id", user_id).execute()
+        result = await client.table("user_baselines").select("*").eq("user_id", user_id).execute()
         return result.data[0] if result.data else None
 
 
@@ -62,7 +62,7 @@ class RecoveryLogRepository:
         if not client:
             return log
         log["user_id"] = user_id
-        result = client.table("recovery_logs").insert(log).execute()
+        result = await client.table("daily_recovery_logs").insert(log).execute()
         return result.data[0] if result.data else log
 
     async def get(self, user_id: int, days: int = 28) -> List[dict]:
@@ -70,8 +70,8 @@ class RecoveryLogRepository:
         client = await db.get_async_client()
         if not client:
             return []
-        result = (
-            client.table("recovery_logs")
+        result = await (
+            client.table("daily_recovery_logs")
             .select("*")
             .eq("user_id", user_id)
             .order("log_date", desc=True)
@@ -94,14 +94,14 @@ class WorkoutRepository:
             workout["warmup"] = json.dumps(workout["warmup"])
         if "cooldown" in workout and isinstance(workout["cooldown"], list):
             workout["cooldown"] = json.dumps(workout["cooldown"])
-        result = client.table("workouts").insert(workout).execute()
+        result = await client.table("workouts").insert(workout).execute()
         return result.data[0] if result.data else workout
 
     async def get(self, user_id: int, days: int = 14) -> List[dict]:
         client = await db.get_async_client()
         if not client:
             return []
-        result = (
+        result = await (
             client.table("workouts")
             .select("*")
             .eq("user_id", user_id)
@@ -120,14 +120,14 @@ class WorkoutLogRepository:
         log["user_id"] = user_id
         if "logged_exercises" in log and isinstance(log["logged_exercises"], list):
             log["logged_exercises"] = json.dumps(log["logged_exercises"])
-        result = client.table("workout_logs").insert(log).execute()
+        result = await client.table("workout_logs").insert(log).execute()
         return result.data[0] if result.data else log
 
     async def get(self, user_id: int, days: int = 28) -> List[dict]:
         client = await db.get_async_client()
         if not client:
             return []
-        result = (
+        result = await (
             client.table("workout_logs")
             .select("*")
             .eq("user_id", user_id)
@@ -144,14 +144,14 @@ class WorkloadRepository:
         if not client:
             return entry
         entry["user_id"] = user_id
-        result = client.table("workload_history").insert(entry).execute()
+        result = await client.table("workload_history").insert(entry).execute()
         return result.data[0] if result.data else entry
 
     async def get(self, user_id: int, days: int = 28) -> List[dict]:
         client = await db.get_async_client()
         if not client:
             return []
-        result = (
+        result = await (
             client.table("workload_history")
             .select("*")
             .eq("user_id", user_id)
@@ -176,7 +176,7 @@ class AgentMemoryRepository:
                 "nlp_feedback_history": [],
                 "evolution_version": 1,
             }
-        result = client.table("agent_memory").select("*").eq("user_id", user_id).execute()
+        result = await client.table("agent_memory").select("*").eq("user_id", user_id).execute()
         if result.data:
             return result.data[0]
         # Create default memory
@@ -191,14 +191,14 @@ class AgentMemoryRepository:
             "nlp_feedback_history": [],
             "evolution_version": 1,
         }
-        client.table("agent_memory").insert(default).execute()
+        await client.table("agent_memory").insert(default).execute()
         return default
 
     async def update(self, user_id: int, updates: dict) -> dict:
         client = await db.get_async_client()
         if not client:
             return updates
-        result = client.table("agent_memory").update(updates).eq("user_id", user_id).execute()
+        result = await client.table("agent_memory").update(updates).eq("user_id", user_id).execute()
         return result.data[0] if result.data else updates
 
 

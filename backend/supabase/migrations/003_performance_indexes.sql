@@ -64,11 +64,6 @@ CREATE INDEX IF NOT EXISTS idx_challenge_participants
 -- Partial indexes for filtered queries (smaller, faster)
 -- ============================================================
 
--- Pending sync items only
-CREATE INDEX IF NOT EXISTS idx_sync_pending_only
-    ON sync_queue(created_at)
-    WHERE synced = 0;
-
 -- Active challenges only
 CREATE INDEX IF NOT EXISTS idx_challenges_active
     ON fitness_challenges(category)

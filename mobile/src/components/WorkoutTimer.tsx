@@ -15,6 +15,7 @@ import {
 import { Play, Pause, RotateCcw, SkipForward, Bell } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { speak } from '../../src/services/tts';
+import { useTheme } from '../services/theme';
 
 type TimerMode = 'countdown' | 'rest' | 'interval' | 'amrap';
 
@@ -39,6 +40,7 @@ export function WorkoutTimer({
   onComplete,
   onTick,
 }: WorkoutTimerProps) {
+  const { theme } = useTheme();
   const [remaining, setRemaining] = useState(initialSeconds);
   const [isRunning, setIsRunning] = useState(false);
   const [currentRound, setCurrentRound] = useState(1);
@@ -175,34 +177,49 @@ export function WorkoutTimer({
       {/* Phase Indicator (interval mode) */}
       {mode === 'interval' && (
         <View style={styles.phaseRow}>
-          <View style={[styles.phaseChip, isWorkPhase && styles.phaseChipWork]}>
-            <Text style={[styles.phaseText, isWorkPhase && styles.phaseTextWork]}>WORK</Text>
+          <View
+            style={[
+              styles.phaseChip,
+              { backgroundColor: isWorkPhase ? `${theme.success}26` : theme.surfaceHover },
+            ]}
+          >
+            <Text style={[styles.phaseText, { color: isWorkPhase ? theme.success : theme.textMuted }]}>WORK</Text>
           </View>
-          <Text style={styles.roundText}>Round {currentRound}/{rounds}</Text>
-          <View style={[styles.phaseChip, !isWorkPhase && styles.phaseChipRest]}>
-            <Text style={[styles.phaseText, !isWorkPhase && styles.phaseTextRest]}>REST</Text>
+          <Text style={[styles.roundText, { color: theme.text }]}>Round {currentRound}/{rounds}</Text>
+          <View
+            style={[
+              styles.phaseChip,
+              { backgroundColor: !isWorkPhase ? `${theme.primary}26` : theme.surfaceHover },
+            ]}
+          >
+            <Text style={[styles.phaseText, { color: !isWorkPhase ? theme.primary : theme.textMuted }]}>REST</Text>
           </View>
         </View>
       )}
 
       {/* Timer Display */}
       <Animated.View style={[styles.timerContainer, { transform: [{ scale: pulseAnim }] }]}>
-        <Text style={[styles.timerText, isUrgent && styles.timerUrgent, isComplete && styles.timerComplete]}>
+        <Text
+          style={[
+            styles.timerText,
+            { color: isUrgent ? theme.danger : isComplete ? theme.success : theme.text },
+          ]}
+        >
           {formatTime(remaining)}
         </Text>
-        <Text style={styles.timerLabel}>
+        <Text style={[styles.timerLabel, { color: theme.textMuted }]}>
           {mode === 'interval' ? (isWorkPhase ? 'Work' : 'Rest') : 'Remaining'}
         </Text>
       </Animated.View>
 
       {/* Progress Bar */}
-      <View style={styles.progressBg}>
+      <View style={[styles.progressBg, { backgroundColor: theme.surfaceHover }]}>
         <Animated.View
           style={[
             styles.progressFill,
             {
               width: progressWidth,
-              backgroundColor: isUrgent ? '#EF4444' : isWorkPhase ? '#22C55E' : '#3B82F6',
+              backgroundColor: isUrgent ? theme.danger : isWorkPhase ? theme.success : theme.primary,
             },
           ]}
         />
@@ -211,10 +228,10 @@ export function WorkoutTimer({
       {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity style={styles.controlBtn} onPress={reset}>
-          <RotateCcw size={20} color="#CBD5E1" />
+          <RotateCcw size={20} color={theme.textSecondary} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.playBtn, { backgroundColor: isRunning ? '#EF4444' : '#22C55E' }]}
+          style={[styles.playBtn, { backgroundColor: isRunning ? theme.danger : theme.success }]}
           onPress={toggle}
         >
           {isRunning ? (
@@ -236,15 +253,15 @@ export function WorkoutTimer({
               }
             }}
           >
-            <SkipForward size={20} color="#CBD5E1" />
+            <SkipForward size={20} color={theme.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
 
       {/* Audio cue indicator */}
       <View style={styles.cueIndicator}>
-        <Bell size={12} color={isRunning ? '#F59E0B' : '#334155'} />
-        <Text style={[styles.cueText, isRunning && { color: '#F59E0B' }]}>Audio cues active</Text>
+        <Bell size={12} color={isRunning ? theme.warning : theme.border} />
+        <Text style={[styles.cueText, { color: isRunning ? theme.warning : theme.border }]}>Audio cues active</Text>
       </View>
     </View>
   );
@@ -257,25 +274,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: '#334155',
   },
-  phaseChipWork: { backgroundColor: '#052E16' },
-  phaseChipRest: { backgroundColor: '#1E3A5F' },
-  phaseText: { fontSize: 12, fontWeight: '700', color: '#8B96AB' },
-  phaseTextWork: { color: '#22C55E' },
-  phaseTextRest: { color: '#3B82F6' },
-  roundText: { fontSize: 14, fontWeight: '600', color: '#F8FAFC' },
+  phaseText: { fontSize: 12, fontWeight: '700' },
+  roundText: { fontSize: 14, fontWeight: '600' },
 
   timerContainer: { alignItems: 'center', marginBottom: 20 },
-  timerText: { fontSize: 64, fontWeight: '800', color: '#F8FAFC', fontVariant: ['tabular-nums'] },
-  timerUrgent: { color: '#EF4444' },
-  timerComplete: { color: '#22C55E' },
-  timerLabel: { fontSize: 14, color: '#8B96AB', marginTop: 4 },
+  timerText: { fontSize: 64, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  timerLabel: { fontSize: 14, marginTop: 4 },
 
   progressBg: {
     width: 200,
     height: 6,
-    backgroundColor: '#334155',
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 24,
@@ -287,5 +296,5 @@ const styles = StyleSheet.create({
   playBtn: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
 
   cueIndicator: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cueText: { fontSize: 11, color: '#334155' },
+  cueText: { fontSize: 11 },
 });

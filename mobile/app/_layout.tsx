@@ -60,7 +60,7 @@ function RootStack() {
         <Stack.Screen name="form-checker" options={{ headerShown: false }} />
       </Stack>
       {profile && (
-        <View style={{ position: "absolute", top: 54, right: 12 }} pointerEvents="none">
+        <View style={{ position: "absolute", top: 96, right: 12 }} pointerEvents="none">
           <SyncStatusBadge />
         </View>
       )}

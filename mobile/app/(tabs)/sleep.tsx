@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Moon, Plus, Trash2, TrendingUp, TrendingDown, Minus, MinusCircle, PlusCircle } from 'lucide-react-native';
 import Svg, { Circle, Rect } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -83,16 +83,28 @@ export default function SleepScreen() {
       if (res.ok) {
         setShowForm(false);
         fetchData();
+      } else {
+        const detail = await res.text().catch(() => '');
+        Alert.alert('Could not save sleep log', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
       }
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', `${API}\n\n${err?.message || String(err)}`);
+    }
   }
 
   async function deleteLog(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const res = await fetch(`${API}/api/v1/sleep/logs/${id}?user_id=${userId}`, { method: 'DELETE' });
-      if (res.ok) fetchData();
-    } catch {}
+      if (res.ok) {
+        fetchData();
+      } else {
+        const detail = await res.text().catch(() => '');
+        Alert.alert('Could not delete sleep log', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', `${API}\n\n${err?.message || String(err)}`);
+    }
   }
 
   function ScoreRing({ score, color }: { score: number; color: string }) {

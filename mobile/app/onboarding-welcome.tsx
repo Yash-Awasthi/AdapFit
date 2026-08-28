@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Heart, Dumbbell, Brain, MessageCircle } from 'lucide-react-native';
 import { Button } from '../src/components';
@@ -28,7 +28,10 @@ export default function OnboardingScreen() {
   const s = makeStyles(theme);
 
   async function handleStart() {
-    if (!email.trim()) return;
+    if (!email.trim()) {
+      Alert.alert('Email required', 'Enter an email to continue.');
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     try {
@@ -54,8 +57,13 @@ export default function OnboardingScreen() {
         });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.replace('/(tabs)');
+      } else {
+        const detail = await res.text().catch(() => '');
+        Alert.alert('Sign-up failed', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
       }
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', `${API_BASE_URL}\n\n${err?.message || String(err)}`);
+    }
     setLoading(false);
   }
 

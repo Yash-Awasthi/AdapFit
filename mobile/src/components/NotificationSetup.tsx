@@ -4,6 +4,7 @@ import { Bell, BellOff, Moon, Dumbbell, Activity, Droplets } from 'lucide-react-
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
 import { useUserStore } from '../stores';
+import { useTheme } from '../services/theme';
 
 const API = API_BASE_URL;
 
@@ -34,6 +35,7 @@ const TYPE_ICONS: Record<string, any> = {
 };
 
 export function NotificationSetup() {
+  const { theme } = useTheme();
   const userId = useUserStore((s) => s.userId);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [prefs, setPrefs] = useState<Preferences | null>(null);
@@ -82,37 +84,37 @@ export function NotificationSetup() {
     } catch {}
   }
 
-  if (loading) return <View style={styles.loading}><Text style={styles.loadingText}>Loading...</Text></View>;
+  if (loading) return <View style={styles.loading}><Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading...</Text></View>;
 
   return (
     <View style={styles.container}>
       {notifications.length === 0 ? (
         <View style={styles.empty}>
-          <BellOff size={32} color="#334155" />
-          <Text style={styles.emptyTitle}>No Notifications</Text>
-          <Text style={styles.emptyDesc}>Set up reminders to stay on track.</Text>
-          <TouchableOpacity style={styles.setupBtn} onPress={setupDefaults}>
+          <BellOff size={32} color={theme.textMuted} />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>No Notifications</Text>
+          <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>Set up reminders to stay on track.</Text>
+          <TouchableOpacity style={[styles.setupBtn, { backgroundColor: theme.primary }]} onPress={setupDefaults}>
             <Bell size={16} color="#fff" />
             <Text style={styles.setupBtnText}>Setup Defaults</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <>
-          <Text style={styles.sectionTitle}>Scheduled Reminders</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Scheduled Reminders</Text>
           {notifications.map((n) => {
             const Icon = TYPE_ICONS[n.type] || Bell;
             return (
-              <View key={n.id} style={styles.notifCard}>
-                <View style={styles.notifIcon}>
-                  <Icon size={18} color="#818CF8" />
+              <View key={n.id} style={[styles.notifCard, { backgroundColor: theme.surface }]}>
+                <View style={[styles.notifIcon, { backgroundColor: theme.primaryBg }]}>
+                  <Icon size={18} color={theme.primaryLight} />
                 </View>
                 <View style={styles.notifInfo}>
-                  <Text style={styles.notifTitle}>{n.title}</Text>
-                  <Text style={styles.notifBody}>{n.body}</Text>
-                  {n.recurring && <Text style={styles.notifRecurring}>Recurring</Text>}
+                  <Text style={[styles.notifTitle, { color: theme.text }]}>{n.title}</Text>
+                  <Text style={[styles.notifBody, { color: theme.textSecondary }]}>{n.body}</Text>
+                  {n.recurring && <Text style={[styles.notifRecurring, { color: theme.primaryLight }]}>Recurring</Text>}
                 </View>
                 <TouchableOpacity onPress={() => deleteNotification(n.id)}>
-                  <BellOff size={16} color="#EF4444" />
+                  <BellOff size={16} color={theme.danger} />
                 </TouchableOpacity>
               </View>
             );
@@ -122,7 +124,7 @@ export function NotificationSetup() {
 
       {prefs && (
         <>
-          <Text style={styles.sectionTitle}>Preferences</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Preferences</Text>
           {[
             { key: 'workout_reminders', label: 'Workout Reminders' },
             { key: 'recovery_checkins', label: 'Recovery Check-ins' },
@@ -130,19 +132,19 @@ export function NotificationSetup() {
             { key: 'hydration', label: 'Hydration Alerts' },
             { key: 'streak_alerts', label: 'Streak Alerts' },
           ].map(({ key, label }) => (
-            <View key={key} style={styles.prefRow}>
-              <Text style={styles.prefLabel}>{label}</Text>
+            <View key={key} style={[styles.prefRow, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.prefLabel, { color: theme.textSecondary }]}>{label}</Text>
               <Switch
                 value={(prefs as any)[key]}
                 onValueChange={(v) => updatePref(key, v)}
-                trackColor={{ false: '#334155', true: '#4F46E5' }}
-                thumbColor="#F8FAFC"
+                trackColor={{ false: theme.surfaceHover, true: theme.primary }}
+                thumbColor={theme.text}
               />
             </View>
           ))}
-          <View style={styles.quietRow}>
-            <Text style={styles.prefLabel}>Quiet Hours</Text>
-            <Text style={styles.quietValue}>{prefs.quiet_hours_start} - {prefs.quiet_hours_end}</Text>
+          <View style={[styles.quietRow, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.prefLabel, { color: theme.textSecondary }]}>Quiet Hours</Text>
+            <Text style={[styles.quietValue, { color: theme.textSecondary }]}>{prefs.quiet_hours_start} - {prefs.quiet_hours_end}</Text>
           </View>
         </>
       )}
@@ -153,36 +155,36 @@ export function NotificationSetup() {
 const styles = StyleSheet.create({
   container: { paddingBottom: 20 },
   loading: { padding: 40, alignItems: 'center' },
-  loadingText: { color: '#94A3B8', fontSize: 14 },
+  loadingText: { fontSize: 14 },
   empty: { alignItems: 'center', padding: 30 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#F8FAFC', marginTop: 12 },
-  emptyDesc: { fontSize: 13, color: '#94A3B8', marginTop: 4, marginBottom: 16 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', marginTop: 12 },
+  emptyDesc: { fontSize: 13, marginTop: 4, marginBottom: 16 },
   setupBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#4F46E5', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12,
+    borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12,
   },
   setupBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#F8FAFC', marginTop: 16, marginBottom: 8 },
+  sectionTitle: { fontSize: 14, fontWeight: '600', marginTop: 16, marginBottom: 8 },
   notifCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#1E293B',
+    flexDirection: 'row', alignItems: 'center',
     borderRadius: 12, padding: 12, marginBottom: 8, gap: 10,
   },
   notifIcon: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(129,140,248,0.15)',
+    width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
   },
   notifInfo: { flex: 1 },
-  notifTitle: { fontSize: 14, fontWeight: '500', color: '#F8FAFC' },
-  notifBody: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-  notifRecurring: { fontSize: 11, color: '#818CF8', marginTop: 2 },
+  notifTitle: { fontSize: 14, fontWeight: '500' },
+  notifBody: { fontSize: 12, marginTop: 2 },
+  notifRecurring: { fontSize: 11, marginTop: 2 },
   prefRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#1E293B', borderRadius: 10, padding: 14, marginBottom: 6,
+    borderRadius: 10, padding: 14, marginBottom: 6,
   },
-  prefLabel: { fontSize: 14, color: '#CBD5E1' },
+  prefLabel: { fontSize: 14 },
   quietRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#1E293B', borderRadius: 10, padding: 14, marginTop: 8,
+    borderRadius: 10, padding: 14, marginTop: 8,
   },
-  quietValue: { fontSize: 13, color: '#94A3B8' },
+  quietValue: { fontSize: 13 },
 });

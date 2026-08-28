@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTheme } from '../services/theme';
 
 interface HeatmapProps {
   workoutDates: string[]; // ISO date strings
@@ -17,7 +18,7 @@ interface DayData {
   level: 0 | 1 | 2 | 3 | 4; // intensity levels
 }
 
-const LEVEL_COLORS = ['#1E293B', '#1E3A1E', '#22C55E', '#16A34A', '#15803D'];
+const INTENSITY_COLORS = ['#1E3A1E', '#22C55E', '#16A34A', '#15803D']; // levels 1-4, empty (0) comes from theme
 const LEVEL_LABELS = ['No workout', 'Light', 'Moderate', 'Hard', 'Intense'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
@@ -50,7 +51,9 @@ function computeLevels(days: DayData[]): DayData[] {
 }
 
 export function WorkoutHeatmap({ workoutDates, year = new Date().getFullYear() }: HeatmapProps) {
+  const { theme } = useTheme();
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
+  const levelColors = [theme.surfaceHover, ...INTENSITY_COLORS];
 
   // Build heatmap data
   const days = getDaysInYear(year);
@@ -107,20 +110,20 @@ export function WorkoutHeatmap({ workoutDates, year = new Date().getFullYear() }
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.surface }]}>
       {/* Stats Header */}
       <View style={styles.statsRow}>
         <View style={styles.stat}>
-          <Text style={styles.statValue}>{totalWorkouts}</Text>
-          <Text style={styles.statLabel}>workouts</Text>
+          <Text style={[styles.statValue, { color: theme.text }]}>{totalWorkouts}</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>workouts</Text>
         </View>
         <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: '#F59E0B' }]}>{currentStreak}</Text>
-          <Text style={styles.statLabel}>current streak</Text>
+          <Text style={[styles.statValue, { color: theme.warning }]}>{currentStreak}</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>current streak</Text>
         </View>
         <View style={styles.stat}>
-          <Text style={[styles.statValue, { color: '#22C55E' }]}>{bestStreak}</Text>
-          <Text style={styles.statLabel}>best streak</Text>
+          <Text style={[styles.statValue, { color: theme.success }]}>{bestStreak}</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>best streak</Text>
         </View>
       </View>
 
@@ -129,7 +132,7 @@ export function WorkoutHeatmap({ workoutDates, year = new Date().getFullYear() }
         {monthLabels.map((m, i) => (
           <Text
             key={i}
-            style={[styles.monthLabel, { marginLeft: m.weekIndex === 0 ? 0 : 4 }]}
+            style={[styles.monthLabel, { color: theme.textMuted, marginLeft: m.weekIndex === 0 ? 0 : 4 }]}
           >
             {m.month}
           </Text>
@@ -141,7 +144,7 @@ export function WorkoutHeatmap({ workoutDates, year = new Date().getFullYear() }
         {/* Day labels */}
         <View style={styles.dayLabels}>
           {DAYS.map((d, i) => (
-            <Text key={i} style={styles.dayLabel}>{d}</Text>
+            <Text key={i} style={[styles.dayLabel, { color: theme.textMuted }]}>{d}</Text>
           ))}
         </View>
 
@@ -154,7 +157,7 @@ export function WorkoutHeatmap({ workoutDates, year = new Date().getFullYear() }
                   key={di}
                   style={[
                     styles.dayCell,
-                    { backgroundColor: day.date ? LEVEL_COLORS[day.level] : 'transparent' },
+                    { backgroundColor: day.date ? levelColors[day.level] : 'transparent' },
                   ]}
                   onPress={() => day.date && setSelectedDay(day)}
                   disabled={!day.date}
@@ -167,21 +170,21 @@ export function WorkoutHeatmap({ workoutDates, year = new Date().getFullYear() }
 
       {/* Legend */}
       <View style={styles.legend}>
-        <Text style={styles.legendLabel}>Less</Text>
-        {LEVEL_COLORS.map((color, i) => (
+        <Text style={[styles.legendLabel, { color: theme.textMuted }]}>Less</Text>
+        {levelColors.map((color, i) => (
           <View key={i} style={[styles.legendCell, { backgroundColor: color }]} />
         ))}
-        <Text style={styles.legendLabel}>More</Text>
+        <Text style={[styles.legendLabel, { color: theme.textMuted }]}>More</Text>
       </View>
 
       {/* Selected Day Tooltip */}
       {selectedDay && selectedDay.date && (
-        <View style={styles.tooltip}>
-          <Text style={styles.tooltipText}>
+        <View style={[styles.tooltip, { backgroundColor: theme.background }]}>
+          <Text style={[styles.tooltipText, { color: theme.textSecondary }]}>
             {selectedDay.date}: {selectedDay.count} workout{selectedDay.count !== 1 ? 's' : ''} — {LEVEL_LABELS[selectedDay.level]}
           </Text>
           <TouchableOpacity onPress={() => setSelectedDay(null)}>
-            <Text style={styles.tooltipClose}>x</Text>
+            <Text style={[styles.tooltipClose, { color: theme.textMuted }]}>x</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -230,7 +233,6 @@ function computeBestStreak(dates: string[]): number {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#1E293B',
     borderRadius: 12,
     padding: 12,
   },
@@ -240,8 +242,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   stat: { alignItems: 'center' },
-  statValue: { fontSize: 20, fontWeight: '800', color: '#F8FAFC' },
-  statLabel: { fontSize: 11, color: '#8B96AB' },
+  statValue: { fontSize: 20, fontWeight: '800' },
+  statLabel: { fontSize: 11 },
   monthRow: {
     flexDirection: 'row',
     marginBottom: 4,
@@ -249,12 +251,11 @@ const styles = StyleSheet.create({
   },
   monthLabel: {
     fontSize: 10,
-    color: '#8B96AB',
     width: 30,
   },
   grid: { flexDirection: 'row' },
   dayLabels: { marginRight: 4, justifyContent: 'space-between' },
-  dayLabel: { fontSize: 9, color: '#8B96AB', height: 12, textAlign: 'right' },
+  dayLabel: { fontSize: 9, height: 12, textAlign: 'right' },
   weeksContainer: { flexDirection: 'row', gap: 2 },
   weekColumn: { gap: 2 },
   dayCell: {
@@ -269,17 +270,16 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 8,
   },
-  legendLabel: { fontSize: 9, color: '#8B96AB' },
+  legendLabel: { fontSize: 9 },
   legendCell: { width: 11, height: 11, borderRadius: 2 },
   tooltip: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0F172A',
     borderRadius: 8,
     padding: 8,
     marginTop: 8,
   },
-  tooltipText: { fontSize: 11, color: '#CBD5E1', flex: 1 },
-  tooltipClose: { fontSize: 14, color: '#8B96AB', marginLeft: 8 },
+  tooltipText: { fontSize: 11, flex: 1 },
+  tooltipClose: { fontSize: 14, marginLeft: 8 },
 });

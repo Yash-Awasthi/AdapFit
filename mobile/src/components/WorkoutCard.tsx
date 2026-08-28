@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
+import { useTheme } from '../services/theme';
 
 interface Exercise {
   name: string;
@@ -15,25 +16,26 @@ interface Props {
 }
 
 export function WorkoutCard({ exercise }: Props) {
+  const { theme } = useTheme();
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.surface }]}>
       {exercise.gif_url ? (
         <Image source={{ uri: exercise.gif_url }} style={styles.image} />
       ) : (
-        <View style={[styles.image, styles.placeholder]}>
-          <Text style={styles.placeholderText}>{exercise.name.charAt(0)}</Text>
+        <View style={[styles.image, styles.placeholder, { backgroundColor: theme.surfaceHover }]}>
+          <Text style={[styles.placeholderText, { color: theme.primaryLight }]}>{exercise.name.charAt(0)}</Text>
         </View>
       )}
       <View style={styles.info}>
-        <Text style={styles.name}>{exercise.name}</Text>
-        <Text style={styles.muscle}>{exercise.target_muscle}</Text>
-        <Text style={styles.detail}>
+        <Text style={[styles.name, { color: theme.text }]}>{exercise.name}</Text>
+        <Text style={[styles.muscle, { color: theme.textSecondary }]}>{exercise.target_muscle}</Text>
+        <Text style={[styles.detail, { color: theme.textMuted }]}>
           {exercise.sets} sets x {exercise.target_reps}
         </Text>
       </View>
       {exercise.target_rpe && (
-        <View style={styles.rpeBadge}>
-          <Text style={styles.rpeText}>RPE {exercise.target_rpe}</Text>
+        <View style={[styles.rpeBadge, { backgroundColor: theme.primaryBg }]}>
+          <Text style={[styles.rpeText, { color: theme.primaryLight }]}>RPE {exercise.target_rpe}</Text>
         </View>
       )}
     </View>
@@ -42,7 +44,6 @@ export function WorkoutCard({ exercise }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#1E293B',
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
@@ -56,14 +57,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   placeholder: {
-    backgroundColor: '#334155',
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderText: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#818CF8',
   },
   info: {
     flex: 1,
@@ -71,20 +70,16 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#F8FAFC',
   },
   muscle: {
     fontSize: 13,
-    color: '#94A3B8',
     marginTop: 2,
   },
   detail: {
     fontSize: 13,
-    color: '#8B96AB',
     marginTop: 4,
   },
   rpeBadge: {
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -92,6 +87,5 @@ const styles = StyleSheet.create({
   rpeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#818CF8',
   },
 });

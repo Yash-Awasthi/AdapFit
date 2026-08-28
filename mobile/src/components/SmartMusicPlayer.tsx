@@ -18,6 +18,7 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
+import { useTheme } from '../services/theme';
 
 interface Track {
   title: string;
@@ -56,6 +57,7 @@ export function SmartMusicPlayer({
   totalSets = 12,
   compact = false,
 }: SmartMusicPlayerProps) {
+  const { theme } = useTheme();
   const [playlists, setPlaylists] = useState<PhasePlaylist[]>([]);
   const [currentPhase, setCurrentPhase] = useState('warmup');
   const [trackIndex, setTrackIndex] = useState(0);
@@ -180,15 +182,15 @@ export function SmartMusicPlayer({
 
   if (loading || !track) {
     return (
-      <View style={[styles.container, compact && styles.containerCompact]}>
-        <Text style={styles.loadingText}>Loading playlist...</Text>
+      <View style={[styles.container, { backgroundColor: theme.surface }, compact && styles.containerCompact]}>
+        <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading playlist...</Text>
       </View>
     );
   }
 
   if (compact) {
     return (
-      <View style={styles.containerCompact}>
+      <View style={[styles.containerCompact, { backgroundColor: theme.surface }]}>
         <View style={styles.compactRow}>
           <Animated.View style={{ transform: [{ scale: bpmPulse }] }}>
             <View style={[styles.phaseDot, { backgroundColor: phaseConfig.color }]}>
@@ -196,18 +198,18 @@ export function SmartMusicPlayer({
             </View>
           </Animated.View>
           <View style={styles.compactInfo}>
-            <Text style={styles.compactTitle} numberOfLines={1}>{track.title}</Text>
-            <Text style={styles.compactBpm}>{track.bpm} BPM</Text>
+            <Text style={[styles.compactTitle, { color: theme.text }]} numberOfLines={1}>{track.title}</Text>
+            <Text style={[styles.compactBpm, { color: theme.textMuted }]}>{track.bpm} BPM</Text>
           </View>
           <TouchableOpacity onPress={() => setIsPlaying(!isPlaying)} style={styles.compactPlay}>
             {isPlaying ? (
-              <Pause size={14} color="#F8FAFC" />
+              <Pause size={14} color={theme.text} />
             ) : (
-              <Play size={14} color="#F8FAFC" />
+              <Play size={14} color={theme.text} />
             )}
           </TouchableOpacity>
           <TouchableOpacity onPress={nextTrack} style={styles.compactPlay}>
-            <SkipForward size={14} color="#94A3B8" />
+            <SkipForward size={14} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -215,7 +217,7 @@ export function SmartMusicPlayer({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.surface }]}>
       {/* Phase Indicator */}
       <View style={styles.phaseRow}>
         {playlists.map((p) => {
@@ -225,10 +227,14 @@ export function SmartMusicPlayer({
           return (
             <View
               key={p.phase}
-              style={[styles.phaseChip, isActive && { backgroundColor: cfg.color + '30', borderColor: cfg.color }]}
+              style={[
+                styles.phaseChip,
+                { backgroundColor: theme.background, borderColor: theme.border },
+                isActive && { backgroundColor: cfg.color + '30', borderColor: cfg.color },
+              ]}
             >
-              <Icon size={12} color={isActive ? cfg.color : '#8B96AB'} />
-              <Text style={[styles.phaseChipText, isActive && { color: cfg.color }]}>
+              <Icon size={12} color={isActive ? cfg.color : theme.textMuted} />
+              <Text style={[styles.phaseChipText, { color: theme.textMuted }, isActive && { color: cfg.color }]}>
                 {cfg?.label || p.phase}
               </Text>
             </View>
@@ -238,16 +244,16 @@ export function SmartMusicPlayer({
 
       {/* Track Info */}
       <View style={styles.trackInfo}>
-        <Animated.View style={[styles.albumArt, { transform: [{ scale: bpmPulse }] }]}>
+        <Animated.View style={[styles.albumArt, { backgroundColor: theme.background }, { transform: [{ scale: bpmPulse }] }]}>
           <Music size={32} color={phaseConfig.color} />
         </Animated.View>
         <View style={styles.trackDetails}>
-          <Text style={styles.trackTitle}>{track.title}</Text>
-          <Text style={styles.trackArtist}>{track.artist}</Text>
+          <Text style={[styles.trackTitle, { color: theme.text }]}>{track.title}</Text>
+          <Text style={[styles.trackArtist, { color: theme.textMuted }]}>{track.artist}</Text>
           <View style={styles.bpmRow}>
-            <Text style={styles.bpmValue}>{track.bpm}</Text>
-            <Text style={styles.bpmLabel}>BPM</Text>
-            <View style={styles.energyBar}>
+            <Text style={[styles.bpmValue, { color: theme.text }]}>{track.bpm}</Text>
+            <Text style={[styles.bpmLabel, { color: theme.textMuted }]}>BPM</Text>
+            <View style={[styles.energyBar, { backgroundColor: theme.border }]}>
               <View style={[styles.energyFill, { width: `${track.energy * 100}%`, backgroundColor: phaseConfig.color }]} />
             </View>
           </View>
@@ -257,7 +263,7 @@ export function SmartMusicPlayer({
       {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity onPress={prevTrack} style={styles.controlBtn}>
-          <SkipBack size={20} color="#CBD5E1" />
+          <SkipBack size={20} color={theme.textSecondary} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.playBtn, { backgroundColor: phaseConfig.color }]}
@@ -273,25 +279,25 @@ export function SmartMusicPlayer({
           )}
         </TouchableOpacity>
         <TouchableOpacity onPress={nextTrack} style={styles.controlBtn}>
-          <SkipForward size={20} color="#CBD5E1" />
+          <SkipForward size={20} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>
 
       {/* Track List */}
-      <View style={styles.trackList}>
+      <View style={[styles.trackList, { borderTopColor: theme.border }]}>
         {getCurrentPlaylist()?.tracks.map((t, i) => (
           <TouchableOpacity
             key={i}
-            style={[styles.trackItem, i === trackIndex && styles.trackItemActive]}
+            style={[styles.trackItem, i === trackIndex && { backgroundColor: theme.background }]}
             onPress={() => {
               Haptics.selectionAsync();
               setTrackIndex(i);
             }}
           >
-            <Text style={[styles.trackItemBpm, i === trackIndex && { color: phaseConfig.color }]}>
+            <Text style={[styles.trackItemBpm, { color: theme.textMuted }, i === trackIndex && { color: phaseConfig.color }]}>
               {t.bpm}
             </Text>
-            <Text style={[styles.trackItemTitle, i === trackIndex && { color: '#F8FAFC' }]} numberOfLines={1}>
+            <Text style={[styles.trackItemTitle, { color: theme.textSecondary }, i === trackIndex && { color: theme.text }]} numberOfLines={1}>
               {t.title}
             </Text>
           </TouchableOpacity>
@@ -303,17 +309,15 @@ export function SmartMusicPlayer({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#1E293B',
     borderRadius: 16,
     padding: 16,
     marginTop: 12,
   },
   containerCompact: {
-    backgroundColor: '#1E293B',
     borderRadius: 10,
     padding: 8,
   },
-  loadingText: { color: '#8B96AB', textAlign: 'center', padding: 12 },
+  loadingText: { textAlign: 'center', padding: 12 },
 
   // Compact mode
   compactRow: {
@@ -329,8 +333,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   compactInfo: { flex: 1 },
-  compactTitle: { fontSize: 13, fontWeight: '600', color: '#F8FAFC' },
-  compactBpm: { fontSize: 11, color: '#8B96AB' },
+  compactTitle: { fontSize: 13, fontWeight: '600' },
+  compactBpm: { fontSize: 11 },
   compactPlay: { padding: 6 },
 
   // Full mode
@@ -342,11 +346,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: '#0F172A',
     borderWidth: 1,
-    borderColor: '#334155',
   },
-  phaseChipText: { fontSize: 11, fontWeight: '600', color: '#8B96AB' },
+  phaseChipText: { fontSize: 11, fontWeight: '600' },
 
   trackInfo: {
     flexDirection: 'row',
@@ -358,20 +360,18 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 12,
-    backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',
   },
   trackDetails: { flex: 1 },
-  trackTitle: { fontSize: 16, fontWeight: '700', color: '#F8FAFC' },
-  trackArtist: { fontSize: 13, color: '#8B96AB', marginBottom: 4 },
+  trackTitle: { fontSize: 16, fontWeight: '700' },
+  trackArtist: { fontSize: 13, marginBottom: 4 },
   bpmRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  bpmValue: { fontSize: 18, fontWeight: '800', color: '#F8FAFC' },
-  bpmLabel: { fontSize: 10, color: '#8B96AB', fontWeight: '600' },
+  bpmValue: { fontSize: 18, fontWeight: '800' },
+  bpmLabel: { fontSize: 10, fontWeight: '600' },
   energyBar: {
     flex: 1,
     height: 4,
-    backgroundColor: '#334155',
     borderRadius: 2,
     marginLeft: 8,
     overflow: 'hidden',
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  trackList: { borderTopWidth: 1, borderTopColor: '#334155', paddingTop: 8 },
+  trackList: { borderTopWidth: 1, paddingTop: 8 },
   trackItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -403,7 +403,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 6,
   },
-  trackItemActive: { backgroundColor: '#0F172A' },
-  trackItemBpm: { fontSize: 11, color: '#8B96AB', fontWeight: '600', width: 30 },
-  trackItemTitle: { fontSize: 12, color: '#CBD5E1', flex: 1 },
+  trackItemBpm: { fontSize: 11, fontWeight: '600', width: 30 },
+  trackItemTitle: { fontSize: 12, flex: 1 },
 });

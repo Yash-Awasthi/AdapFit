@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '../services/theme';
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function WorkoutCalendar({ workoutDays, onDayPress }: Props) {
+  const { theme } = useTheme();
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
@@ -22,11 +24,11 @@ export function WorkoutCalendar({ workoutDays, onDayPress }: Props) {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.monthTitle}>{monthName}</Text>
+    <View style={[styles.container, { backgroundColor: theme.surface }]}>
+      <Text style={[styles.monthTitle, { color: theme.text }]}>{monthName}</Text>
       <View style={styles.headerRow}>
         {DAYS.map((d, i) => (
-          <Text key={i} style={styles.dayLabel}>{d}</Text>
+          <Text key={i} style={[styles.dayLabel, { color: theme.textMuted }]}>{d}</Text>
         ))}
       </View>
       <View style={styles.grid}>
@@ -38,11 +40,22 @@ export function WorkoutCalendar({ workoutDays, onDayPress }: Props) {
           return (
             <TouchableOpacity
               key={`d${i}`}
-              style={[styles.cell, hasWorkout && styles.cellWorkout, isToday && styles.cellToday]}
+              style={[
+                styles.cell,
+                hasWorkout && { backgroundColor: `${theme.success}33` },
+                isToday && { borderWidth: 1.5, borderColor: theme.primaryLight },
+              ]}
               onPress={() => onDayPress?.(dateStr)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.cellText, hasWorkout && styles.cellTextWorkout, isToday && styles.cellTextToday]}>
+              <Text
+                style={[
+                  styles.cellText,
+                  { color: theme.textSecondary },
+                  hasWorkout && { color: theme.success, fontWeight: '600' },
+                  isToday && { color: theme.primaryLight, fontWeight: '700' },
+                ]}
+              >
                 {day}
               </Text>
             </TouchableOpacity>
@@ -55,19 +68,15 @@ export function WorkoutCalendar({ workoutDays, onDayPress }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#1E293B', borderRadius: 16, padding: 16, marginBottom: 16,
+    borderRadius: 16, padding: 16, marginBottom: 16,
   },
-  monthTitle: { fontSize: 16, fontWeight: '600', color: '#F8FAFC', marginBottom: 12, textAlign: 'center' },
+  monthTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12, textAlign: 'center' },
   headerRow: { flexDirection: 'row', marginBottom: 8 },
-  dayLabel: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#8B96AB' },
+  dayLabel: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: {
     width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center',
     borderRadius: 8,
   },
-  cellWorkout: { backgroundColor: 'rgba(34, 197, 94, 0.2)' },
-  cellToday: { borderWidth: 1.5, borderColor: '#818CF8' },
-  cellText: { fontSize: 13, color: '#94A3B8' },
-  cellTextWorkout: { color: '#22C55E', fontWeight: '600' },
-  cellTextToday: { color: '#818CF8', fontWeight: '700' },
+  cellText: { fontSize: 13 },
 });

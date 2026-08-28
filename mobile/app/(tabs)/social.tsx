@@ -5,6 +5,7 @@ import {
 import { Trophy, Users, TrendingUp, Plus, ChevronRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { LoadingScreen } from '../../src/components';
+import { ActivityFeed } from '../../src/components/ActivityFeed';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
@@ -32,14 +33,6 @@ interface LeaderboardEntry {
   is_current_user: boolean;
 }
 
-interface Activity {
-  id: string;
-  user_name: string;
-  action: string;
-  detail: string;
-  timestamp: string;
-}
-
 type ViewMode = 'challenges' | 'leaderboard' | 'feed';
 
 const TABS: { key: ViewMode; label: string; icon: any }[] = [
@@ -54,7 +47,6 @@ export default function SocialScreen() {
   const s = makeStyles(theme);
   const [mode, setMode] = useState<ViewMode>('challenges');
   const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [feed, setFeed] = useState<Activity[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -64,7 +56,7 @@ export default function SocialScreen() {
 
   useEffect(() => {
     if (mode === 'challenges') fetchChallenges();
-    else if (mode === 'feed') fetchFeed();
+    else if (mode === 'feed') setLoading(false);
     else if (selectedChallenge) fetchLeaderboard();
   }, [mode, selectedChallenge]);
 
@@ -73,15 +65,6 @@ export default function SocialScreen() {
     try {
       const res = await fetch(`${API}/api/v1/social?user_id=${userId}`);
       if (res.ok) setChallenges(await res.json());
-    } catch {}
-    setLoading(false);
-  }
-
-  async function fetchFeed() {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/v1/social/feed`);
-      if (ok(res)) setFeed(await res.json());
     } catch {}
     setLoading(false);
   }
@@ -107,8 +90,12 @@ export default function SocialScreen() {
       } else if (res.status === 409) {
         setSelectedChallenge(id);
         setMode('leaderboard');
+      } else {
+        Alert.alert('Could not join challenge', `Server returned ${res.status}.`);
       }
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', err?.message || String(err));
+    }
   }
 
   async function createChallenge() {
@@ -129,8 +116,12 @@ export default function SocialScreen() {
         setNewName('');
         setNewDesc('');
         fetchChallenges();
+      } else {
+        Alert.alert('Could not create challenge', `Server returned ${res.status}.`);
       }
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not reach the server', err?.message || String(err));
+    }
   }
 
   function daysLeft(endsAt: string) {
@@ -231,20 +222,7 @@ export default function SocialScreen() {
         />
       )}
 
-      {mode === 'feed' && (
-        <FlatList
-          data={feed}
-          keyExtractor={(i) => i.id}
-          contentContainerStyle={s.list}
-          renderItem={({ item }) => (
-            <View style={s.feedItem}>
-              <Text style={s.feedUser}>{item.user_name}</Text>
-              <Text style={s.feedAction}> {item.action} </Text>
-              <Text style={s.feedDetail}>{item.detail}</Text>
-            </View>
-          )}
-        />
-      )}
+      {mode === 'feed' && <ActivityFeed userId={userId} />}
     </View>
   );
 }
@@ -303,10 +281,6 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     lbProgressBar: { height: 4, backgroundColor: theme.surfaceHover, borderRadius: 2 },
     lbProgressFill: { height: 4, backgroundColor: theme.success, borderRadius: 2 },
     lbScore: { fontSize: 14, fontWeight: '600', color: theme.textSecondary },
-    feedItem: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, borderBottomWidth: 1, borderBottomColor: theme.surface },
-    feedUser: { fontSize: 14, fontWeight: '600', color: theme.primaryLight },
-    feedAction: { fontSize: 14, color: theme.textSecondary },
-    feedDetail: { fontSize: 14, color: theme.textSecondary },
     empty: { alignItems: 'center', padding: 40 },
     emptyTitle: { fontSize: 18, fontWeight: '600', color: theme.text, marginTop: 12 },
     emptyDesc: { fontSize: 14, color: theme.textMuted, marginTop: 4 },

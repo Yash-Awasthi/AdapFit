@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../services/theme';
 
 interface Props {
   title: string;
@@ -7,10 +8,11 @@ interface Props {
 }
 
 export function EmptyState({ title, message }: Props) {
+  const { theme } = useTheme();
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.message}>{message}</Text>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+      <Text style={[styles.message, { color: theme.textMuted }]}>{message}</Text>
     </View>
   );
 }
@@ -18,7 +20,6 @@ export function EmptyState({ title, message }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
@@ -26,12 +27,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#F8FAFC',
     marginBottom: 8,
   },
   message: {
     fontSize: 14,
-    color: '#8B96AB',
     textAlign: 'center',
   },
 });

@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, Alert, ActivityIndicator,
 } from "react-native";
 import { Plus, Camera, Utensils, Flame, Dumbbell, Droplets, Target, X } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import { api } from "../../src/services/api";
 import { useTheme } from "../../src/services/theme";
 import { API_BASE_URL } from "../../src/services/config";
 import { useUserStore } from "../../src/stores";
@@ -109,21 +111,54 @@ export default function DietScreen() {
     } catch {}
   };
 
-  const quickAdd = async (food: QuickFood) => {
+  const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
+
+  const photoLog = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Camera permission needed", "Enable camera access to log a meal from a photo.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5 });
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+
+    setAnalyzingPhoto(true);
     try {
-      await fetch(`${API}/api/v1/diet/quick-add/${encodeURIComponent(food.name)}?user_id=${userId}`, {
-        method: "POST",
-      });
-      setShowQuickAdd(false);
+      const res = await api.photoLogMeal(result.assets[0].base64, "snack", userId);
+      if (res.foods.length === 0) {
+        Alert.alert("Couldn't identify the meal", res.suggestions[0] || "Try a clearer photo, or log it manually.");
+      } else {
+        Alert.alert("Meal logged", res.foods.map((f) => f.name).join(", "));
+      }
       loadDaily();
       loadChart();
-    } catch {}
+    } catch {
+      Alert.alert("Couldn't analyze photo", "Check your connection and try again.");
+    }
+    setAnalyzingPhoto(false);
+  };
+
+  const quickAdd = async (food: QuickFood) => {
+    try {
+      const res = await fetch(`${API}/api/v1/diet/quick-add/${encodeURIComponent(food.name)}?user_id=${userId}`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        setShowQuickAdd(false);
+        loadDaily();
+        loadChart();
+      } else {
+        Alert.alert("Couldn't add food", `Server returned ${res.status}.`);
+      }
+    } catch (err: any) {
+      Alert.alert("Couldn't reach the server", err?.message || String(err));
+    }
   };
 
   const customAdd = async () => {
     if (!customName || !customCal) return;
     try {
-      await fetch(`${API}/api/v1/diet/log?user_id=${userId}`, {
+      const res = await fetch(`${API}/api/v1/diet/log?user_id=${userId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -132,11 +167,17 @@ export default function DietScreen() {
           carbs_g: 0, fat_g: 0, meal_type: "snack",
         }),
       });
-      setShowCustomAdd(false);
-      setCustomName(""); setCustomCal(""); setCustomProtein("");
-      loadDaily();
-      loadChart();
-    } catch {}
+      if (res.ok) {
+        setShowCustomAdd(false);
+        setCustomName(""); setCustomCal(""); setCustomProtein("");
+        loadDaily();
+        loadChart();
+      } else {
+        Alert.alert("Couldn't add food", `Server returned ${res.status}.`);
+      }
+    } catch (err: any) {
+      Alert.alert("Couldn't reach the server", err?.message || String(err));
+    }
   };
 
   const caloriePct = Math.round((totals.calories / TARGETS.calories) * 100);
@@ -204,8 +245,8 @@ export default function DietScreen() {
         <TouchableOpacity style={[s.fab, { backgroundColor: "#8B5CF6" }]} onPress={() => setShowCustomAdd(true)}>
           <Dumbbell size={20} color="#FFF" />
         </TouchableOpacity>
-        <TouchableOpacity style={[s.fab, { backgroundColor: "#10B981" }]}>
-          <Camera size={20} color="#FFF" />
+        <TouchableOpacity style={[s.fab, { backgroundColor: "#10B981" }]} onPress={photoLog} disabled={analyzingPhoto}>
+          {analyzingPhoto ? <ActivityIndicator size="small" color="#FFF" /> : <Camera size={20} color="#FFF" />}
         </TouchableOpacity>
       </View>
 

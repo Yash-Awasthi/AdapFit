@@ -125,23 +125,41 @@ export default function HealthScreen() {
   };
 
   const addCondition = async (conditionId: string) => {
-    await fetch(`${API}/api/v1/health/conditions?user_id=${userId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ condition_id: conditionId, severity: 5, is_active: true }),
-    });
-    setShowAddCondition(false);
-    loadData();
+    try {
+      const res = await fetch(`${API}/api/v1/health/conditions?user_id=${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ condition_id: conditionId, severity: 5, is_active: true }),
+      });
+      if (res.ok) {
+        setShowAddCondition(false);
+        loadData();
+      } else {
+        const detail = await res.text().catch(() => "");
+        Alert.alert("Could not add condition", `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ""}`);
+      }
+    } catch (err: any) {
+      Alert.alert("Could not reach the server", err?.message || String(err));
+    }
   };
 
   const addMedication = async (name: string, dosage: string) => {
-    await fetch(`${API}/api/v1/health/medications?user_id=${userId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, dosage, frequency: "daily", category: "other", time_of_day: ["morning"] }),
-    });
-    setShowAddMed(false);
-    loadData();
+    try {
+      const res = await fetch(`${API}/api/v1/health/medications?user_id=${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, dosage, frequency: "daily", category: "other", time_of_day: ["morning"] }),
+      });
+      if (res.ok) {
+        setShowAddMed(false);
+        loadData();
+      } else {
+        const detail = await res.text().catch(() => "");
+        Alert.alert("Could not add medication", `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ""}`);
+      }
+    } catch (err: any) {
+      Alert.alert("Could not reach the server", err?.message || String(err));
+    }
   };
 
   const riskColor = profile?.risk_level === "high" ? theme.danger : profile?.risk_level === "moderate" ? theme.warning : theme.success;

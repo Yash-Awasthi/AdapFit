@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Check } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../src/services/theme';
 import { useEnterAnimation } from '../../src/services/devSettings';
 import { api } from '../../src/services/api';
 import { useUserStore } from '../../src/stores';
-import { LoadingScreen } from '../../src/components';
+import { LoadingScreen, ScreenHeader } from '../../src/components';
 
 const GENDERS = ['female', 'male', 'other', 'prefer_not_to_say'];
 const FITNESS_LEVELS = ['beginner', 'intermediate', 'advanced'];
@@ -98,15 +98,14 @@ export default function PersonalInfoScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronLeft size={22} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Personal Info</Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.backBtn}>
-          <Check size={22} color={theme.primaryLight} />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Personal Info"
+        right={
+          <TouchableOpacity onPress={handleSave} disabled={saving} hitSlop={10}>
+            <Check size={22} color={theme.primaryLight} />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Animated.View entering={enter(40)}>
@@ -178,12 +177,6 @@ export default function PersonalInfoScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingTop: 56, paddingBottom: 12,
-  },
-  backBtn: { padding: 8 },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
   content: { padding: 20, paddingBottom: 100, gap: 4 },
   field: { marginBottom: 20 },
   fieldLabel: { fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },

@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Easing,
 } from "react-native";
 import { Play, Pause, SkipForward, X, Wind, Clock } from "lucide-react-native";
+import { useTheme } from "../services/theme";
 
 interface MeditationStep {
   step: number;
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function MeditationPlayer({ session, onComplete, onClose }: Props) {
+  const { theme } = useTheme();
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [timeLeft, setTimeLeft] = useState(session.steps[0]?.duration_seconds || 0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -96,15 +98,15 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
   const totalDuration = session.steps.reduce((acc, s) => acc + s.duration_seconds, 0);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Close button */}
       <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-        <X size={24} color="#94A3B8" />
+        <X size={24} color={theme.textSecondary} />
       </TouchableOpacity>
 
       {/* Session info */}
-      <Text style={styles.sessionName}>{session.name}</Text>
-      <Text style={styles.sessionMeta}>
+      <Text style={[styles.sessionName, { color: theme.text }]}>{session.name}</Text>
+      <Text style={[styles.sessionMeta, { color: theme.textSecondary }]}>
         Step {currentStepIdx + 1} of {totalSteps} • {formatTime(totalElapsed)} / {formatTime(totalDuration)}
       </Text>
 
@@ -113,39 +115,43 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
         <Animated.View
           style={[
             styles.breathCircle,
-            { transform: [{ scale: breathAnim }] },
+            {
+              backgroundColor: theme.primaryBg,
+              borderColor: `${theme.primaryLight}4D`,
+              transform: [{ scale: breathAnim }],
+            },
           ]}
         />
         <Animated.View
           style={[
             styles.breathInner,
-            { transform: [{ scale: pulseAnim }] },
+            { backgroundColor: theme.primaryBg, transform: [{ scale: pulseAnim }] },
           ]}
         />
-        <Text style={styles.breathTime}>{formatTime(timeLeft)}</Text>
-        <Text style={styles.breathLabel}>remaining</Text>
+        <Text style={[styles.breathTime, { color: theme.text }]}>{formatTime(timeLeft)}</Text>
+        <Text style={[styles.breathLabel, { color: theme.textSecondary }]}>remaining</Text>
       </View>
 
       {/* Current instruction */}
-      <Animated.View style={[styles.instructionCard, { transform: [{ scale: pulseAnim }] }]}>
-        <Wind size={20} color="#818CF8" />
-        <Text style={styles.instructionText}>{currentStep?.instruction || "Session complete"}</Text>
+      <Animated.View style={[styles.instructionCard, { backgroundColor: theme.surface, transform: [{ scale: pulseAnim }] }]}>
+        <Wind size={20} color={theme.primaryLight} />
+        <Text style={[styles.instructionText, { color: theme.text }]}>{currentStep?.instruction || "Session complete"}</Text>
       </Animated.View>
 
       {/* Progress bar */}
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progress}%` }]} />
+      <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+        <View style={[styles.progressFill, { backgroundColor: theme.primaryLight, width: `${progress}%` }]} />
       </View>
 
       {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity style={styles.controlBtn} onPress={skipStep}>
-          <SkipForward size={24} color="#94A3B8" />
-          <Text style={styles.controlLabel}>Skip</Text>
+          <SkipForward size={24} color={theme.textSecondary} />
+          <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>Skip</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.playBtn}
+          style={[styles.playBtn, { backgroundColor: theme.primary }]}
           onPress={() => setIsPlaying(!isPlaying)}
         >
           {isPlaying ? (
@@ -156,15 +162,15 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.controlBtn} onPress={onComplete}>
-          <Clock size={24} color="#94A3B8" />
-          <Text style={styles.controlLabel}>End</Text>
+          <Clock size={24} color={theme.textSecondary} />
+          <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>End</Text>
         </TouchableOpacity>
       </View>
 
       {/* Benefits */}
       <View style={styles.benefitsRow}>
         {session.benefits.slice(0, 3).map((b, i) => (
-          <Text key={i} style={styles.benefitTag}>{b}</Text>
+          <Text key={i} style={[styles.benefitTag, { backgroundColor: theme.surface, color: theme.textSecondary }]}>{b}</Text>
         ))}
       </View>
     </View>
@@ -173,48 +179,46 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, backgroundColor: "#0F172A", alignItems: "center",
+    flex: 1, alignItems: "center",
     justifyContent: "center", padding: 24,
   },
   closeBtn: { position: "absolute", top: 50, right: 20 },
-  sessionName: { color: "#F8FAFC", fontSize: 22, fontWeight: "700", marginBottom: 4 },
-  sessionMeta: { color: "#94A3B8", fontSize: 13, marginBottom: 30 },
+  sessionName: { fontSize: 22, fontWeight: "700", marginBottom: 4 },
+  sessionMeta: { fontSize: 13, marginBottom: 30 },
   breathContainer: { alignItems: "center", marginBottom: 30, position: "relative" },
   breathCircle: {
     width: 180, height: 180, borderRadius: 90,
-    backgroundColor: "rgba(129, 140, 248, 0.15)",
-    borderWidth: 2, borderColor: "rgba(129, 140, 248, 0.3)",
+    borderWidth: 2,
   },
   breathInner: {
     position: "absolute", width: 140, height: 140, borderRadius: 70,
-    backgroundColor: "rgba(129, 140, 248, 0.1)",
     top: 20,
   },
   breathTime: {
-    position: "absolute", color: "#F8FAFC", fontSize: 36, fontWeight: "300",
+    position: "absolute", fontSize: 36, fontWeight: "300",
     top: 65,
   },
-  breathLabel: { position: "absolute", color: "#94A3B8", fontSize: 12, top: 110 },
+  breathLabel: { position: "absolute", fontSize: 12, top: 110 },
   instructionCard: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    backgroundColor: "#1E293B", borderRadius: 12, padding: 16,
+    borderRadius: 12, padding: 16,
     marginBottom: 20, width: "100%",
   },
-  instructionText: { color: "#CBD5E1", fontSize: 15, flex: 1, lineHeight: 22 },
+  instructionText: { fontSize: 15, flex: 1, lineHeight: 22 },
   progressTrack: {
-    width: "100%", height: 4, backgroundColor: "#334155", borderRadius: 2, marginBottom: 30,
+    width: "100%", height: 4, borderRadius: 2, marginBottom: 30,
   },
-  progressFill: { height: 4, backgroundColor: "#818CF8", borderRadius: 2 },
+  progressFill: { height: 4, borderRadius: 2 },
   controls: { flexDirection: "row", alignItems: "center", gap: 40, marginBottom: 30 },
   controlBtn: { alignItems: "center", gap: 4 },
-  controlLabel: { color: "#94A3B8", fontSize: 11 },
+  controlLabel: { fontSize: 11 },
   playBtn: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: "#4F46E5",
+    width: 72, height: 72, borderRadius: 36,
     alignItems: "center", justifyContent: "center",
   },
   benefitsRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", justifyContent: "center" },
   benefitTag: {
-    backgroundColor: "#1E293B", color: "#94A3B8", fontSize: 11,
+    fontSize: 11,
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
   },
 });

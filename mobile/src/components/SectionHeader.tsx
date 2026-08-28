@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../services/theme';
 
 interface Props {
   title: string;
@@ -8,11 +9,12 @@ interface Props {
 }
 
 export function SectionHeader({ title, action, onAction }: Props) {
+  const { theme } = useTheme();
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
       {action && (
-        <Text style={styles.action} onPress={onAction}>
+        <Text style={[styles.action, { color: theme.primary }]} onPress={onAction}>
           {action}
         </Text>
       )}
@@ -31,10 +33,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#F8FAFC',
   },
   action: {
     fontSize: 14,
-    color: '#818CF8',
   },
 });

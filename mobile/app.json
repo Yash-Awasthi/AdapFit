@@ -44,10 +44,10 @@
         }
       ],
       [
-        "expo-speech-recognition",
+        "expo-image-picker",
         {
-          "microphonePermission": "AdapFit uses the microphone for hands-free voice workout logging.",
-          "speechRecognitionPermission": "AdapFit transcribes your voice to log sets hands-free."
+          "photosPermission": "AdapFit uses your photos to log a meal from a picture.",
+          "cameraPermission": "AdapFit uses the camera to snap a photo of your meal for logging."
         }
       ],
       [
