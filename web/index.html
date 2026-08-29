@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AdapFit — AI-Powered Fitness That Adapts To You</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0f1a; color: #e2e8f0; line-height: 1.6; }
+a { color: #06d6a0; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Hero */
+.hero { min-height: 90vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 60px 24px; background: linear-gradient(135deg, #0a0f1a 0%, #0d1929 40%, #0a2540 70%, #0a0f1a 100%); position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 30% 50%, rgba(6,214,160,0.06) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(14,165,233,0.04) 0%, transparent 40%); animation: drift 20s ease-in-out infinite alternate; }
+@keyframes drift { from { transform: translate(0,0); } to { transform: translate(-3%,2%); } }
+.hero-content { position: relative; z-index: 1; max-width: 700px; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; line-height: 1.15; margin-bottom: 20px; }
+.hero h1 .accent { background: linear-gradient(135deg, #06d6a0, #0ea5e9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero p { font-size: 1.15rem; color: #94a3b8; margin-bottom: 32px; max-width: 520px; margin-left: auto; margin-right: auto; }
+.hero-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn-hero { padding: 12px 28px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+.btn-primary { background: linear-gradient(135deg, #06d6a0, #0ea5e9); color: #0a0f1a; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(6,214,160,0.25); }
+.btn-secondary { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.12); }
+.btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+/* Features */
+.features { padding: 80px 24px; max-width: 1100px; margin: 0 auto; }
+.features h2 { text-align: center; font-size: 2rem; margin-bottom: 12px; }
+.features .subtitle { text-align: center; color: #64748b; margin-bottom: 48px; font-size: 1.05rem; }
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.feature-card { background: linear-gradient(135deg, rgba(22,27,34,0.8), rgba(13,25,41,0.8)); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 24px; transition: border-color 0.2s, transform 0.2s; }
+.feature-card:hover { border-color: rgba(6,214,160,0.3); transform: translateY(-2px); }
+.feature-card .icon { font-size: 28px; margin-bottom: 12px; }
+.feature-card h3 { font-size: 1rem; margin-bottom: 6px; color: #f1f5f9; }
+.feature-card p { font-size: 0.85rem; color: #94a3b8; line-height: 1.5; }
+
+/* How It Works */
+.how { padding: 80px 24px; max-width: 900px; margin: 0 auto; text-align: center; }
+.how h2 { font-size: 2rem; margin-bottom: 48px; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; }
+.step { position: relative; }
+.step-num { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #06d6a0, #0ea5e9); color: #0a0f1a; font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+.step h3 { font-size: 1.1rem; margin-bottom: 8px; color: #f1f5f9; }
+.step p { font-size: 0.9rem; color: #94a3b8; }
+
+/* Tech Stack */
+.tech { padding: 80px 24px; text-align: center; }
+.tech h2 { font-size: 2rem; margin-bottom: 32px; }
+.tech-stack { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; max-width: 700px; margin: 0 auto; }
+.tech-badge { padding: 12px 24px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); font-weight: 600; font-size: 0.95rem; color: #cbd5e1; display: flex; align-items: center; gap: 8px; }
+.tech-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Footer */
+footer { padding: 40px 24px; text-align: center; border-top: 1px solid rgba(255,255,255,0.06); color: #475569; font-size: 0.85rem; }
+footer a { color: #64748b; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero::before { animation: none; }
+  .feature-card { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-content">
+    <h1>AI-Powered Fitness<br>That <span class="accent">Adapts To You</span></h1>
+    <p>AdapFit learns your body, your recovery, your goals — then builds the perfect workout, meal plan, and rest schedule for today.</p>
+    <div class="hero-buttons">
+      <a href="https://github.com/Yash-Awasthi/ZFIT" class="btn-hero btn-primary">View on GitHub</a>
+      <a href="dashboard.html" class="btn-hero btn-secondary">📊 Live Dashboard</a>
+    </div>
+  </div>
+</section>
+
+<section class="features" id="features">
+  <h2>Everything Your Body Needs</h2>
+  <p class="subtitle">12 modules working together to optimize your health</p>
+  <div class="feature-grid">
+    <div class="feature-card"><div class="icon">🏋️</div><h3>Adaptive Workouts</h3><p>AI-generated plans that adjust to your recovery state, goals, and physical limitations.</p></div>
+    <div class="feature-card"><div class="icon">🫀</div><h3>Cardiovascular Analysis</h3><p>HRV analysis, heart rate zones, VO2 max estimation, and cardiovascular risk scoring.</p></div>
+    <div class="feature-card"><div class="icon">😴</div><h3>Sleep Analysis</h3><p>Sleep quality scoring, circadian rhythm tracking, and sleep debt calculation.</p></div>
+    <div class="feature-card"><div class="icon">🥗</div><h3>Nutrition Tracking</h3><p>Macro breakdown, meal quality scoring, and 9 dietary profiles including keto, halal, and vegan.</p></div>
+    <div class="feature-card"><div class="icon">🩸</div><h3>Blood Pressure</h3><p>AHA/ACC classification, trend analysis, MAP calculation, and CV risk assessment.</p></div>
+    <div class="feature-card"><div class="icon">🌙</div><h3>Hormonal Cycle</h3><p>Cycle prediction, ovulation tracking, fertility windows, and symptom correlation.</p></div>
+    <div class="feature-card"><div class="icon">📱</div><h3>HealthKit Bridge</h3><p>Import data from Apple HealthKit — heart rate, SpO2, steps, sleep, workouts.</p></div>
+    <div class="feature-card"><div class="icon">🌍</div><h3>13 Languages</h3><p>Full i18n with RTL support, locale-aware formatting, and translation fallback chains.</p></div>
+    <div class="feature-card"><div class="icon">♿</div><h3>Accessible</h3><p>Wheelchair-friendly exercises, seated alternatives, and limitation-aware workout plans.</p></div>
+    <div class="feature-card"><div class="icon">🏃</div><h3>Activity Recognition</h3><p>Auto-detect workouts from sensor data, step counting, and calorie calculation.</p></div>
+    <div class="feature-card"><div class="icon">🎯</div><h3>Onboarding</h3><p>7-step guided setup that personalizes your experience from day one.</p></div>
+    <div class="feature-card"><div class="icon">🏆</div><h3>Achievements</h3><p>25 gamification badges across 7 categories with XP and tier progression.</p></div>
+  </div>
+</section>
+
+<section class="how" id="how">
+  <h2>How It Works</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Set Up</h3>
+      <p>Tell AdapFit your goals, preferences, and any physical limitations. Connect your wearables.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>Track</h3>
+      <p>Log workouts, meals, sleep, and vitals. Or let HealthKit sync automatically.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Adapt</h3>
+      <p>AdapFit analyzes your data and generates today's perfect plan — workout, meals, and rest.</p>
+    </div>
+  </div>
+</section>
+
+<section class="tech">
+  <h2>Built With</h2>
+  <div class="tech-stack">
+    <div class="tech-badge"><span class="dot" style="background:#3776ab"></span>Python 3.11+</div>
+    <div class="tech-badge"><span class="dot" style="background:#009688"></span>FastAPI</div>
+    <div class="tech-badge"><span class="dot" style="background:#61dafb"></span>React Native</div>
+    <div class="tech-badge"><span class="dot" style="background:#3178c6"></span>TypeScript</div>
+    <div class="tech-badge"><span class="dot" style="background:#336791"></span>PostgreSQL</div>
+    <div class="tech-badge"><span class="dot" style="background:#dc382d"></span>Docker</div>
+  </div>
+</section>
+
+<footer>
+  <p>AdapFit — Open source fitness intelligence<br>
+  <a href="https://github.com/Yash-Awasthi/ZFIT">GitHub</a> · <a href="https://github.com/Yash-Awasthi/ZFIT/blob/main/README.md">Docs</a> · <a href="https://github.com/Yash-Awasthi/ZFIT/issues">Issues</a></p>
+</footer>
+
+</body>
+</html>

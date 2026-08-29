@@ -29,7 +29,7 @@ class CompatibilityInput(BaseModel):
 
 
 @router.post("/import")
-async def import_healthkit(req: ImportInput):
+def import_healthkit(req: ImportInput):
     """Import and transform a batch of HealthKit samples into ZFIT format."""
     raw = [s.model_dump() for s in req.samples]
     transformed = transform_batch(raw)
@@ -44,7 +44,7 @@ async def import_healthkit(req: ImportInput):
 
 
 @router.post("/heart-rate")
-async def heart_rate_analysis(samples: list[HKSampleInput]):
+def heart_rate_analysis(samples: list[HKSampleInput]):
     """Analyze heart rate data from HealthKit samples."""
     raw = [s.model_dump() for s in samples]
     transformed = transform_batch(raw)
@@ -55,7 +55,7 @@ async def heart_rate_analysis(samples: list[HKSampleInput]):
 
 
 @router.post("/sleep")
-async def sleep_analysis(samples: list[HKSampleInput]):
+def sleep_analysis(samples: list[HKSampleInput]):
     """Analyze sleep data from HealthKit sleep analysis samples."""
     raw = [s.model_dump() for s in samples]
     transformed = transform_batch(raw)
@@ -73,7 +73,7 @@ async def sleep_analysis(samples: list[HKSampleInput]):
 
 
 @router.post("/workouts")
-async def workout_summary(samples: list[HKSampleInput]):
+def workout_summary(samples: list[HKSampleInput]):
     """Summarize workout data from HealthKit workout samples."""
     raw = [s.model_dump() for s in samples]
     transformed = transform_batch(raw)
@@ -90,7 +90,7 @@ async def workout_summary(samples: list[HKSampleInput]):
 
 
 @router.post("/summary")
-async def healthkit_summary(samples: list[HKSampleInput]):
+def healthkit_summary(samples: list[HKSampleInput]):
     """Full HealthKit summary — daily, weekly, monthly, resting HR trend."""
     raw = [s.model_dump() for s in samples]
     transformed = transform_batch(raw)
@@ -108,6 +108,6 @@ async def healthkit_summary(samples: list[HKSampleInput]):
 
 
 @router.post("/compatibility")
-async def compatibility(req: CompatibilityInput):
+def compatibility(req: CompatibilityInput):
     """Check HealthKit data type compatibility for a device."""
     return check_healthkit_compatibility(req.device_type, req.ios_version)

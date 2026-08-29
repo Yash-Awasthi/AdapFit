@@ -100,6 +100,8 @@ ROUTE_MAP = {
     "location_tracking": ("/location", ["Location Tracking"]),
     "content_hub": ("/content", ["Content Hub"]),
     "personalization_api": ("/personalize", ["Personalization"]),
+    "blood_pressure_api": ("/blood-pressure", ["Blood Pressure"]),
+    "hormonal_cycle_api": ("/hormonal-cycle", ["Hormonal Cycle"]),
     "sleep_tracking_api": ("/sleep-tracking", ["Sleep Tracking"]),
     "health_goals_api": ("/health-goals", ["Health Goals"]),
     "health_summary": ("/summary", ["Health Summary"]),
