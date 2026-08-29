@@ -1,13 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+/**
+ * Workout Screen — Premium AI-Powered Workout Generator
+ * Glassmorphism cards, animated elements, modern workout UI
+ */
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  ScrollView, Animated, Dimensions,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Dumbbell, Calendar, Sparkles, ChevronDown, ChevronUp, Flame, Snowflake, Timer, Target } from 'lucide-react-native';
-import { WorkoutCard, Button, SectionHeader, LoadingScreen, EmptyState } from '../../src/components';
-import { WorkoutCalendar } from '../../src/components/WorkoutCalendar';
-import { api } from '../../src/services/api';
-import * as Haptics from 'expo-haptics';
-import { useUserStore, useWorkoutStore } from '../../src/stores';
-import { useTheme } from '../../src/services/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, typography, spacing, radius, glass } from '../../src/theme';
+import {
+  GlassCard, GradientCard, SectionHeaderPremium, QuickAction, PillChip,
+} from '../../src/components/PremiumComponents';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const API = 'http://localhost:8000/api/v1';
 
 interface Exercise {
   exercise_id: string;
@@ -16,7 +25,6 @@ interface Exercise {
   sets: number;
   target_reps: string;
   target_rpe?: number;
-  gif_url?: string;
 }
 
 interface Workout {
@@ -27,333 +35,269 @@ interface Workout {
   created_at?: string;
 }
 
+const MUSCLE_GROUPS = [
+  { label: 'All', icon: 'fitness', color: colors.primary },
+  { label: 'Chest', icon: 'body', color: colors.health.heart },
+  { label: 'Back', icon: 'arrow-up', color: colors.health.activity },
+  { label: 'Legs', icon: 'walk', color: colors.health.calm },
+  { label: 'Arms', icon: 'barbell', color: colors.health.energy },
+  { label: 'Core', icon: 'radio-button-on', color: '#F59E0B' },
+];
+
 export default function WorkoutScreen() {
-  const { theme } = useTheme();
-  const s = makeStyles(theme);
-  const userId = useUserStore((s) => s.userId);
-  const startWorkout = useWorkoutStore((s) => s.startWorkout);
   const router = useRouter();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
-  const [warmupData, setWarmupData] = useState<any | null>(null);
-  const [cooldownData, setCooldownData] = useState<any | null>(null);
-  const [showRoutines, setShowRoutines] = useState(false);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [activeTimer, setActiveTimer] = useState<{ section: 'warmup' | 'cooldown'; index: number; remaining: number } | null>(null);
+  const [selectedMuscle, setSelectedMuscle] = useState('All');
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
     fetchWorkouts();
-    fetchRoutines();
   }, []);
 
-  useEffect(() => {
-    if (!activeTimer) return;
-    if (activeTimer.remaining <= 0) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setActiveTimer(null);
-      return;
-    }
-    const id = setTimeout(() => {
-      setActiveTimer((t) => (t ? { ...t, remaining: t.remaining - 1 } : t));
-    }, 1000);
-    return () => clearTimeout(id);
-  }, [activeTimer]);
-
-  function startItemTimer(section: 'warmup' | 'cooldown', index: number, duration?: number) {
-    Haptics.selectionAsync();
-    setActiveTimer({ section, index, remaining: duration || 30 });
-  }
-
-  async function fetchWorkouts() {
+  const fetchWorkouts = async () => {
     try {
-      const res = await api.getWorkouts(userId, 14);
-      setWorkouts(res.items || []);
+      const res = await fetch(`${API}/workouts?user_id=default&days=14`);
+      if (res.ok) {
+        const data = await res.json();
+        setWorkouts(data.items || []);
+      }
     } catch {}
     setLoading(false);
-  }
+  };
 
-  async function fetchRoutines() {
-    try {
-      const [w, c] = await Promise.all([
-        api.getWarmupRoutine(['chest', 'back', 'quadriceps']).catch(() => null),
-        api.getCooldownRoutine(['chest', 'back', 'quadriceps']).catch(() => null),
-      ]);
-      if (w) setWarmupData(w);
-      if (c) setCooldownData(c);
-    } catch {}
-  }
-
-  async function generateWorkout() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const generateWorkout = async () => {
     setGenerating(true);
     try {
-      const workout = await api.generateWorkout({
-        user_id: userId,
-        target_date: new Date().toISOString().split('T')[0],
-        target_duration_minutes: 45,
+      const res = await fetch(`${API}/workouts/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: 'default',
+          target_date: new Date().toISOString().split('T')[0],
+          target_duration_minutes: 45,
+        }),
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setWorkouts((prev) => [workout, ...prev]);
+      if (res.ok) {
+        const workout = await res.json();
+        setWorkouts(prev => [workout, ...prev]);
+      }
     } catch {}
     setGenerating(false);
-  }
+  };
 
-  function formatDate(dateStr?: string) {
+  const filteredWorkouts = selectedMuscle === 'All'
+    ? workouts
+    : workouts.filter(w => w.exercises.some(e => e.target_muscle.toLowerCase().includes(selectedMuscle.toLowerCase())));
+
+  const formatDate = (dateStr?: string) => {
     if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  }
-
-  if (loading) return <LoadingScreen />;
+    return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
 
   return (
-    <View style={s.container}>
-      <View style={s.header}>
-        <Text style={s.title} accessibilityRole="header">Workouts</Text>
-        <Text style={s.count}>{workouts.length} workouts</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+      {/* Header */}
+      <LinearGradient colors={[colors.health.heart, '#F97316']} style={styles.header}>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>💪 Workouts</Text>
+            <Text style={styles.headerSubtitle}>AI-powered adaptive training</Text>
+          </View>
+          <View style={styles.workoutCount}>
+            <Text style={styles.workoutCountNumber}>{workouts.length}</Text>
+            <Text style={styles.workoutCountLabel}>workouts</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Quick Actions */}
+      <View style={styles.quickActionsRow}>
+        <TouchableOpacity style={styles.generateBtn} onPress={generateWorkout} disabled={generating}>
+          <LinearGradient colors={[colors.primary, '#8B5CF6']} style={styles.generateBtnGradient}>
+            <Ionicons name={generating ? 'hourglass' : 'sparkles'} size={20} color="#FFF" />
+            <Text style={styles.generateBtnText}>{generating ? 'Generating...' : 'Generate Workout'}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
-      <WorkoutCalendar
-        workoutDays={workouts.map((w: any) => w.target_date || w.created_at || '')}
-      />
+      <View style={styles.quickActionsRow}>
+        <QuickAction icon="checkmark-circle" label="Form Check" color={colors.health.calm} onPress={() => router.push('/form-checker' as any)} />
+        <QuickAction icon="timer" label="Quick Workout" color={colors.health.energy} onPress={() => {}} />
+        <QuickAction icon="analytics" label="Analytics" color={colors.health.mental} onPress={() => {}} />
+        <QuickAction icon="calendar" label="Schedule" color="#3B82F6" onPress={() => {}} />
+      </View>
 
-      <Button
-        title={generating ? 'Generating...' : 'Generate Adaptive Workout'}
-        onPress={generateWorkout}
-        loading={generating}
-        accessibilityLabel="Generate a new AI-powered workout"
-        accessibilityHint="Creates a personalized workout based on your recovery state"
-      />
-
-      <TouchableOpacity
-        style={s.formCheckerBtn}
-        onPress={() => {
-          Haptics.selectionAsync();
-          router.push('/form-checker');
-        }}
-      >
-        <Target size={16} color={theme.success} />
-        <Text style={s.formCheckerBtnText}>Form Checker</Text>
-      </TouchableOpacity>
-
-      {/* Warmup & Cooldown Accordion */}
-      <TouchableOpacity
-        style={s.routineAccordion}
-        onPress={() => {
-          Haptics.selectionAsync();
-          setShowRoutines(!showRoutines);
-        }}
-      >
-        <View style={s.routineAccordionHeader}>
-          <Flame size={16} color={theme.warning} />
-          <Text style={s.routineAccordionTitle}>Warmup & Cooldown Routines</Text>
-          {showRoutines ? (
-            <ChevronUp size={16} color={theme.textSecondary} />
-          ) : (
-            <ChevronDown size={16} color={theme.textSecondary} />
-          )}
+      {/* Muscle Group Filter */}
+      <SectionHeaderPremium icon="barbell" iconColor={colors.health.heart} title="Filter by Muscle" />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+        <View style={styles.filterRow}>
+          {MUSCLE_GROUPS.map(mg => (
+            <TouchableOpacity
+              key={mg.label}
+              style={[styles.filterPill, selectedMuscle === mg.label && { backgroundColor: mg.color + '20', borderColor: mg.color + '50' }]}
+              onPress={() => setSelectedMuscle(mg.label)}
+            >
+              <Ionicons name={mg.icon as any} size={14} color={selectedMuscle === mg.label ? mg.color : colors.text.muted} />
+              <Text style={[styles.filterPillText, selectedMuscle === mg.label && { color: mg.color }]}>{mg.label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
+      </ScrollView>
 
-        {showRoutines && (
-          <View style={s.routineContent}>
-            {warmupData?.warmup_routine && (
-              <View style={s.routineSection}>
-                <Text style={s.sectionHeading}>Dynamic Warmup:</Text>
-                {warmupData.warmup_routine.map((item: any, idx: number) => (
-                  <View key={idx} style={s.routineItemRow}>
-                    <View style={s.routineNumber}>
-                      <Text style={s.routineNumberText}>{idx + 1}</Text>
-                    </View>
-                    <View style={s.routineItemContent}>
-                      <Text style={s.routineItemName}>{item.name}</Text>
-                      <Text style={s.routineItemDetail}>
-                        {item.duration ? `${item.duration}s` : `${item.reps ?? 10} reps`}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={s.timerChip}
-                      onPress={() => startItemTimer('warmup', idx, item.duration)}
-                    >
-                      <Timer size={12} color={theme.warning} />
-                      <Text style={s.timerChipText}>
-                        {activeTimer?.section === 'warmup' && activeTimer.index === idx
-                          ? `${activeTimer.remaining}s`
-                          : 'Start'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
+      {/* Workout List */}
+      <SectionHeaderPremium
+        icon="list"
+        iconColor={colors.primary}
+        title="Recent Workouts"
+        subtitle={`${filteredWorkouts.length} workouts`}
+      />
 
-            {cooldownData?.cooldown_routine && (
-              <View style={s.routineSection}>
-                <Text style={[s.sectionHeading, { color: '#38BDF8', marginTop: 8 }]}>
-                  Static Cooldown:
-                </Text>
-                {cooldownData.cooldown_routine.map((item: any, idx: number) => (
-                  <View key={idx} style={s.routineItemRow}>
-                    <View style={[s.routineNumber, { backgroundColor: '#1E3A5F' }]}>
-                      <Text style={[s.routineNumberText, { color: '#38BDF8' }]}>{idx + 1}</Text>
-                    </View>
-                    <View style={s.routineItemContent}>
-                      <Text style={s.routineItemName}>{item.name}</Text>
-                      <Text style={s.routineItemDetail}>
-                        {item.duration ? `${item.duration}s hold` : '30s hold'}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[s.timerChip, { backgroundColor: '#1E3A5F' }]}
-                      onPress={() => startItemTimer('cooldown', idx, item.duration)}
-                    >
-                      <Timer size={12} color="#38BDF8" />
-                      <Text style={[s.timerChipText, { color: '#38BDF8' }]}>
-                        {activeTimer?.section === 'cooldown' && activeTimer.index === idx
-                          ? `${activeTimer.remaining}s`
-                          : 'Start'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-      </TouchableOpacity>
-
-      {workouts.length === 0 ? (
-        <EmptyState
-          title="No Workouts"
-          message="Generate your first AI-powered workout based on your recovery state."
-        />
+      {filteredWorkouts.length === 0 ? (
+        <GlassCard variant="light" style={styles.emptyCard}>
+          <Ionicons name="barbell" size={48} color={colors.text.muted} />
+          <Text style={styles.emptyTitle}>No Workouts Yet</Text>
+          <Text style={styles.emptyText}>Generate your first AI-powered workout based on your recovery state.</Text>
+          <TouchableOpacity style={styles.generateBtnSmall} onPress={generateWorkout}>
+            <Ionicons name="sparkles" size={16} color="#FFF" />
+            <Text style={styles.generateBtnSmallText}>Generate First Workout</Text>
+          </TouchableOpacity>
+        </GlassCard>
       ) : (
-        <FlatList
-          data={workouts}
-          keyExtractor={(item) => item.workout_id}
-          renderItem={({ item }) => (
-            <View style={s.workoutCard}>
-              <View style={s.workoutHeader}>
-                <Dumbbell size={16} color={theme.primaryLight} />
-                <Text style={s.workoutTitle}>{item.title}</Text>
-              </View>
-              {item.created_at && (
-                <View style={s.dateRow}>
-                  <Calendar size={12} color={theme.textMuted} />
-                  <Text style={s.dateText}>{formatDate(item.created_at)}</Text>
+        filteredWorkouts.map((workout, index) => (
+          <Animated.View key={workout.workout_id || index} style={{ opacity: fadeAnim }}>
+            <GlassCard variant="light" style={styles.workoutCard}>
+              <View style={styles.workoutHeader}>
+                <View style={styles.workoutIcon}>
+                  <Ionicons name="barbell" size={18} color={colors.health.heart} />
                 </View>
-              )}
-              <Text style={s.rationale}>{item.adaptation_rationale}</Text>
-              <View style={s.exerciseCount}>
-                <Sparkles size={12} color={theme.primaryLight} />
-                <Text style={s.exerciseCountText}>
-                  {item.exercises.length} exercises
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.workoutTitle}>{workout.title}</Text>
+                  {workout.created_at && (
+                    <View style={styles.workoutDate}>
+                      <Ionicons name="calendar" size={10} color={colors.text.muted} />
+                      <Text style={styles.workoutDateText}>{formatDate(workout.created_at)}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.exerciseBadge}>
+                  <Text style={styles.exerciseBadgeText}>{workout.exercises.length}</Text>
+                  <Text style={styles.exerciseBadgeLabel}>exercises</Text>
+                </View>
               </View>
-              {item.exercises.map((ex) => (
-                <WorkoutCard key={ex.exercise_id} exercise={ex} />
-              ))}
+
+              <Text style={styles.workoutRationale}>{workout.adaptation_rationale}</Text>
+
+              {/* Exercise List */}
+              <View style={styles.exerciseList}>
+                {workout.exercises.slice(0, 5).map((ex, i) => (
+                  <View key={ex.exercise_id || i} style={styles.exerciseItem}>
+                    <View style={styles.exerciseNumber}>
+                      <Text style={styles.exerciseNumberText}>{i + 1}</Text>
+                    </View>
+                    <View style={styles.exerciseInfo}>
+                      <Text style={styles.exerciseName}>{ex.name}</Text>
+                      <Text style={styles.exerciseDetail}>
+                        {ex.sets} sets × {ex.target_reps} • {ex.target_muscle}
+                      </Text>
+                    </View>
+                    {ex.target_rpe && (
+                      <View style={styles.rpeBadge}>
+                        <Text style={styles.rpeText}>RPE {ex.target_rpe}</Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+                {workout.exercises.length > 5 && (
+                  <Text style={styles.moreExercises}>+{workout.exercises.length - 5} more exercises</Text>
+                )}
+              </View>
+
+              {/* Start Button */}
               <TouchableOpacity
-                style={s.startBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  startWorkout(item);
-                  router.push('/workout-active');
-                }}
+                style={styles.startBtn}
+                onPress={() => router.push('/workout-active' as any)}
               >
-                <Dumbbell size={16} color={theme.background} />
-                <Text style={s.startBtnText}>Start Workout</Text>
+                <Ionicons name="play" size={18} color="#FFF" />
+                <Text style={styles.startBtnText}>Start Workout</Text>
               </TouchableOpacity>
-            </View>
-          )}
-          contentContainerStyle={s.list}
-        />
+            </GlassCard>
+          </Animated.View>
+        ))
       )}
-    </View>
+
+      <View style={{ height: 100 }} />
+    </ScrollView>
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background, padding: 20 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 48, marginBottom: 16 },
-    title: { fontSize: 28, fontWeight: '700', color: theme.text },
-    count: { fontSize: 14, color: theme.textMuted },
-    routineAccordion: {
-      backgroundColor: theme.surface,
-      borderRadius: 12,
-      padding: 14,
-      marginTop: 12,
-      borderWidth: 1,
-      borderColor: theme.border,
-    },
-    routineAccordionHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    routineAccordionTitle: { fontSize: 14, fontWeight: '600', color: theme.text, flex: 1, marginLeft: 8 },
-    routineContent: { marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.border },
-    routineSection: { marginBottom: 4 },
-    sectionHeading: { fontSize: 12, fontWeight: '700', color: theme.warning, marginBottom: 4 },
-    routineItem: { fontSize: 12, color: '#CBD5E1', marginBottom: 2 },
-    routineItemRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      paddingVertical: 6,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.surface,
-    },
-    routineNumber: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: '#422006',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    routineNumberText: { fontSize: 11, fontWeight: '700', color: theme.warning },
-    routineItemContent: { flex: 1 },
-    routineItemName: { fontSize: 13, color: theme.text, fontWeight: '600' },
-    routineItemDetail: { fontSize: 11, color: theme.textMuted },
-    timerChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: '#422006',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 6,
-    },
-    timerChipText: { fontSize: 10, fontWeight: '600', color: theme.warning },
-    formCheckerBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      backgroundColor: '#052E16',
-      borderRadius: 12,
-      padding: 12,
-      marginTop: 8,
-      borderWidth: 1,
-      borderColor: '#166534',
-    },
-    formCheckerBtnText: { color: theme.success, fontSize: 14, fontWeight: '600' },
-    list: { paddingBottom: 40 },
-    workoutCard: {
-      backgroundColor: theme.surface, borderRadius: 16, padding: 16, marginTop: 16,
-    },
-    workoutHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-    workoutTitle: { fontSize: 16, fontWeight: '600', color: theme.text, flex: 1 },
-    dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
-    dateText: { fontSize: 12, color: theme.textMuted },
-    rationale: { fontSize: 13, color: theme.textSecondary, marginBottom: 8, lineHeight: 18 },
-    exerciseCount: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
-    exerciseCountText: { fontSize: 12, color: theme.primaryLight, fontWeight: '500' },
-    startBtn: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      backgroundColor: theme.primaryLight, borderRadius: 12, padding: 12, marginTop: 8,
-    },
-    startBtnText: { color: theme.background, fontSize: 14, fontWeight: '700' },
-  });
-}
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg.deep },
+  contentContainer: { paddingBottom: 100 },
+
+  // Header
+  header: { paddingTop: 56, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
+  workoutCount: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 16, padding: 12 },
+  workoutCountNumber: { fontSize: 24, fontWeight: '800', color: '#FFF' },
+  workoutCountLabel: { fontSize: 10, color: 'rgba(255,255,255,0.8)' },
+
+  // Quick Actions
+  quickActionsRow: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg },
+  generateBtn: { flex: 1 },
+  generateBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md, borderRadius: radius.button },
+  generateBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
+  generateBtnSmall: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, paddingVertical: spacing.md, borderRadius: radius.button, marginTop: spacing.md },
+  generateBtnSmallText: { fontSize: 14, fontWeight: '700', color: '#FFF' },
+
+  // Filter
+  filterScroll: { marginTop: spacing.sm },
+  filterRow: { flexDirection: 'row', paddingHorizontal: spacing.screenPadding, gap: spacing.sm },
+  filterPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border,
+  },
+  filterPillText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
+
+  // Empty
+  emptyCard: { alignItems: 'center', paddingVertical: spacing['3xl'], marginHorizontal: spacing.screenPadding },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text.primary, marginTop: spacing.lg, marginBottom: spacing.sm },
+  emptyText: { fontSize: 14, color: colors.text.muted, textAlign: 'center', paddingHorizontal: spacing.xl },
+
+  // Workout Card
+  workoutCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.lg },
+  workoutHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  workoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.health.heartBg, justifyContent: 'center', alignItems: 'center' },
+  workoutTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary },
+  workoutDate: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  workoutDateText: { fontSize: 11, color: colors.text.muted },
+  exerciseBadge: { alignItems: 'center', backgroundColor: colors.primaryMuted, borderRadius: 10, padding: 8 },
+  exerciseBadgeText: { fontSize: 18, fontWeight: '800', color: colors.primary },
+  exerciseBadgeLabel: { fontSize: 9, color: colors.text.muted },
+
+  workoutRationale: { fontSize: 13, color: colors.text.secondary, marginTop: spacing.md, lineHeight: 18 },
+
+  // Exercise List
+  exerciseList: { marginTop: spacing.md },
+  exerciseItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.surface.divider },
+  exerciseNumber: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.health.heartBg, justifyContent: 'center', alignItems: 'center' },
+  exerciseNumberText: { fontSize: 11, fontWeight: '700', color: colors.health.heart },
+  exerciseInfo: { flex: 1 },
+  exerciseName: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
+  exerciseDetail: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  rpeBadge: { backgroundColor: colors.health.energyBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  rpeText: { fontSize: 10, fontWeight: '600', color: colors.health.energy },
+  moreExercises: { fontSize: 12, color: colors.text.muted, marginTop: spacing.sm, textAlign: 'center' },
+
+  // Start Button
+  startBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    backgroundColor: colors.health.heart, paddingVertical: spacing.md, borderRadius: radius.button, marginTop: spacing.md,
+  },
+  startBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
+});

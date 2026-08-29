@@ -54,8 +54,8 @@ async def create_recovery_log(req: RecoveryCalculationRequest):
             ml_insights=ml_insights,
             injury_risk=injury_risk,
         )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Recovery calculation failed", )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Recovery calculation failed") from e
 
 @router.get("")
 async def list_recovery_logs(user_id: str, days: int = 28):

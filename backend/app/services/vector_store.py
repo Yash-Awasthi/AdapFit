@@ -9,26 +9,49 @@ import os
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-# Try importing sentence-transformers
-try:
-    from sentence_transformers import SentenceTransformer
-    _EMBED_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-    _HAS_EMBEDDINGS = True
-except Exception:
-    _EMBED_MODEL = None
-    _HAS_EMBEDDINGS = False
+# Lazy-loaded ML dependencies — imported only when first needed
+_EMBED_MODEL = None
+_HAS_EMBEDDINGS = None  # None = not checked yet
+_QDRANT_CLIENT = None
+_HAS_QDRANT = None
+_QDRANT_IMPORTED = False
+_DIMENSION = 384  # all-MiniLM-L6-v2 dimension
 
-# Try importing qdrant
-try:
-    from qdrant_client import QdrantClient
+
+def _ensure_sentence_transformers():
+    """Lazily load sentence-transformers model on first use."""
+    global _EMBED_MODEL, _HAS_EMBEDDINGS
+    if _HAS_EMBEDDINGS is not None:
+        return
+    try:
+        from sentence_transformers import SentenceTransformer
+        _EMBED_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+        _HAS_EMBEDDINGS = True
+    except Exception:
+        _EMBED_MODEL = None
+        _HAS_EMBEDDINGS = False
+
+
+def _ensure_qdrant():
+    """Lazily initialize Qdrant client on first use."""
+    global _QDRANT_CLIENT, _HAS_QDRANT, _QDRANT_IMPORTED
+    if _QDRANT_IMPORTED:
+        return
+    _QDRANT_IMPORTED = True
+    try:
+        from qdrant_client import QdrantClient
+        from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue
+        _QDRANT_CLIENT = QdrantClient(":memory:")
+        _HAS_QDRANT = True
+    except Exception:
+        _QDRANT_CLIENT = None
+        _HAS_QDRANT = False
+
+
+def _get_qdrant_models():
+    """Import qdrant models on demand."""
     from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue
-    _QDRANT_CLIENT = QdrantClient(":memory:")
-    _HAS_QDRANT = True
-except Exception:
-    _QDRANT_CLIENT = None
-    _HAS_QDRANT = False
-
-DIMENSION = 384  # all-MiniLM-L6-v2 dimension
+    return VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue
 
 
 def _simple_embedding(text: str) -> List[float]:
@@ -64,25 +87,28 @@ class VectorStore:
     
     def initialize(self, exercises: List[dict]):
         """Index all exercises with embeddings."""
+        _ensure_sentence_transformers()
+        _ensure_qdrant()
         self.exercises = exercises
         
         for ex in exercises:
             # Build text representation for embedding
             text = f"{ex.get('name', '')} {' '.join(ex.get('primary_muscles', []))} {ex.get('equipment', '')} {ex.get('mechanic', '')} {ex.get('category', '')}"
-            if _HAS_EMBEDDINGS:
+            if _HAS_EMBEDDINGS and _EMBED_MODEL is not None:
                 emb = _EMBED_MODEL.encode(text).tolist()
             else:
                 emb = _simple_embedding(text)
             self.embeddings.append(emb)
         
         # Try to create Qdrant collection
-        if _HAS_QDRANT and _QDRANT_CLIENT:
+        if _HAS_QDRANT and _QDRANT_CLIENT is not None:
             try:
+                VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue = _get_qdrant_models()
                 collections = [c.name for c in _QDRANT_CLIENT.get_collections().collections]
                 if self.COLLECTION_NAME not in collections:
                     _QDRANT_CLIENT.create_collection(
                         collection_name=self.COLLECTION_NAME,
-                        vectors_config=VectorParams(size=DIMENSION, distance=Distance.COSINE),
+                        vectors_config=VectorParams(size=_DIMENSION, distance=Distance.COSINE),
                     )
                 
                 points = []
@@ -101,14 +127,18 @@ class VectorStore:
         if not self._initialized or not self.exercises:
             return []
         
-        if _HAS_EMBEDDINGS:
+        _ensure_sentence_transformers()
+        _ensure_qdrant()
+
+        if _HAS_EMBEDDINGS and _EMBED_MODEL is not None:
             query_emb = _EMBED_MODEL.encode(query).tolist()
         else:
             query_emb = _simple_embedding(query)
         
         # Try Qdrant first
-        if _HAS_QDRANT and _QDRANT_CLIENT:
+        if _HAS_QDRANT and _QDRANT_CLIENT is not None:
             try:
+                Filter, FieldCondition, MatchValue = _get_qdrant_models()[3:6]
                 must_conditions = []
                 if filter_equipment:
                     must_conditions.append(FieldCondition(key="equipment", match=MatchValue(value=filter_equipment[0])))

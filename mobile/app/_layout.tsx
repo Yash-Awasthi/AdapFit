@@ -2,6 +2,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "../src/services/theme";
 import { DevSettingsProvider } from "../src/services/devSettings";
 import { useUserStore } from "../src/stores";
@@ -53,6 +54,8 @@ function RootStack() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false, animation: "fade" }} />
+        <Stack.Screen name="register" options={{ headerShown: false, animation: "slide_from_right" }} />
         <Stack.Screen name="onboarding-welcome" options={{ headerShown: false, animation: "fade" }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, animation: "fade" }} />
         <Stack.Screen name="workout-active" options={{ headerShown: false }} />
@@ -70,12 +73,14 @@ function RootStack() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <DevSettingsProvider>
-          <RootStack />
-        </DevSettingsProvider>
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider>
+          <DevSettingsProvider>
+            <RootStack />
+          </DevSettingsProvider>
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }

@@ -55,8 +55,8 @@ async def transcribe_base64(payload: dict):
         raise HTTPException(status_code=400, detail="audio_base64 required")
     try:
         data = base64.b64decode(b64)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid base64")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid base64") from e
     result = transcribe_audio_bytes(data, filename)
     if not result.get("available"):
         raise HTTPException(status_code=503, detail=result.get("message", "STT unavailable"))

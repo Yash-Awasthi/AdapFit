@@ -69,8 +69,8 @@ async def create_workout(req: WorkoutGenerateRequest):
             ml_insights=ml_predictions,
             agent_memory_insights={"exercise_preferences": dict(list(prefs.items())[:10]), "accepted_count": memory.get("accepted_workouts", 0)},
         )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Workout generation failed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Workout generation failed") from e
 
 @router.patch("/{workout_id}", response_model=WorkoutCompleteResponse)
 async def complete_workout(workout_id: str, req: WorkoutCompleteRequest):
@@ -158,8 +158,8 @@ async def complete_workout(workout_id: str, req: WorkoutCompleteRequest):
             nlp_sentiment=nlp_sentiment,
             injury_risk=injury_risk,
         )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Workout completion failed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Workout completion failed") from e
 
 @router.get("")
 async def list_workouts(user_id: str, days: int = 14):

@@ -9,13 +9,23 @@ import httpx
 from typing import Dict, List, Any, Optional
 from core_engine import compute_subjective_score
 
-try:
-    from transformers import pipeline as hf_pipeline
-    _SENTIMENT_PIPE = hf_pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
-    _HAS_HF = True
-except Exception:
-    _SENTIMENT_PIPE = None
-    _HAS_HF = False
+# Lazy-loaded HuggingFace pipeline — loaded on first use
+_SENTIMENT_PIPE = None
+_HAS_HF = None  # None = not checked yet
+
+
+def _ensure_hf_pipeline():
+    """Lazily load the HuggingFace sentiment pipeline on first use."""
+    global _SENTIMENT_PIPE, _HAS_HF
+    if _HAS_HF is not None:
+        return
+    try:
+        from transformers import pipeline as hf_pipeline
+        _SENTIMENT_PIPE = hf_pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+        _HAS_HF = True
+    except Exception:
+        _SENTIMENT_PIPE = None
+        _HAS_HF = False
 
 from app.core.config import settings
 
@@ -55,6 +65,8 @@ class NLPPipeline:
         if not text_lower:
             return {"sentiment": "neutral", "confidence": 0.5, "method": "empty"}
         
+        _ensure_hf_pipeline()
+
         # Method 1: HuggingFace Transformers
         if _HAS_HF and _SENTIMENT_PIPE:
             try:

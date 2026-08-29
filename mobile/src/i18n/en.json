@@ -1,0 +1,16 @@
+{
+  "app": { "name": "AdapFit", "tagline": "Your AI-Powered Health Platform" },
+  "tabs": { "home": "Home", "workout": "Workout", "health": "Health", "coach": "Coach", "content": "Content", "trends": "Trends", "menu": "Menu" },
+  "home": { "welcome": "Welcome back", "healthScore": "Health Score", "todayActivity": "Today's Activity", "recentWorkouts": "Recent Workouts", "quickActions": "Quick Actions" },
+  "health": { "bpm": "Heart Rate", "stress": "Stress Level", "sleep": "Sleep Score", "steps": "Steps", "calories": "Calories", "water": "Hydration", "weight": "Weight", "bp": "Blood Pressure" },
+  "workout": { "start": "Start Workout", "exercises": "Exercises", "plans": "Workout Plans", "history": "History", "personalRecords": "Personal Records", "sets": "Sets", "reps": "Reps", "weight": "Weight", "rest": "Rest" },
+  "nutrition": { "calories": "Calories", "protein": "Protein", "carbs": "Carbs", "fat": "Fat", "fiber": "Fiber", "meals": "Meals", "search": "Search Food", "logMeal": "Log Meal", "remaining": "remaining" },
+  "sleep": { "score": "Sleep Score", "duration": "Duration", "quality": "Quality", "deep": "Deep Sleep", "rem": "REM Sleep", "light": "Light Sleep", "debt": "Sleep Debt", "bedtime": "Bedtime", "wakeUp": "Wake Up" },
+  "mental": { "mood": "Mood", "energy": "Energy", "anxiety": "Anxiety", "journal": "Journal", "assessments": "Assessments", "phq9": "Depression Screening", "gad7": "Anxiety Screening" },
+  "coach": { "insight": "Daily Insight", "ask": "Ask a Question", "report": "Weekly Report", "recommendations": "Recommendations" },
+  "community": { "forums": "Forums", "challenges": "Challenges", "leaderboard": "Leaderboard", "posts": "Posts", "trending": "Trending", "createPost": "Create Post" },
+  "telemedicine": { "doctors": "Doctors", "appointments": "Appointments", "history": "History", "book": "Book Consultation", "available": "Available Today", "specialty": "Specialty" },
+  "settings": { "notifications": "Notifications", "privacy": "Privacy", "language": "Language", "theme": "Theme", "units": "Units", "export": "Export Data", "about": "About" },
+  "auth": { "login": "Sign In", "register": "Create Account", "email": "Email", "password": "Password", "forgotPassword": "Forgot Password?", "noAccount": "Don't have an account?", "hasAccount": "Already have an account?" },
+  "common": { "save": "Save", "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "loading": "Loading...", "error": "Error", "retry": "Retry", "back": "Back", "next": "Next", "done": "Done", "search": "Search", "filter": "Filter" }
+}

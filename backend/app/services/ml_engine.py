@@ -7,49 +7,54 @@ import math
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, timezone
 
-try:
-    import numpy as np
-    _HAS_NUMPY = True
-except ImportError:
-    _HAS_NUMPY = False
-    class np:
-        @staticmethod
-        def array(x): return x
-        @staticmethod
-        def mean(x): return sum(x)/len(x) if x else 0
-        @staticmethod
-        def std(x):
-            m = sum(x)/len(x) if x else 0
-            return math.sqrt(sum((v-m)**2 for v in x)/len(x)) if x else 1
-        @staticmethod
-        def zeros(n): return [0.0]*n
-        @staticmethod
-        def ones(n): return [1.0]*n
-        @staticmethod
-        def clip(x, lo, hi): return max(lo, min(hi, x))
+# Lazy-loaded ML dependencies — loaded on first use
+_HAS_NUMPY = None  # None = not checked yet
+_HAS_PYTORCH = None
+_HAS_XGBOOST = None
+_HAS_LIGHTGBM = None
 
-try:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
-    _HAS_PYTORCH = True
-except ImportError:
-    _HAS_PYTORCH = False
+def _ensure_numpy():
+    global _HAS_NUMPY
+    if _HAS_NUMPY is not None:
+        return
+    try:
+        import numpy as np
+        _HAS_NUMPY = True
+    except ImportError:
+        _HAS_NUMPY = False
 
-try:
-    from xgboost import XGBRegressor, XGBClassifier
-    _HAS_XGBOOST = True
-except ImportError:
-    _HAS_XGBOOST = False
+def _ensure_pytorch():
+    global _HAS_PYTORCH
+    if _HAS_PYTORCH is not None:
+        return
+    try:
+        import torch
+        _HAS_PYTORCH = True
+    except ImportError:
+        _HAS_PYTORCH = False
 
-try:
-    from lightgbm import LGBMRegressor
-    _HAS_LIGHTGBM = True
-except ImportError:
-    _HAS_LIGHTGBM = False
+def _ensure_xgboost():
+    global _HAS_XGBOOST
+    if _HAS_XGBOOST is not None:
+        return
+    try:
+        from xgboost import XGBRegressor, XGBClassifier
+        _HAS_XGBOOST = True
+    except ImportError:
+        _HAS_XGBOOST = False
+
+def _ensure_lightgbm():
+    global _HAS_LIGHTGBM
+    if _HAS_LIGHTGBM is not None:
+        return
+    try:
+        from lightgbm import LGBMRegressor
+        _HAS_LIGHTGBM = True
+    except ImportError:
+        _HAS_LIGHTGBM = False
 
 
-class ReadinessNet(nn.Module if _HAS_PYTORCH else object):
+class ReadinessNet(object):
     def __init__(self, input_dim=14, hidden_dim=32, output_dim=4):
         if not _HAS_PYTORCH:
             return
@@ -232,8 +237,10 @@ class WorkoutPerformancePredictor:
         if len(self._training_data_x) < 5:
             return {"status": "insufficient_data", "samples": len(self._training_data_x)}
 
+        _ensure_xgboost()
         if _HAS_XGBOOST:
             try:
+                from xgboost import XGBRegressor
                 X = self._training_data_x[-200:]
                 y = self._training_data_y[-200:]
 
@@ -251,6 +258,7 @@ class WorkoutPerformancePredictor:
 
     def predict_next_rpe(self, features: List[float]) -> Dict[str, Any]:
         """Predict expected RPE for tomorrow's workout."""
+        _ensure_xgboost()
         if _HAS_XGBOOST and self._is_trained and self._model is not None:
             try:
                 pred = self._model.predict([features])[0]
@@ -392,7 +400,7 @@ class AdvancedMLEngine:
     """
 
     def __init__(self):
-        self.readiness_model = ReadinessNet() if _HAS_PYTORCH else None
+        self.readiness_model = None  # lazy-created on first train/predict
         self.is_trained = False
         self.training_samples = 0
         self._feature_history: List[List[float]] = []
@@ -449,6 +457,7 @@ class AdvancedMLEngine:
         return features
 
     def train_readiness_model(self, features_list: List[List[float]], labels: List[int]):
+        _ensure_pytorch()
         if not _HAS_PYTORCH or len(features_list) < 5:
             self._feature_history.extend(features_list)
             self._label_history.extend(labels)
@@ -479,6 +488,7 @@ class AdvancedMLEngine:
     def predict_readiness(self, features: List[float]) -> Dict[str, Any]:
         states = ["DEPLETED", "REDUCED", "MODERATE", "OPTIMAL"]
 
+        _ensure_pytorch()
         if _HAS_PYTORCH and self.is_trained and self.readiness_model is not None:
             self.readiness_model.eval()
             with torch.no_grad():
