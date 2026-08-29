@@ -9,13 +9,14 @@ import {
   Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Wind, Brain, TrendingUp, TrendingDown, Minus, Droplets, Plus, Clock } from 'lucide-react-native';
+import { Wind, Brain, TrendingUp, TrendingDown, Minus, Droplets, Plus, Clock, Angry, Frown, Meh, Smile, Laugh } from 'lucide-react-native';
 import { SectionHeader } from '../../src/components';
 import MeditationPlayer from '../../src/components/MeditationPlayer';
 import { api } from '../../src/services/api';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
+import { authHeader } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -50,7 +51,9 @@ interface MeditationSessionSummary {
   steps_count: number;
 }
 
-const MOOD_EMOJIS = ['', '😢', '😔', '😐', '🙂', '😊', '😄', '😁', '🤩', '🥳', '🌟'];
+// index 0 unused, mood is logged 1-10; icon progresses through 5 expressions, color ramps red to green
+const MOOD_ICONS = [Angry, Angry, Frown, Frown, Meh, Meh, Smile, Smile, Laugh, Laugh];
+const MOOD_COLORS = ['#EF4444', '#F87171', '#FB923C', '#FBBF24', '#FACC15', '#A3E635', '#84CC16', '#4ADE80', '#22C55E', '#10B981'];
 const TAGS = ['work_stress', 'good_sleep', 'social', 'exercise', 'meditation', 'nature'];
 const QUICK_DRINKS = [
   { ml: 150, label: '150ml' },
@@ -84,8 +87,8 @@ export default function WellnessScreen() {
   async function fetchData() {
     try {
       const [exRes, trendRes, hydData, medData] = await Promise.all([
-        fetch(`${API}/api/v1/mental-health/breathing-exercises`),
-        fetch(`${API}/api/v1/mental-health?user_id=${userId}&days=7`),
+        fetch(`${API}/api/v1/mental-health/breathing-exercises`, { headers: authHeader() }),
+        fetch(`${API}/api/v1/mental-health?user_id=${userId}&days=7`, { headers: authHeader() }),
         api.getHydrationToday(userId).catch(() => null),
         api.getMeditationSessions().catch(() => null),
       ]);
@@ -118,7 +121,7 @@ export default function WellnessScreen() {
     try {
       const res = await fetch(`${API}/api/v1/mental-health`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({
           user_id: userId,
           mood: selectedMood,
@@ -243,19 +246,20 @@ export default function WellnessScreen() {
       {/* Mood Check-in */}
       <SectionHeader title="How are you feeling?" />
 
-      <Text style={s.label}>Mood ({MOOD_EMOJIS[selectedMood]})</Text>
+      <Text style={s.label}>Mood ({selectedMood}/10)</Text>
       <View style={s.slider}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
-          <TouchableOpacity
-            key={v}
-            style={[s.dot, selectedMood === v && s.dotActive]}
-            onPress={() => { Haptics.selectionAsync(); setSelectedMood(v); }}
-          >
-            <Text style={[s.dotText, selectedMood === v && s.dotTextActive]}>
-              {MOOD_EMOJIS[v]}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => {
+          const MoodIcon = MOOD_ICONS[v - 1];
+          return (
+            <TouchableOpacity
+              key={v}
+              style={[s.dot, selectedMood === v && s.dotActive]}
+              onPress={() => { Haptics.selectionAsync(); setSelectedMood(v); }}
+            >
+              <MoodIcon size={selectedMood === v ? 20 : 16} color={selectedMood === v ? '#fff' : MOOD_COLORS[v - 1]} />
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <Text style={s.label}>Energy ({selectedEnergy}/10)</Text>

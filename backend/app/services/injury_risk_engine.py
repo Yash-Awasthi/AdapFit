@@ -6,6 +6,7 @@ biomechanical indicators, and historical data to predict and prevent injuries.
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 import math
+from app.core.workout_metrics import session_duration_minutes, session_load, session_rpe
 
 
 # Injury risk factor weights (evidence-based)
@@ -316,7 +317,7 @@ class InjuryRiskEngine:
 
     def _assess_fatigue(self, workout_logs: List[dict], recovery_logs: List[dict]) -> Dict[str, Any]:
         """Assess fatigue accumulation from training patterns."""
-        rpe_values = [wl.get("session_rpe", 5) for wl in workout_logs[-14:]]
+        rpe_values = [session_rpe(wl) for wl in workout_logs[-14:]]
 
         if not rpe_values:
             return {"score": 10, "detail": "No RPE data"}

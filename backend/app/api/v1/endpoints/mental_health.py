@@ -7,14 +7,13 @@ from typing import Optional, List
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from app.core.limiter import make_limiter
 
 from app.core.storage import storage
 from app.core.cache import api_response_cache as cache
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
+limiter = make_limiter()
 
 
 # --- Schemas ---

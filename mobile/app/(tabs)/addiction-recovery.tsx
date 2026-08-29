@@ -17,12 +17,12 @@ const mockData = {
   soberDays: 142,
   longestStreak: 142,
   milestones: [
-    { days: 1, label: 'First Step', emoji: '🌱', achieved: true },
-    { days: 7, label: 'One Week', emoji: '💪', achieved: true },
-    { days: 30, label: '30 Days', emoji: '⭐', achieved: true },
-    { days: 90, label: '90 Days', emoji: '🎯', achieved: true },
-    { days: 180, label: '6 Months', emoji: '🏆', achieved: false },
-    { days: 365, label: '1 Year', emoji: '🌟', achieved: false },
+    { days: 1, label: 'First Step', icon: 'leaf', achieved: true },
+    { days: 7, label: 'One Week', icon: 'barbell', achieved: true },
+    { days: 30, label: '30 Days', icon: 'star', achieved: true },
+    { days: 90, label: '90 Days', icon: 'flag', achieved: true },
+    { days: 180, label: '6 Months', icon: 'trophy', achieved: false },
+    { days: 365, label: '1 Year', icon: 'sparkles', achieved: false },
   ],
   triggers: [
     { name: 'Stress', frequency: 8, resisted: 6, icon: 'flash' },
@@ -84,7 +84,7 @@ export default function AddictionRecoveryScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {mockData.milestones.map((m, i) => (
               <View key={i} style={[styles.milestoneCard, m.achieved && styles.milestoneAchieved]}>
-                <Text style={{ fontSize: 28 }}>{m.emoji}</Text>
+                <Ionicons name={m.icon as any} size={28} color={m.achieved ? colors.health.success : colors.text.muted} />
                 <Text style={[typography.body.sm, { color: m.achieved ? colors.health.success : colors.text.muted, marginTop: 4 }]}>{m.days} days</Text>
                 <Text style={[typography.body.xs, { color: colors.text.muted }]}>{m.label}</Text>
                 {m.achieved && <Ionicons name="checkmark-circle" size={16} color={colors.health.success} style={{ marginTop: 4 }} />}
@@ -101,7 +101,10 @@ export default function AddictionRecoveryScreen() {
               <MiniLineChart data={mockData.weeklyMood} color={colors.health.calm} height={50} width={140} />
             </GlassCard>
             <GlassCard style={{ flex: 1 }}>
-              <Text style={[typography.body.sm, { color: colors.text.muted }]}>Cravings ↓</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={[typography.body.sm, { color: colors.text.muted }]}>Cravings</Text>
+                <Ionicons name="arrow-down" size={12} color={colors.health.success} />
+              </View>
               <MiniLineChart data={mockData.cravingsOverTime} color={colors.health.heart} height={50} width={140} />
             </GlassCard>
           </View>

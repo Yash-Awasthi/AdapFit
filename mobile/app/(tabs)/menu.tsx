@@ -4,13 +4,18 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ChevronRight, Sun, Moon as MoonIcon, Search, Calendar, BarChart3, Award,
-  Brain, Moon, Shield, Utensils, Salad, Users, Settings as SettingsIcon,
+  Brain, Moon, Shield, Utensils, Users, Settings as SettingsIcon,
   Download, Bell, Info, Pencil, Ruler, Droplet, Wrench,
+  LayoutDashboard, Activity, TrendingUp, HeartPulse, Baby, MessagesSquare,
+  ChefHat, Droplets, Smile, Pill, Watch, CalendarDays, Siren, Accessibility,
 } from 'lucide-react-native';
 import { useTheme, AccentName, CARD_SHADOW } from '../../src/services/theme';
 import { useDevSettings } from '../../src/services/devSettings';
+import { useFemaleFeatures } from '../../src/services/gender';
+import { useGrid } from '../../src/theme/layout';
 import { api } from '../../src/services/api';
 import { useUserStore } from '../../src/stores';
 import { LoadingScreen } from '../../src/components';
@@ -38,15 +43,24 @@ interface CatalogSection {
   items: CatalogItem[];
 }
 
-function buildCatalog(theme: any, showCycle: boolean): CatalogSection[] {
+function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] {
   return [
+    {
+      title: 'Overview',
+      items: [
+        { icon: LayoutDashboard, label: 'Dashboard', sub: 'Everything at a glance', route: '/dashboard', color: theme.primary },
+        { icon: Activity, label: 'Health Hub', sub: 'Vitals & body systems', route: '/health-hub', color: '#22C55E' },
+        { icon: TrendingUp, label: 'Trends', sub: 'HRV, load, readiness', route: '/trends', color: '#06B6D4' },
+        { icon: BarChart3, label: 'Stats', sub: 'Volume & PRs', route: '/stats', color: '#F97316' },
+      ],
+    },
     {
       title: 'Training',
       items: [
         { icon: Search, label: 'Exercises', sub: 'Movement library', route: '/exercises', color: theme.primary },
         { icon: Calendar, label: 'Periodization', sub: 'Long-term plan', route: '/periodization', color: '#06B6D4' },
-        { icon: BarChart3, label: 'Stats', sub: 'Volume & PRs', route: '/stats', color: '#F97316' },
         { icon: Award, label: 'Achievements', sub: '25 badges to earn', route: '/achievements', color: '#EAB308' },
+        { icon: HeartPulse, label: 'Recovery', sub: 'Readiness breakdown', route: '/recovery-dashboard', color: '#EF4444' },
       ],
     },
     {
@@ -55,22 +69,45 @@ function buildCatalog(theme: any, showCycle: boolean): CatalogSection[] {
         { icon: Brain, label: 'Wellness', sub: 'Mood & mind check-in', route: '/wellness', color: '#A855F7' },
         { icon: Moon, label: 'Sleep', sub: 'Stages & consistency', route: '/sleep', color: '#6366F1' },
         { icon: Shield, label: 'Health', sub: 'Conditions & meds', route: '/health', color: '#22C55E' },
-        ...(showCycle
-          ? [{ icon: Droplet, label: 'Cycle', sub: 'Phase-aware training', route: '/cycle', color: '#EF4444' }]
+        ...(showFemaleScreens
+          ? [
+              { icon: Droplet, label: 'Cycle', sub: 'Phases & fertility window', route: '/cycle', color: '#EF4444' },
+              { icon: Baby, label: 'Pregnancy', sub: 'Trimester guidance', route: '/pregnancy', color: '#F472B6' },
+            ]
           : []),
       ],
     },
     {
       title: 'Nutrition',
       items: [
-        { icon: Utensils, label: 'Nutrition', sub: 'Macros & meal plans', route: '/nutrition', color: '#F59E0B' },
-        { icon: Salad, label: 'Diet Log', sub: 'Quick meal logging', route: '/diet', color: '#84CC16' },
+        { icon: Utensils, label: 'Nutrition', sub: 'Meals, macros & photo log', route: '/nutrition', color: '#F59E0B' },
+        { icon: ChefHat, label: 'Recipes', sub: 'Meals that fit macros', route: '/recipes', color: '#F97316' },
+        { icon: Droplets, label: 'Hydration', sub: 'Daily water intake', route: '/nutrition', color: '#38BDF8' },
+      ],
+    },
+    {
+      title: 'Body & Vitals',
+      items: [
+        { icon: HeartPulse, label: 'Vital Signs', sub: 'Heart rate & blood pressure', route: '/vital-signs', color: '#EF4444' },
+        { icon: Smile, label: 'Mental Health', sub: 'Mood & anxiety tracking', route: '/mental-health', color: '#A855F7' },
+        { icon: Pill, label: 'Medication', sub: 'Doses & reminders', route: '/medication', color: '#22C55E' },
+        { icon: Watch, label: 'Devices', sub: 'Wearables & sync', route: '/devices', color: '#64748B' },
       ],
     },
     {
       title: 'Community',
       items: [
         { icon: Users, label: 'Social', sub: 'Feed & challenges', route: '/social', color: '#EC4899' },
+        { icon: MessagesSquare, label: 'Forums', sub: 'Ask and answer', route: '/forums', color: '#8B5CF6' },
+      ],
+    },
+    {
+      title: 'Tools',
+      items: [
+        { icon: CalendarDays, label: 'Calendar', sub: 'Plan and history', route: '/health-calendar', color: '#06B6D4' },
+        { icon: Siren, label: 'Emergency', sub: 'Contacts & medical ID', route: '/emergency', color: '#DC2626' },
+        { icon: Accessibility, label: 'Accessibility', sub: 'Text size & motion', route: '/accessibility-settings', color: '#0EA5E9' },
+        { icon: Download, label: 'Export Data', sub: 'Download your records', route: '/data-export', color: '#22C55E' },
       ],
     },
   ];
@@ -78,17 +115,21 @@ function buildCatalog(theme: any, showCycle: boolean): CatalogSection[] {
 
 const ACCENT_ORDER: AccentName[] = ['indigo', 'emerald', 'rose', 'amber', 'cyan'];
 
-function CatalogCard({ item, index, theme, reduceMotion }: { item: CatalogItem; index: number; theme: any; reduceMotion: boolean }) {
+function CatalogCard({ item, index, theme, reduceMotion, width }: {
+  item: CatalogItem; index: number; theme: any; reduceMotion: boolean; width: number;
+}) {
   const router = useRouter();
   const [pressed, setPressed] = useState(false);
   const Icon = item.icon;
   return (
-    <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(280).delay(40 * index)} style={styles.cardWrap}>
+    <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(280).delay(40 * index)} style={{ width }}>
       <TouchableOpacity
         activeOpacity={0.9}
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
         onPress={() => { Haptics.selectionAsync(); router.push(item.route as any); }}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.label}. ${item.sub}`}
         style={[
           styles.card,
           CARD_SHADOW,
@@ -98,8 +139,8 @@ function CatalogCard({ item, index, theme, reduceMotion }: { item: CatalogItem; 
         <View style={[styles.cardIcon, { backgroundColor: `${item.color}22` }]}>
           <Icon size={20} color={item.color} />
         </View>
-        <Text style={[styles.cardLabel, { color: theme.text }]}>{item.label}</Text>
-        <Text style={[styles.cardSub, { color: theme.textMuted }]} numberOfLines={1}>{item.sub}</Text>
+        <Text style={[styles.cardLabel, { color: theme.text }]} numberOfLines={1}>{item.label}</Text>
+        <Text style={[styles.cardSub, { color: theme.textMuted }]} numberOfLines={2}>{item.sub}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -124,10 +165,12 @@ export default function MenuScreen() {
   const { theme, isDark, toggle, accent, setAccent, accents } = useTheme();
   const { reduceMotion } = useDevSettings();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const grid = useGrid(2);
+  const showFemaleScreens = useFemaleFeatures();
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const profile = useUserStore((s) => s.profile);
-  const hydrated = useUserStore((s) => s.hydrated);
   const refreshProfile = useUserStore((s) => s.refreshProfile);
 
   useEffect(() => {
@@ -141,18 +184,17 @@ export default function MenuScreen() {
 
   if (loading) return <LoadingScreen />;
 
-  const showCycle = hydrated && profile?.gender === 'female';
   const initials = (user?.name || user?.email || '?').trim().charAt(0).toUpperCase();
-  const catalog = buildCatalog(theme, showCycle);
+  const catalog = buildCatalog(theme, showFemaleScreens);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ paddingBottom: 100 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ paddingBottom: 120 }}>
       {/* Profile header */}
       <LinearGradient
         colors={[theme.primary, theme.primaryLight]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.heroCard, CARD_SHADOW]}
+        style={[styles.heroCard, CARD_SHADOW, { paddingTop: insets.top + 20 }]}
       >
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
@@ -180,9 +222,16 @@ export default function MenuScreen() {
       {catalog.map((section) => (
         <View key={section.title} style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>{section.title}</Text>
-          <View style={styles.grid}>
+          <View style={[styles.grid, { gap: grid.gap }]}>
             {section.items.map((item, i) => (
-              <CatalogCard key={item.label} item={item} index={i} theme={theme} reduceMotion={reduceMotion} />
+              <CatalogCard
+                key={item.label}
+                item={item}
+                index={i}
+                theme={theme}
+                reduceMotion={reduceMotion}
+                width={grid.cell}
+              />
             ))}
           </View>
         </View>
@@ -227,7 +276,7 @@ export default function MenuScreen() {
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Account</Text>
         <View style={[styles.list, CARD_SHADOW, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <SystemRow icon={Ruler} label="Body & system status" sub="Measurements, backend health" color="#38BDF8" theme={theme} onPress={() => router.push('/profile' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />
+          <SystemRow icon={Ruler} label="Body & measurements" sub="Age, height, training preferences" color="#38BDF8" theme={theme} onPress={() => router.push('/personal-info' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />
           <SystemRow icon={Wrench} label="Dev Tools" sub="Your own AI key, reduce motion" color="#94A3B8" theme={theme} onPress={() => router.push('/dev-tools' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />
           <SystemRow icon={SettingsIcon} label="App preferences" sub="Notifications, reminders" color="#818CF8" theme={theme} onPress={() => router.push('/settings' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />
           <SystemRow icon={Bell} label="Notifications" sub="Manage alerts" color="#F59E0B" theme={theme} onPress={() => router.push('/settings' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />
@@ -266,14 +315,14 @@ const styles = StyleSheet.create({
   heroTag: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   heroTagText: { color: '#fff', fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
 
-  section: { paddingHorizontal: 16, marginTop: 8, marginBottom: 8 },
+  section: { paddingHorizontal: 20, marginTop: 8, marginBottom: 8 },
   sectionTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  cardWrap: { width: '47%' },
-  card: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 4 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  // Fixed height so a one-line and a two-line subtitle keep the same card box.
+  card: { height: 122, borderRadius: 16, borderWidth: 1, padding: 14, gap: 2 },
   cardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   cardLabel: { fontSize: 14, fontWeight: '700' },
-  cardSub: { fontSize: 11 },
+  cardSub: { fontSize: 11, lineHeight: 15 },
 
   list: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   sysRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1 },

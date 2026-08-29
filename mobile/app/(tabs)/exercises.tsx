@@ -16,6 +16,7 @@ import { useBookmarkStore } from '../../src/stores';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../../src/services/config';
 import { useTheme } from '../../src/services/theme';
+import { authHeader } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -61,7 +62,7 @@ export default function ExercisesScreen() {
       if (selectedMuscle !== 'all') params.set('muscle', selectedMuscle);
       params.set('page_size', '50');
 
-      const res = await fetch(`${API}/api/v1/exercises?${params}`);
+      const res = await fetch(`${API}/api/v1/exercises?${params}`, { headers: authHeader() });
       if (res.ok) {
         const json = await res.json();
         setExercises(json.items || []);

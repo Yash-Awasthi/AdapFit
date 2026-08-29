@@ -24,13 +24,15 @@ function buildTheme(isDark: boolean, accent: AccentName) {
   const a = ACCENTS[accent];
   return isDark
     ? {
-        background: '#0F172A',
-        surface: '#1E293B',
-        surfaceHover: '#334155',
-        border: '#334155',
-        text: '#F8FAFC',
-        textSecondary: '#94A3B8',
-        textMuted: '#8B96AB',
+        // Kept in step with the static tokens in src/theme so screens built
+        // on either system sit on the same surfaces.
+        background: '#0C111C',
+        surface: '#182031',
+        surfaceHover: '#2A3550',
+        border: '#2A3550',
+        text: '#F1F5F9',
+        textSecondary: '#CBD5E1',
+        textMuted: '#9AA8BF',
         primary: a.primary,
         primaryLight: a.primaryLight,
         primaryBg: `${a.primary}26`,

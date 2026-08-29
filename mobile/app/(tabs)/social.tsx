@@ -9,6 +9,7 @@ import { ActivityFeed } from '../../src/components/ActivityFeed';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
+import { authHeader } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -63,7 +64,7 @@ export default function SocialScreen() {
   async function fetchChallenges() {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/v1/social?user_id=${userId}`);
+      const res = await fetch(`${API}/api/v1/social?user_id=${userId}`, { headers: authHeader() });
       if (res.ok) setChallenges(await res.json());
     } catch {}
     setLoading(false);
@@ -73,7 +74,7 @@ export default function SocialScreen() {
     if (!selectedChallenge) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/v1/social/${selectedChallenge}/leaderboard?user_id=${userId}`);
+      const res = await fetch(`${API}/api/v1/social/${selectedChallenge}/leaderboard?user_id=${userId}`, { headers: authHeader() });
       if (ok(res)) setLeaderboard(await res.json());
     } catch {}
     setLoading(false);
@@ -82,7 +83,7 @@ export default function SocialScreen() {
   async function joinChallenge(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const res = await fetch(`${API}/api/v1/social/${id}/join?user_id=${userId}`, { method: 'POST' });
+      const res = await fetch(`${API}/api/v1/social/${id}/join?user_id=${userId}`, { method: 'POST', headers: authHeader() });
       if (res.ok) {
         setSelectedChallenge(id);
         setMode('leaderboard');
@@ -104,7 +105,7 @@ export default function SocialScreen() {
     try {
       const res = await fetch(`${API}/api/v1/social?user_id=${userId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({
           name: newName.trim(), description: newDesc.trim(),
           challenge_type: 'duration', target_value: 30,

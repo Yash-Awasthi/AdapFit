@@ -4,13 +4,16 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
+const TAB_ICONS = { screen: 'search-outline', exercises: 'barbell', trends: 'trending-up-outline' } as const;
+const TAB_LABELS = { screen: 'Screen', exercises: 'Exercises', trends: 'Trends' } as const;
+
 const DISEASES = [
-  { id: 'depression', name: 'Depression', icon: '🧠', color: '#7C3AED', desc: 'Speech pattern analysis for mood disorders' },
-  { id: 'heart_disease', name: 'Heart Health', icon: '❤️', color: '#EF4444', desc: 'Vocal tremor and breath support analysis' },
-  { id: 'cognitive_decline', name: 'Cognitive Health', icon: '🎯', color: '#3B82F6', desc: 'Word finding and coherence assessment' },
-  { id: 'parkinsons', name: "Parkinson's", icon: '🔬', color: '#10B981', desc: 'Voice tremor and monotonicity detection' },
-  { id: 'respiratory', name: 'Respiratory', icon: '🫁', color: '#06B6D4', desc: 'Breath pattern and lung function analysis' },
-  { id: 'anxiety', name: 'Anxiety', icon: '😰', color: '#F59E0B', desc: 'Speech tempo and hesitation detection' },
+  { id: 'depression', name: 'Depression', icon: 'body-outline', color: '#7C3AED', desc: 'Speech pattern analysis for mood disorders' },
+  { id: 'heart_disease', name: 'Heart Health', icon: 'heart', color: '#EF4444', desc: 'Vocal tremor and breath support analysis' },
+  { id: 'cognitive_decline', name: 'Cognitive Health', icon: 'bulb-outline', color: '#3B82F6', desc: 'Word finding and coherence assessment' },
+  { id: 'parkinsons', name: "Parkinson's", icon: 'flask-outline', color: '#10B981', desc: 'Voice tremor and monotonicity detection' },
+  { id: 'respiratory', name: 'Respiratory', icon: 'pulse-outline', color: '#06B6D4', desc: 'Breath pattern and lung function analysis' },
+  { id: 'anxiety', name: 'Anxiety', icon: 'alert-circle-outline', color: '#F59E0B', desc: 'Speech tempo and hesitation detection' },
 ];
 
 export default function VoiceHealthScreen() {
@@ -48,7 +51,7 @@ export default function VoiceHealthScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🎤 Voice Health Analysis</Text>
+        <Text style={styles.headerTitle}>Voice Health Analysis</Text>
         <Text style={styles.headerSubtitle}>AI-powered disease screening from your voice</Text>
       </View>
 
@@ -59,8 +62,9 @@ export default function VoiceHealthScreen() {
             style={[styles.tab, activeTab === tab && styles.activeTab]}
             onPress={() => setActiveTab(tab)}
           >
+            <Ionicons name={TAB_ICONS[tab]} size={14} color={activeTab === tab ? '#FFFFFF' : '#94A3B8'} />
             <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-              {tab === 'screen' ? '🔍 Screen' : tab === 'exercises' ? '💪 Exercises' : '📈 Trends'}
+              {TAB_LABELS[tab]}
             </Text>
           </TouchableOpacity>
         ))}
@@ -78,15 +82,20 @@ export default function VoiceHealthScreen() {
                 disabled={isRecording}
               >
                 <View style={styles.diseaseLeft}>
-                  <Text style={styles.diseaseIcon}>{disease.icon}</Text>
+                  <Ionicons name={disease.icon as any} size={28} color={disease.color} style={styles.diseaseIcon} />
                   <View style={styles.diseaseInfo}>
                     <Text style={styles.diseaseName}>{disease.name}</Text>
                     <Text style={styles.diseaseDesc}>{disease.desc}</Text>
                   </View>
                 </View>
                 <View style={[styles.scanBadge, { backgroundColor: disease.color + '20' }]}>
+                  <Ionicons
+                    name={isRecording && selectedDisease === disease.id ? 'hourglass-outline' : 'mic-outline'}
+                    size={12}
+                    color={disease.color}
+                  />
                   <Text style={[styles.scanBadgeText, { color: disease.color }]}>
-                    {isRecording && selectedDisease === disease.id ? '⏳ Analyzing...' : '🎤 Scan'}
+                    {isRecording && selectedDisease === disease.id ? 'Analyzing...' : 'Scan'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -124,7 +133,7 @@ export default function VoiceHealthScreen() {
                 </View>
                 <Text style={styles.exerciseBenefit}>{ex.benefit}</Text>
                 <TouchableOpacity style={styles.startBtn}>
-                  <Text style={styles.startBtnText}>▶ Start</Text>
+                  <Text style={styles.startBtnText}>Start</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -139,21 +148,21 @@ export default function VoiceHealthScreen() {
               <View style={styles.trendBar}>
                 <View style={[styles.trendFill, { width: '25%', backgroundColor: '#10B981' }]} />
               </View>
-              <Text style={styles.trendStatus}>✅ Low risk - stable over 4 sessions</Text>
+              <Text style={styles.trendStatus}>Low risk - stable over 4 sessions</Text>
             </View>
             <View style={styles.trendCard}>
               <Text style={styles.trendTitle}>Cognitive Health</Text>
               <View style={styles.trendBar}>
                 <View style={[styles.trendFill, { width: '15%', backgroundColor: '#10B981' }]} />
               </View>
-              <Text style={styles.trendStatus}>✅ Excellent - improving trend</Text>
+              <Text style={styles.trendStatus}>Excellent - improving trend</Text>
             </View>
             <View style={styles.trendCard}>
               <Text style={styles.trendTitle}>Respiratory Health</Text>
               <View style={styles.trendBar}>
                 <View style={[styles.trendFill, { width: '35%', backgroundColor: '#F59E0B' }]} />
               </View>
-              <Text style={styles.trendStatus}>⚠️ Moderate - practice more exercises</Text>
+              <Text style={styles.trendStatus}>Moderate - practice more exercises</Text>
             </View>
           </>
         )}
@@ -168,7 +177,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#F8FAFC' },
   headerSubtitle: { fontSize: 14, color: '#94A3B8', marginTop: 4 },
   tabBar: { flexDirection: 'row', backgroundColor: '#1E293B', paddingHorizontal: 16, paddingVertical: 8 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
+  tab: { flex: 1, flexDirection: 'row', gap: 6, paddingVertical: 10, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
   activeTab: { backgroundColor: '#3B82F6' },
   tabText: { color: '#94A3B8', fontSize: 13, fontWeight: '600' },
   activeTabText: { color: '#FFFFFF' },
@@ -179,11 +188,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   diseaseLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  diseaseIcon: { fontSize: 32, marginRight: 12 },
+  diseaseIcon: { marginRight: 12 },
   diseaseInfo: { flex: 1 },
   diseaseName: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC' },
   diseaseDesc: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-  scanBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
+  scanBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
   scanBadgeText: { fontSize: 12, fontWeight: 'bold' },
   resultCard: {
     backgroundColor: '#1E293B', borderRadius: 16, padding: 20, marginTop: 16,

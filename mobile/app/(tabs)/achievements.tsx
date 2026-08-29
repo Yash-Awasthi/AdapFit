@@ -7,6 +7,7 @@ import { LoadingScreen, EmptyState } from '../../src/components';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
+import { authHeader } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -44,7 +45,7 @@ export default function AchievementsScreen() {
 
   async function fetchAchievements() {
     try {
-      const res = await fetch(`${API}/api/v1/achievements?user_id=${userId}`);
+      const res = await fetch(`${API}/api/v1/achievements?user_id=${userId}`, { headers: authHeader() });
       if (res.ok) {
         setAchievements(await res.json());
       }

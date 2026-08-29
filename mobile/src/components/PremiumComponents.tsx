@@ -10,6 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, shadows, glass } from '../theme';
+import { SCREEN_HEADER_TOP } from '../theme/layout';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -134,23 +135,33 @@ interface HealthMetricMiniProps {
   trend?: 'up' | 'down' | 'flat';
   trendValue?: string;
   onPress?: () => void;
+  /** Explicit cell width from a grid. Without it the card flexes to fill its row. */
+  width?: number;
 }
 
-export const HealthMetricMini: React.FC<HealthMetricMiniProps> = ({ icon, value, label, color, trend, trendValue, onPress }) => {
+export const HealthMetricMini: React.FC<HealthMetricMiniProps> = ({ icon, value, label, color, trend, trendValue, onPress, width }) => {
   const trendIcon = trend === 'up' ? 'trending-up' : trend === 'down' ? 'trending-down' : 'remove';
   const trendColor = trend === 'up' ? colors.score.excellent : trend === 'down' ? colors.score.critical : colors.text.muted;
 
   return (
     <TouchableOpacity
-      style={[styles.metricMini, { borderColor: color + '20' }]}
+      style={[
+        styles.metricMini,
+        { borderColor: color + '20' },
+        // A flexed card in a wrapped row stretches the final row's items;
+        // a measured width keeps every cell identical.
+        width ? { width, flex: 0, minWidth: 0 } : null,
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={`${label}: ${value}`}
     >
       <View style={[styles.metricMiniIcon, { backgroundColor: color + '18' }]}>
         <Ionicons name={icon as any} size={18} color={color} />
       </View>
-      <Text style={[styles.metricMiniValue, { color }]}>{value}</Text>
-      <Text style={styles.metricMiniLabel}>{label}</Text>
+      <Text style={[styles.metricMiniValue, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value}</Text>
+      <Text style={styles.metricMiniLabel} numberOfLines={1}>{label}</Text>
       {trend && (
         <View style={styles.metricMiniTrend}>
           <Ionicons name={trendIcon as any} size={10} color={trendColor} />
@@ -361,13 +372,13 @@ const styles = StyleSheet.create({
 
   // Header
   headerContainer: { marginBottom: spacing.lg },
-  headerGradient: { paddingTop: 56, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  headerGradient: { paddingTop: SCREEN_HEADER_TOP, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerContent: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   headerTitle: { fontSize: 22, fontWeight: '700', color: '#FFF' },
   headerTitleLarge: { fontSize: 28, fontWeight: '800' },
   headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
   headerAction: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
-  headerContentPlain: { flexDirection: 'row', alignItems: 'center', paddingTop: 56, paddingHorizontal: spacing.screenPadding, paddingBottom: spacing.lg },
+  headerContentPlain: { flexDirection: 'row', alignItems: 'center', paddingTop: SCREEN_HEADER_TOP, paddingHorizontal: spacing.screenPadding, paddingBottom: spacing.lg },
   headerTitlePlain: { fontSize: 28, fontWeight: '800', color: colors.text.primary },
   headerSubtitlePlain: { fontSize: 14, color: colors.text.muted, marginTop: 4 },
   headerActionPlain: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryMuted, justifyContent: 'center', alignItems: 'center' },

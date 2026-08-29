@@ -6,6 +6,7 @@ workout performance prediction, and fatigue forecasting.
 import math
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, timezone
+from app.core.workout_metrics import session_duration_minutes, session_load, session_rpe
 
 # Lazy-loaded ML dependencies — loaded on first use
 _HAS_NUMPY = None  # None = not checked yet
@@ -148,9 +149,9 @@ class TrendCorrelationAnalyzer:
         hrv = [r.get("hrv_rmssd", 50) for r in recent_recovery]
         sleep = [r.get("sleep_duration_hours", 7) for r in recent_recovery]
         recovery_scores = [r.get("recovery_score", 70) for r in recent_recovery]
-        rpe = [w.get("session_rpe", 5) for w in recent_workouts]
+        rpe = [session_rpe(w) for w in recent_workouts]
         workout_load = [w.get("session_load", 500) for w in recent_workouts]
-        workout_duration = [w.get("duration_minutes", 45) for w in recent_workouts]
+        workout_duration = [session_duration_minutes(w) for w in recent_workouts]
 
         # Calculate all pairwise correlations
         pairs = [
@@ -218,9 +219,9 @@ class WorkoutPerformancePredictor:
             recovery_log.get("sleep_efficiency_pct", 85),
             recovery_log.get("recovery_score", 70),
             recovery_log.get("hrv_z_score", 0) or 0,
-            workout_log.get("session_rpe", 5),
+            session_rpe(workout_log),
             workout_log.get("session_load", 500),
-            workout_log.get("duration_minutes", 45),
+            session_duration_minutes(workout_log),
             workout_log.get("total_volume_kg", 5000),
             workout_log.get("acwr", 1.0),
             # Day of week as cyclical
@@ -337,9 +338,7 @@ class FatigueForecaster:
         cumulative = 0.0
 
         for wl in workout_logs[-14:]:
-            rpe = wl.get("session_rpe", 5)
-            duration = wl.get("duration_minutes", 45)
-            load = rpe * duration
+            load = session_load(wl)
 
             # Fatigue accumulates faster than fitness
             acute_fatigue = load * 0.3  # fast component
@@ -434,7 +433,7 @@ class AdvancedMLEngine:
 
         last_rpe = 5.0
         if workout_logs:
-            last_rpe = float(workout_logs[-1].get("session_rpe", 5))
+            last_rpe = session_rpe(workout_logs[-1])
         features.append(last_rpe)
 
         # Extended features for v2
@@ -443,7 +442,7 @@ class AdvancedMLEngine:
         features.append(avg_recovery)
 
         # 7-day average RPE
-        avg_rpe = sum(w.get("session_rpe", 5) for w in workout_logs[-7:]) / max(len(workout_logs[-7:]), 1) if workout_logs else 5.0
+        avg_rpe = sum(session_rpe(w) for w in workout_logs[-7:]) / max(len(workout_logs[-7:]), 1) if workout_logs else 5.0
         features.append(avg_rpe)
 
         # Workout frequency (sessions per week in last 14 days)

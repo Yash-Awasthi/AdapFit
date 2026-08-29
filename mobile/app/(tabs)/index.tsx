@@ -10,7 +10,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { colors, typography, spacing, radius, shadows, glass, getScoreColor } from '../../src/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, spacing, radius } from '../../src/theme';
+import { useGrid } from '../../src/theme/layout';
 import {
   ScoreRing, GradientCard, GlassCard, HealthMetricMini,
   SectionHeaderPremium, ProgressBarPremium, StatCard, QuickAction, PillChip,
@@ -19,10 +21,10 @@ import { InteractiveLineChart, MetricCardWithChart, Sparkline } from '../../src/
 import { HapticButton, SwipeableCard } from '../../src/components/GestureSystem';
 import { useToast, QuickAlert } from '../../src/components/ToastSystem';
 import { FloatingActionButton, SectionDivider } from '../../src/components/NavigationHelpers';
+import { TodayDecision } from '../../src/components/TodayDecision';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API = 'http://localhost:8000/api/v1';
-
+import { API_V1 as API } from '../../src/services/config';
 const api = async (path: string, opts?: RequestInit) => {
   try {
     const r = await fetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -34,14 +36,16 @@ const api = async (path: string, opts?: RequestInit) => {
 // ===== Greeting based on time of day =====
 const getGreeting = () => {
   const h = new Date().getHours();
-  if (h < 12) return { text: 'Good Morning', icon: '☀️', gradient: ['#FF9A56', '#FF6B35'] };
-  if (h < 17) return { text: 'Good Afternoon', icon: '🌤️', gradient: ['#3B82F6', '#06B6D4'] };
-  if (h < 21) return { text: 'Good Evening', icon: '🌅', gradient: ['#8B5CF6', '#6366F1'] };
-  return { text: 'Good Night', icon: '🌙', gradient: ['#1E1B4B', '#312E81'] };
+  if (h < 12) return { text: 'Good morning', icon: 'sunny', gradient: ['#E8814A', '#C2542A'] };
+  if (h < 17) return { text: 'Good afternoon', icon: 'partly-sunny', gradient: ['#3E7BC4', '#2E8BA0'] };
+  if (h < 21) return { text: 'Good evening', icon: 'moon', gradient: ['#6D5BC7', '#4F51B8'] };
+  return { text: 'Good night', icon: 'moon', gradient: ['#2A2A5E', '#312E81'] };
 };
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const grid = useGrid(3);
   const [refreshing, setRefreshing] = useState(false);
   const [healthScore, setHealthScore] = useState(72);
   const [bpm, setBpm] = useState<number | null>(null);
@@ -68,9 +72,10 @@ export default function HomeScreen() {
       api('/sleep/log', { method: 'POST', body: JSON.stringify({ bedtime: '23:00', wake_time: '07:00', quality_score: 78 }) }),
     ]);
     if (stressRes?.overall_score) setStressLevel(stressRes.overall_score);
-    if (wellbeingRes?.total_screen_time_minutes) setSteps(Math.floor(Math.random() * 8000) + 2000);
-    if (sleepRes) setSleepScore(78);
-    setWaterIntake(4);
+    // A placeholder value here is indistinguishable from a real reading, so
+    // only a count the backend actually reported may be displayed.
+    if (typeof wellbeingRes?.step_count === 'number') setSteps(wellbeingRes.step_count);
+    if (typeof sleepRes?.quality_score === 'number') setSleepScore(sleepRes.quality_score);
   };
 
   const onRefresh = async () => {
@@ -89,12 +94,12 @@ export default function HomeScreen() {
   ];
 
   const healthMetrics = [
-    { icon: 'heart', value: bpm || '--', label: 'BPM', color: colors.health.heart, trend: 'flat' as const },
-    { icon: 'footprints', value: steps.toLocaleString(), label: 'Steps', color: colors.health.activity, trend: 'up' as const, trendValue: '+12%' },
-    { icon: 'moon', value: `${sleepScore}`, label: 'Sleep', color: colors.health.sleep, trend: 'up' as const },
-    { icon: 'flame', value: `${Math.floor(steps * 0.04)}`, label: 'Calories', color: colors.health.energy },
-    { icon: 'water', value: `${waterIntake}/8`, label: 'Water', color: '#3B82F6', trend: 'flat' as const },
-    { icon: 'leaf', value: `${stressLevel}`, label: 'Stress', color: colors.health.calm },
+    { icon: 'heart', value: bpm ?? '--', label: 'BPM', color: colors.health.heart },
+    { icon: 'walk', value: steps ? steps.toLocaleString() : '--', label: 'Steps', color: colors.health.activity },
+    { icon: 'moon', value: sleepScore || '--', label: 'Sleep', color: colors.health.sleep },
+    { icon: 'flame', value: steps ? Math.floor(steps * 0.04) : '--', label: 'Calories', color: colors.health.energy },
+    { icon: 'water', value: `${waterIntake}/8`, label: 'Water', color: '#3B82F6' },
+    { icon: 'leaf', value: stressLevel, label: 'Stress', color: colors.health.calm },
   ];
 
   return (
@@ -105,16 +110,21 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Hero Header with Gradient */}
-      <LinearGradient colors={greeting.gradient as any} style={styles.heroHeader}>
+      <LinearGradient colors={greeting.gradient as any} style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.heroContent}>
           <View style={styles.heroTop}>
-            <View>
-              <Text style={styles.heroGreeting}>{greeting.icon} {greeting.text}</Text>
-              <Text style={styles.heroDate}>
+            <View style={styles.heroTitleBlock}>
+              <View style={styles.heroGreetingRow}>
+                <Ionicons name={greeting.icon as any} size={20} color="rgba(255,255,255,0.9)" />
+                <Text style={styles.heroGreeting} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {greeting.text}
+                </Text>
+              </View>
+              <Text style={styles.heroDate} numberOfLines={1}>
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </Text>
             </View>
-            <TouchableOpacity style={styles.heroAvatar} onPress={() => router.push('/profile' as any)}>
+            <TouchableOpacity style={styles.heroAvatar} onPress={() => router.push('/menu' as any)}>
               <Ionicons name="person" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
@@ -153,6 +163,8 @@ export default function HomeScreen() {
         </View>
       </LinearGradient>
 
+      <TodayDecision />
+
       {/* Quick Actions Row */}
       <View style={styles.section}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
@@ -175,16 +187,15 @@ export default function HomeScreen() {
         title="Today's Metrics"
         action={{ label: 'See All', onPress: () => router.push('/health-hub' as any) }}
       />
-      <View style={styles.metricsGrid}>
-        {healthMetrics.map((metric, i) => (
+      <View style={[styles.metricsGrid, { gap: grid.gap, paddingHorizontal: grid.padding }]}>
+        {healthMetrics.map((metric) => (
           <HealthMetricMini
-            key={i}
+            key={metric.label}
             icon={metric.icon}
             value={metric.value}
             label={metric.label}
             color={metric.color}
-            trend={metric.trend}
-            trendValue={(metric as any).trendValue}
+            width={grid.cell}
             onPress={() => router.push('/health-hub' as any)}
           />
         ))}
@@ -294,7 +305,10 @@ export default function HomeScreen() {
               ))}
             </View>
           </View>
-          <Text style={styles.streakMessage}>🔥 You're on fire! Keep it going!</Text>
+          <View style={styles.streakMessageRow}>
+            <Ionicons name="flame" size={16} color="#FFF" />
+            <Text style={styles.streakMessage}>Five sessions in a row. Keep it going.</Text>
+          </View>
         </GradientCard>
       </View>
 
@@ -358,7 +372,7 @@ export default function HomeScreen() {
       {/* Quick Log FAB */}
       <FloatingActionButton
         icon="add"
-        onPress={() => {}}
+        onPress={() => router.push('/checkin' as any)}
         color={colors.primary}
         label="Log"
       />
@@ -380,11 +394,13 @@ const styles = StyleSheet.create({
   contentContainer: { paddingBottom: 100 },
 
   // Hero Header
-  heroHeader: { paddingTop: 56, paddingBottom: spacing.xl, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  heroHeader: { paddingBottom: spacing.xl, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   heroContent: { paddingHorizontal: spacing.screenPadding },
-  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xl },
-  heroGreeting: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  heroDate: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
+  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xl, gap: spacing.md },
+  heroTitleBlock: { flex: 1 },
+  heroGreetingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  heroGreeting: { flexShrink: 1, fontSize: 24, fontWeight: '800', color: '#FFF', letterSpacing: -0.4 },
+  heroDate: { fontSize: 14, color: 'rgba(255,255,255,0.85)', marginTop: 4 },
   heroAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   heroScoreRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
   heroScoreDetails: { flex: 1 },
@@ -398,7 +414,7 @@ const styles = StyleSheet.create({
   // Quick Actions
   section: { marginTop: spacing.xl },
   quickActionsScroll: { paddingHorizontal: spacing.screenPadding, gap: spacing.lg },
-  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, paddingHorizontal: spacing.screenPadding },
+  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap' },
 
   // Activity Rings
   activityRingsCard: { marginHorizontal: spacing.screenPadding },
@@ -435,7 +451,8 @@ const styles = StyleSheet.create({
   streakDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.3)' },
   streakDotActive: { backgroundColor: '#FFF' },
   streakDotLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600' },
-  streakMessage: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginTop: spacing.md, fontWeight: '600' },
+  streakMessageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  streakMessage: { flex: 1, fontSize: 14, color: 'rgba(255,255,255,0.95)', fontWeight: '600' },
 
   // Tips
   tipCard: { marginHorizontal: spacing.screenPadding },

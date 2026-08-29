@@ -1,36 +1,42 @@
 /**
- * Tab Layout — Premium Glassmorphism Tab Bar
- * Modern bottom navigation with frosted glass effect
+ * Tab layout.
+ *
+ * Five primary destinations. Everything else is reachable through the More
+ * catalog, which is where the previous seven-tab bar was crushing its labels.
  */
-import { Tabs, useRouter } from "expo-router";
-import { TouchableOpacity, View, StyleSheet, Platform } from "react-native";
+import { Tabs } from "expo-router";
+import { View, Text, StyleSheet, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, spacing, radius, glass } from "../../src/theme";
+import { colors, spacing } from "../../src/theme";
+import { BackButton } from "../../src/components/BackButton";
 
-function BackButton() {
-  const router = useRouter();
-  return (
-    <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={{ paddingHorizontal: 8 }}>
-      <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-    </TouchableOpacity>
-  );
-}
+const TABS = [
+  { name: "index", title: "Home", icon: "home", activeIcon: "home" },
+  { name: "workout", title: "Train", icon: "barbell-outline", activeIcon: "barbell" },
+  { name: "content-feed", title: "Watch", icon: "play-circle-outline", activeIcon: "play-circle" },
+  { name: "chat", title: "Coach", icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
+  { name: "menu", title: "More", icon: "grid-outline", activeIcon: "grid" },
+] as const;
 
 const HIDDEN_SCREENS = [
+  "dashboard", "health-hub", "trends",
   "telemedicine", "forums", "analytics", "vital-signs", "gamification",
   "family", "health-calendar", "recipes", "exercises", "wellness", "sleep",
-  "nutrition", "health", "diet", "stats", "social", "periodization",
-  "achievements", "settings", "cycle", "profile", "personal-info", "dev-tools",
-  "sleep-tracker", "nutrition-log", "mental-health", "medication", "emergency",
+  "nutrition", "health", "stats", "social", "periodization",
+  "achievements", "settings", "personal-info", "dev-tools",
+  "sleep-tracker", "mental-health", "medication", "emergency",
   "community", "workouts", "devices", "coach", "voice-health", "longevity",
-  "ambient", "data-export", "diabetes", "pregnancy", "chronic-pain", "fertility",
-  "accessibility-settings", "menu",
+  "ambient", "data-export", "diabetes", "chronic-pain", "chronic-pain-v2",
+  "accessibility-settings",
   "skin-health", "circadian", "posture", "respiratory",
   "medical-imaging", "remote-monitoring",
   "genomics", "cardiac-rehab", "addiction-recovery",
   "health-equity", "health-savings", "precision-nutrition",
-  "recovery-dashboard",
 ];
+
+/** Only meaningful when the profile records a female gender. */
+const FEMALE_SCREENS = ["cycle", "fertility", "pregnancy", "pregnancy-v2"];
 
 const screenHeaderStyle = {
   headerShown: true,
@@ -42,133 +48,99 @@ const screenHeaderStyle = {
   headerLeft: () => <BackButton />,
 };
 
+function TabIcon({ icon, activeIcon, label, color, focused }: {
+  icon: string; activeIcon: string; label: string; color: string; focused: boolean;
+}) {
+  return (
+    <View style={styles.tabItem}>
+      <View style={[styles.tabIcon, focused && { backgroundColor: color + "1F" }]}>
+        <Ionicons name={(focused ? activeIcon : icon) as any} size={22} color={color} />
+      </View>
+      <Text
+        style={[styles.tabLabel, { color }, focused && styles.tabLabelActive]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
+  // Gesture-navigation Android reports a small bottom inset and three-button
+  // navigation a large one, so the bar height has to follow the measured inset.
+  const bottomInset = Math.max(insets.bottom, Platform.OS === "ios" ? 20 : 8);
+
   return (
     <Tabs
       screenOptions={{
         tabBarStyle: {
-          position: "absolute" as const,
-          backgroundColor: "rgba(15, 22, 41, 0.88)",
-          borderTopWidth: 0.5,
-          borderTopColor: "rgba(255, 255, 255, 0.08)",
-          height: 70,
-          paddingBottom: Platform.OS === "ios" ? 24 : 10,
-          paddingTop: 8,
+          position: "absolute",
+          backgroundColor: "rgba(12, 17, 28, 0.94)",
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.surface.border,
+          height: 58 + bottomInset,
+          paddingBottom: bottomInset,
+          paddingTop: 6,
+          paddingHorizontal: spacing.xs,
           elevation: 0,
           shadowOpacity: 0,
         },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "600" as const,
-          marginTop: 2,
-        },
-        tabBarActiveTintColor: colors.primary,
+        tabBarShowLabel: false,
+        tabBarItemStyle: { paddingVertical: 0 },
+        tabBarActiveTintColor: colors.primaryLight,
         tabBarInactiveTintColor: colors.text.muted,
         headerShown: false,
+        sceneStyle: { backgroundColor: colors.bg.deep },
       }}
     >
-      {/* Main Tabs */}
-      <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: "Dashboard",
-          tabBarIcon: ({ color, size }) => (
-            <View style={[styles.tabIconContainer, { backgroundColor: color + "15" }]}>
-              <Ionicons name="grid" size={20} color={color} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <View style={[styles.tabIconContainer, { backgroundColor: color + "15" }]}>
-              <Ionicons name="home" size={20} color={color} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="workout"
-        options={{
-          title: "Workout",
-          tabBarIcon: ({ color, size }) => (
-            <View style={[styles.tabIconContainer, { backgroundColor: color + "15" }]}>
-              <Ionicons name="barbell" size={20} color={color} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="health-hub"
-        options={{
-          title: "Health",
-          tabBarIcon: ({ color, size }) => (
-            <View style={[styles.tabIconContainer, { backgroundColor: color + "15" }]}>
-              <Ionicons name="pulse" size={20} color={color} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="chat"
-        options={{
-          title: "Coach",
-          tabBarIcon: ({ color, size }) => (
-            <View style={[styles.tabIconContainer, { backgroundColor: color + "15" }]}>
-              <Ionicons name="chatbubble-ellipses" size={20} color={color} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="content-feed"
-        options={{
-          title: "Content",
-          tabBarIcon: ({ color, size }) => (
-            <View style={[styles.tabIconContainer, { backgroundColor: color + "15" }]}>
-              <Ionicons name="play-circle" size={20} color={color} />
-            </View>
-          ),
-        }}
-      />
-
-      {/* Trending Tab */}
-      <Tabs.Screen
-        name="trends"
-        options={{
-          title: "Trends",
-          tabBarIcon: ({ color, size }) => (
-            <View style={[styles.tabIconContainer, { backgroundColor: color + "15" }]}>
-              <Ionicons name="trending-up" size={20} color={color} />
-            </View>
-          ),
-        }}
-      />
-
-      {/* Hidden screens with headers */}
-      {HIDDEN_SCREENS.map((name) => (
+      {TABS.map((tab) => (
         <Tabs.Screen
-          key={name}
-          name={name}
+          key={tab.name}
+          name={tab.name}
           options={{
-            href: null,
-            ...screenHeaderStyle,
+            title: tab.title,
+            tabBarAccessibilityLabel: tab.title,
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon
+                icon={tab.icon}
+                activeIcon={tab.activeIcon}
+                label={tab.title}
+                color={color}
+                focused={focused}
+              />
+            ),
           }}
         />
+      ))}
+
+      {HIDDEN_SCREENS.map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null, ...screenHeaderStyle }} />
+      ))}
+
+      {/*
+        These routes stay registered so a saved deep link still resolves after
+        a profile change. What gates them is the More catalog, which only
+        lists them when useFemaleFeatures() is true.
+      */}
+      {FEMALE_SCREENS.map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null, ...screenHeaderStyle }} />
       ))}
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  tabIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+  tabItem: { alignItems: "center", justifyContent: "center", width: 64, gap: 2 },
+  tabIcon: {
+    width: 40,
+    height: 28,
+    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
   },
+  tabLabel: { fontSize: 10, fontWeight: "600", letterSpacing: 0.2 },
+  tabLabelActive: { fontWeight: "700" },
 });

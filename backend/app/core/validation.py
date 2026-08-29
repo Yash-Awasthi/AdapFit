@@ -31,7 +31,10 @@ SQL_INJECTION_PATTERNS = [
 XSS_PATTERNS = [
     r"<script[^>]*>",
     r"javascript:",
-    r"on\w+\s*=",
+    # Inline event handlers are only dangerous inside a tag. Matching a bare
+    # "on<word>=" rejects ordinary query strings such as months=2 and
+    # session_id=abc, because "onths=" and "on_id=" satisfy it.
+    r"<[^>]*\son\w+\s*=",
     r"<iframe",
     r"<object",
     r"<embed",
@@ -75,9 +78,11 @@ class ValidationMiddleware(BaseHTTPMiddleware):
                 )
 
         # 2. Rate limiting (skip for /auth/ — per-email lockout is the protection there)
+        #    Also skip when RATE_LIMITING_ENABLED=false (tests, dev)
+        from app.core.config import settings
         client_ip = request.client.host if request.client else "unknown"
         category = self._get_category(request.url.path)
-        if category != "auth" and self._is_rate_limited(client_ip, category):
+        if settings.RATE_LIMITING_ENABLED and category != "auth" and self._is_rate_limited(client_ip, category):
             return Response(
                 content='{"error": "Rate limit exceeded. Please try again later."}',
                 status_code=429,
@@ -85,9 +90,10 @@ class ValidationMiddleware(BaseHTTPMiddleware):
                 headers={"Retry-After": "60"},
             )
 
-        # 3. Security pattern detection on query params and path
-        full_url = str(request.url)
-        if self._detect_injection(full_url):
+        # 3. Security pattern detection on query params only (not URL path,
+        #    since legitimate API paths like /update and /delete match SQL keywords)
+        query_string = request.url.query or ""
+        if self._detect_injection(query_string):
             return Response(
                 content='{"error": "Invalid request detected"}',
                 status_code=400,

@@ -19,18 +19,18 @@ import { StaggeredList } from '../../src/components/AnimationSystem';
 const XP_LEVEL = { current: 12, xp: 2750, xpNeeded: 3000, title: 'Fitness Enthusiast' };
 
 const BADGES = [
-  { id: 1, name: 'First Workout', icon: '🏋️', unlocked: true, color: '#22C55E' },
-  { id: 2, name: '7-Day Streak', icon: '🔥', unlocked: true, color: '#F97316' },
-  { id: 3, name: 'Early Bird', icon: '🌅', unlocked: true, color: '#F59E0B' },
-  { id: 4, name: 'Hydration Hero', icon: '💧', unlocked: true, color: '#3B82F6' },
-  { id: 5, name: '100 Workouts', icon: '💪', unlocked: false, color: '#8B5CF6' },
-  { id: 6, name: 'Sleep Master', icon: '😴', unlocked: true, color: '#6366F1' },
-  { id: 7, name: 'Meditation Guru', icon: '🧘', unlocked: false, color: '#EC4899' },
-  { id: 8, name: 'Marathon Runner', icon: '🏃', unlocked: false, color: '#EF4444' },
-  { id: 9, name: 'Nutrition Pro', icon: '🥗', unlocked: true, color: '#22C55E' },
-  { id: 10, name: 'Social Butterfly', icon: '🦋', unlocked: false, color: '#F59E0B' },
-  { id: 11, name: 'Iron Will', icon: '⚡', unlocked: false, color: '#F97316' },
-  { id: 12, name: 'Health Champion', icon: '🏆', unlocked: false, color: '#F59E0B' },
+  { id: 1, name: 'First Workout', icon: 'barbell', unlocked: true, color: '#22C55E' },
+  { id: 2, name: '7-Day Streak', icon: 'flame', unlocked: true, color: '#F97316' },
+  { id: 3, name: 'Early Bird', icon: 'sunny', unlocked: true, color: '#F59E0B' },
+  { id: 4, name: 'Hydration Hero', icon: 'water', unlocked: true, color: '#3B82F6' },
+  { id: 5, name: '100 Workouts', icon: 'fitness', unlocked: false, color: '#8B5CF6' },
+  { id: 6, name: 'Sleep Master', icon: 'moon', unlocked: true, color: '#6366F1' },
+  { id: 7, name: 'Meditation Guru', icon: 'flower-outline', unlocked: false, color: '#EC4899' },
+  { id: 8, name: 'Marathon Runner', icon: 'walk-outline', unlocked: false, color: '#EF4444' },
+  { id: 9, name: 'Nutrition Pro', icon: 'nutrition-outline', unlocked: true, color: '#22C55E' },
+  { id: 10, name: 'Social Butterfly', icon: 'people', unlocked: false, color: '#F59E0B' },
+  { id: 11, name: 'Iron Will', icon: 'flash', unlocked: false, color: '#F97316' },
+  { id: 12, name: 'Health Champion', icon: 'trophy', unlocked: false, color: '#F59E0B' },
 ];
 
 const ACHIEVEMENTS = [
@@ -71,7 +71,7 @@ export default function GamificationScreen() {
       <GlassCard variant="light" style={styles.levelCard}>
         <View style={styles.levelHeader}>
           <View style={styles.levelBadge}>
-            <Animated.Text style={[styles.levelNumber, { transform: [{ scale: fireAnim }] }]}>🔥</Animated.Text>
+            <Animated.Text style={[styles.levelNumber, { transform: [{ scale: fireAnim }] }]}></Animated.Text>
             <Text style={styles.levelValue}>{XP_LEVEL.current}</Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -116,7 +116,7 @@ export default function GamificationScreen() {
             }}
           >
             <View style={[styles.badgeIcon, badge.unlocked && { backgroundColor: badge.color + '15' }]}>
-              <Text style={styles.badgeEmoji}>{badge.unlocked ? badge.icon : '🔒'}</Text>
+              <Ionicons name={(badge.unlocked ? badge.icon : 'lock-closed') as any} size={24} color={badge.unlocked ? badge.color : colors.text.muted} />
             </View>
             <Text style={[styles.badgeName, !badge.unlocked && { color: colors.text.muted }]} numberOfLines={1}>{badge.name}</Text>
           </TouchableOpacity>
@@ -127,13 +127,13 @@ export default function GamificationScreen() {
       <SectionHeaderPremium icon="podium" iconColor="#EF4444" title="Leaderboard" />
       <GlassCard variant="light" style={styles.leaderboardCard}>
         {[
-          { rank: 1, name: 'Sarah M.', score: 9850, avatar: '👩', isUser: false },
-          { rank: 2, name: 'You', score: 8720, avatar: '🧑', isUser: true },
-          { rank: 3, name: 'Mike R.', score: 8200, avatar: '👨', isUser: false },
+          { rank: 1, name: 'Sarah M.', score: 9850, avatar: 'woman', isUser: false },
+          { rank: 2, name: 'You', score: 8720, avatar: 'person', isUser: true },
+          { rank: 3, name: 'Mike R.', score: 8200, avatar: 'man', isUser: false },
         ].map((entry, i) => (
           <View key={i} style={[styles.lbRow, entry.isUser && styles.lbRowUser]}>
             <Text style={[styles.lbRank, entry.rank === 1 && { color: '#F59E0B' }]}>#{entry.rank}</Text>
-            <Text style={styles.lbAvatar}>{entry.avatar}</Text>
+            <Ionicons name={entry.avatar as any} size={24} color={colors.text.secondary} style={styles.lbAvatar} />
             <Text style={[styles.lbName, entry.isUser && { color: colors.primary }]}>{entry.name}</Text>
             <Text style={[styles.lbScore, { color: colors.primary }]}>{entry.score.toLocaleString()}</Text>
           </View>
@@ -170,7 +170,6 @@ const styles = StyleSheet.create({
   badgeItem: { width: (SCREEN_WIDTH - spacing.screenPadding * 2 - spacing.md * 3) / 4, alignItems: 'center' },
   badgeLocked: { opacity: 0.5 },
   badgeIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.bg.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.surface.border },
-  badgeEmoji: { fontSize: 24 },
   badgeName: { fontSize: 10, fontWeight: '600', color: colors.text.secondary, marginTop: 4, textAlign: 'center' },
 
   // Leaderboard

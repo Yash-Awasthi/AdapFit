@@ -4,20 +4,21 @@
  */
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ScrollView, Animated, Dimensions,
+  View, Text, TouchableOpacity, StyleSheet, TextInput,
+  ScrollView, Animated, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, radius, glass } from '../../src/theme';
+import { colors, spacing, radius } from '../../src/theme';
+import { fitText } from '../../src/theme/layout';
 import {
-  GlassCard, GradientCard, SectionHeaderPremium, QuickAction, PillChip,
+  GlassCard, SectionHeaderPremium, QuickAction,
 } from '../../src/components/PremiumComponents';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API = 'http://localhost:8000/api/v1';
-
+import { api } from '../../src/services/api';
+import { useUserStore } from '../../src/stores';
+import { API_V1 as API } from '../../src/services/config';
 interface Exercise {
   exercise_id: string;
   name: string;
@@ -44,13 +45,38 @@ const MUSCLE_GROUPS = [
   { label: 'Core', icon: 'radio-button-on', color: '#F59E0B' },
 ];
 
+const PROMPT_EXAMPLES = [
+  '45 minutes, upper body, shoulder is sore',
+  'Short session, dumbbells only',
+  'What should I train today?',
+];
+
 export default function WorkoutScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const userId = useUserStore((s) => s.userId);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [selectedMuscle, setSelectedMuscle] = useState('All');
+  const [prompt, setPrompt] = useState('');
+  const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const askCoach = async (text: string) => {
+    const question = text.trim();
+    if (!question || asking) return;
+    setAsking(true);
+    setSuggestion(null);
+    try {
+      const data = await api.chat(userId, question);
+      setSuggestion(data.reply);
+    } catch {
+      setSuggestion("Couldn't reach the coach. Check your connection and try again.");
+    }
+    setAsking(false);
+  };
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
@@ -98,36 +124,109 @@ export default function WorkoutScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       {/* Header */}
-      <LinearGradient colors={[colors.health.heart, '#F97316']} style={styles.header}>
+      <LinearGradient
+        colors={[colors.health.heart, colors.health.energy]}
+        style={[styles.header, { paddingTop: insets.top + spacing.md }]}
+      >
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.headerTitle}>💪 Workouts</Text>
-            <Text style={styles.headerSubtitle}>AI-powered adaptive training</Text>
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle} {...fitText(1)}>Workouts</Text>
+            <Text style={styles.headerSubtitle} numberOfLines={2}>
+              Adaptive training built from your recovery data
+            </Text>
           </View>
           <View style={styles.workoutCount}>
-            <Text style={styles.workoutCountNumber}>{workouts.length}</Text>
-            <Text style={styles.workoutCountLabel}>workouts</Text>
+            <Text style={styles.workoutCountNumber} {...fitText(1)}>{workouts.length}</Text>
+            <Text style={styles.workoutCountLabel}>sessions</Text>
           </View>
         </View>
       </LinearGradient>
+
+      {/* Ask the coach */}
+      <View style={styles.askSection}>
+        <SectionHeaderPremium icon="sparkles" iconColor={colors.primary} title="Ask for a session" />
+        <View style={styles.askBox}>
+          <TextInput
+            style={styles.askInput}
+            value={prompt}
+            onChangeText={setPrompt}
+            placeholder="Describe what you want to train, how long you have, and anything that hurts."
+            placeholderTextColor={colors.text.muted}
+            multiline
+            maxLength={500}
+            editable={!asking}
+            accessibilityLabel="Describe the workout you want"
+          />
+          <View style={styles.askActions}>
+            <Text style={styles.askCounter}>{prompt.length}/500</Text>
+            <TouchableOpacity
+              style={[styles.askButton, (!prompt.trim() || asking) && styles.askButtonDisabled]}
+              onPress={() => askCoach(prompt)}
+              disabled={!prompt.trim() || asking}
+              accessibilityRole="button"
+              accessibilityLabel="Get a suggestion"
+            >
+              {asking
+                ? <ActivityIndicator size="small" color="#FFF" />
+                : <Ionicons name="arrow-up" size={18} color="#FFF" />}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {!suggestion && !asking && (
+          <View style={styles.exampleRow}>
+            {PROMPT_EXAMPLES.map((example) => (
+              <TouchableOpacity
+                key={example}
+                style={styles.examplePill}
+                onPress={() => { setPrompt(example); askCoach(example); }}
+              >
+                <Text style={styles.exampleText} numberOfLines={1}>{example}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {suggestion && (
+          <GlassCard variant="primary" style={styles.suggestionCard}>
+            <View style={styles.suggestionHeader}>
+              <Ionicons name="sparkles" size={14} color={colors.primaryLight} />
+              <Text style={styles.suggestionLabel}>Coach suggestion</Text>
+              <TouchableOpacity onPress={() => setSuggestion(null)} hitSlop={10}>
+                <Ionicons name="close" size={16} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.suggestionText}>{suggestion}</Text>
+          </GlassCard>
+        )}
+      </View>
 
       {/* Quick Actions */}
       <View style={styles.quickActionsRow}>
         <TouchableOpacity style={styles.generateBtn} onPress={generateWorkout} disabled={generating}>
           <LinearGradient colors={[colors.primary, '#8B5CF6']} style={styles.generateBtnGradient}>
             <Ionicons name={generating ? 'hourglass' : 'sparkles'} size={20} color="#FFF" />
-            <Text style={styles.generateBtnText}>{generating ? 'Generating...' : 'Generate Workout'}</Text>
+            <Text style={styles.generateBtnText}>{generating ? 'Generating…' : 'Generate Workout'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
       <View style={styles.quickActionsRow}>
-        <QuickAction icon="checkmark-circle" label="Form Check" color={colors.health.calm} onPress={() => router.push('/form-checker' as any)} />
-        <QuickAction icon="timer" label="Quick Workout" color={colors.health.energy} onPress={() => {}} />
-        <QuickAction icon="analytics" label="Analytics" color={colors.health.mental} onPress={() => {}} />
-        <QuickAction icon="calendar" label="Schedule" color="#3B82F6" onPress={() => {}} />
+        <QuickAction icon="checkmark-circle" label="Form check" color={colors.health.calm} onPress={() => router.push('/form-checker' as any)} />
+        <QuickAction
+          icon="timer"
+          label="Quick 20"
+          color={colors.health.energy}
+          onPress={() => askCoach('Give me a 20 minute session I can start right now with no equipment.')}
+        />
+        <QuickAction icon="analytics" label="Stats" color={colors.health.mental} onPress={() => router.push('/stats' as any)} />
+        <QuickAction icon="calendar" label="Plan" color="#3B82F6" onPress={() => router.push('/periodization' as any)} />
       </View>
 
       {/* Muscle Group Filter */}
@@ -162,7 +261,7 @@ export default function WorkoutScreen() {
           <Text style={styles.emptyText}>Generate your first AI-powered workout based on your recovery state.</Text>
           <TouchableOpacity style={styles.generateBtnSmall} onPress={generateWorkout}>
             <Ionicons name="sparkles" size={16} color="#FFF" />
-            <Text style={styles.generateBtnSmallText}>Generate First Workout</Text>
+            <Text style={styles.generateBtnSmallText} numberOfLines={1}>Generate first workout</Text>
           </TouchableOpacity>
         </GlassCard>
       ) : (
@@ -228,8 +327,9 @@ export default function WorkoutScreen() {
         ))
       )}
 
-      <View style={{ height: 100 }} />
+      <View style={{ height: 120 }} />
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -238,21 +338,70 @@ const styles = StyleSheet.create({
   contentContainer: { paddingBottom: 100 },
 
   // Header
-  header: { paddingTop: 56, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
-  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
-  workoutCount: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 16, padding: 12 },
+  header: { paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.lg },
+  headerText: { flex: 1 },
+  headerTitle: { fontSize: 28, fontWeight: '800', color: '#FFF', letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 18 },
+  workoutCount: { minWidth: 72, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.22)', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12 },
   workoutCountNumber: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  workoutCountLabel: { fontSize: 10, color: 'rgba(255,255,255,0.8)' },
+  workoutCountLabel: { fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
+
+  // Ask the coach
+  askSection: { marginTop: spacing.lg },
+  askBox: {
+    marginHorizontal: spacing.screenPadding,
+    backgroundColor: colors.bg.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    padding: spacing.md,
+  },
+  askInput: {
+    minHeight: 68,
+    maxHeight: 140,
+    color: colors.text.primary,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: 'top',
+  },
+  askActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
+  askCounter: { fontSize: 11, color: colors.text.muted },
+  askButton: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  askButtonDisabled: { backgroundColor: colors.bg.elevated },
+  exampleRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm,
+    paddingHorizontal: spacing.screenPadding, marginTop: spacing.md,
+  },
+  examplePill: {
+    maxWidth: '100%',
+    backgroundColor: colors.bg.card,
+    borderWidth: 1, borderColor: colors.surface.border,
+    borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7,
+  },
+  exampleText: { fontSize: 12, color: colors.text.secondary },
+  suggestionCard: { marginHorizontal: spacing.screenPadding, marginTop: spacing.md },
+  suggestionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
+  suggestionLabel: { flex: 1, fontSize: 11, fontWeight: '700', color: colors.primaryLight, textTransform: 'uppercase', letterSpacing: 0.5 },
+  suggestionText: { fontSize: 14, color: colors.text.primary, lineHeight: 21 },
 
   // Quick Actions
   quickActionsRow: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg },
   generateBtn: { flex: 1 },
   generateBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md, borderRadius: radius.button },
   generateBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
-  generateBtnSmall: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.primary, paddingVertical: spacing.md, borderRadius: radius.button, marginTop: spacing.md },
-  generateBtnSmallText: { fontSize: 14, fontWeight: '700', color: '#FFF' },
+  generateBtnSmall: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    alignSelf: 'stretch', backgroundColor: colors.primary,
+    // Horizontal padding is what keeps a long label off the pill's edge.
+    paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
+    borderRadius: radius.button, marginTop: spacing.lg,
+  },
+  generateBtnSmallText: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: '#FFF', textAlign: 'center' },
 
   // Filter
   filterScroll: { marginTop: spacing.sm },

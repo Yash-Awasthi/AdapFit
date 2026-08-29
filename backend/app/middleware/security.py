@@ -26,7 +26,9 @@ request_counts: dict[str, list[float]] = {}
 SUSPICIOUS_PATTERNS = [
     re.compile(r"<script", re.IGNORECASE),
     re.compile(r"javascript:", re.IGNORECASE),
-    re.compile(r"on\w+\s*=", re.IGNORECASE),
+    # Anchored to a tag: a bare "on<word>=" also matches ordinary query
+    # strings such as months=2 and session_id=abc, which are not attacks.
+    re.compile(r"<[^>]*\son\w+\s*=", re.IGNORECASE),
     re.compile(r"<iframe", re.IGNORECASE),
     re.compile(r"eval\(", re.IGNORECASE),
     re.compile(r"union\s+select", re.IGNORECASE),

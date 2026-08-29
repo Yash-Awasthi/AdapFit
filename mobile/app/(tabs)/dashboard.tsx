@@ -15,6 +15,8 @@ import { colors, spacing, radius, glass, typography, shadows } from '../../src/t
 import { ScoreRing, GlassCard, AnimatedHeader, HealthMetricMini, SectionHeaderPremium, ProgressBarPremium } from '../../src/components/PremiumComponents';
 import { useUserStore } from '../../src/stores/userStore';
 import { api } from '../../src/services/api';
+import { getJson } from '../../src/services/http';
+import { fetchHealthData } from '../../src/services/healthBridge';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -149,14 +151,21 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   
-  // Live data state
-  const [healthScore, setHealthScore] = useState(0);
-  const [todayData, setTodayData] = useState({
-    steps: 0, stepsGoal: 10000,
+  // Live data state — steps/calories/activeMinutes are null until a real
+  // reading comes back from the device; the UI shows '--' rather than guess.
+  const [healthScore, setHealthScore] = useState<number | null>(null);
+  const [todayData, setTodayData] = useState<{
+    steps: number | null; stepsGoal: number;
+    sleep: number; sleepGoal: number;
+    calories: number | null; caloriesGoal: number;
+    water: number; waterGoal: number;
+    activeMinutes: number | null; activeMinutesGoal: number;
+  }>({
+    steps: null, stepsGoal: 10000,
     sleep: 0, sleepGoal: 8,
-    calories: 0, caloriesGoal: 2200,
+    calories: null, caloriesGoal: 2200,
     water: 0, waterGoal: 8,
-    activeMinutes: 0, activeMinutesGoal: 30,
+    activeMinutes: null, activeMinutesGoal: 30,
   });
   const [medications, setMedications] = useState<any[]>([]);
   const [challenges, setChallenges] = useState<any[]>([]);
@@ -175,27 +184,28 @@ export default function DashboardScreen() {
   const loadData = useCallback(async () => {
     try {
       // Fetch multiple data sources in parallel
-      const [recoveryRes, hydrationRes, sleepRes, medRes, challengeRes, activityRes, streakRes, acwrRes] = await Promise.allSettled([
+      const [recoveryRes, hydrationRes, sleepRes, medRes, challengeRes, activityRes, streakRes, acwrRes, healthRes] = await Promise.allSettled([
         api.getRecoveryLogs(userId, 1),
         api.getHydrationToday(userId),
         api.getSleepAnalysis(userId, 1),
         api.post('/api/v1/medication/today', { user_id: userId }),
-        api.post('/api/v1/challenges/list', { user_id: userId }),
+        getJson<any>(`/challenges?user_id=${userId}`),
         api.post('/api/v1/activity-feed', { user_id: userId, limit: 5 }),
-        api.post('/api/v1/streaks/summary', { user_id: userId }),
+        getJson<any>(`/streaks?user_id=${userId}`),
         api.getAcwr(userId),
+        fetchHealthData(),
       ]);
 
-      // Recovery data
+      // Recovery data — leave healthScore unset (renders as '--') when no
+      // real score is available, rather than showing a plausible-looking one.
       if (recoveryRes.status === 'fulfilled' && recoveryRes.value?.items?.length > 0) {
         const latest = recoveryRes.value.items[0];
-        const score = latest.recovery_score ?? latest.score ?? 72;
-        setHealthScore(Math.round(score));
-        setRecoveryScore(Math.round(score));
+        const score = latest.recovery_score ?? latest.score;
+        if (score != null) {
+          setHealthScore(Math.round(score));
+          setRecoveryScore(Math.round(score));
+        }
         setHrv(Math.round(latest.hrv_rmssd ?? latest.wearable_data?.hrv_rmssd ?? 0));
-      } else {
-        setHealthScore(72);
-        setRecoveryScore(72);
       }
 
       // Hydration
@@ -241,17 +251,25 @@ export default function DashboardScreen() {
         setAcwr(acwrRes.value?.acwr ?? 0);
       }
 
-      // Simulate steps and calories from activity data
-      setTodayData(prev => ({
-        ...prev,
-        steps: Math.floor(Math.random() * 4000) + 4000,
-        calories: Math.floor(Math.random() * 500) + 1500,
-        activeMinutes: Math.floor(Math.random() * 20) + 25,
-      }));
+      // Steps and active calories come from the device's health API. When
+      // the platform module, permission, or fetch isn't available they stay
+      // null and render as '--' instead of a fabricated number.
+      if (healthRes.status === 'fulfilled') {
+        const h = healthRes.value;
+        if (h.source === 'simulated' && __DEV__) {
+          console.warn('[dashboard] showing simulated health data (EXPO_PUBLIC_USE_SIMULATED_HEALTH_DATA=true)');
+        }
+        if (h.source !== 'unavailable') {
+          setTodayData(prev => ({
+            ...prev,
+            steps: h.steps ?? null,
+            calories: h.activeCalories ?? null,
+          }));
+        }
+      }
 
     } catch (err) {
-      // Use sensible defaults on error
-      setHealthScore(72);
+      // No sensible default exists here; state simply keeps its last value.
     } finally {
       setLoading(false);
     }
@@ -263,8 +281,10 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  const scoreColor = healthScore >= 80 ? colors.health.success : healthScore >= 60 ? colors.health.activity : colors.health.warning;
+  const scoreColor = healthScore == null ? colors.text.muted : healthScore >= 80 ? colors.health.success : healthScore >= 60 ? colors.health.activity : colors.health.warning;
+  const scoreLabel = healthScore == null ? 'No data yet' : healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs attention';
   const todaySummary = { ...todayData };
+  const pct = (value: number | null, goal: number) => (value == null ? 0 : (value / goal) * 100);
 
   return (
     <View style={styles.container}>
@@ -287,30 +307,30 @@ export default function DashboardScreen() {
 
           {/* Health Score Ring */}
           <View style={styles.scoreContainer}>
-            <ScoreRing score={healthScore} size={140} color={scoreColor} />
+            <ScoreRing score={healthScore ?? 0} size={140} color={scoreColor} />
             <View style={styles.scoreInfo}>
               <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.6)' }]}>Health Score</Text>
-              <Text style={[typography.metric.large, { color: '#fff' }]}>{healthScore}</Text>
-              <Text style={[typography.body.sm, { color: scoreColor }]}>Excellent</Text>
+              <Text style={[typography.metric.large, { color: '#fff' }]}>{healthScore ?? '--'}</Text>
+              <Text style={[typography.body.sm, { color: scoreColor }]}>{scoreLabel}</Text>
             </View>
           </View>
 
           {/* Today's Activity Rings */}
           <View style={styles.activityRingsContainer}>
             <View style={styles.activityRingItem}>
-              <MiniActivityRing progress={(todaySummary.steps / todaySummary.stepsGoal) * 100} color={colors.health.activity} size={52} strokeWidth={5} />
+              <MiniActivityRing progress={pct(todaySummary.steps, todaySummary.stepsGoal)} color={colors.health.activity} size={52} strokeWidth={5} />
               <Text style={[typography.body.xs, { color: 'rgba(255,255,255,0.6)', marginTop: 4 }]}>Steps</Text>
             </View>
             <View style={styles.activityRingItem}>
-              <MiniActivityRing progress={(todaySummary.activeMinutes / todaySummary.activeMinutesGoal) * 100} color={colors.health.heart} size={52} strokeWidth={5} />
+              <MiniActivityRing progress={pct(todaySummary.activeMinutes, todaySummary.activeMinutesGoal)} color={colors.health.heart} size={52} strokeWidth={5} />
               <Text style={[typography.body.xs, { color: 'rgba(255,255,255,0.6)', marginTop: 4 }]}>Active</Text>
             </View>
             <View style={styles.activityRingItem}>
-              <MiniActivityRing progress={(todaySummary.calories / todaySummary.caloriesGoal) * 100} color={colors.health.energy} size={52} strokeWidth={5} />
+              <MiniActivityRing progress={pct(todaySummary.calories, todaySummary.caloriesGoal)} color={colors.health.energy} size={52} strokeWidth={5} />
               <Text style={[typography.body.xs, { color: 'rgba(255,255,255,0.6)', marginTop: 4 }]}>Calories</Text>
             </View>
             <View style={styles.activityRingItem}>
-              <MiniActivityRing progress={(todaySummary.water / todaySummary.waterGoal) * 100} color={colors.health.activity} size={52} strokeWidth={5} />
+              <MiniActivityRing progress={pct(todaySummary.water, todaySummary.waterGoal)} color={colors.health.activity} size={52} strokeWidth={5} />
               <Text style={[typography.body.xs, { color: 'rgba(255,255,255,0.6)', marginTop: 4 }]}>Water</Text>
             </View>
           </View>
@@ -320,9 +340,9 @@ export default function DashboardScreen() {
         <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
           <SectionHeaderPremium title="Today's Summary" icon="today" iconColor={colors.health.activity} />
           <View style={styles.metricsGrid}>
-            <TodayMetric icon="footsteps" label="Steps" value={todaySummary.steps.toLocaleString()} unit="steps" goal={todaySummary.stepsGoal} color={colors.health.activity} progress={(todaySummary.steps / todaySummary.stepsGoal) * 100} />
+            <TodayMetric icon="footsteps" label="Steps" value={todaySummary.steps != null ? todaySummary.steps.toLocaleString() : '--'} unit="steps" goal={todaySummary.stepsGoal} color={colors.health.activity} progress={pct(todaySummary.steps, todaySummary.stepsGoal)} />
             <TodayMetric icon="bed" label="Sleep" value={todaySummary.sleep} unit="hrs" goal={todaySummary.sleepGoal} color={colors.health.sleep} progress={(todaySummary.sleep / todaySummary.sleepGoal) * 100} />
-            <TodayMetric icon="flame" label="Calories" value={todaySummary.calories} unit="cal" goal={todaySummary.caloriesGoal} color={colors.health.energy} progress={(todaySummary.calories / todaySummary.caloriesGoal) * 100} />
+            <TodayMetric icon="flame" label="Calories" value={todaySummary.calories ?? '--'} unit="cal" goal={todaySummary.caloriesGoal} color={colors.health.energy} progress={pct(todaySummary.calories, todaySummary.caloriesGoal)} />
             <TodayMetric icon="water" label="Water" value={todaySummary.water} unit="glasses" goal={todaySummary.waterGoal} color={colors.health.activity} progress={(todaySummary.water / todaySummary.waterGoal) * 100} />
           </View>
         </Animated.View>

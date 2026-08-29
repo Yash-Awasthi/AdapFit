@@ -22,7 +22,7 @@ export default function AccessibilitySettingsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>♿ Accessibility Settings</Text>
+        <Text style={styles.headerTitle}>Accessibility Settings</Text>
         <Text style={styles.headerSubtitle}>Customize the app for your needs</Text>
       </View>
 

@@ -43,6 +43,8 @@ async def create_recovery_log(req: RecoveryCalculationRequest):
             "fatigue_score": sc.fatigue if sc else None,
             "stress_score": sc.stress if sc else None,
             "sore_muscle_groups": sc.sore_muscle_groups if sc else [],
+            "pain_flagged": getattr(sc, "pain_flagged", False) if sc else False,
+            "illness_flagged": getattr(sc, "illness_flagged", False) if sc else False,
             "log_date": req.log_date,
         })
 

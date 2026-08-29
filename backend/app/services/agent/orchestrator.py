@@ -1,14 +1,13 @@
 """
-AdapFit LangGraph-style Multi-Agent Orchestrator
-Coordinates Recovery, ML, NLP, and Evolution agents through state-driven graph execution.
+AdapFit Multi-Agent Orchestrator
+Node-shaped services for the LangGraph pipeline in app.services.agent.graph.
 """
+from decimal import Decimal
 from typing import Dict, List, Any, Optional, TypedDict
-from datetime import datetime, timezone
 from core_engine import compute_acwr, compute_recovery_score, compute_hrv_zscore, compute_sleep_score, compute_subjective_score
 from app.core.storage import storage
 from app.services.ml_engine import ml_engine
 from app.services.nlp_pipeline import nlp_pipeline
-from app.services.agent.supervisor import supervisor_agent
 from app.services.agent.evolution_engine import evolution_engine
 
 
@@ -23,10 +22,22 @@ class FitnessAgentState(TypedDict, total=False):
     exercise_preferences: dict
     recommendations: dict
     timestamp: str
+    checkin: Optional[dict]
+    signals: Any
+    decision: dict
+    phrased_summary: str
+
+
+def _floatify(records: List[dict]) -> List[dict]:
+    """Postgres NUMERIC columns arrive as Decimal; ml_engine does float arithmetic on them."""
+    return [
+        {k: float(v) if isinstance(v, Decimal) else v for k, v in r.items()}
+        for r in records
+    ]
 
 
 class AgentOrchestrator:
-    """LangGraph-inspired state-driven multi-agent orchestrator."""
+    """Node-shaped async methods wrapped by app.services.agent.graph's StateGraph."""
 
     async def execute_recovery_analysis(self, state):
         user_id = state["user_id"]
@@ -72,8 +83,8 @@ class AgentOrchestrator:
 
     async def execute_ml_analysis(self, state):
         user_id = state["user_id"]
-        recovery_logs = await storage.get_recovery_logs(user_id, 28)
-        workout_logs = await storage.get_workout_logs(user_id, 28)
+        recovery_logs = _floatify(await storage.get_recovery_logs(user_id, 28))
+        workout_logs = _floatify(await storage.get_workout_logs(user_id, 28))
         features = ml_engine.extract_features(recovery_logs, workout_logs)
         state["ml_predictions"] = ml_engine.predict_readiness(features)
         
@@ -106,29 +117,8 @@ class AgentOrchestrator:
         state["exercise_preferences"] = await evolution_engine.get_personalization_vector(user_id)
         return state
 
-    async def execute_supervisor(self, state):
-        state["recommendations"] = supervisor_agent.synthesize_recommendation(
-            recovery_assessment=state.get("recovery_assessment", {}),
-            workout_plan=state.get("workout_plan", {}),
-            acwr_status=state.get("acwr_status", {}),
-            ml_predictions=state.get("ml_predictions", {}),
-            nlp_insights=state.get("nlp_insights"),
-            agent_memory=state.get("agent_memory"),
-        )
-        return state
-
-    async def run_full_pipeline(self, user_id, biometrics):
-        state = {"user_id": user_id, "biometrics": biometrics, "timestamp": datetime.now(timezone.utc).isoformat()}
-        state = await self.execute_recovery_analysis(state)
-        state = await self.execute_ml_analysis(state)
-        state = await self.execute_nlp_analysis(state)
-        state = await self.execute_preference_learning(state)
-        state = await self.execute_supervisor(state)
-        await storage.add_recovery_log(user_id, {**state.get("recovery_assessment", {}), "hrv_rmssd": biometrics.get("hrv_rmssd"), "sleep_duration_hours": biometrics.get("sleep_duration_hours"), "log_date": biometrics.get("log_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))})
-        return state
-
     def get_status(self):
-        return {"orchestrator_version": "2.0", "nodes": ["recovery_analyst", "ml_engine", "nlp_pipeline", "evolution_engine", "supervisor"], "ml_status": ml_engine.get_status(), "nlp_status": nlp_pipeline.get_status()}
+        return {"orchestrator_version": "3.0", "nodes": ["recovery", "ml", "nlp", "preference", "signals", "decision", "recommendation", "phrasing"], "ml_status": ml_engine.get_status(), "nlp_status": nlp_pipeline.get_status()}
 
 
 agent_orchestrator = AgentOrchestrator()

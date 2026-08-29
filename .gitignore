@@ -31,3 +31,6 @@ Thumbs.db
 /nul
 .pytest_cache/
 *.log
+backend/scratch/
+.sb-pentest-context.json
+.sb-pentest-audit.log

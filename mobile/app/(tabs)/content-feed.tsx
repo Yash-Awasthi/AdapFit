@@ -1,158 +1,240 @@
 /**
- * Content Feed — Premium YouTube-like Health Content
- * Glassmorphism cards, gradient thumbnails, category pills, trending section
+ * Content Hub — video and GIF feed for health and training content.
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Dimensions, RefreshControl, TextInput, ActivityIndicator, Animated,
+  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  RefreshControl, TextInput, ActivityIndicator, Linking,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, radius, glass } from '../../src/theme';
-import { GlassCard, SectionHeaderPremium, PillChip } from '../../src/components/PremiumComponents';
+import { colors, spacing, radius } from '../../src/theme';
+import { useGrid } from '../../src/theme/layout';
+import { VideoCard, inlinePlaybackAvailable } from '../../src/components/VideoCard';
+import { getJson, asArray } from '../../src/services/http';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API = 'http://localhost:8000/api/v1';
-
-interface Item {
-  id: string; title: string; description: string; content_type: string;
-  category: string; difficulty: string; duration_seconds: number;
-  rating: number; view_count: number; muscles_targeted: string[];
+interface YouTubeHit {
+  video_id: string;
+  title: string;
+  channel: string;
+  duration_seconds: number;
+  view_count: number;
+  thumbnail_url: string;
+  watch_url: string;
+  embed_url: string;
 }
 
-const FALLBACK: Item[] = [
-  { id: '1', title: 'Barbell Back Squat — Proper Form', description: 'Learn proper squat form with progressive overload tips', content_type: 'exercise_video', category: 'strength', difficulty: 'all_levels', duration_seconds: 30, rating: 4.7, view_count: 12400, muscles_targeted: ['Quads', 'Glutes', 'Core'] },
-  { id: '2', title: '5-Minute Morning Meditation', description: 'Start your day with clarity and mindfulness', content_type: 'meditation', category: 'mental_wellness', difficulty: 'beginner', duration_seconds: 300, rating: 4.8, view_count: 8900, muscles_targeted: [] },
-  { id: '3', title: 'Pre-Workout Nutrition Guide', description: 'Optimize your performance with the right fuel', content_type: 'nutrition_tip', category: 'nutrition', difficulty: 'beginner', duration_seconds: 180, rating: 4.5, view_count: 6200, muscles_targeted: [] },
-  { id: '4', title: 'Deadlift — Complete Tutorial', description: 'Master the king of all exercises', content_type: 'exercise_video', category: 'strength', difficulty: 'intermediate', duration_seconds: 180, rating: 4.9, view_count: 15600, muscles_targeted: ['Back', 'Glutes', 'Hamstrings'] },
-  { id: '5', title: 'Box Breathing for Stress Relief', description: 'Navy SEAL calming technique for instant calm', content_type: 'meditation', category: 'mental_wellness', difficulty: 'beginner', duration_seconds: 300, rating: 4.6, view_count: 7800, muscles_targeted: [] },
-  { id: '6', title: 'HRV: Your Recovery Dashboard', description: 'Why heart rate variability matters for recovery', content_type: 'article', category: 'health_knowledge', difficulty: 'intermediate', duration_seconds: 480, rating: 4.8, view_count: 3800, muscles_targeted: [] },
-  { id: '7', title: 'Progressive Overload Explained', description: 'The #1 principle for muscle growth', content_type: 'article', category: 'strength', difficulty: 'intermediate', duration_seconds: 240, rating: 4.7, view_count: 9200, muscles_targeted: [] },
-  { id: '8', title: 'Sleep Hygiene Masterclass', description: 'Science-backed tips for better sleep quality', content_type: 'sleep_education', category: 'sleep', difficulty: 'beginner', duration_seconds: 600, rating: 4.9, view_count: 11000, muscles_targeted: [] },
-];
+interface Item {
+  id: string;
+  title: string;
+  description: string;
+  content_type: string;
+  category: string;
+  difficulty: string;
+  duration_seconds: number;
+  rating: number;
+  view_count: number;
+  muscles_targeted: string[];
+  video_id?: string | null;
+  thumbnail_url?: string | null;
+  embed_url?: string | null;
+  watch_url?: string | null;
+  search_url?: string | null;
+  gif_url?: string | null;
+}
 
 const CATEGORIES = [
-  { label: 'All', icon: 'apps', color: colors.primary },
-  { label: 'Strength', icon: 'barbell', color: colors.health.heart },
-  { label: 'Cardio', icon: 'walk', color: colors.health.activity },
-  { label: 'Mental', icon: 'leaf', color: colors.health.mental },
-  { label: 'Nutrition', icon: 'restaurant', color: colors.health.nutrition },
-  { label: 'Sleep', icon: 'moon', color: colors.health.sleep },
-  { label: 'Knowledge', icon: 'bulb', color: '#F59E0B' },
+  { label: 'All', value: 'all', icon: 'apps', color: colors.primary },
+  { label: 'Strength', value: 'strength', icon: 'barbell', color: colors.health.heart },
+  { label: 'Cardio', value: 'cardio', icon: 'walk', color: colors.health.activity },
+  { label: 'Mental', value: 'mental_wellness', icon: 'leaf', color: colors.health.mental },
+  { label: 'Nutrition', value: 'nutrition', icon: 'restaurant', color: colors.health.nutrition },
+  { label: 'Sleep', value: 'sleep', icon: 'moon', color: colors.health.sleep },
+  { label: 'Flexibility', value: 'flexibility', icon: 'body', color: colors.health.stress },
 ];
 
-const TYPE_CONFIG: Record<string, { gradient: string[]; emoji: string }> = {
-  exercise_video: { gradient: ['#EF4444', '#F97316'], emoji: '🏋️' },
-  exercise_gif: { gradient: ['#F97316', '#F59E0B'], emoji: '💪' },
-  meditation: { gradient: ['#8B5CF6', '#6366F1'], emoji: '🧘' },
-  nutrition_tip: { gradient: ['#22C55E', '#06B6D4'], emoji: '🥗' },
-  article: { gradient: ['#3B82F6', '#06B6D4'], emoji: '📖' },
-  sleep_education: { gradient: ['#6366F1', '#8B5CF6'], emoji: '😴' },
+const TYPE_STYLE: Record<string, { accent: string; icon: string; label: string }> = {
+  exercise_video: { accent: colors.health.heart, icon: 'barbell', label: 'Exercise' },
+  exercise_gif: { accent: colors.health.energy, icon: 'body', label: 'Demo' },
+  meditation: { accent: colors.health.mental, icon: 'leaf', label: 'Meditation' },
+  nutrition_tip: { accent: colors.health.nutrition, icon: 'restaurant', label: 'Nutrition' },
+  article: { accent: colors.health.activity, icon: 'document-text', label: 'Read' },
+  sleep_education: { accent: colors.health.sleep, icon: 'moon', label: 'Sleep' },
 };
 
-// ===== Content Card =====
-const ContentCard: React.FC<{ item: Item; index: number; onPress: () => void }> = ({ item, index, onPress }) => {
-  const config = TYPE_CONFIG[item.content_type] || { gradient: ['#64748B', '#475569'], emoji: '📄' };
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+const DIFFICULTY_COLOR: Record<string, string> = {
+  beginner: colors.health.calm,
+  intermediate: colors.health.stress,
+  advanced: colors.health.heart,
+  all_levels: colors.text.muted,
+};
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay: index * 80, useNativeDriver: true }).start();
-  }, []);
+const FALLBACK: Item[] = [
+  {
+    id: 'fb-1', title: 'Barbell Back Squat — Proper Form Guide',
+    description: 'Bracing, bar path, and depth, plus the mistakes that cost you the lift.',
+    content_type: 'exercise_video', category: 'strength', difficulty: 'all_levels',
+    duration_seconds: 720, rating: 4.8, view_count: 12400,
+    muscles_targeted: ['Quads', 'Glutes', 'Core'],
+    video_id: 'bEv6CCg2BC8',
+    thumbnail_url: 'https://img.youtube.com/vi/bEv6CCg2BC8/hqdefault.jpg',
+    embed_url: 'https://www.youtube-nocookie.com/embed/bEv6CCg2BC8?rel=0&playsinline=1',
+    watch_url: 'https://www.youtube.com/watch?v=bEv6CCg2BC8',
+  },
+  {
+    id: 'fb-2', title: 'The Five Lifts — Squat, Deadlift, Bench, Press, Row',
+    description: 'One walkthrough covering setup and execution for each main barbell lift.',
+    content_type: 'exercise_video', category: 'strength', difficulty: 'beginner',
+    duration_seconds: 900, rating: 4.7, view_count: 15600,
+    muscles_targeted: ['Full body'],
+    video_id: 'DQGHPLs9N6Y',
+    thumbnail_url: 'https://img.youtube.com/vi/DQGHPLs9N6Y/hqdefault.jpg',
+    embed_url: 'https://www.youtube-nocookie.com/embed/DQGHPLs9N6Y?rel=0&playsinline=1',
+    watch_url: 'https://www.youtube.com/watch?v=DQGHPLs9N6Y',
+  },
+  {
+    id: 'fb-3', title: 'Box Breathing for Stress Relief',
+    description: 'A four-count cycle you can run in under five minutes to drop arousal.',
+    content_type: 'meditation', category: 'mental_wellness', difficulty: 'beginner',
+    duration_seconds: 300, rating: 4.6, view_count: 7800, muscles_targeted: [],
+    search_url: 'https://www.youtube.com/results?search_query=box+breathing+for+stress+relief',
+  },
+  {
+    id: 'fb-4', title: 'HRV — Your Recovery Dashboard',
+    description: 'Why heart rate variability tracks readiness better than resting heart rate alone.',
+    content_type: 'article', category: 'general_health', difficulty: 'intermediate',
+    duration_seconds: 480, rating: 4.8, view_count: 3800, muscles_targeted: [],
+    search_url: 'https://www.youtube.com/results?search_query=heart+rate+variability+recovery+explained',
+  },
+];
+
+function formatViews(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return String(count);
+}
+
+function ContentCard({ item, width }: { item: Item; width: number }) {
+  const style = TYPE_STYLE[item.content_type] || {
+    accent: colors.primary, icon: 'document-text', label: 'Content',
+  };
+  const difficultyColor = DIFFICULTY_COLOR[item.difficulty] || colors.text.muted;
 
   return (
-    <Animated.View style={{ opacity: fadeAnim }}>
-      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-        {/* Thumbnail with gradient overlay */}
-        <LinearGradient colors={config.gradient as any} style={styles.cardThumbnail}>
-          <Text style={styles.cardEmoji}>{config.emoji}</Text>
-          {item.duration_seconds > 60 && (
-            <View style={styles.durationBadge}>
-              <Ionicons name="time" size={10} color="#FFF" />
-              <Text style={styles.durationText}>{Math.floor(item.duration_seconds / 60)}:{(item.duration_seconds % 60).toString().padStart(2, '0')}</Text>
-            </View>
-          )}
-          <View style={styles.playOverlay}>
-            <Ionicons name="play-circle" size={40} color="rgba(255,255,255,0.9)" />
-          </View>
-        </LinearGradient>
+    <View style={[styles.card, { width }]}>
+      <VideoCard
+        title={item.title}
+        videoId={item.video_id}
+        thumbnailUrl={item.thumbnail_url}
+        embedUrl={item.embed_url}
+        watchUrl={item.watch_url}
+        searchUrl={item.search_url}
+        gifUrl={item.gif_url}
+        accent={style.accent}
+        icon={style.icon}
+        durationSeconds={item.duration_seconds}
+        height={Math.round(width * 0.5625)}
+      />
 
-        {/* Card Body */}
-        <View style={styles.cardBody}>
-          <View style={styles.cardTopRow}>
-            <View style={[styles.typeTag, { backgroundColor: config.gradient[0] + '20' }]}>
-              <Text style={[styles.typeTagText, { color: config.gradient[0] }]}>{item.content_type.replace(/_/g, ' ')}</Text>
-            </View>
+      <View style={styles.cardBody}>
+        <View style={styles.cardTopRow}>
+          <View style={[styles.typeTag, { backgroundColor: style.accent + '22' }]}>
+            <Ionicons name={style.icon as any} size={11} color={style.accent} />
+            <Text style={[styles.typeTagText, { color: style.accent }]}>{style.label}</Text>
+          </View>
+          {item.rating > 0 && (
             <View style={styles.ratingRow}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={styles.ratingText}>{item.rating}</Text>
-            </View>
-          </View>
-
-          <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.cardDescription} numberOfLines={1}>{item.description}</Text>
-
-          <View style={styles.cardFooter}>
-            <View style={styles.viewCount}>
-              <Ionicons name="eye" size={12} color={colors.text.muted} />
-              <Text style={styles.viewCountText}>{(item.view_count / 1000).toFixed(1)}k views</Text>
-            </View>
-            <View style={[styles.difficultyBadge, {
-              backgroundColor: item.difficulty === 'beginner' ? colors.health.calm + '15' : item.difficulty === 'intermediate' ? '#F59E0B15' : colors.health.heart + '15',
-            }]}>
-              <Text style={[styles.difficultyText, {
-                color: item.difficulty === 'beginner' ? colors.health.calm : item.difficulty === 'intermediate' ? '#F59E0B' : colors.health.heart,
-              }]}>{item.difficulty}</Text>
-            </View>
-          </View>
-
-          {item.muscles_targeted?.length > 0 && (
-            <View style={styles.muscleRow}>
-              {item.muscles_targeted.map((m, i) => (
-                <View key={i} style={styles.muscleTag}>
-                  <Text style={styles.muscleText}>{m}</Text>
-                </View>
-              ))}
+              <Ionicons name="star" size={12} color={colors.health.stress} />
+              <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
             </View>
           )}
         </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
 
-// ===== Main Screen =====
+        <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+        {!!item.description && (
+          <View style={styles.channelRow}>
+            <Ionicons name="person-circle-outline" size={13} color={colors.text.muted} />
+            <Text style={styles.cardDescription} numberOfLines={1}>{item.description}</Text>
+          </View>
+        )}
+
+        <View style={styles.cardFooter}>
+          {item.view_count > 0 ? (
+            <View style={styles.footerItem}>
+              <Ionicons name="eye-outline" size={12} color={colors.text.muted} />
+              <Text style={styles.footerText}>{formatViews(item.view_count)} views</Text>
+            </View>
+          ) : (
+            <View style={styles.footerItem}>
+              <Ionicons name="logo-youtube" size={12} color={colors.text.muted} />
+              <Text style={styles.footerText}>YouTube</Text>
+            </View>
+          )}
+          <View style={[styles.difficultyBadge, { backgroundColor: difficultyColor + '1F' }]}>
+            <Text style={[styles.difficultyText, { color: difficultyColor }]}>
+              {item.difficulty.replace(/_/g, ' ')}
+            </Text>
+          </View>
+        </View>
+
+        {item.muscles_targeted?.length > 0 && (
+          <View style={styles.muscleRow}>
+            {item.muscles_targeted.slice(0, 3).map((m) => (
+              <View key={m} style={styles.muscleTag}>
+                <Text style={styles.muscleText} numberOfLines={1}>{m}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+/** Map a YouTube search hit onto the card model the feed renders. */
+function fromYouTube(hit: YouTubeHit, category: string): Item {
+  return {
+    id: hit.video_id,
+    title: hit.title,
+    description: hit.channel,
+    content_type: 'exercise_video',
+    category,
+    difficulty: 'all_levels',
+    duration_seconds: hit.duration_seconds,
+    rating: 0,
+    view_count: hit.view_count,
+    muscles_targeted: [],
+    video_id: hit.video_id,
+    thumbnail_url: hit.thumbnail_url,
+    embed_url: hit.embed_url,
+    watch_url: hit.watch_url,
+  };
+}
+
 export default function ContentFeedScreen() {
+  const insets = useSafeAreaInsets();
+  const grid = useGrid(1, spacing.lg);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [category, setCategory] = useState('all');
   const [content, setContent] = useState<Item[]>([]);
   const [search, setSearch] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [query, setQuery] = useState('');
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const catParam = activeCategory !== 'All' ? `&category=${activeCategory.toLowerCase().replace(' ', '_')}` : '';
-      const [feedRes, trendRes] = await Promise.allSettled([
-        globalThis.fetch(`${API}/content/feed?page_size=30${catParam}`).then(r => r.json()),
-        globalThis.fetch(`${API}/content/trending?limit=5`).then(r => r.json()),
-      ]);
-      if (feedRes.status === 'fulfilled' && feedRes.value?.items) {
-        setContent(feedRes.value.items.map((i: any) => ({
-          id: i.id, title: i.title, description: i.description,
-          content_type: i.content_type, category: i.category, difficulty: i.difficulty,
-          duration_seconds: i.duration_seconds || 0, rating: i.rating || 4.5,
-          view_count: i.view_count || 0, muscles_targeted: i.muscles_targeted || [],
-        })));
-      } else {
-        setContent(FALLBACK);
-      }
-    } catch { setContent(FALLBACK); }
+    const path = query
+      ? `/content/youtube/search?q=${encodeURIComponent(query)}&limit=20`
+      : `/content/youtube/category/${category}?limit=20`;
+    const data = await getJson<{ results: YouTubeHit[] }>(path);
+    const hits = asArray<YouTubeHit>(data?.results);
+    setContent(hits.length ? hits.map((h) => fromYouTube(h, category)) : FALLBACK);
     setLoading(false);
-  }, [activeCategory]);
+  }, [category, query]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    setLoading(true);
+    fetchData();
+  }, [fetchData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -160,180 +242,192 @@ export default function ContentFeedScreen() {
     setRefreshing(false);
   }, [fetchData]);
 
-  const doSearch = async () => {
-    if (!search.trim()) { setSearchResults([]); return; }
-    try {
-      const r = await globalThis.fetch(`${API}/content/search?q=${encodeURIComponent(search)}`);
-      const d = await r.json();
-      setSearchResults(d.results || []);
-    } catch {}
-  };
+  // Submitting is what runs a search: each one costs a YouTube extraction on
+  // the server, so it must not fire per keystroke.
+  const runSearch = useCallback(() => setQuery(search.trim()), [search]);
 
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.header}>
-        <Text style={styles.headerTitle}>📺 Content Hub</Text>
-        <Text style={styles.headerSubtitle}>Health knowledge, exercise guides & wellness content</Text>
-      </LinearGradient>
+  const clearSearch = useCallback(() => {
+    setSearch('');
+    setQuery('');
+  }, []);
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={colors.text.muted} />
-          <TextInput
-            style={styles.searchInput}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search exercises, articles..."
-            placeholderTextColor={colors.text.muted}
-            onSubmitEditing={doSearch}
-            returnKeyType="search"
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => { setSearch(''); setSearchResults([]); }}>
-              <Ionicons name="close-circle" size={18} color={colors.text.muted} />
-            </TouchableOpacity>
-          )}
-        </View>
+  const visible = content;
+
+  const header = (
+    <View>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+        <Text style={styles.headerTitle}>Content Hub</Text>
+        <Text style={styles.headerSubtitle}>
+          Exercise walkthroughs, recovery science, and guided sessions
+        </Text>
       </View>
 
-      {/* Search Results */}
-      {searchResults.length > 0 && (
-        <View style={styles.searchResultsContainer}>
-          <Text style={styles.searchResultsTitle}>Search Results ({searchResults.length})</Text>
-          {searchResults.slice(0, 5).map((r: any, i: number) => (
-            <TouchableOpacity key={i} style={styles.searchResultItem}>
-              <View style={styles.searchResultIcon}>
-                <Ionicons name="document-text" size={16} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.searchResultTitle}>{r.title}</Text>
-                <Text style={styles.searchResultMeta}>{r.content_type} • {r.difficulty} • ⭐{r.rating}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={18} color={colors.text.muted} />
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={runSearch}
+          placeholder="Search any exercise or topic on YouTube"
+          placeholderTextColor={colors.text.muted}
+          returnKeyType="search"
+          accessibilityLabel="Search content"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={clearSearch} hitSlop={8} accessibilityLabel="Clear search">
+            <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+          </TouchableOpacity>
+        )}
+      </View>
 
-      {/* Category Pills */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
-        <View style={styles.categoriesRow}>
-          {CATEGORIES.map((cat) => (
+      <FlatList
+        horizontal
+        data={CATEGORIES}
+        keyExtractor={(c) => c.label}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryRow}
+        renderItem={({ item: cat }) => {
+          const active = !query && category === cat.value;
+          return (
             <TouchableOpacity
-              key={cat.label}
-              style={[styles.categoryPill, activeCategory === cat.label && { backgroundColor: cat.color + '20', borderColor: cat.color + '50' }]}
-              onPress={() => setActiveCategory(cat.label)}
-              activeOpacity={0.7}
+              style={[
+                styles.categoryPill,
+                active && { backgroundColor: cat.color + '22', borderColor: cat.color + '66' },
+              ]}
+              onPress={() => { setCategory(cat.value); clearSearch(); }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
             >
-              <Ionicons name={cat.icon as any} size={14} color={activeCategory === cat.label ? cat.color : colors.text.muted} />
-              <Text style={[styles.categoryPillText, activeCategory === cat.label && { color: cat.color }]}>{cat.label}</Text>
+              <Ionicons
+                name={cat.icon as any}
+                size={14}
+                color={active ? cat.color : colors.text.muted}
+              />
+              <Text
+                style={[styles.categoryPillText, active && { color: cat.color }]}
+                numberOfLines={1}
+              >
+                {cat.label}
+              </Text>
             </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+          );
+        }}
+      />
 
-      {/* Content Grid */}
-      {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
-      ) : (
-        <View style={styles.contentGrid}>
-          {content.map((item, index) => (
-            <ContentCard key={item.id} item={item} index={index} onPress={() => {}} />
-          ))}
+      {!inlinePlaybackAvailable && (
+        <View style={styles.notice}>
+          <Ionicons name="open-outline" size={14} color={colors.text.muted} />
+          <Text style={styles.noticeText}>Videos open in YouTube</Text>
         </View>
       )}
+    </View>
+  );
 
-      <View style={{ height: 100 }} />
-    </ScrollView>
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      style={styles.container}
+      data={visible}
+      keyExtractor={(item) => item.id}
+      ListHeaderComponent={header}
+      renderItem={({ item }) => <ContentCard item={item} width={grid.cell} />}
+      contentContainerStyle={[styles.listContent, { paddingHorizontal: grid.padding }]}
+      ItemSeparatorComponent={() => <View style={{ height: spacing.xl }} />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+      }
+      ListEmptyComponent={
+        <View style={styles.empty}>
+          <Ionicons name="search-outline" size={40} color={colors.text.muted} />
+          <Text style={styles.emptyTitle}>Nothing here matches that search</Text>
+          <TouchableOpacity
+            onPress={() =>
+              Linking.openURL(
+                `https://www.youtube.com/results?search_query=${encodeURIComponent(search)}`
+              )
+            }
+          >
+            <Text style={styles.emptyLink}>Search YouTube instead</Text>
+          </TouchableOpacity>
+        </View>
+      }
+      showsVerticalScrollIndicator={false}
+    />
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
-  contentContainer: { paddingBottom: 100 },
+  center: { flex: 1, backgroundColor: colors.bg.deep, justifyContent: 'center', alignItems: 'center' },
+  listContent: { paddingBottom: 120 },
 
-  // Header
-  header: { paddingTop: 56, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
+  header: { paddingBottom: spacing.lg },
+  headerTitle: { fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 14, color: colors.text.muted, marginTop: 4, lineHeight: 20 },
 
-  // Search
-  searchContainer: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.bg.card, paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md, borderRadius: radius.lg,
+    height: 46, borderRadius: radius.lg,
     borderWidth: 1, borderColor: colors.surface.border,
   },
-  searchInput: { flex: 1, color: colors.text.primary, fontSize: 15 },
+  searchInput: { flex: 1, color: colors.text.primary, fontSize: 15, paddingVertical: 0 },
 
-  // Search Results
-  searchResultsContainer: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.md },
-  searchResultsTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginBottom: spacing.sm },
-  searchResultItem: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.bg.card, padding: spacing.md, borderRadius: radius.md,
-    marginBottom: spacing.xs, borderWidth: 1, borderColor: colors.surface.border,
-  },
-  searchResultIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primaryMuted, justifyContent: 'center', alignItems: 'center' },
-  searchResultTitle: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
-  searchResultMeta: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
-
-  // Categories
-  categoriesScroll: { marginTop: spacing.lg },
-  categoriesRow: { flexDirection: 'row', paddingHorizontal: spacing.screenPadding, gap: spacing.sm },
+  categoryRow: { gap: spacing.sm, paddingVertical: spacing.lg },
   categoryPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+    paddingHorizontal: 14, height: 36, borderRadius: radius.pill,
     backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border,
   },
   categoryPillText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
 
-  // Content Grid
-  contentGrid: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.lg },
+  noticeText: { fontSize: 12, color: colors.text.muted },
 
-  // Content Card
   card: {
     backgroundColor: colors.bg.card, borderRadius: radius.lg,
-    marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.surface.border,
-    overflow: 'hidden',
+    borderWidth: 1, borderColor: colors.surface.border, overflow: 'hidden',
   },
-  cardThumbnail: {
-    height: 140, justifyContent: 'center', alignItems: 'center',
-  },
-  cardEmoji: { fontSize: 48 },
-  playOverlay: {
-    position: 'absolute', justifyContent: 'center', alignItems: 'center',
-    width: '100%', height: '100%',
-  },
-  durationBadge: {
-    position: 'absolute', bottom: spacing.sm, right: spacing.sm,
+  cardBody: { padding: spacing.lg, gap: spacing.xs },
+  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  typeTag: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#000000AA', paddingHorizontal: spacing.sm,
-    paddingVertical: 3, borderRadius: radius.xs,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.badge,
   },
-  durationText: { fontSize: 11, color: '#FFF', fontWeight: '600' },
-  cardBody: { padding: spacing.lg },
-  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  typeTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  typeTagText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  typeTagText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  ratingText: { fontSize: 12, fontWeight: '600', color: '#F59E0B' },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary, lineHeight: 22 },
-  cardDescription: { fontSize: 13, color: colors.text.muted, marginTop: 4 },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
-  viewCount: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  viewCountText: { fontSize: 12, color: colors.text.muted },
-  difficultyBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  difficultyText: { fontSize: 10, fontWeight: '600', textTransform: 'capitalize' },
-  muscleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
-  muscleTag: { backgroundColor: colors.surface.divider, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  ratingText: { fontSize: 12, fontWeight: '600', color: colors.health.stress },
+
+  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary, lineHeight: 22, marginTop: 2 },
+  channelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  cardDescription: { flex: 1, fontSize: 13, color: colors.text.secondary, lineHeight: 19 },
+
+  cardFooter: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: spacing.sm,
+  },
+  footerItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  footerText: { fontSize: 12, color: colors.text.muted },
+  difficultyBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.badge },
+  difficultyText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
+
+  muscleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
+  muscleTag: {
+    maxWidth: '48%',
+    backgroundColor: colors.surface.divider,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.badge,
+  },
   muscleText: { fontSize: 10, color: colors.text.secondary, fontWeight: '500' },
+
+  empty: { alignItems: 'center', paddingVertical: spacing['4xl'], gap: spacing.sm },
+  emptyTitle: { fontSize: 15, color: colors.text.secondary, textAlign: 'center' },
+  emptyLink: { fontSize: 14, color: colors.text.link, fontWeight: '600' },
 });

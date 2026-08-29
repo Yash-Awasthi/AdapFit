@@ -25,6 +25,7 @@ import { useRouter } from 'expo-router';
 import { colors, typography, spacing, radius, shadows, glass, getScoreColor, getScoreLabel, accessibility } from '../src/theme';
 import { useUserStore } from '../src/stores/userStore';
 import { api } from '../src/services/api';
+import { SCREEN_HEADER_TOP } from '../src/theme/layout';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -451,7 +452,7 @@ const styles = StyleSheet.create({
 
   // Hero
   heroSection: {
-    paddingTop: 56,
+    paddingTop: SCREEN_HEADER_TOP,
     paddingBottom: 32,
     paddingHorizontal: spacing.screenPadding,
     alignItems: 'center',

@@ -6,15 +6,15 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets } from '../../src/theme';
 
-const API = 'http://localhost:8000/api/v1';
+import { API_V1 as API } from '../../src/services/config';
 const api = async (p: string, o?: RequestInit) => { try { const r = await fetch(`${API}${p}`, { headers: { 'Content-Type': 'application/json' }, ...o }); return r.ok ? await r.json() : null; } catch { return null; } };
 
 const PLATFORMS = [
-  { id: 'apple_health', name: 'Apple Health', icon: ' heart', color: '#FF2D55' },
-  { id: 'google_fit', name: 'Google Fit', icon: '🏃', color: '#4285F4' },
-  { id: 'fitbit', name: 'Fitbit', icon: '⌚', color: '#00B0B9' },
-  { id: 'samsung_health', name: 'Samsung Health', icon: '📱', color: '#1428A0' },
-];
+  { id: 'apple_health', name: 'Apple Health', icon: 'heart', color: '#FF2D55' },
+  { id: 'google_fit', name: 'Google Fit', icon: 'walk', color: '#4285F4' },
+  { id: 'fitbit', name: 'Fitbit', icon: 'watch', color: '#00B0B9' },
+  { id: 'samsung_health', name: 'Samsung Health', icon: 'phone-portrait', color: '#1428A0' },
+] as const;
 
 export default function DevicesScreen() {
   const [devices, setDevices] = useState<any[]>([]);
@@ -50,7 +50,7 @@ export default function DevicesScreen() {
   return (
     <ScrollView style={ds.container}>
       <View style={ds.header}>
-        <Text style={typography.heading.h1}>📱 Devices</Text>
+        <Text style={typography.heading.h1}>Devices</Text>
         <Text style={typography.body.sm}>Connect wearables and health platforms</Text>
       </View>
 
@@ -70,7 +70,7 @@ export default function DevicesScreen() {
           const connected = devices.some((d: any) => d.platform === p.id);
           return (
             <TouchableOpacity key={p.id} style={ds.platformCard} onPress={() => !connected && connect(p.id, p.name)}>
-              <Text style={{ fontSize: 24 }}>{p.icon}</Text>
+              <Ionicons name={p.icon} size={24} color={p.color} />
               <View style={{ flex: 1 }}>
                 <Text style={typography.label.lg}>{p.name}</Text>
                 <Text style={[typography.body.xs, { color: connected ? colors.health.calm : colors.text.muted }]}>

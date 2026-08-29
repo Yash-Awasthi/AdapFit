@@ -12,8 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius } from '../theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const API = 'http://localhost:8000/api/v1';
-
+import { API_V1 as API } from '../services/config';
 const api = async (path: string, opts?: RequestInit) => {
   try {
     const r = await fetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });

@@ -14,8 +14,8 @@ import {
   Alert,
 } from 'react-native';
 import {
-  Key, Bell, Download, Shield, Moon, Sun, Globe, Heart,
-  ChevronRight, Copy, Plus, Palette,
+  Bell, Download, Shield, Moon, Sun, Globe, Heart,
+  ChevronRight, Palette,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../../src/services/config';
@@ -39,8 +39,6 @@ export default function SettingsScreen() {
     recoveryCheckins: true,
     sleepReminders: true,
   });
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
 
   function toggleSetting(key: keyof SettingsState) {
     Haptics.selectionAsync();
@@ -55,26 +53,6 @@ export default function SettingsScreen() {
   function pickAccent(name: AccentName) {
     Haptics.selectionAsync();
     setAccent(name);
-  }
-
-  async function createApiKey() {
-    try {
-      const res = await fetch(`${API}/api/v1/auth/keys`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'mobile-app', tier: 'free' }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setApiKey(data.api_key);
-        setShowApiKey(true);
-      } else {
-        const detail = await res.text().catch(() => '');
-        Alert.alert('Could not create API key', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
-      }
-    } catch (err: any) {
-      Alert.alert('Could not reach server', err?.message || String(err));
-    }
   }
 
   async function exportData(format: string) {
@@ -133,35 +111,6 @@ export default function SettingsScreen() {
             ))}
           </View>
         </View>
-      </View>
-
-      {/* API Key Section */}
-      <View style={s.section}>
-        <Text style={s.sectionTitle}>API Key</Text>
-        <View style={s.card}>
-          <Key size={20} color={theme.primaryLight} />
-          <View style={s.cardContent}>
-            <Text style={s.cardTitle}>Developer API Key</Text>
-            <Text style={s.cardDesc}>
-              {showApiKey ? apiKey : 'Create a key to access the API'}
-            </Text>
-          </View>
-          <TouchableOpacity style={s.actionBtn} onPress={createApiKey}>
-            <Plus size={16} color={theme.primaryLight} />
-          </TouchableOpacity>
-        </View>
-        {showApiKey && (
-          <TouchableOpacity
-            style={s.copyBtn}
-            onPress={() => {
-              Haptics.selectionAsync();
-              Alert.alert('Copied', 'API key copied to clipboard');
-            }}
-          >
-            <Copy size={14} color={theme.primaryLight} />
-            <Text style={s.copyText}>Copy Key</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Notifications */}

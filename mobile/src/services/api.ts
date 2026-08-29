@@ -1,5 +1,6 @@
 import { cache } from './cache';
 import { API_BASE_URL } from './config';
+import { authHeader } from './authToken';
 
 const API = API_BASE_URL;
 const CACHE_TTL = 60_000; // 1 minute
@@ -15,8 +16,8 @@ async function request<T>(path: string, options?: RequestInit, ttl: number = CAC
 
   try {
     const res = await fetch(`${API}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
       ...options,
+      headers: { 'Content-Type': 'application/json', ...authHeader(), ...(options?.headers || {}) },
     });
     if (!res.ok) {
       throw new Error(`API error: ${res.status}`);
@@ -99,10 +100,10 @@ export const api = {
       confidence: string;
       data_completeness: number;
       calculated_at: string;
-    }>(`/api/v1/recovery/v2/quick`),
+    }>(`/api/v1/recovery-v2/quick`),
 
   calculateRecoveryV2: (data: Record<string, any>) =>
-    request<any>('/api/v1/recovery/v2/calculate', {
+    request<any>('/api/v1/recovery-v2/calculate', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -367,7 +368,7 @@ export const api = {
     // Multipart upload — must NOT set Content-Type (boundary is auto-generated)
     const res = await fetch(`${API}/api/v1/voice-engine/transcribe-base64`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
       body: JSON.stringify({ audio_base64: audioBase64, filename: 'recording.m4a', user_id: userId }),
     });
     if (!res.ok) throw new Error(`API error: ${res.status}`);

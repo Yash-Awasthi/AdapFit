@@ -21,7 +21,8 @@ import json
 import hmac
 
 
-_env_key = os.getenv("JWT_SECRET_KEY", "")
+from app.core.config import settings as _settings
+_env_key = os.getenv("JWT_SECRET_KEY", "") or _settings.JWT_SECRET_KEY
 if not _env_key:
     if os.getenv("ENVIRONMENT", "development") == "production":
         raise ValueError(
@@ -46,12 +47,13 @@ MAX_AUDIT_LOG_SIZE = 5000
 _audit_log: list[dict] = []
 
 
-def _log_audit_event(event_type: str, user_id: str = "", details: dict = None, ip: str = ""):
+def _log_audit_event(event_type: str, user_id: str = "", details: dict = None, ip: str = "", email: str = ""):
     """Record a security audit event."""
     import time as _time
     _audit_log.append({
         "event": event_type,
         "user_id": user_id,
+        "email": email,
         "details": details or {},
         "ip": ip,
         "timestamp": _time.time(),
@@ -234,8 +236,15 @@ class ApiKeyManager:
             return True
         return False
 
+    def get_key_info(self, raw_key: str) -> Optional[dict]:
+        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+        key = self._keys.get(key_hash)
+        if not key:
+            return None
+        return {"name": key.name, "tier": key.tier, "rate_limit": key.rate_limit, "is_active": key.is_active, "created_at": key.created_at}
+
     def list_keys(self) -> list[dict]:
-        return [{"name": k.name, "tier": k.tier, "rate_limit": k.rate_limit, "active": k.is_active, "created_at": k.created_at} for k in self._keys.values()]
+        return [{"name": k.name, "tier": k.tier, "rate_limit": k.rate_limit, "is_active": k.is_active, "created_at": k.created_at} for k in self._keys.values()]
 
 
 api_key_manager = ApiKeyManager()

@@ -16,16 +16,18 @@ export default function ChronicPainScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>💊 Chronic Pain Manager</Text>
+        <Text style={styles.headerTitle}>Chronic Pain Manager</Text>
         <Text style={styles.headerSubtitle}>Pain diary, triggers & relief tracking</Text>
       </View>
 
       <View style={styles.tabBar}>
         {(['diary', 'triggers', 'treatments', 'cbt'] as const).map(tab => (
           <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.activeTab]} onPress={() => setActiveTab(tab)}>
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-              {tab === 'diary' ? '📓' : tab === 'triggers' ? '🔍' : tab === 'treatments' ? '💉' : '🧠'}
-            </Text>
+            <Ionicons
+              name={tab === 'diary' ? 'book-outline' : tab === 'triggers' ? 'search-outline' : tab === 'treatments' ? 'medkit-outline' : 'analytics-outline'}
+              size={20}
+              color={activeTab === tab ? '#FFF' : '#94A3B8'}
+            />
           </TouchableOpacity>
         ))}
       </View>
@@ -120,7 +122,7 @@ export default function ChronicPainScreen() {
                 <Text style={styles.cbtDesc}>{t.desc}</Text>
                 <Text style={styles.cbtEvidence}>Evidence: {t.evidence}</Text>
                 <TouchableOpacity style={styles.cbtStartBtn}>
-                  <Text style={styles.cbtStartText}>▶ Start Exercise</Text>
+                  <Text style={styles.cbtStartText}>Start Exercise</Text>
                 </TouchableOpacity>
               </View>
             ))}

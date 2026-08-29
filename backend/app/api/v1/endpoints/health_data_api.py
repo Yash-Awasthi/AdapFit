@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.core.health_data import health_data_store, MEASUREMENT_TYPES
+from app.core.health_validation import PHYSIOLOGICAL_RANGES, validate, compute_confidence
 from app.core.dependencies import require_user
 
 router = APIRouter()
@@ -18,7 +19,7 @@ class AddRecordRequest(BaseModel):
     value: float
     source: str = Field(default="manual", description="manual, device, sensor, import, calculated, clinical")
     device: str = ""
-    confidence: str = Field(default="medium", description="high, medium, low, estimated")
+    confidence: str = Field(default="medium", description="high, medium, low, estimated — ignored for types with a known physiological range, where confidence is computed instead")
     timestamp: Optional[float] = None
     privacy_level: str = Field(default="private", description="private, family, medical")
     metadata: Optional[dict] = None
@@ -28,39 +29,41 @@ class BatchAddRequest(BaseModel):
     records: list[AddRecordRequest] = Field(max_length=100)
 
 
+def _add_validated_record(user_id: str, rec: AddRecordRequest) -> dict:
+    """Store one record, computing confidence instead of trusting the client's claim
+    whenever the measurement type has a known plausible physiological range.
+    """
+    value = rec.value
+    confidence = rec.confidence
+    if rec.measurement_type in PHYSIOLOGICAL_RANGES:
+        ok, normalized, reason = validate(rec.measurement_type, value)
+        if not ok:
+            return {"error": reason, "type": rec.measurement_type, "value": value}
+        value = normalized
+        confidence = compute_confidence(rec.measurement_type, value, source=rec.source).value
+    return health_data_store.add_record(
+        user_id=user_id,
+        measurement_type=rec.measurement_type,
+        value=value,
+        source=rec.source,
+        device=rec.device,
+        confidence=confidence,
+        timestamp=rec.timestamp,
+        privacy_level=rec.privacy_level,
+        metadata=rec.metadata,
+    )
+
+
 @router.post("/record")
 async def add_health_record(request: AddRecordRequest, user: dict = Depends(require_user)):
     """Add a normalized health data record with source attribution."""
-    return health_data_store.add_record(
-        user_id=user["id"],
-        measurement_type=request.measurement_type,
-        value=request.value,
-        source=request.source,
-        device=request.device,
-        confidence=request.confidence,
-        timestamp=request.timestamp,
-        privacy_level=request.privacy_level,
-        metadata=request.metadata,
-    )
+    return _add_validated_record(user["id"], request)
 
 
 @router.post("/batch")
 async def add_batch_records(request: BatchAddRequest, user: dict = Depends(require_user)):
     """Add multiple health records in a single request."""
-    results = []
-    for rec in request.records:
-        result = health_data_store.add_record(
-            user_id=user["id"],
-            measurement_type=rec.measurement_type,
-            value=rec.value,
-            source=rec.source,
-            device=rec.device,
-            confidence=rec.confidence,
-            timestamp=rec.timestamp,
-            privacy_level=rec.privacy_level,
-            metadata=rec.metadata,
-        )
-        results.append(result)
+    results = [_add_validated_record(user["id"], rec) for rec in request.records]
     return {"added": len(results), "results": results}
 
 
@@ -76,10 +79,11 @@ async def get_health_records(
     records = health_data_store.get_records(
         user["id"],
         measurement_type=measurement_type,
-        source=source,
         days=days,
         limit=limit,
     )
+    if source:
+        records = [r for r in records if r.get("source") == source]
     return {"records": records, "count": len(records), "user_id": user["id"]}
 
 
@@ -107,7 +111,7 @@ async def get_measurement_types():
             "type": mt,
             "unit": info["unit"],
             "category": info["category"],
-            "typical_range": info["typical_range"],
+            "typical_range": PHYSIOLOGICAL_RANGES.get(mt),
         })
     return {"measurement_types": types, "count": len(types)}
 

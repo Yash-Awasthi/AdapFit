@@ -4,9 +4,26 @@ Content Hub API — YouTube-like Health Video/GIF Feed
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from typing import Optional
+from urllib.parse import quote_plus
+
 from app.services.content_platform import content_platform_service
+from app.services.content_media import media_for, SEARCH_TEMPLATE
+from app.services import youtube_search as youtube
 
 router = APIRouter()
+
+# Search phrasing per category, tuned to return instructional videos rather
+# than vlogs. Editing a line here changes what that category's feed shows.
+CATEGORY_QUERIES = {
+    "all": "evidence based fitness and health explained",
+    "strength": "proper lifting technique tutorial barbell",
+    "cardio": "cardio workout follow along no equipment",
+    "flexibility": "mobility and stretching routine follow along",
+    "mental_wellness": "guided meditation and breathing exercise",
+    "nutrition": "evidence based nutrition for muscle and fat loss",
+    "sleep": "sleep science how to sleep better",
+    "general_health": "heart rate variability and recovery explained",
+}
 
 
 class BookmarkRequest(BaseModel):
@@ -47,16 +64,48 @@ async def get_content_feed(
                 "category": item.category.value,
                 "difficulty": item.difficulty.value,
                 "duration_seconds": item.duration_seconds,
-                "thumbnail_url": item.thumbnail_url,
                 "muscles_targeted": item.muscles_targeted,
                 "rating": item.rating,
                 "view_count": item.view_count,
+                # The seeded media_url is a placeholder path until a real asset
+                # host is configured, so only absolute URLs are handed to clients.
+                "gif_url": item.media_url if item.media_url.startswith("http") else None,
+                **media_for(item.title, item.category.value),
             }
             for item in feed.items
         ],
         "total_count": feed.total_count,
         "page": feed.page,
         "page_size": feed.page_size,
+    }
+
+
+@router.get("/youtube/search")
+async def youtube_search(
+    q: str = Query(..., min_length=2, max_length=120),
+    limit: int = Query(12, ge=1, le=25),
+):
+    """Search YouTube for playable content matching a query."""
+    results = await youtube.search(q, limit)
+    return {
+        "query": q,
+        "available": youtube.search_available(),
+        "results": results,
+        "fallback_url": SEARCH_TEMPLATE.format(query=quote_plus(q)),
+    }
+
+
+@router.get("/youtube/category/{category}")
+async def youtube_category(category: str, limit: int = Query(12, ge=1, le=25)):
+    """Curated YouTube feed for one content category."""
+    query = CATEGORY_QUERIES.get(category, CATEGORY_QUERIES["all"])
+    results = await youtube.search(query, limit)
+    return {
+        "category": category,
+        "query": query,
+        "available": youtube.search_available(),
+        "results": results,
+        "fallback_url": SEARCH_TEMPLATE.format(query=quote_plus(query)),
     }
 
 

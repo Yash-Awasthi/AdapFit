@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../../src/theme';
 import { GlassCard, SectionHeaderPremium, ScoreRing, ProgressBarPremium } from '../../src/components/PremiumComponents';
+import { SCREEN_HEADER_TOP } from '../../src/theme/layout';
 
 const MEDICATIONS = [
   { id: 1, name: 'Vitamin D3', dosage: '2000 IU', frequency: 'Daily', time: '8:00 AM', color: '#F59E0B', taken: true, refillDays: 45 },
@@ -32,7 +33,7 @@ export default function MedicationScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
       <LinearGradient colors={['#F59E0B', '#F97316']} style={styles.header}>
-        <Text style={styles.headerTitle}>💊 Medications</Text>
+        <Text style={styles.headerTitle}>Medications</Text>
         <Text style={styles.headerSubtitle}>Track your medication schedule</Text>
       </LinearGradient>
 
@@ -83,7 +84,7 @@ export default function MedicationScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
   contentContainer: { paddingBottom: 100 },
-  header: { paddingTop: 56, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  header: { paddingTop: SCREEN_HEADER_TOP, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
   headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
 

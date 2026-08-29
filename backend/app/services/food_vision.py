@@ -14,6 +14,7 @@ import json
 import re
 from typing import Optional
 from dataclasses import dataclass, field
+from app.core.gemini import gemini_endpoint
 
 
 @dataclass
@@ -145,7 +146,7 @@ def analyze_food_from_gemini_vision(image_base64: str, api_key: str = "") -> Mea
         )
 
         response = httpx.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+            gemini_endpoint(api_key)[0],
             json={
                 "contents": [{"parts": [
                     {"text": prompt},

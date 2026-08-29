@@ -9,11 +9,13 @@ import importlib
 import pkgutil
 from pathlib import Path
 from fastapi import FastAPI
+from starlette.routing import compile_path
 
 
 # Module name → (prefix, tags) mapping
 # Modules not in this map get auto-generated prefix/tags from filename
 ROUTE_MAP = {
+    "decision": ("/decision", ["Daily Decision"]),
     "users": ("/users", ["Users"]),
     "recovery": ("/recovery-logs", ["Recovery Logs"]),
     "workouts": ("/workouts", ["Workouts"]),
@@ -65,7 +67,6 @@ ROUTE_MAP = {
     "exercise_subs": ("/exercise-subs", ["Exercise Substitutions"]),
     "breathing": ("/breathing", ["Breathing Exercises"]),
     "workout_stats": ("/workout-stats", ["Workout Stats"]),
-    "achievements_v2": ("/achievements-v2", ["Achievements V2"]),
     "qr_share": ("/qr-share", ["QR Share"]),
     "exercise_library": ("/exercise-library", ["Exercise Library"]),
     "activity_feed": ("/activity-feed", ["Activity Feed"]),
@@ -92,7 +93,6 @@ ROUTE_MAP = {
     "content_hub": ("/content", ["Content Hub"]),
     "personalization_api": ("/personalize", ["Personalization"]),
     "sleep_tracking_api": ("/sleep-tracking", ["Sleep Tracking"]),
-    "nutrition_api": ("/nutrition-logging", ["Nutrition Logging"]),
     "health_goals_api": ("/health-goals", ["Health Goals"]),
     "health_summary": ("/summary", ["Health Summary"]),
     "ws_camera": ("/camera-ws", ["Camera WebSocket"]),
@@ -100,16 +100,12 @@ ROUTE_MAP = {
     "medication_api": ("/medication", ["Medication Reminders"]),
     "emergency_api": ("/emergency", ["Emergency SOS"]),
     "data_export_api": ("/data-export", ["Data Export"]),
-    "mental_health_api": ("/clinical", ["Clinical Assessments"]),
-    "community_api": ("/community-challenges", ["Community Challenges"]),
     "workout_api": ("/workout-engine", ["Workout Engine"]),
     "device_sync_api": ("/device-sync", ["Device Sync"]),
     "ai_coach_api": ("/ai-coach", ["AI Health Coach"]),
     "body_health_api": ("/body-health", ["Body Health"]),
     "wearable_realtime_api": ("/wearable-rt", ["Wearable Real-Time"]),
     "health_rewards_api": ("/rewards", ["Health Rewards"]),
-    "notifications_api": ("/push-notifications", ["Push Notifications"]),
-    "auth_api": ("/auth-v2", ["User Authentication"]),
     "admin_api": ("/admin", ["Admin Dashboard"]),
     "telemedicine_api": ("/telemedicine", ["Telemedicine"]),
     "forums_api": ("/forums", ["Community Forums"]),
@@ -119,9 +115,7 @@ ROUTE_MAP = {
     "family_api": ("/family", ["Family"]),
     "calendar_api": ("/health-calendar", ["Health Calendar"]),
     "health_risk_api": ("/risk", ["Health Risk"]),
-    "voice_api": ("/voice-assistant", ["Voice Assistant"]),
     "recipe_api": ("/recipes", ["AI Recipes"]),
-    "social_api": ("/social-share", ["Social Sharing"]),
     "habit_coach_api": ("/habits", ["AI Habit Coach"]),
     "symptom_checker_api": ("/symptoms", ["Symptom Checker"]),
     "corporate_api": ("/corporate", ["Corporate Health"]),
@@ -130,7 +124,6 @@ ROUTE_MAP = {
     "respiratory_api": ("/respiratory", ["Respiratory Training"]),
     "skin_health_api": ("/skin", ["Skin Health"]),
     "diabetes_api": ("/diabetes", ["Diabetes Management"]),
-    "meditation_api_v2": ("/meditation-v2", ["Mindfulness"]),
     "rehab_api": ("/rehab", ["Physical Therapy"]),
     "voice_biomarker_api": ("/voice-biomarker", ["Voice Biomarker"]),
     "longevity_api": ("/longevity", ["Longevity"]),
@@ -140,7 +133,6 @@ ROUTE_MAP = {
     "wound_care_api": ("/wound-care", ["Wound Care"]),
     "travel_health_api": ("/travel-health", ["Travel Health"]),
     "allergy_api": ("/allergies", ["Allergy Tracking"]),
-    "recovery_api": ("/recovery-v1", ["Recovery"]),
     "cognitive_api": ("/cognitive", ["Cognitive Training"]),
     "pregnancy_api": ("/pregnancy", ["Pregnancy Tracking"]),
     "chronic_pain_api": ("/chronic-pain", ["Chronic Pain"]),
@@ -220,7 +212,24 @@ ROUTE_MAP = {
 }
 
 # Prefixes to skip (these have special handling or are registered manually)
-SKIP_PREFIXES = {"/metrics"}  # metrics uses a different prefix pattern
+SKIP_PREFIXES = {"/metrics"}  # metrics is registered manually at root level in main.py
+
+
+def _strip_baked_prefix(router, baked_prefix: str) -> None:
+    """Remove a router's own APIRouter(prefix=...) from each route's path.
+
+    add_api_route bakes the router's prefix into route.path at decoration time,
+    before register_endpoints ever sees the router. When the declared prefix
+    (ROUTE_MAP) disagrees with that baked-in one, the baked one has to be
+    stripped and the match regex recompiled, or it would still show up in the
+    final path alongside the declared prefix.
+    """
+    for route in router.routes:
+        path = getattr(route, "path", None)
+        if path is None or not path.startswith(baked_prefix):
+            continue
+        route.path = path[len(baked_prefix):] or "/"
+        route.path_regex, route.path_format, route.param_convertors = compile_path(route.path)
 
 
 def register_endpoints(app: FastAPI, package_path: str = "app.api.v1.endpoints"):
@@ -251,18 +260,27 @@ def register_endpoints(app: FastAPI, package_path: str = "app.api.v1.endpoints")
             # Look up prefix and tags
             if module_name in ROUTE_MAP:
                 prefix, tags = ROUTE_MAP[module_name]
-                # Apply API_V1_STR prefix
-                full_prefix = f"{settings.API_V1_STR}{prefix}"
             else:
                 # Auto-generate from filename
-                prefix = module_name.replace("_api", "").replace("_", "-")
-                full_prefix = f"{settings.API_V1_STR}/{prefix}"
-                tags = [prefix.replace("-", " ").title()]
+                prefix = "/" + module_name.replace("_api", "").replace("_", "-")
+                tags = [prefix.strip("/").replace("-", " ").title()]
 
             # Skip manually-registered prefixes
             if prefix in SKIP_PREFIXES:
                 skipped += 1
                 continue
+
+            # Most modules declare their own APIRouter(prefix=...), which is
+            # already baked into every route path — adding it again here would
+            # double it. If a module's own prefix disagrees with the one
+            # declared above, the declared one wins and the baked-in one is
+            # stripped instead of being appended a second time.
+            router_prefix = getattr(router, "prefix", "") or ""
+            if router_prefix and router_prefix != prefix:
+                _strip_baked_prefix(router, router_prefix)
+                router_prefix = ""
+
+            full_prefix = settings.API_V1_STR if router_prefix else f"{settings.API_V1_STR}{prefix}"
 
             app.include_router(router, prefix=full_prefix, tags=tags)
             registered += 1

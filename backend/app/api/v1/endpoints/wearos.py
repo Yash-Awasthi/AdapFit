@@ -5,6 +5,9 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
+from app.core import health_validation
+from app.core.health_data import health_data_store
+
 router = APIRouter()
 
 
@@ -24,6 +27,7 @@ class SyncResponse(BaseModel):
     sync_id: str
     device_type: str
     records_ingested: int
+    records_rejected: int
     hrv_count: int
     sleep_count: int
     hr_count: int
@@ -43,45 +47,137 @@ sync_history: dict = {}  # user_id -> list of sync records
 device_registry: dict = {}  # user_id -> {device_id -> info}
 
 
+def _parse_ts(value) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _sleep_duration_hours(session: dict) -> Optional[float]:
+    start, end = session.get("start"), session.get("end")
+    if start and end:
+        try:
+            t0 = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
+            t1 = datetime.fromisoformat(str(end).replace("Z", "+00:00"))
+            hours = (t1 - t0).total_seconds() / 3600
+            if hours > 0:
+                return hours
+        except ValueError:
+            pass
+    minutes = sum(session.get(k) or 0 for k in ("deep_min", "rem_min", "light_min"))
+    return minutes / 60 if minutes else None
+
+
+def _ingest(
+    user_id: str, device_type: str, readings: List[dict],
+    value_key: str, physiological_type: str, storage_type: str,
+    timestamp_key: str = "timestamp",
+) -> tuple[int, int]:
+    """Validate each reading against its plausible physiological range, then
+    persist survivors with a computed (never client-supplied) confidence.
+    """
+    accepted = rejected = 0
+    for item in readings:
+        value = item.get(value_key)
+        if value is None:
+            rejected += 1
+            continue
+        ok, normalized, _reason = health_validation.validate(physiological_type, value)
+        if not ok:
+            rejected += 1
+            continue
+        confidence = health_validation.compute_confidence(physiological_type, normalized, source="device").value
+        result = health_data_store.add_record(
+            user_id=user_id, measurement_type=storage_type, value=normalized,
+            source="device", device=device_type, confidence=confidence,
+            timestamp=_parse_ts(item.get(timestamp_key)),
+        )
+        if result.get("error"):
+            rejected += 1
+        else:
+            accepted += 1
+    return accepted, rejected
+
+
+def _ingest_stress(user_id: str, device_type: str, readings: List[dict]) -> tuple[int, int]:
+    """Stress score has no physiological plausible-range table; only bound-check it."""
+    accepted = rejected = 0
+    for item in readings:
+        value = item.get("score_0_100")
+        if not isinstance(value, (int, float)) or not (0 <= value <= 100):
+            rejected += 1
+            continue
+        result = health_data_store.add_record(
+            user_id=user_id, measurement_type="stress_score", value=value,
+            source="device", device=device_type, confidence="medium",
+            timestamp=_parse_ts(item.get("timestamp")),
+        )
+        if result.get("error"):
+            rejected += 1
+        else:
+            accepted += 1
+    return accepted, rejected
+
+
 @router.post("/sync", response_model=SyncResponse)
 async def sync_wearable_data(batch: WearableDataBatch, user_id: str = Query("default")):
-    """Sync data from a wearable companion device."""
+    """Sync data from a wearable companion device, validating and persisting each reading."""
     now = datetime.now(timezone.utc)
     sync_id = str(uuid.uuid4())[:8]
+    device_type = batch.device_type
 
-    total_records = (
-        len(batch.hrv_readings) + len(batch.sleep_sessions) +
-        len(batch.heart_rate_readings) + len(batch.step_counts) +
-        len(batch.body_measurements) + len(batch.stress_readings)
-    )
+    hrv_ok, hrv_rej = _ingest(user_id, device_type, batch.hrv_readings, "value_ms", "hrv_rmssd", "hrv_rmssd")
+    hr_ok, hr_rej = _ingest(user_id, device_type, batch.heart_rate_readings, "bpm", "heart_rate", "heart_rate")
+    step_ok, step_rej = _ingest(user_id, device_type, batch.step_counts, "count", "steps", "steps")
+    weight_ok, weight_rej = _ingest(user_id, device_type, batch.body_measurements, "weight_kg", "weight_kg", "weight", timestamp_key="date")
+    stress_ok, stress_rej = _ingest_stress(user_id, device_type, batch.stress_readings)
+
+    sleep_items = []
+    sleep_rej = 0
+    for session in batch.sleep_sessions:
+        hours = _sleep_duration_hours(session)
+        if hours is None:
+            sleep_rej += 1
+            continue
+        sleep_items.append({"duration_hours": hours, "timestamp": session.get("start")})
+    sleep_ok, extra_sleep_rej = _ingest(user_id, device_type, sleep_items, "duration_hours", "sleep_duration_hours", "sleep_duration")
+    sleep_rej += extra_sleep_rej
+
+    total_accepted = hrv_ok + hr_ok + step_ok + weight_ok + stress_ok + sleep_ok
+    total_rejected = hrv_rej + hr_rej + step_rej + weight_rej + stress_rej + sleep_rej
 
     record = {
         "sync_id": sync_id,
-        "device_type": batch.device_type,
+        "device_type": device_type,
         "device_id": batch.device_id,
-        "records_ingested": total_records,
+        "records_ingested": total_accepted,
+        "records_rejected": total_rejected,
         "synced_at": now.isoformat(),
-        "hrv_count": len(batch.hrv_readings),
-        "sleep_count": len(batch.sleep_sessions),
-        "hr_count": len(batch.heart_rate_readings),
-        "step_count": len(batch.step_counts),
+        "hrv_count": hrv_ok,
+        "sleep_count": sleep_ok,
+        "hr_count": hr_ok,
+        "step_count": step_ok,
     }
     sync_history.setdefault(user_id, []).append(record)
 
-    # Register device
     if batch.device_id:
         device_registry.setdefault(user_id, {})[batch.device_id] = {
             "device_id": batch.device_id,
-            "device_type": batch.device_type,
+            "device_type": device_type,
             "last_sync": now.isoformat(),
-            "records_total": total_records,
+            "records_total": total_accepted,
         }
 
     return SyncResponse(
-        sync_id=sync_id, device_type=batch.device_type,
-        records_ingested=total_records,
-        hrv_count=record["hrv_count"], sleep_count=record["sleep_count"],
-        hr_count=record["hrv_count"], step_count=record["step_count"],
+        sync_id=sync_id, device_type=device_type,
+        records_ingested=total_accepted, records_rejected=total_rejected,
+        hrv_count=hrv_ok, sleep_count=sleep_ok,
+        hr_count=hr_ok, step_count=step_ok,
         synced_at=now.isoformat(),
     )
 
