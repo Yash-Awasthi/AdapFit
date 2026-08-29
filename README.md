@@ -12,6 +12,8 @@
 
 Not a dashboard of raw numbers. Every screen answers: *What should I do today, and why?*
 
+🌐 **[Landing Page](web/index.html)** · 📖 **[API Docs](http://localhost:8000/docs)**
+
 ---
 
 ## ✨ Highlights

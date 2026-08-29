@@ -162,7 +162,8 @@ async def ready():
         checks["storage"] = "error"
     try:
         from app.services.vector_store import vector_store
-        checks["vector_store"] = "ok" if vector_store._initialized else "not_initialized"
+        vs_status = vector_store.get_status()
+        checks["vector_store"] = "ok" if vs_status.get("initialized", False) else "not_initialized"
     except Exception:
         checks["vector_store"] = "error"
     is_ready = all(v in ("ok", "not_initialized") for v in checks.values())

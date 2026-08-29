@@ -30,6 +30,13 @@ HK_TYPE_MAP = {
     "HKQuantityTypeIdentifierFlightsClimbed": "flights_climbed",
     "HKCategoryTypeIdentifierSleepAnalysis": "sleep",
     "HKWorkoutTypeIdentifier": "workout",
+    "HKQuantityTypeIdentifierActiveEnergyBurned": "active_energy",
+    "HKQuantityTypeIdentifierBasalEnergyBurned": "basal_energy",
+    "HKQuantityTypeIdentifierDietaryEnergyConsumed": "dietary_energy",
+    "HKQuantityTypeIdentifierRespiratoryRate": "respiratory_rate",
+    "HKQuantityTypeIdentifierAppleExerciseTime": "exercise_time",
+    "HKQuantityTypeIdentifierAppleStandTime": "stand_time",
+    "HKQuantityTypeIdentifierVO2Max": "vo2_max",
 }
 
 # Unit conversions to ZFIT internal units
@@ -45,6 +52,8 @@ UNIT_CONVERSIONS = {
     "ft": lambda v: v * 0.0003048,           # feet → km
     "kJ": lambda v: v / 4.184,               # kJ → kcal
     "kcal": lambda v: v,
+    "breaths/min": lambda v: v,
+    "ml/kg*min": lambda v: v,
     "hr": lambda v: v,                       # hours
     "min": lambda v: v / 60,                 # minutes → hours
     "s": lambda v: v / 3600,                 # seconds → hours
@@ -220,8 +229,10 @@ def monthly_summaries(samples: list[ZFITSample]) -> dict:
 
         # For step_count and distance, report total
         # For heart_rate, report average
-        if stype in ("step_count", "flights_climbed"):
-            result[stype] = {"total": round(total), "days": len(set(s.start[:10] for s in type_samples))}
+        if stype in ("step_count", "flights_climbed", "exercise_time", "stand_time"):
+            result[stype] = {"total": round(total, 1), "days": len(set(s.start[:10] for s in type_samples))}
+        elif stype in ("active_energy", "basal_energy", "dietary_energy"):
+            result[stype] = {"total_kcal": round(total, 1), "days": len(set(s.start[:10] for s in type_samples))}
         elif stype == "distance":
             result[stype] = {"total_km": round(total, 2), "days": len(set(s.start[:10] for s in type_samples))}
         elif stype == "sleep":
@@ -272,7 +283,7 @@ def resting_hr_trend(samples: list[ZFITSample], days: int = 30) -> dict:
     denominator = sum((x - x_mean) ** 2 for x in x_vals)
     slope = numerator / denominator if denominator > 0 else 0
 
-    trend = "improving" if slope < -0.3 else "declining" if slope > 0.3 else "stable"
+    trend = "improving" if slope < -0.1 else "declining" if slope > 0.1 else "stable"
 
     return {
         "avg_resting_hr": round(statistics.mean(values), 1),
@@ -298,6 +309,13 @@ COMPATIBILITY_TABLE = {
     "flights_climbed":        {"ios": "8.0", "watchos": "2.0", "devices": ["iphone", "watch"]},
     "sleep":                  {"ios": "8.0", "watchos": "2.0", "devices": ["iphone", "watch"]},
     "workout":                {"ios": "8.0", "watchos": "2.0", "devices": ["iphone", "watch"]},
+    "active_energy":           {"ios": "8.0", "watchos": "2.0", "devices": ["watch"]},
+    "basal_energy":            {"ios": "8.0", "watchos": "2.0", "devices": ["watch"]},
+    "dietary_energy":          {"ios": "8.0", "watchos": "2.0", "devices": ["iphone", "watch"]},
+    "respiratory_rate":        {"ios": "14.0", "watchos": "7.0", "devices": ["watch"]},
+    "exercise_time":           {"ios": "8.0", "watchos": "2.0", "devices": ["watch"]},
+    "stand_time":              {"ios": "8.0", "watchos": "2.0", "devices": ["watch"]},
+    "vo2_max":                 {"ios": "14.0", "watchos": "7.0", "devices": ["watch"]},
 }
 
 
