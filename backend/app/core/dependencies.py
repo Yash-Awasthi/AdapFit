@@ -1,74 +1,117 @@
-"""Dependency injection layer following FastAPI best practices.
-
-Provides clean, testable access to services and storage.
 """
+FastAPI Dependencies — Authentication & Authorization
 
-from __future__ import annotations
-from typing import AsyncGenerator
-from fastapi import Depends, HTTPException
-from app.core.storage import storage
-from app.services.recovery_engine import RecoveryEngine
-from app.services.ml_engine import ml_engine
-from app.services.nlp_pipeline import nlp_pipeline
-from app.services.intent_classifier import intent_classifier
-from app.services.rag_knowledge import rag_retriever
-from app.services.auto_scaler import auto_scaler
-
-
-async def get_storage():
-    """Dependency: provide the storage engine."""
-    return storage
+Provides route-level dependencies for protecting endpoints:
+- get_current_user: Extract user from Authorization header (optional)
+- require_user: Require valid authentication
+- require_admin: Require admin role
+- require_owner_or_admin: Require resource owner or admin
+"""
+from typing import Optional
+from fastapi import Depends, Header, HTTPException, status
+from app.core.auth import decode_token, user_manager
 
 
-async def get_recovery_engine() -> RecoveryEngine:
-    """Dependency: provide the recovery engine."""
-    return RecoveryEngine()
+def _extract_bearer_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
+    """Extract JWT token from Authorization header."""
+    if not authorization:
+        return None
+    if not authorization.startswith("Bearer "):
+        return None
+    return authorization[7:]
 
 
-async def get_ml_engine():
-    """Dependency: provide the ML engine."""
-    return ml_engine
+def _decode_user_from_token(token: Optional[str]) -> Optional[dict]:
+    """Decode and validate JWT, return user dict or None."""
+    if not token:
+        return None
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "access":
+        return None
+    return user_manager.get_user(payload["sub"])
 
 
-async def get_nlp_pipeline():
-    """Dependency: provide the NLP pipeline."""
-    return nlp_pipeline
+async def get_current_user(
+    authorization: Optional[str] = Header(None),
+) -> Optional[dict]:
+    """
+    Dependency: Extract authenticated user from request.
+    Returns None if not authenticated (does NOT raise).
+    Use this when auth is optional (e.g. public endpoints with optional personalization).
+    """
+    token = _extract_bearer_token(authorization)
+    return _decode_user_from_token(token)
 
 
-async def get_intent_classifier():
-    """Dependency: provide the intent classifier."""
-    return intent_classifier
-
-
-async def get_rag_retriever():
-    """Dependency: provide the RAG knowledge retriever."""
-    return rag_retriever
-
-
-async def get_auto_scaler():
-    """Dependency: provide the auto-scaler engine."""
-    return auto_scaler
-
-
-async def require_user(user_id: str) -> str:
-    """Dependency: validate user_id exists, raise 404 if not."""
-    user = await storage.get_user(user_id)
+async def require_user(
+    authorization: Optional[str] = Header(None),
+) -> dict:
+    """
+    Dependency: Require valid authentication.
+    Raises 401 if not authenticated.
+    Use this as the default for any endpoint that needs a logged-in user.
+    """
+    token = _extract_bearer_token(authorization)
+    user = _decode_user_from_token(token)
     if not user:
-        raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-    return user_id
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
 
-async def get_user_with_recovery(user_id: str) -> dict:
-    """Dependency: fetch user and their latest recovery data together."""
-    user = await storage.get_user(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+async def require_admin(
+    authorization: Optional[str] = Header(None),
+) -> dict:
+    """
+    Dependency: Require admin or superadmin role.
+    Raises 401 if not authenticated, 403 if not admin.
+    """
+    user = await require_user(authorization)
+    if user.get("role") not in ("admin", "superadmin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user
 
-    recovery_logs = await storage.get_recovery_logs(user_id, 1)
-    latest_recovery = recovery_logs[-1] if recovery_logs else {}
 
-    return {
-        "user": user,
-        "recovery": latest_recovery,
-        "user_id": user_id,
-    }
+def require_owner_or_owner_id(user_id: str):
+    """
+    Factory: Returns a dependency that checks if the authenticated user
+    matches the given user_id or is an admin.
+
+    Usage:
+        @router.get("/items/{item_id}")
+        async def get_item(item_id: str, user: dict = Depends(require_owner_or_owner_id("me"))):
+            ...
+    """
+    async def _check(authorization: Optional[str] = Header(None)) -> dict:
+        user = await require_user(authorization)
+        if user["id"] == user_id or user.get("role") in ("admin", "superadmin"):
+            return user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: not resource owner",
+        )
+    return _check
+
+
+# Default dependency for most endpoints — extracts user_id from query or body
+async def get_user_id(
+    user_id: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
+) -> str:
+    """
+    Extract user_id from query parameter or authenticated token.
+    Falls back to 'default' for backward compatibility with unauthenticated endpoints.
+    """
+    if user_id:
+        return user_id
+    token = _extract_bearer_token(authorization)
+    user = _decode_user_from_token(token)
+    if user:
+        return user["id"]
+    return "default"

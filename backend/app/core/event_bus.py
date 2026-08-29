@@ -71,7 +71,7 @@ class EventBus:
         )
         errors = [r for r in results if isinstance(r, Exception)]
         if errors:
-            logger.error(f"Event {event_type} had {len(errors)} handler errors: {errors[0]}")
+            logger.exception(f"Event {event_type} had {len(errors)} handler errors")
 
     def emit_sync(self, event_type: str, payload: dict, user_id: str = "", source: str = "system"):
         """Fire an event synchronously (queues for async processing)."""
@@ -101,7 +101,7 @@ class EventBus:
         try:
             await handler(event)
         except Exception as e:
-            logger.error(f"Handler {handler.__name__} failed for {event.event_type}: {e}")
+            logger.exception(f"Handler {handler.__name__} failed for {event.event_type}")
 
     def get_history(self, event_type: str = "", limit: int = 50) -> list[dict]:
         events = self._history

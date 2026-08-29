@@ -148,8 +148,8 @@ async def analyze_form(req: FormCheckRequest):
 
     try:
         image_bytes = base64.b64decode(req.image_base64, validate=False)
-    except Exception:
-        raise HTTPException(status_code=400, detail="image_base64 is not valid base64")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="image_base64 is not valid base64") from e
 
     try:
         landmarks = _decode_landmarks(image_bytes)

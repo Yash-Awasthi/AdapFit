@@ -74,6 +74,39 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Recovery Engine V2
+  getRecoveryV2: (userId: string) =>
+    request<{
+      overall_score: number;
+      recovery_level: string;
+      domains: {
+        name: string;
+        score: number;
+        weight: number;
+        weighted_score: number;
+        status: string;
+        insight: string;
+        data_available: boolean;
+      }[];
+      cross_domain_insights: string[];
+      recommendations: {
+        priority: string;
+        category: string;
+        message: string;
+        rationale: string;
+      }[];
+      training_recommendation: string;
+      confidence: string;
+      data_completeness: number;
+      calculated_at: string;
+    }>(`/api/v1/recovery/v2/quick`),
+
+  calculateRecoveryV2: (data: Record<string, any>) =>
+    request<any>('/api/v1/recovery/v2/calculate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   // Workouts
   getWorkouts: (userId: string, days = 14) =>
     request<{ items: any[]; count: number }>(

@@ -46,7 +46,7 @@ class BackgroundTaskManager:
                     "elapsed_seconds": round(elapsed, 2),
                     "completed_at": datetime.now(timezone.utc).isoformat(),
                 })
-                logger.error(f"Background task {task_id} failed: {e}")
+                logger.exception(f"Background task {task_id} failed")
                 return None
             finally:
                 self._tasks.pop(task_id, None)

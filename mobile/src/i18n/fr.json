@@ -1,0 +1,16 @@
+{
+  "app": { "name": "AdapFit", "tagline": "Votre Plateforme de Sante avec IA" },
+  "tabs": { "home": "Accueil", "workout": "Entrainement", "health": "Sante", "coach": "Coach", "content": "Contenu", "trends": "Tendances", "menu": "Menu" },
+  "home": { "welcome": "Bienvenue", "healthScore": "Score de Sante", "todayActivity": "Activite du Jour", "recentWorkouts": "Entrainements Recents", "quickActions": "Actions Rapides" },
+  "health": { "bpm": "Frequence Cardiaque", "stress": "Niveau de Stress", "sleep": "Score de Sommeil", "steps": "Pas", "calories": "Calories", "water": "Hydratation", "weight": "Poids", "bp": "Pression Arterielle" },
+  "workout": { "start": "Commencer", "exercises": "Exercices", "plans": "Plans d'Entrainement", "history": "Historique", "personalRecords": "Records Personnels", "sets": "Series", "reps": "Repetitions", "weight": "Poids", "rest": "Repos" },
+  "nutrition": { "calories": "Calories", "protein": "Proteines", "carbs": "Glucides", "fat": "Lipides", "fiber": "Fibres", "meals": "Repas", "search": "Rechercher", "logMeal": "Enregistrer", "remaining": "restant" },
+  "sleep": { "score": "Score de Sommeil", "duration": "Duree", "quality": "Qualite", "deep": "Sommeil Profond", "rem": "Sommeil REM", "light": "Sommeil Legere", "debt": "Dette de Sommeil", "bedtime": "Heure de Coucher", "wakeUp": "Reveil" },
+  "mental": { "mood": "Humeur", "energy": "Energie", "anxiety": "Anxiete", "journal": "Journal", "assessments": "Evaluations", "phq9": "Depistage Depression", "gad7": "Depistage Anxiete" },
+  "coach": { "insight": "Apercu du Jour", "ask": "Poser une Question", "report": "Rapport Hebdomadaire", "recommendations": "Recommandations" },
+  "community": { "forums": "Forums", "challenges": "Defis", "leaderboard": "Classement", "posts": "Publications", "trending": "Tendances", "createPost": "Creer une Publication" },
+  "telemedicine": { "doctors": "Medecins", "appointments": "Rendez-vous", "history": "Historique", "book": "Reserver", "available": "Disponible Aujourd'hui", "specialty": "Specialite" },
+  "settings": { "notifications": "Notifications", "privacy": "Confidentialite", "language": "Langue", "theme": "Theme", "units": "Unites", "export": "Exporter", "about": "A Propos" },
+  "auth": { "login": "Se Connecter", "register": "Creer un Compte", "email": "Email", "password": "Mot de Passe", "forgotPassword": "Mot de passe oublie?", "noAccount": "Pas de compte?", "hasAccount": "Deja un compte?" },
+  "common": { "save": "Enregistrer", "cancel": "Annuler", "delete": "Supprimer", "edit": "Modifier", "loading": "Chargement...", "error": "Erreur", "retry": "Reessayer", "back": "Retour", "next": "Suivant", "done": "Termine", "search": "Rechercher", "filter": "Filtrer" }
+}

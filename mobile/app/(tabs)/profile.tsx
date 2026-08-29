@@ -1,201 +1,210 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Camera } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { SectionHeader, LoadingScreen, ScreenHeader } from '../../src/components';
-import { WorkoutHeatmap } from '../../src/components/WorkoutHeatmap';
-import PersonalBestsWall from '../../src/components/PersonalBestsWall';
-import { PhotoComparison } from '../../src/components/PhotoComparison';
-import { useTheme } from '../../src/services/theme';
-import { useUserStore } from '../../src/stores/userStore';
-import { API_BASE_URL } from '../../src/services/config';
+/**
+ * Profile Screen — Premium User Profile & Settings
+ * Glassmorphism cards, avatar, stats, settings shortcuts
+ */
+import React, { useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  Switch, Dimensions,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing, radius, glass } from '../../src/theme';
+import { GlassCard, SectionHeaderPremium, ScoreRing, StatCard } from '../../src/components/PremiumComponents';
 
-const API = API_BASE_URL;
-
-interface HealthData {
-  status: string;
-  version: string;
-  services: Record<string, any>;
-}
-
-interface ProgressPhoto {
-  photo_uri: string;
-  date: string;
-  weight_kg?: number;
-  body_fat_pct?: number;
-}
-
-function BodyMeasureRow({ label, apiPath, unit, userId, theme }: { label: string; apiPath: string; unit: string; userId: string; theme: any }) {
-  const [value, setValue] = useState<string | null>(null);
-  useEffect(() => {
-    fetch(`${API}/api/v1/body/measurements?user_id=${userId}&days=1`)
-      .then(r => r.ok ? r.json() : [])
-      .then(items => {
-        if (items.length > 0 && items[items.length - 1][apiPath] != null) {
-          setValue(`${items[items.length - 1][apiPath]}${unit}`);
-        }
-      })
-      .catch(() => {});
-  }, [userId]);
-  return (
-    <View style={styles.measureRow}>
-      <Text style={[styles.measureLabel, { color: theme.textSecondary }]}>{label}</Text>
-      <Text style={[styles.measureValue, { color: theme.text }]}>{value || '--'}</Text>
-    </View>
-  );
-}
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ProfileScreen() {
-  const { theme } = useTheme();
-  const userId = useUserStore((s) => s.userId);
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [workoutDates, setWorkoutDates] = useState<string[]>([]);
-  const [beforePhoto, setBeforePhoto] = useState<ProgressPhoto | null>(null);
-  const [afterPhoto, setAfterPhoto] = useState<ProgressPhoto | null>(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const router = useRouter();
+  const [darkMode, setDarkMode] = useState(true);
+  const [notifications, setNotifications] = useState(true);
 
-  useEffect(() => {
-    fetch(`${API}/health`)
-      .then(r => r.ok ? r.json() : null)
-      .then(setHealth)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const userStats = [
+    { value: '28', label: 'Age', icon: 'person', color: colors.primary },
+    { value: '72', label: 'Health Score', icon: 'heart', color: colors.health.heart },
+    { value: '5', label: 'Day Streak', icon: 'flame', color: colors.health.energy },
+    { value: '12', label: 'Workouts', icon: 'barbell', color: colors.health.activity },
+  ];
 
-  const loadPhotoCompare = () => {
-    fetch(`${API}/api/v1/progress-photos/compare?user_id=${userId}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        setBeforePhoto(d?.before || null);
-        setAfterPhoto(d?.after || null);
-      })
-      .catch(() => {});
-  };
-
-  useEffect(() => { loadPhotoCompare(); }, [userId]);
-
-  const capturePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Camera permission needed', 'Enable camera access to log a progress photo.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
-    if (result.canceled || !result.assets?.[0]?.uri) return;
-
-    setUploadingPhoto(true);
-    try {
-      const res = await fetch(`${API}/api/v1/progress-photos?user_id=${userId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photo_uri: result.assets[0].uri, angle: 'front' }),
-      });
-      if (res.ok) {
-        loadPhotoCompare();
-      } else {
-        const detail = await res.text().catch(() => '');
-        Alert.alert("Couldn't save photo", `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
-      }
-    } catch (err: any) {
-      Alert.alert("Couldn't save photo", err?.message || String(err));
-    }
-    setUploadingPhoto(false);
-  };
-
-  if (loading) return <LoadingScreen />;
+  const menuItems = [
+    { icon: 'person', label: 'Personal Info', color: colors.primary, route: '/personal-info' },
+    { icon: 'fitness', label: 'Health Goals', color: colors.health.calm, route: '/health-hub' },
+    { icon: 'notifications', label: 'Notifications', color: '#F59E0B', route: '/settings' },
+    { icon: 'shield-checkmark', label: 'Privacy & Security', color: colors.health.heart, route: '/settings' },
+    { icon: 'download', label: 'Export Health Data', color: colors.health.activity, route: '/data-export' },
+    { icon: 'phone-portrait', label: 'Connected Devices', color: colors.health.sleep, route: '/devices' },
+    { icon: 'accessibility', label: 'Accessibility', color: colors.health.mental, route: '/accessibility-settings' },
+    { icon: 'language', label: 'Language', color: '#06B6D4', route: '/settings' },
+    { icon: 'help-circle', label: 'Help & Support', color: colors.health.calm, route: '/settings' },
+    { icon: 'information-circle', label: 'About AdapFit', color: colors.text.muted, route: '/settings' },
+  ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Body & System" />
-
-      <ScrollView contentContainerStyle={styles.content}>
-        <SectionHeader title="Body Measurements" />
-        <View style={[styles.card, { backgroundColor: theme.surface }]}>
-          <BodyMeasureRow label="Weight" apiPath="weight_kg" unit="kg" userId={userId} theme={theme} />
-          <BodyMeasureRow label="Body Fat" apiPath="body_fat_pct" unit="%" userId={userId} theme={theme} />
-          <BodyMeasureRow label="Waist" apiPath="waist_cm" unit="cm" userId={userId} theme={theme} />
-          <BodyMeasureRow label="Muscle" apiPath="muscle_mass_kg" unit="kg" userId={userId} theme={theme} />
-        </View>
-
-        <SectionHeader title="Progress Photos" />
-        <View style={[styles.card, { backgroundColor: theme.surface }]}>
-          <PhotoComparison
-            beforeUri={beforePhoto?.photo_uri}
-            afterUri={afterPhoto?.photo_uri}
-            beforeDate={beforePhoto?.date}
-            afterDate={afterPhoto?.date}
-            beforeWeight={beforePhoto?.weight_kg}
-            afterWeight={afterPhoto?.weight_kg}
-            beforeBodyFat={beforePhoto?.body_fat_pct}
-            afterBodyFat={afterPhoto?.body_fat_pct}
-          />
-          <TouchableOpacity
-            style={[styles.photoButton, { backgroundColor: theme.primary }]}
-            onPress={capturePhoto}
-            disabled={uploadingPhoto}
-          >
-            {uploadingPhoto ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <>
-                <Camera size={16} color="#FFF" />
-                <Text style={styles.photoButtonText}>Add Photo</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <SectionHeader title="Personal Bests" />
-        <PersonalBestsWall userId={userId} />
-
-        <SectionHeader title="Workout History" />
-        <WorkoutHeatmap workoutDates={workoutDates} />
-
-        <SectionHeader title="System Status" />
-        <View style={[styles.card, { backgroundColor: theme.surface }]}>
-          <View style={styles.statusRow}>
-            <View style={styles.statusIndicator}>
-              <View style={[styles.dot, { backgroundColor: health?.status === 'healthy' ? theme.success : theme.danger }]} />
-              <Text style={[styles.statusText, { color: theme.textSecondary }]}>Backend v{health?.version || '--'}</Text>
-            </View>
-            <Text style={[styles.statusValue, { color: theme.textMuted }]}>{health?.status || 'unknown'}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+      {/* Header with Avatar */}
+      <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.header}>
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={32} color="#FFF" />
           </View>
-          {health?.services && Object.entries(health.services).map(([name, svc]: [string, any]) => (
-            <View key={name} style={styles.statusRow}>
-              <View style={styles.statusIndicator}>
-                <View style={[styles.dot, { backgroundColor: svc?.pytorch_available !== false || svc?.status !== 'unavailable' ? theme.success : theme.warning }]} />
-                <Text style={[styles.statusText, { color: theme.textSecondary }]}>{name.replace('_', ' ')}</Text>
-              </View>
-              <Text style={[styles.statusValue, { color: theme.textMuted }]}>
-                {svc?.model_trained ? 'trained' : svc?.status || 'active'}
-              </Text>
-            </View>
-          ))}
+          <View style={styles.onlineIndicator} />
         </View>
-      </ScrollView>
-    </View>
+        <Text style={styles.userName}>Alex Johnson</Text>
+        <Text style={styles.userEmail}>alex@adapfit.com</Text>
+        <Text style={styles.memberSince}>Member since Jan 2024</Text>
+      </LinearGradient>
+
+      {/* Health Score Card */}
+      <View style={styles.scoreSection}>
+        <GlassCard variant="light" style={styles.scoreCard}>
+          <View style={styles.scoreRow}>
+            <ScoreRing score={72} size={90} strokeWidth={6} color={colors.score.good} label="HEALTH" />
+            <View style={styles.scoreDetails}>
+              <Text style={styles.scoreTitle}>Health Score</Text>
+              <Text style={styles.scoreSubtitle}>Good — Keep improving!</Text>
+              <View style={styles.scoreBreakdown}>
+                <View style={styles.scoreItem}>
+                  <View style={[styles.scoreDot, { backgroundColor: colors.health.heart }]} />
+                  <Text style={styles.scoreItemText}>Heart: 85</Text>
+                </View>
+                <View style={styles.scoreItem}>
+                  <View style={[styles.scoreDot, { backgroundColor: colors.health.sleep }]} />
+                  <Text style={styles.scoreItemText}>Sleep: 78</Text>
+                </View>
+                <View style={styles.scoreItem}>
+                  <View style={[styles.scoreDot, { backgroundColor: colors.health.activity }]} />
+                  <Text style={styles.scoreItemText}>Activity: 72</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </GlassCard>
+      </View>
+
+      {/* Stats Grid */}
+      <View style={styles.statsGrid}>
+        {userStats.map((stat, i) => (
+          <StatCard key={i} value={stat.value} label={stat.label} icon={stat.icon} color={stat.color} />
+        ))}
+      </View>
+
+      {/* Settings Menu */}
+      <SectionHeaderPremium icon="settings" iconColor={colors.primary} title="Settings" />
+      <View style={styles.menuContainer}>
+        {menuItems.map((item, i) => (
+          <TouchableOpacity
+            key={i}
+            style={styles.menuItem}
+            onPress={() => router.push(item.route as any)}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: item.color + '15' }]}>
+              <Ionicons name={item.icon as any} size={18} color={item.color} />
+            </View>
+            <Text style={styles.menuLabel}>{item.label}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Quick Toggles */}
+      <SectionHeaderPremium icon="toggle-left" iconColor={colors.health.calm} title="Quick Settings" />
+      <GlassCard variant="light" style={styles.togglesCard}>
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleInfo}>
+            <Ionicons name="moon" size={18} color={colors.health.sleep} />
+            <Text style={styles.toggleLabel}>Dark Mode</Text>
+          </View>
+          <Switch
+            value={darkMode}
+            onValueChange={setDarkMode}
+            trackColor={{ false: colors.surface.divider, true: colors.primary + '60' }}
+            thumbColor={darkMode ? colors.primary : colors.text.muted}
+          />
+        </View>
+        <View style={styles.toggleDivider} />
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleInfo}>
+            <Ionicons name="notifications" size={18} color="#F59E0B" />
+            <Text style={styles.toggleLabel}>Push Notifications</Text>
+          </View>
+          <Switch
+            value={notifications}
+            onValueChange={setNotifications}
+            trackColor={{ false: colors.surface.divider, true: colors.primary + '60' }}
+            thumbColor={notifications ? colors.primary : colors.text.muted}
+          />
+        </View>
+      </GlassCard>
+
+      {/* Logout */}
+      <TouchableOpacity style={styles.logoutBtn}>
+        <Ionicons name="log-out" size={18} color={colors.health.danger} />
+        <Text style={styles.logoutText}>Sign Out</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.version}>AdapFit v2.0.0 • Built with 💜</Text>
+
+      <View style={{ height: 100 }} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 100 },
-  card: { borderRadius: 12, padding: 16, marginBottom: 16 },
-  measureRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
-  measureLabel: { fontSize: 14 },
-  measureValue: { fontSize: 14, fontWeight: '600' },
-  statusRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 8,
+  container: { flex: 1, backgroundColor: colors.bg.deep },
+  contentContainer: { paddingBottom: 100 },
+
+  // Header
+  header: { paddingTop: 56, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, alignItems: 'center' },
+  avatarContainer: { position: 'relative', marginBottom: spacing.md },
+  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  onlineIndicator: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: colors.health.calm, borderWidth: 2, borderColor: colors.primary },
+  userName: { fontSize: 22, fontWeight: '800', color: '#FFF' },
+  userEmail: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+  memberSince: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 },
+
+  // Score
+  scoreSection: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg },
+  scoreCard: {},
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
+  scoreDetails: { flex: 1 },
+  scoreTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary },
+  scoreSubtitle: { fontSize: 13, color: colors.text.muted, marginTop: 2 },
+  scoreBreakdown: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
+  scoreItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  scoreDot: { width: 6, height: 6, borderRadius: 3 },
+  scoreItemText: { fontSize: 11, color: colors.text.muted },
+
+  // Stats
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg },
+
+  // Menu
+  menuContainer: { paddingHorizontal: spacing.screenPadding },
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.bg.card, padding: spacing.lg,
+    borderRadius: radius.lg, marginBottom: spacing.sm,
+    borderWidth: 1, borderColor: colors.surface.border,
   },
-  statusIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: 13, textTransform: 'capitalize' },
-  statusValue: { fontSize: 12 },
-  photoButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    borderRadius: 8, paddingVertical: 10, marginTop: 4,
+  menuIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  menuLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text.primary },
+
+  // Toggles
+  togglesCard: { marginHorizontal: spacing.screenPadding },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm },
+  toggleInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  toggleLabel: { fontSize: 15, fontWeight: '500', color: colors.text.primary },
+  toggleDivider: { height: 1, backgroundColor: colors.surface.divider, marginVertical: spacing.sm },
+
+  // Logout
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    marginHorizontal: spacing.screenPadding, marginTop: spacing.xl,
+    backgroundColor: colors.health.dangerBg, padding: spacing.lg, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.health.danger + '30',
   },
-  photoButtonText: { fontSize: 13, fontWeight: '600', color: '#FFF' },
+  logoutText: { fontSize: 15, fontWeight: '600', color: colors.health.danger },
+
+  // Version
+  version: { fontSize: 12, color: colors.text.muted, textAlign: 'center', marginTop: spacing.xl },
 });

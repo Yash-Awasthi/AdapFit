@@ -125,7 +125,7 @@ def log_timing(logger: logging.Logger, operation: str):
                 return result
             except Exception as e:
                 elapsed = (time.perf_counter() - start) * 1000
-                logger.error(f"{operation} failed after {elapsed:.1f}ms: {e}")
+                logger.exception(f"{operation} failed after {elapsed:.1f}ms")
                 raise
 
         @wraps(func)
@@ -138,7 +138,7 @@ def log_timing(logger: logging.Logger, operation: str):
                 return result
             except Exception as e:
                 elapsed = (time.perf_counter() - start) * 1000
-                logger.error(f"{operation} failed after {elapsed:.1f}ms: {e}")
+                logger.exception(f"{operation} failed after {elapsed:.1f}ms")
                 raise
 
         import asyncio

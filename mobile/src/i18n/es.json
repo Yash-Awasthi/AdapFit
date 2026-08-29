@@ -1,0 +1,16 @@
+{
+  "app": { "name": "AdapFit", "tagline": "Tu Plataforma de Salud con IA" },
+  "tabs": { "home": "Inicio", "workout": "Entreno", "health": "Salud", "coach": "Coach", "content": "Contenido", "trends": "Tendencias", "menu": "Menu" },
+  "home": { "welcome": "Bienvenido", "healthScore": "Puntuacion de Salud", "todayActivity": "Actividad de Hoy", "recentWorkouts": "Entrenos Recientes", "quickActions": "Acciones Rapidas" },
+  "health": { "bpm": "Frecuencia Cardiaca", "stress": "Nivel de Estres", "sleep": "Puntuacion de Sueno", "steps": "Pasos", "calories": "Calorias", "water": "Hidratacion", "weight": "Peso", "bp": "Presion Arterial" },
+  "workout": { "start": "Iniciar Entreno", "exercises": "Ejercicios", "plans": "Planes de Entreno", "history": "Historial", "personalRecords": "Records Personales", "sets": "Series", "reps": "Repeticiones", "weight": "Peso", "rest": "Descanso" },
+  "nutrition": { "calories": "Calorias", "protein": "Proteina", "carbs": "Carbohidratos", "fat": "Grasa", "fiber": "Fibra", "meals": "Comidas", "search": "Buscar Comida", "logMeal": "Registrar Comida", "remaining": "restante" },
+  "sleep": { "score": "Puntuacion de Sueno", "duration": "Duracion", "quality": "Calidad", "deep": "Sueno Profundo", "rem": "Sueno REM", "light": "Sueno Ligero", "debt": "Deuda de Sueno", "bedtime": "Hora de Dormir", "wakeUp": "Despertar" },
+  "mental": { "mood": "Estado de Animio", "energy": "Energia", "anxiety": "Ansiedad", "journal": "Diario", "assessments": "Evaluaciones", "phq9": "Deteccion de Depresion", "gad7": "Deteccion de Ansiedad" },
+  "coach": { "insight": "Insight del Dia", "ask": "Hacer una Pregunta", "report": "Reporte Semanal", "recommendations": "Recomendaciones" },
+  "community": { "forums": "Foros", "challenges": "Desafios", "leaderboard": "Clasificacion", "posts": "Publicaciones", "trending": "Tendencias", "createPost": "Crear Publicacion" },
+  "telemedicine": { "doctors": "Doctores", "appointments": "Citas", "history": "Historial", "book": "Reservar Consulta", "available": "Disponible Hoy", "specialty": "Especialidad" },
+  "settings": { "notifications": "Notificaciones", "privacy": "Privacidad", "language": "Idioma", "theme": "Tema", "units": "Unidades", "export": "Exportar Datos", "about": "Acerca de" },
+  "auth": { "login": "Iniciar Sesion", "register": "Crear Cuenta", "email": "Correo", "password": "Contrasena", "forgotPassword": "Olvidaste tu contrasena?", "noAccount": "No tienes cuenta?", "hasAccount": "Ya tienes cuenta?" },
+  "common": { "save": "Guardar", "cancel": "Cancelar", "delete": "Eliminar", "edit": "Editar", "loading": "Cargando...", "error": "Error", "retry": "Reintentar", "back": "Atras", "next": "Siguiente", "done": "Listo", "search": "Buscar", "filter": "Filtrar" }
+}

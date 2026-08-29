@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 from fastapi import APIRouter, Query
-from app.services.meditation import get_sessions, get_session, recommend_session
+from app.services.meditation import meditation_service
 
 router = APIRouter()
 
 
 @router.get("")
 async def list_sessions(category: str = "", duration_max: int = 60, difficulty: str = ""):
-    return {"sessions": get_sessions(category, duration_max, difficulty)}
+    return {"sessions": meditation_service.get_sessions(category, difficulty, duration_max)}
 
 
 @router.get("/{session_id}")
 async def get_session_detail(session_id: str):
-    s = get_session(session_id)
+    s = meditation_service.get_session(session_id)
     if not s:
         return {"error": "Session not found"}
     return s
@@ -26,4 +26,5 @@ async def recommend(
     time_available: int = Query(10, ge=1, le=60),
     time_of_day: str = Query("anytime"),
 ):
-    return recommend_session(stress_level, time_available, time_of_day)
+    mood = "stressed" if stress_level > 7 else "anxious" if stress_level > 5 else "neutral"
+    return meditation_service.get_recommendations(mood)
