@@ -8,6 +8,8 @@ import {
 } from "lucide-react-native";
 import { useTheme } from "../../src/services/theme";
 import { API_BASE_URL } from "../../src/services/config";
+import { getJson, asArray } from "../../src/services/http";
+import { authHeader } from "../../src/services/authToken";
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync } from "expo-audio";
 import { File } from "expo-file-system";
 import { api } from "../../src/services/api";
@@ -79,18 +81,23 @@ export default function HealthScreen() {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    try {
-      const [prof, conds, meds, restricts] = await Promise.all([
-        fetch(`${API}/api/v1/health/profile-summary?user_id=${userId}`).then(r => r.json()),
-        fetch(`${API}/api/v1/health/conditions?user_id=${userId}`).then(r => r.json()),
-        fetch(`${API}/api/v1/health/medications?user_id=${userId}`).then(r => r.json()),
-        fetch(`${API}/api/v1/health/exercise-restrictions?user_id=${userId}`).then(r => r.json()),
-      ]);
-      setProfile(prof);
-      setConditions(conds.conditions || []);
-      setMedications(meds.medications || []);
-      setRestrictions(restricts);
-    } catch {}
+    const [prof, conds, meds, restricts] = await Promise.all([
+      getJson<ProfileSummary>(`/health/profile-summary?user_id=${userId}`),
+      getJson<{ conditions: Condition[] }>(`/health/conditions?user_id=${userId}`),
+      getJson<{ medications: Medication[] }>(`/health/medications?user_id=${userId}`),
+      getJson<Restrictions>(`/health/exercise-restrictions?user_id=${userId}`),
+    ]);
+    setProfile(prof);
+    setConditions(asArray<Condition>(conds?.conditions));
+    setMedications(asArray<Medication>(meds?.medications));
+    // Every list is normalised here so the render path can index it without
+    // a guard on each of the four groups.
+    setRestrictions({
+      avoid: asArray<string>(restricts?.avoid),
+      modify: restricts?.modify ?? {},
+      recommend: asArray<string>(restricts?.recommend),
+      warnings: asArray<string>(restricts?.warnings),
+    });
   };
 
   const toggleVoice = async () => {
@@ -128,7 +135,7 @@ export default function HealthScreen() {
     try {
       const res = await fetch(`${API}/api/v1/health/conditions?user_id=${userId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ condition_id: conditionId, severity: 5, is_active: true }),
       });
       if (res.ok) {
@@ -147,7 +154,7 @@ export default function HealthScreen() {
     try {
       const res = await fetch(`${API}/api/v1/health/medications?user_id=${userId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ name, dosage, frequency: "daily", category: "other", time_of_day: ["morning"] }),
       });
       if (res.ok) {

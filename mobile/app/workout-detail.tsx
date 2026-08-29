@@ -22,6 +22,7 @@ import { API_BASE_URL } from '../src/services/config';
 import { useUserStore } from '../src/stores';
 import { useTheme } from '../src/services/theme';
 import { ScreenHeader } from '../src/components';
+import { authHeader } from '../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -72,7 +73,7 @@ export default function WorkoutDetailScreen() {
   async function fetchWorkout() {
     try {
       // Fetch recent workouts and find the one by ID
-      const res = await fetch(`${API}/api/v1/workouts?user_id=${userId}&days=90`);
+      const res = await fetch(`${API}/api/v1/workouts?user_id=${userId}&days=90`, { headers: authHeader() });
       if (res.ok) {
         const data = await res.json();
         const workouts = data.items || [];

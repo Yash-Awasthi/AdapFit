@@ -7,6 +7,7 @@ import { LoadingScreen } from '../../src/components';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
+import { authHeader } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -48,8 +49,8 @@ export default function SleepScreen() {
     setLoading(true);
     try {
       const [aRes, lRes] = await Promise.all([
-        fetch(`${API}/api/v1/sleep/analysis?user_id=${userId}&days=7`),
-        fetch(`${API}/api/v1/sleep/logs?user_id=${userId}&days=7`),
+        fetch(`${API}/api/v1/sleep/analysis?user_id=${userId}&days=7`, { headers: authHeader() }),
+        fetch(`${API}/api/v1/sleep/logs?user_id=${userId}&days=7`, { headers: authHeader() }),
       ]);
       if (aRes.ok) setAnalysis(await aRes.json());
       if (lRes.ok) setLogs(await lRes.json());
@@ -68,7 +69,7 @@ export default function SleepScreen() {
     try {
       const res = await fetch(`${API}/api/v1/sleep/logs?user_id=${userId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({
           bedtime: fmtClock(bed),
           wake_time: fmtClock(wake),
@@ -95,7 +96,7 @@ export default function SleepScreen() {
   async function deleteLog(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const res = await fetch(`${API}/api/v1/sleep/logs/${id}?user_id=${userId}`, { method: 'DELETE' });
+      const res = await fetch(`${API}/api/v1/sleep/logs/${id}?user_id=${userId}`, { method: 'DELETE', headers: authHeader() });
       if (res.ok) {
         fetchData();
       } else {

@@ -10,6 +10,8 @@ Provides route-level dependencies for protecting endpoints:
 from typing import Optional
 from fastapi import Depends, Header, HTTPException, status
 from app.core.auth import decode_token, user_manager
+from app.core.config import settings
+from app.middleware.auth import auth_bypass_active
 
 
 def _extract_bearer_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
@@ -31,6 +33,26 @@ def _decode_user_from_token(token: Optional[str]) -> Optional[dict]:
     return user_manager.get_user(payload["sub"])
 
 
+def _dev_user() -> dict:
+    """
+    Stand-in for the authenticated user while the dev bypass is on.
+
+    Must carry the same keys as a real record, `id` above all: endpoints index
+    `user["id"]` directly and a differently shaped dict turns the bypass into
+    a KeyError instead of a 401.
+    """
+    existing = user_manager.get_user(settings.DEV_USER_ID)
+    if existing:
+        return existing
+    return {
+        "id": settings.DEV_USER_ID,
+        "sub": settings.DEV_USER_ID,
+        "user_id": settings.DEV_USER_ID,
+        "email": f"{settings.DEV_USER_ID}@localhost",
+        "auth": "bypass",
+    }
+
+
 async def get_current_user(
     authorization: Optional[str] = Header(None),
 ) -> Optional[dict]:
@@ -40,7 +62,10 @@ async def get_current_user(
     Use this when auth is optional (e.g. public endpoints with optional personalization).
     """
     token = _extract_bearer_token(authorization)
-    return _decode_user_from_token(token)
+    user = _decode_user_from_token(token)
+    if user is None and auth_bypass_active():
+        return _dev_user()
+    return user
 
 
 async def require_user(
@@ -53,6 +78,10 @@ async def require_user(
     """
     token = _extract_bearer_token(authorization)
     user = _decode_user_from_token(token)
+    # The middleware bypass does not reach route-level dependencies, so the
+    # flag has to be honoured here too for a guarded endpoint to open.
+    if not user and auth_bypass_active():
+        return _dev_user()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

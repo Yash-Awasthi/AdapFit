@@ -2,13 +2,16 @@
 
 import json
 import asyncio
+import logging
 import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.core.config import settings
+from app.core.gemini import DEFAULT_MODEL, extract_text, gemini_endpoint
 from app.services.rag_knowledge import rag_retriever
 from app.services.chat_actions import maybe_execute_action
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 async def _stream_gemini(prompt: str, history: list[dict], system: str = "") -> str:
@@ -22,14 +25,20 @@ async def _stream_gemini(prompt: str, history: list[dict], system: str = "") -> 
         contents.append({"role": role, "parts": [{"text": msg.get("content", "")}]})
     contents.append({"role": "user", "parts": [{"text": prompt}]})
 
+    key = settings.GOOGLE_AI_API_KEY
+    if not key:
+        return ""
+    url, headers = gemini_endpoint(key)
+
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GOOGLE_AI_API_KEY}",
+            url,
+            headers=headers,
             json={"contents": contents, "generationConfig": {"maxOutputTokens": 1024}},
         )
         if r.status_code == 200:
-            data = r.json()
-            return data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+            return extract_text(r.json()) or ""
+        logger.warning("Gemini stream failed: %s %s", r.status_code, r.text[:300])
     return ""
 
 
@@ -44,7 +53,7 @@ async def _stream_groq(prompt: str, history: list[dict]) -> str:
         r = await client.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
-            json={"model": "llama-3.3-70b-versatile", "messages": messages, "max_tokens": 1024},
+            json={"model": settings.GROQ_MODEL, "messages": messages, "max_tokens": 1024},
         )
         if r.status_code == 200:
             data = r.json()
@@ -118,7 +127,7 @@ async def chat_websocket(websocket: WebSocket, user_id: str):
             if settings.GOOGLE_AI_API_KEY:
                 try:
                     response = await _stream_gemini(grounded_prompt, history)
-                    model_used = "gemini-2.0-flash"
+                    model_used = DEFAULT_MODEL
                 except Exception:
                     pass
 

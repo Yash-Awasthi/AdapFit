@@ -16,11 +16,11 @@ import { StaggeredList } from '../../src/components/AnimationSystem';
 import { PillChip } from '../../src/components/PremiumComponents';
 
 const DOCTORS = [
-  { id: 1, name: 'Dr. Sarah Chen', specialty: 'Cardiologist', rating: 4.9, reviews: 128, available: true, nextSlot: '2:00 PM today', avatar: '👩‍⚕️', color: '#EF4444' },
-  { id: 2, name: 'Dr. Michael Park', specialty: 'Dermatologist', rating: 4.8, reviews: 95, available: true, nextSlot: '4:30 PM today', avatar: '👨‍⚕️', color: '#F59E0B' },
-  { id: 3, name: 'Dr. Emily Johnson', specialty: 'Psychiatrist', rating: 4.9, reviews: 210, available: false, nextSlot: 'Tomorrow 10:00 AM', avatar: '👩‍⚕️', color: '#8B5CF6' },
-  { id: 4, name: 'Dr. James Wilson', specialty: 'General Practice', rating: 4.7, reviews: 156, available: true, nextSlot: '1:00 PM today', avatar: '👨‍⚕️', color: '#22C55E' },
-  { id: 5, name: 'Dr. Lisa Anderson', specialty: 'Endocrinologist', rating: 4.8, reviews: 87, available: false, nextSlot: 'Wednesday 9:00 AM', avatar: '👩‍⚕️', color: '#06B6D4' },
+  { id: 1, name: 'Dr. Sarah Chen', specialty: 'Cardiologist', rating: 4.9, reviews: 128, available: true, nextSlot: '2:00 PM today', avatar: 'woman', color: '#EF4444' },
+  { id: 2, name: 'Dr. Michael Park', specialty: 'Dermatologist', rating: 4.8, reviews: 95, available: true, nextSlot: '4:30 PM today', avatar: 'man', color: '#F59E0B' },
+  { id: 3, name: 'Dr. Emily Johnson', specialty: 'Psychiatrist', rating: 4.9, reviews: 210, available: false, nextSlot: 'Tomorrow 10:00 AM', avatar: 'woman', color: '#8B5CF6' },
+  { id: 4, name: 'Dr. James Wilson', specialty: 'General Practice', rating: 4.7, reviews: 156, available: true, nextSlot: '1:00 PM today', avatar: 'man', color: '#22C55E' },
+  { id: 5, name: 'Dr. Lisa Anderson', specialty: 'Endocrinologist', rating: 4.8, reviews: 87, available: false, nextSlot: 'Wednesday 9:00 AM', avatar: 'woman', color: '#06B6D4' },
 ];
 
 const SPECIALTIES = ['All', 'Cardiology', 'Dermatology', 'Psychiatry', 'General', 'Endocrinology'];
@@ -66,7 +66,9 @@ export default function TelemedicineScreen() {
         {DOCTORS.filter(d => selectedSpecialty === 'All' || d.specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())).map(doctor => (
           <GlassCard key={doctor.id} variant="light" style={styles.doctorCard}>
             <View style={styles.doctorHeader}>
-              <Text style={styles.doctorAvatar}>{doctor.avatar}</Text>
+              <View style={[styles.doctorAvatar, { backgroundColor: doctor.color + '20' }]}>
+                <Ionicons name={doctor.avatar as any} size={22} color={doctor.color} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.doctorName}>{doctor.name}</Text>
                 <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
@@ -115,7 +117,7 @@ const styles = StyleSheet.create({
 
   doctorCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.md },
   doctorHeader: { flexDirection: 'row', gap: spacing.md },
-  doctorAvatar: { fontSize: 40 },
+  doctorAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   doctorName: { fontSize: 16, fontWeight: '700', color: colors.text.primary },
   doctorSpecialty: { fontSize: 13, color: colors.text.muted, marginTop: 2 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },

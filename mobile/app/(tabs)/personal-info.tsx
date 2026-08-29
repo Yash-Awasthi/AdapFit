@@ -10,7 +10,7 @@ import { api } from '../../src/services/api';
 import { useUserStore } from '../../src/stores';
 import { LoadingScreen, ScreenHeader } from '../../src/components';
 
-const GENDERS = ['female', 'male', 'other', 'prefer_not_to_say'];
+import { GENDER_OPTIONS } from '../../src/services/gender';
 const FITNESS_LEVELS = ['beginner', 'intermediate', 'advanced'];
 const GOALS = ['hypertrophy', 'strength', 'endurance', 'fat_loss', 'general_fitness'];
 
@@ -85,7 +85,9 @@ export default function PersonalInfoScreen() {
         preferred_days_per_week: Number(daysPerWeek) || 4,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
+      Alert.alert('Profile updated', 'Your details have been saved.', [
+        { text: 'Done', onPress: () => router.back() },
+      ]);
     } catch {
       Alert.alert('Save failed', 'Could not update your profile. Try again.');
     }
@@ -117,8 +119,8 @@ export default function PersonalInfoScreen() {
         <Animated.View entering={enter(90)}>
           <Field label="Gender" theme={theme}>
             <View style={styles.chipRow}>
-              {GENDERS.map((g) => (
-                <Chip key={g} label={g} active={gender === g} onPress={() => setGender(g)} theme={theme} />
+              {GENDER_OPTIONS.map(({ value, label }) => (
+                <Chip key={value} label={label} active={gender === value} onPress={() => setGender(value)} theme={theme} />
               ))}
             </View>
           </Field>

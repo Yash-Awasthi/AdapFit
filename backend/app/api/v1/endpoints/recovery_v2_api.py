@@ -96,18 +96,23 @@ async def quick_recovery(user: dict = Depends(require_user)):
 
     if logs:
         latest = logs[-1]
-        wd = latest.get("wearable_data", {})
-        if wd.get("hrv_rmssd"):
-            data.hrv_rmssd = wd["hrv_rmssd"]
-        if wd.get("resting_hr"):
-            data.resting_hr = wd["resting_hr"]
-        if wd.get("sleep_duration_hours"):
-            data.sleep_hours = wd["sleep_duration_hours"]
-        if latest.get("sleep_score"):
-            data.sleep_quality = latest["sleep_score"]
+        # Database rows are flat columns; the in-memory backend nests the same
+        # readings under wearable_data. Read either shape.
+        wd = latest.get("wearable_data") or {}
 
-    data.fatigue_level = latest.get("fatigue_level") if logs else None
-    data.mood_score = latest.get("mood_score") if logs else None
+        def reading(*names):
+            for name in names:
+                value = wd.get(name, latest.get(name))
+                if value is not None:
+                    return value
+            return None
+
+        data.hrv_rmssd = reading("hrv_rmssd")
+        data.resting_hr = reading("resting_hr", "resting_heart_rate")
+        data.sleep_hours = reading("sleep_duration_hours")
+        data.sleep_quality = reading("sleep_score")
+        data.fatigue_level = reading("fatigue_score", "fatigue_level")
+        data.mood_score = reading("mood_score")
 
     result = recovery_engine_v2.calculate_recovery(data)
     result_dict = recovery_engine_v2.result_to_dict(result)

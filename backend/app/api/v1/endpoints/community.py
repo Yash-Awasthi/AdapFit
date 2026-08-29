@@ -9,9 +9,12 @@ router = APIRouter()
 
 
 class WorkoutShareRequest(BaseModel):
-    workout_id: str
+    # Omitted for a plain discussion post, which shares the same feed,
+    # like, and comment machinery as a shared workout.
+    workout_id: Optional[str] = None
     title: str = Field(min_length=1, max_length=200)
     caption: str = Field(max_length=1000, default="")
+    category: str = Field(max_length=40, default="general")
     is_public: bool = True
 
 
@@ -23,7 +26,8 @@ class ShareResponse(BaseModel):
     id: str
     user_id: str
     user_name: str
-    workout_id: str
+    workout_id: Optional[str] = None
+    category: str = "general"
     title: str
     caption: str
     exercises_summary: str
@@ -71,6 +75,7 @@ async def get_community_feed(
             user_id=s["user_id"],
             user_name=s["user_name"],
             workout_id=s["workout_id"],
+            category=s.get("category", "general"),
             title=s["title"],
             caption=s["caption"],
             exercises_summary=s["exercises_summary"],
@@ -94,11 +99,13 @@ async def share_workout(request: WorkoutShareRequest, user_id: str = Query("defa
     except Exception:
         workouts = []
 
-    workout = next((w for w in workouts if w.get("workout_id") == request.workout_id), None)
-    if not workout:
-        raise HTTPException(status_code=404, detail="Workout not found")
+    workout = None
+    if request.workout_id:
+        workout = next((w for w in workouts if w.get("workout_id") == request.workout_id), None)
+        if not workout:
+            raise HTTPException(status_code=404, detail="Workout not found")
 
-    exercises = workout.get("exercises", [])
+    exercises = (workout or {}).get("exercises", [])
     ex_summary = ", ".join(e.get("name", "") for e in exercises[:3])
     if len(exercises) > 3:
         ex_summary += f" +{len(exercises) - 3} more"
@@ -109,11 +116,12 @@ async def share_workout(request: WorkoutShareRequest, user_id: str = Query("defa
         "user_id": user_id,
         "user_name": user_id,  # Would be real user name in production
         "workout_id": request.workout_id,
+        "category": request.category,
         "title": request.title,
         "caption": request.caption,
         "exercises_summary": ex_summary,
-        "duration_minutes": workout.get("target_duration_minutes", 0),
-        "readiness_state": workout.get("readiness_state", "unknown"),
+        "duration_minutes": (workout or {}).get("target_duration_minutes", 0),
+        "readiness_state": (workout or {}).get("readiness_state", "unknown"),
         "is_public": request.is_public,
         "shared_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -123,7 +131,8 @@ async def share_workout(request: WorkoutShareRequest, user_id: str = Query("defa
 
     return ShareResponse(
         id=sid, user_id=user_id, user_name=user_id,
-        workout_id=request.workout_id, title=request.title,
+        workout_id=request.workout_id, category=request.category,
+        title=request.title,
         caption=request.caption, exercises_summary=ex_summary,
         duration_minutes=share["duration_minutes"],
         readiness_state=share["readiness_state"],
@@ -203,7 +212,8 @@ async def my_shares(user_id: str = Query("default"), limit: int = Query(20, ge=1
     return [
         ShareResponse(
             id=s["id"], user_id=s["user_id"], user_name=s["user_name"],
-            workout_id=s["workout_id"], title=s["title"], caption=s["caption"],
+            workout_id=s["workout_id"], category=s.get("category", "general"),
+            title=s["title"], caption=s["caption"],
             exercises_summary=s["exercises_summary"],
             duration_minutes=s["duration_minutes"],
             readiness_state=s["readiness_state"],

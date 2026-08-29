@@ -3579,14 +3579,18 @@ def test_meditation_sessions():
     assert len(r1.json()["sessions"]) >= 5
 
     # Get detail
-    r2 = c.get("/api/v1/meditation/body_scan_10")
+    r2 = c.get("/api/v1/meditation/ms_002")
     assert r2.status_code == 200
-    assert len(r2.json()["steps"]) >= 5
+    assert "guide" in r2.json()
+    assert len(r2.json()["guide"]) > 0
 
     # Recommend
     r3 = c.get("/api/v1/meditation/recommend/quick?stress_level=8&time_available=10")
     assert r3.status_code == 200
-    assert "id" in r3.json()
+    recs = r3.json()
+    assert isinstance(recs, list)
+    assert len(recs) >= 1
+    assert "id" in recs[0]
 
     # Not found
     r4 = c.get("/api/v1/meditation/nonexistent")

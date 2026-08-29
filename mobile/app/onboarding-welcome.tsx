@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../src/services/config';
 import { useUserStore } from '../src/stores';
 import { useTheme } from '../src/services/theme';
+import { GENDER_OPTIONS } from '../src/services/gender';
 
 const API = API_BASE_URL;
 
@@ -20,7 +21,9 @@ const FEATURES = [
 export default function OnboardingScreen() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [gender, setGender] = useState('female');
+  // No default: an assumed gender silently unlocks cycle, fertility, and
+  // pregnancy features for every account that skips the question.
+  const [gender, setGender] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const setUser = useUserStore((s) => s.setUser);
@@ -30,6 +33,10 @@ export default function OnboardingScreen() {
   async function handleStart() {
     if (!email.trim()) {
       Alert.alert('Email required', 'Enter an email to continue.');
+      return;
+    }
+    if (!gender) {
+      Alert.alert('Gender required', 'Pick an option so we only show features that apply to you.');
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -72,7 +79,7 @@ export default function OnboardingScreen() {
       {/* Logo */}
       <View style={s.logoContainer}>
         <View style={s.logoIcon}>
-          <Text style={s.logoEmoji}>⚡</Text>
+          <Text style={s.logoEmoji}></Text>
         </View>
         <Text style={s.title}>AdapFit</Text>
         <Text style={s.subtitle}>AI-Powered Adaptive Fitness</Text>
@@ -114,14 +121,14 @@ export default function OnboardingScreen() {
         />
         <Text style={s.label}>Gender</Text>
         <View style={s.genderRow}>
-          {['female', 'male', 'other'].map((g) => (
+          {GENDER_OPTIONS.map(({ value: g, label }) => (
             <TouchableOpacity
               key={g}
               onPress={() => { Haptics.selectionAsync(); setGender(g); }}
               style={[s.genderChip, gender === g && s.genderChipActive]}
             >
-              <Text style={[s.genderChipText, gender === g && s.genderChipTextActive]}>
-                {g}
+              <Text style={[s.genderChipText, gender === g && s.genderChipTextActive]} numberOfLines={1}>
+                {label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -167,9 +174,11 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
       backgroundColor: theme.surface, borderRadius: 12, padding: 16,
       fontSize: 16, color: theme.text, marginBottom: 12,
     },
-    genderRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+    genderRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
     genderChip: {
-      flex: 1,
+      // Fixed padding rather than flex:1 so four options wrap onto two rows
+      // instead of squeezing four chips into one.
+      paddingHorizontal: 16,
       paddingVertical: 12,
       borderRadius: 12,
       backgroundColor: theme.surface,
@@ -178,7 +187,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
       alignItems: 'center',
     },
     genderChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
-    genderChipText: { fontSize: 14, color: theme.textSecondary, textTransform: 'capitalize' },
+    genderChipText: { fontSize: 14, color: theme.textSecondary },
     genderChipTextActive: { color: '#fff', fontWeight: '700' },
     footer: { fontSize: 12, color: '#475569', textAlign: 'center' },
   });

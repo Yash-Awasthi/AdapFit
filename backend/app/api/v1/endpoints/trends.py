@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from app.core.limiter import make_limiter
 from app.services.recovery_engine import RecoveryEngine
 from app.services.ml_engine import ml_engine
 from app.services.nlp_pipeline import nlp_pipeline
@@ -15,7 +14,7 @@ from app.core.background import task_manager
 from core_engine import is_rust_available
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
+limiter = make_limiter()
 
 @router.get("/acwr")
 async def get_acwr_status(user_id: str):

@@ -14,6 +14,7 @@ import {
   ScoreRing, GlassCard, SectionHeaderPremium, QuickAction, PillChip,
 } from '../../src/components/PremiumComponents';
 import { StaggeredList } from '../../src/components/AnimationSystem';
+import { SCREEN_HEADER_TOP } from '../../src/theme/layout';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -26,11 +27,11 @@ const CHALLENGES = [
 ];
 
 const LEADERBOARD = [
-  { rank: 1, name: 'Sarah M.', score: 9850, avatar: '👩', streak: 15 },
-  { rank: 2, name: 'You', score: 8720, avatar: '🧑', streak: 5, isUser: true },
-  { rank: 3, name: 'Mike R.', score: 8200, avatar: '👨', streak: 8 },
-  { rank: 4, name: 'Emma L.', score: 7800, avatar: '👩', streak: 12 },
-  { rank: 5, name: 'James K.', score: 7200, avatar: '🧑', streak: 3 },
+  { rank: 1, name: 'Sarah M.', score: 9850, avatar: 'woman', streak: 15 },
+  { rank: 2, name: 'You', score: 8720, avatar: 'person', streak: 5, isUser: true },
+  { rank: 3, name: 'Mike R.', score: 8200, avatar: 'man', streak: 8 },
+  { rank: 4, name: 'Emma L.', score: 7800, avatar: 'woman', streak: 12 },
+  { rank: 5, name: 'James K.', score: 7200, avatar: 'person', streak: 3 },
 ];
 
 export default function CommunityScreen() {
@@ -45,7 +46,7 @@ export default function CommunityScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <LinearGradient colors={['#EC4899', '#F472B6']} style={styles.header}>
-        <Text style={styles.headerTitle}>👥 Community</Text>
+        <Text style={styles.headerTitle}>Community</Text>
         <Text style={styles.headerSubtitle}>Connect, compete, and grow together</Text>
       </LinearGradient>
 
@@ -113,10 +114,13 @@ export default function CommunityScreen() {
                   <Text style={styles.rankNumber}>#{entry.rank}</Text>
                 )}
               </View>
-              <Text style={styles.leaderboardAvatar}>{entry.avatar}</Text>
+              <Ionicons name={entry.avatar as any} size={28} color={colors.text.secondary} style={styles.leaderboardAvatar} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.leaderboardName, entry.isUser && { color: colors.primary }]}>{entry.name}</Text>
-                <Text style={styles.leaderboardStreak}>🔥 {entry.streak} day streak</Text>
+                <View style={styles.leaderboardStreakRow}>
+                  <Ionicons name="flame" size={12} color="#F97316" />
+                  <Text style={styles.leaderboardStreak}>{entry.streak} day streak</Text>
+                </View>
               </View>
               <Text style={[styles.leaderboardScore, { color: colors.primary }]}>{entry.score.toLocaleString()}</Text>
             </GlassCard>
@@ -128,13 +132,13 @@ export default function CommunityScreen() {
         <View style={styles.feedContainer}>
           <GlassCard variant="light" style={styles.feedCard}>
             <View style={styles.feedHeader}>
-              <Text style={styles.feedAvatar}>👩</Text>
+              <Text style={styles.feedAvatar}></Text>
               <View>
                 <Text style={styles.feedName}>Sarah M.</Text>
                 <Text style={styles.feedTime}>2 hours ago</Text>
               </View>
             </View>
-            <Text style={styles.feedText}>Just completed my 10K steps challenge! 🎉 15-day streak! Who's joining me tomorrow?</Text>
+            <Text style={styles.feedText}>Just completed my 10K steps challenge! <Ionicons name="trophy" size={14} color="#F59E0B" /> 15-day streak! Who's joining me tomorrow?</Text>
             <View style={styles.feedActions}>
               <TouchableOpacity style={styles.feedAction}>
                 <Ionicons name="heart-outline" size={18} color={colors.text.muted} />
@@ -160,7 +164,7 @@ export default function CommunityScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
   contentContainer: { paddingBottom: 100 },
-  header: { paddingTop: 56, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  header: { paddingTop: SCREEN_HEADER_TOP, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
   headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
 
@@ -194,9 +198,10 @@ const styles = StyleSheet.create({
   rankBadge: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   rankBadgeText: { fontSize: 12, fontWeight: '800', color: '#FFF' },
   rankNumber: { fontSize: 14, fontWeight: '700', color: colors.text.muted, textAlign: 'center' },
-  leaderboardAvatar: { fontSize: 28 },
+  leaderboardAvatar: {},
   leaderboardName: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
-  leaderboardStreak: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  leaderboardStreakRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  leaderboardStreak: { fontSize: 11, color: colors.text.muted },
   leaderboardScore: { fontSize: 16, fontWeight: '800' },
 
   // Feed

@@ -15,11 +15,11 @@ import { GlassCard, SectionHeaderPremium, ScoreRing, ProgressBarPremium } from '
 import { InteractiveBarChart } from '../../src/components/InteractiveCharts';
 
 const CHRONOTYPES = [
-  { type: 'Lion', emoji: '🦁', description: 'Early riser, peak energy morning', color: '#F59E0B', bestTime: '5:30 AM - 9:00 PM' },
-  { type: 'Bear', emoji: '🐻', description: 'Follows solar cycle, most common', color: '#22C55E', bestTime: '7:00 AM - 11:00 PM' },
-  { type: 'Wolf', emoji: '🐺', description: 'Night owl, peak energy evening', color: '#8B5CF6', bestTime: '12:00 PM - 12:00 AM' },
-  { type: 'Dolphin', emoji: '🐬', description: 'Light sleeper, irregular patterns', color: '#3B82F6', bestTime: '6:00 AM - 10:00 PM' },
-];
+  { type: 'Lion', icon: 'sunny', description: 'Early riser, peak energy morning', color: '#F59E0B', bestTime: '5:30 AM - 9:00 PM' },
+  { type: 'Bear', icon: 'partly-sunny', description: 'Follows solar cycle, most common', color: '#22C55E', bestTime: '7:00 AM - 11:00 PM' },
+  { type: 'Wolf', icon: 'moon', description: 'Night owl, peak energy evening', color: '#8B5CF6', bestTime: '12:00 PM - 12:00 AM' },
+  { type: 'Dolphin', icon: 'water', description: 'Light sleeper, irregular patterns', color: '#3B82F6', bestTime: '6:00 AM - 10:00 PM' },
+] as const;
 
 const ENERGY_DATA = [
   { value: 85, label: '6AM', color: '#22C55E' },
@@ -50,7 +50,7 @@ export default function CircadianScreen() {
             style={[styles.chronotypeCard, selectedChronotype === i && { borderColor: ct.color + '80', backgroundColor: ct.color + '10' }]}
             onPress={() => setSelectedChronotype(i)}
           >
-            <Text style={styles.chronotypeEmoji}>{ct.emoji}</Text>
+            <Ionicons name={ct.icon} size={28} color={ct.color} style={styles.chronotypeIcon} />
             <Text style={[styles.chronotypeType, selectedChronotype === i && { color: ct.color }]}>{ct.type}</Text>
             <Text style={styles.chronotypeDesc} numberOfLines={2}>{ct.description}</Text>
           </TouchableOpacity>
@@ -61,7 +61,7 @@ export default function CircadianScreen() {
       <SectionHeaderPremium icon="trending-up" iconColor="#22C55E" title="Energy Curve" />
       <GlassCard variant="light" style={styles.sectionCard}>
         <InteractiveBarChart data={ENERGY_DATA} height={160} showValues />
-        <Text style={styles.energyInsight}>💡 Your peak focus hours are 9-11 AM. Schedule deep work here.</Text>
+        <Text style={styles.energyInsight}>Your peak focus hours are 9-11 AM. Schedule deep work here.</Text>
       </GlassCard>
 
       {/* Light Exposure */}
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   // Chronotype
   chronotypeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, paddingHorizontal: spacing.screenPadding, marginBottom: spacing.lg },
   chronotypeCard: { width: (SCREEN_WIDTH - spacing.screenPadding * 2 - spacing.md) / 2, backgroundColor: colors.bg.card, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.surface.border, alignItems: 'center' },
-  chronotypeEmoji: { fontSize: 32, marginBottom: spacing.xs },
+  chronotypeIcon: { marginBottom: spacing.xs },
   chronotypeType: { fontSize: 16, fontWeight: '700', color: colors.text.primary },
   chronotypeDesc: { fontSize: 11, color: colors.text.muted, textAlign: 'center', marginTop: 4 },
 

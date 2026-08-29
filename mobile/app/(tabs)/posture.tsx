@@ -61,7 +61,10 @@ export default function PostureScreen() {
               </View>
               <Text style={[styles.areaScore, { color: area.color }]}>{area.score}%</Text>
             </View>
-            <Text style={styles.areaTip}>💡 {area.tip}</Text>
+            <View style={styles.areaTipRow}>
+              <Ionicons name="bulb-outline" size={14} color={colors.text.muted} />
+              <Text style={styles.areaTip}>{area.tip}</Text>
+            </View>
           </GlassCard>
         ))}
       </StaggeredList>
@@ -111,7 +114,8 @@ const styles = StyleSheet.create({
   areaIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   areaName: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginBottom: 4 },
   areaScore: { fontSize: 16, fontWeight: '800' },
-  areaTip: { fontSize: 12, color: colors.text.muted, marginTop: spacing.sm, lineHeight: 16 },
+  areaTipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.sm },
+  areaTip: { fontSize: 12, color: colors.text.muted, lineHeight: 16, flex: 1 },
 
   // Exercises
   exerciseCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm },

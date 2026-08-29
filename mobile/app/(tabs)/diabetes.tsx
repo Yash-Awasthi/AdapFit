@@ -16,16 +16,18 @@ export default function DiabetesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>💉 Diabetes Manager</Text>
+        <Text style={styles.headerTitle}>Diabetes Manager</Text>
         <Text style={styles.headerSubtitle}>Track glucose, insulin & carbs</Text>
       </View>
 
       <View style={styles.tabBar}>
         {(['glucose', 'insulin', 'carbs', 'trends'] as const).map(tab => (
           <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.activeTab]} onPress={() => setActiveTab(tab)}>
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-              {tab === 'glucose' ? '🩸' : tab === 'insulin' ? '💉' : tab === 'carbs' ? '🍞' : '📈'}
-            </Text>
+            <Ionicons
+              name={tab === 'glucose' ? 'water' : tab === 'insulin' ? 'medkit-outline' : tab === 'carbs' ? 'nutrition-outline' : 'trending-up'}
+              size={20}
+              color={activeTab === tab ? '#FFF' : '#94A3B8'}
+            />
           </TouchableOpacity>
         ))}
       </View>
@@ -130,7 +132,7 @@ export default function DiabetesScreen() {
               <View style={styles.trendBar}>
                 <View style={[styles.trendFill, { width: '64%', backgroundColor: '#10B981' }]} />
               </View>
-              <Text style={styles.trendStatus}>✅ Within target range (70-180)</Text>
+              <Text style={styles.trendStatus}>Within target range (70-180)</Text>
             </View>
             <View style={styles.trendCard}>
               <Text style={styles.trendTitle}>Time in Range: 72%</Text>
@@ -144,7 +146,7 @@ export default function DiabetesScreen() {
               <View style={styles.trendBar}>
                 <View style={[styles.trendFill, { width: '68%', backgroundColor: '#F59E0B' }]} />
               </View>
-              <Text style={styles.trendStatus}>⚠️ Slightly above target (under 7%)</Text>
+              <Text style={styles.trendStatus}>Slightly above target (under 7%)</Text>
             </View>
           </>
         )}

@@ -11,6 +11,7 @@ from app.models.schemas import (
     WarmupCooldownItem
 )
 from app.services.exercise_service import exercise_service
+from app.core.gemini import gemini_endpoint
 
 class RecommendationEngine:
     """
@@ -90,7 +91,7 @@ class RecommendationEngine:
         """
         Calls Google Gemini 2.0 Flash / 1.5 Flash API via REST with Structured JSON mode.
         """
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+        url = gemini_endpoint(settings.GEMINI_API_KEY)[0]
         
         system_instruction = (
             "You are AdapFit's Biometric Exercise Physiologist. Generate an adaptive workout routine "

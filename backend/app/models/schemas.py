@@ -2,6 +2,8 @@ from typing import List, Optional, Dict, Any, Generic, TypeVar
 from enum import Enum
 from pydantic import BaseModel, Field
 
+from app.core.health_validation import PHYSIOLOGICAL_RANGES
+
 T = TypeVar('T')
 
 class FitnessLevel(str, Enum):
@@ -83,18 +85,20 @@ class UserBaseline(BaseModel):
 
 # --- Telemetry & Ingestion ---
 class WearableBiometrics(BaseModel):
-    sleep_duration_hours: Optional[float] = None
-    sleep_efficiency_pct: Optional[float] = None
-    hrv_rmssd: Optional[float] = None
-    resting_heart_rate: Optional[int] = None
-    steps: Optional[int] = None
-    active_calories: Optional[float] = None
+    sleep_duration_hours: Optional[float] = Field(None, ge=PHYSIOLOGICAL_RANGES["sleep_duration_hours"][0], le=PHYSIOLOGICAL_RANGES["sleep_duration_hours"][1])
+    sleep_efficiency_pct: Optional[float] = Field(None, ge=PHYSIOLOGICAL_RANGES["sleep_efficiency_pct"][0], le=PHYSIOLOGICAL_RANGES["sleep_efficiency_pct"][1])
+    hrv_rmssd: Optional[float] = Field(None, ge=PHYSIOLOGICAL_RANGES["hrv_rmssd"][0], le=PHYSIOLOGICAL_RANGES["hrv_rmssd"][1])
+    resting_heart_rate: Optional[int] = Field(None, ge=PHYSIOLOGICAL_RANGES["resting_heart_rate"][0], le=PHYSIOLOGICAL_RANGES["resting_heart_rate"][1])
+    steps: Optional[int] = Field(None, ge=PHYSIOLOGICAL_RANGES["steps"][0], le=PHYSIOLOGICAL_RANGES["steps"][1])
+    active_calories: Optional[float] = Field(None, ge=PHYSIOLOGICAL_RANGES["active_calories"][0], le=PHYSIOLOGICAL_RANGES["active_calories"][1])
 
 class SubjectiveCheckin(BaseModel):
     soreness: int = Field(ge=1, le=10, description="1 (extremely sore) to 10 (fresh)")
     fatigue: int = Field(ge=1, le=10, description="1 (exhausted) to 10 (energized)")
     stress: int = Field(ge=1, le=10, description="1 (relaxed) to 10 (extreme stress)")
     sore_muscle_groups: List[str] = []
+    pain_flagged: bool = False
+    illness_flagged: bool = False
 
 class RecoveryCalculationRequest(BaseModel):
     user_id: str = Field(..., examples=["user-123"])

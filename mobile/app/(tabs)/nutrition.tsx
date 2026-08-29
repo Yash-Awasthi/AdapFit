@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, ScrollView,
+  View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
-import { Utensils, Plus, Trash2, Sparkles, ChefHat } from 'lucide-react-native';
+import { Utensils, Plus, Trash2, Sparkles, ChefHat, Camera } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { LoadingScreen } from '../../src/components';
 import { api } from '../../src/services/api';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
+import { authHeader } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -43,6 +45,8 @@ const QUICK_MEALS = [
   { name: 'Chicken Breast', cal: 200, pro: 35, carb: 0, fat: 4 },
   { name: 'Banana', cal: 105, pro: 1, carb: 27, fat: 0 },
 ];
+const CARBS_TARGET = 300;
+const FAT_TARGET = 70;
 
 export default function NutritionScreen() {
   const { theme } = useTheme();
@@ -61,6 +65,8 @@ export default function NutritionScreen() {
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
   const [mealType, setMealType] = useState('lunch');
+  const [filterType, setFilterType] = useState<string | null>(null);
+  const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
 
   useEffect(() => { fetchData(); fetchCurrentPlan(); }, []);
 
@@ -68,8 +74,8 @@ export default function NutritionScreen() {
     setLoading(true);
     try {
       const [mealsRes, sumRes] = await Promise.all([
-        fetch(`${API}/api/v1/nutrition/meals?user_id=${userId}`),
-        fetch(`${API}/api/v1/nutrition/daily?user_id=${userId}`),
+        fetch(`${API}/api/v1/nutrition/meals?user_id=${userId}`, { headers: authHeader() }),
+        fetch(`${API}/api/v1/nutrition/daily?user_id=${userId}`, { headers: authHeader() }),
       ]);
       if (mealsRes.ok) setMeals(await mealsRes.json());
       if (sumRes.ok) setSummary(await sumRes.json());
@@ -110,7 +116,7 @@ export default function NutritionScreen() {
     try {
       const res = await fetch(`${API}/api/v1/nutrition/meals?user_id=${userId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify(payload),
       });
       if (res.ok) {
@@ -129,7 +135,7 @@ export default function NutritionScreen() {
   async function deleteMeal(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const res = await fetch(`${API}/api/v1/nutrition/meals/${id}?user_id=${userId}`, { method: 'DELETE' });
+      const res = await fetch(`${API}/api/v1/nutrition/meals/${id}?user_id=${userId}`, { method: 'DELETE', headers: authHeader() });
       if (res.ok) {
         fetchData();
       } else {
@@ -141,20 +147,50 @@ export default function NutritionScreen() {
     }
   }
 
-  function MacroBar({ label, current, target, color }: { label: string; current: number; target: number; color: string }) {
+  async function photoLog() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Camera permission needed', 'Enable camera access to log a meal from a photo.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5 });
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+
+    setAnalyzingPhoto(true);
+    try {
+      const res = await api.photoLogMeal(result.assets[0].base64, mealType, userId);
+      if (res.foods.length === 0) {
+        Alert.alert("Couldn't identify the meal", res.suggestions[0] || 'Try a clearer photo, or log it manually.');
+      } else {
+        Alert.alert('Meal logged', res.foods.map((f) => f.name).join(', '));
+      }
+      fetchData();
+    } catch {
+      Alert.alert("Couldn't analyze photo", 'Check your connection and try again.');
+    }
+    setAnalyzingPhoto(false);
+  }
+
+  function MacroCard({ label, current, target, color }: { label: string; current: number; target: number; color: string }) {
     const pct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
     return (
-      <View style={s.macroCol}>
-        <Text style={s.macroLabel}>{label}</Text>
+      <View style={s.macroCard}>
+        <Text style={[s.macroCardValue, { color }]}>{Math.round(current)}g</Text>
+        <Text style={s.macroCardLabel}>{label}</Text>
         <View style={s.macroBarBg}>
           <View style={[s.macroBarFill, { width: `${pct}%`, backgroundColor: color }]} />
         </View>
-        <Text style={s.macroValue}>{Math.round(current)}g</Text>
+        <Text style={s.macroCardTarget}>{target}g target</Text>
       </View>
     );
   }
 
   if (loading) return <LoadingScreen />;
+
+  const caloriePct = summary && summary.calorie_target > 0
+    ? Math.min(100, Math.round((summary.total_calories / summary.calorie_target) * 100))
+    : 0;
+  const visibleMeals = filterType ? meals.filter((m) => m.meal_type === filterType) : meals;
 
   return (
     <View style={s.container}>
@@ -162,15 +198,20 @@ export default function NutritionScreen() {
       <Text style={s.subtitle}>Track your fuel</Text>
 
       {summary && (
-        <View style={s.summaryCard}>
-          <Text style={s.calBig}>{summary.total_calories}</Text>
-          <Text style={s.calLabel}>/ {summary.calorie_target} kcal</Text>
-          <View style={s.macroRow}>
-            <MacroBar label="Protein" current={summary.total_protein} target={summary.protein_target} color={theme.success} />
-            <MacroBar label="Carbs" current={summary.total_carbs} target={300} color={theme.primaryLight} />
-            <MacroBar label="Fat" current={summary.total_fat} target={70} color={theme.warning} />
+        <View style={s.ringContainer}>
+          <View style={[s.ring, { borderColor: caloriePct >= 100 ? theme.danger : theme.primary }]}>
+            <Text style={s.ringNum}>{summary.total_calories}</Text>
+            <Text style={s.ringLabel}>of {summary.calorie_target} kcal</Text>
           </View>
           <Text style={s.remaining}>{summary.remaining_calories} kcal remaining</Text>
+        </View>
+      )}
+
+      {summary && (
+        <View style={s.macroRow}>
+          <MacroCard label="Protein" current={summary.total_protein} target={summary.protein_target} color={theme.success} />
+          <MacroCard label="Carbs" current={summary.total_carbs} target={CARBS_TARGET} color={theme.primaryLight} />
+          <MacroCard label="Fat" current={summary.total_fat} target={FAT_TARGET} color={theme.warning} />
         </View>
       )}
 
@@ -218,10 +259,15 @@ export default function NutritionScreen() {
         ))}
       </View>
 
-      <TouchableOpacity style={s.addBtn} onPress={() => setShowForm(!showForm)}>
-        <Plus size={16} color="#fff" />
-        <Text style={s.addBtnText}>Log Meal</Text>
-      </TouchableOpacity>
+      <View style={s.actionRow}>
+        <TouchableOpacity style={[s.addBtn, { flex: 1 }]} onPress={() => setShowForm(!showForm)}>
+          <Plus size={16} color="#fff" />
+          <Text style={s.addBtnText}>Log Meal</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.cameraBtn} onPress={photoLog} disabled={analyzingPhoto}>
+          {analyzingPhoto ? <ActivityIndicator size="small" color="#fff" /> : <Camera size={18} color="#fff" />}
+        </TouchableOpacity>
+      </View>
 
       {showForm && (
         <View style={s.form}>
@@ -255,8 +301,26 @@ export default function NutritionScreen() {
         </View>
       )}
 
+      <View style={s.filterRow}>
+        <TouchableOpacity
+          style={[s.filterTab, filterType === null && s.filterTabActive]}
+          onPress={() => setFilterType(null)}
+        >
+          <Text style={[s.filterText, filterType === null && s.filterTextActive]}>All</Text>
+        </TouchableOpacity>
+        {MEAL_TYPES.map((t) => (
+          <TouchableOpacity
+            key={t}
+            style={[s.filterTab, filterType === t && s.filterTabActive]}
+            onPress={() => setFilterType(filterType === t ? null : t)}
+          >
+            <Text style={[s.filterText, filterType === t && s.filterTextActive]}>{t}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <FlatList
-        data={meals}
+        data={visibleMeals}
         keyExtractor={(i) => i.id}
         contentContainerStyle={s.list}
         renderItem={({ item }) => (
@@ -285,18 +349,23 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     container: { flex: 1, backgroundColor: theme.background, padding: 20 },
     title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 48 },
     subtitle: { fontSize: 14, color: theme.textMuted, marginBottom: 16 },
-    summaryCard: {
-      backgroundColor: theme.surface, borderRadius: 16, padding: 20, alignItems: 'center', marginBottom: 12,
+    ringContainer: { alignItems: 'center', marginBottom: 16 },
+    ring: {
+      width: 140, height: 140, borderRadius: 70, borderWidth: 6,
+      alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface,
     },
-    calBig: { fontSize: 48, fontWeight: '800', color: theme.text },
-    calLabel: { fontSize: 14, color: theme.textMuted, marginBottom: 12 },
-    macroRow: { flexDirection: 'row', gap: 16, width: '100%', marginBottom: 8 },
-    macroCol: { flex: 1 },
-    macroLabel: { fontSize: 11, color: theme.textSecondary, marginBottom: 4 },
-    macroBarBg: { height: 6, backgroundColor: theme.surfaceHover, borderRadius: 3, marginBottom: 2 },
-    macroBarFill: { height: 6, borderRadius: 3 },
-    macroValue: { fontSize: 11, color: '#CBD5E1' },
-    remaining: { fontSize: 12, color: theme.success, fontWeight: '500' },
+    ringNum: { fontSize: 30, fontWeight: '800', color: theme.text },
+    ringLabel: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
+    remaining: { fontSize: 12, color: theme.success, fontWeight: '500', marginTop: 8 },
+    macroRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+    macroCard: {
+      flex: 1, backgroundColor: theme.surface, borderRadius: 12, padding: 10, alignItems: 'center',
+    },
+    macroCardValue: { fontSize: 16, fontWeight: '800' },
+    macroCardLabel: { fontSize: 11, color: theme.textSecondary, marginTop: 2, marginBottom: 6 },
+    macroCardTarget: { fontSize: 9, color: theme.textMuted, marginTop: 4 },
+    macroBarBg: { height: 5, width: '100%', backgroundColor: theme.surfaceHover, borderRadius: 3 },
+    macroBarFill: { height: 5, borderRadius: 3 },
     aiPlanBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -329,11 +398,16 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
       paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: theme.success,
     },
     quickText: { fontSize: 12, color: theme.success, fontWeight: '500' },
+    actionRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
     addBtn: {
-      flexDirection: 'row', alignItems: 'center', gap: 8,
-      backgroundColor: theme.primary, borderRadius: 12, padding: 12, marginBottom: 12,
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      backgroundColor: theme.primary, borderRadius: 12, padding: 12,
     },
     addBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+    cameraBtn: {
+      width: 46, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: '#10B981', borderRadius: 12,
+    },
     form: { backgroundColor: theme.surface, borderRadius: 12, padding: 16, marginBottom: 12 },
     input: {
       backgroundColor: theme.background, borderRadius: 8, padding: 12,
@@ -349,6 +423,14 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     typeTextActive: { color: theme.text, fontWeight: '600' },
     submitBtn: { backgroundColor: theme.success, borderRadius: 8, padding: 12, alignItems: 'center' },
     submitBtnText: { color: theme.background, fontSize: 14, fontWeight: '600' },
+    filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+    filterTab: {
+      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+      backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
+    },
+    filterTabActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+    filterText: { fontSize: 12, color: theme.textMuted, textTransform: 'capitalize' },
+    filterTextActive: { color: '#fff', fontWeight: '600' },
     list: { paddingBottom: 40 },
     mealCard: {
       flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surface,

@@ -5,12 +5,25 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "AdapFit API"
     VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
-    
+
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+
+    # Skips JWT validation and injects a fixed development user. The auth
+    # middleware ignores this whenever ENVIRONMENT is "production".
+    AUTH_DISABLED: bool = os.getenv("AUTH_DISABLED", "").lower() in {"1", "true", "yes"}
+    DEV_USER_ID: str = os.getenv("DEV_USER_ID", "default")
+
     # AI / LLM Configuration
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GOOGLE_AI_API_KEY: str = os.getenv("GOOGLE_AI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    # Groq retires model ids without notice; a retired id answers 404.
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     
+    # Postgres (asyncpg pool; empty keeps the in-memory fallback active)
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    DB_POOL_MAX_SIZE: int = int(os.getenv("DB_POOL_MAX_SIZE", "4"))
+
     # Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
@@ -26,12 +39,20 @@ class Settings(BaseSettings):
     
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 100
+    RATE_LIMITING_ENABLED: bool = os.getenv("RATE_LIMITING_ENABLED", "").lower() not in {"0", "false", "no"}
     
     # ML Engine
     ML_MIN_TRAINING_SAMPLES: int = 14
     
+    # Read by app.core.auth at import time; declared here so a .env carrying it
+    # does not fail validation.
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
+
     class Config:
         case_sensitive = True
         env_file = ".env"
+        # .env.example ships keys no setting declares. Rejecting unknown keys
+        # turns copying it into a boot failure.
+        extra = "ignore"
 
 settings = Settings()

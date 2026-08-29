@@ -6,7 +6,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Activi
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets, getScoreColor } from '../../src/theme';
 
-const API = 'http://localhost:8000/api/v1';
+import { API_V1 as API } from '../../src/services/config';
 const api = async (p: string, o?: RequestInit) => { try { const r = await fetch(`${API}${p}`, { headers: { 'Content-Type': 'application/json' }, ...o }); return r.ok ? await r.json() : null; } catch { return null; } };
 
 const PRIORITY_COLORS: Record<string, string> = { high: colors.health.danger, medium: colors.health.energy, low: colors.health.calm };
@@ -48,7 +48,7 @@ export default function CoachScreen() {
   return (
     <ScrollView style={co.container}>
       <View style={co.header}>
-        <Text style={typography.heading.h1}>🤖 AI Coach</Text>
+        <Text style={typography.heading.h1}>AI Coach</Text>
         <Text style={typography.body.sm}>Your personalized health advisor</Text>
       </View>
 
@@ -109,7 +109,7 @@ export default function CoachScreen() {
           <View style={[presets.card, { marginHorizontal: spacing.lg, minHeight: 300 }]}>
             {chatMessages.length === 0 && (
               <View style={{ alignItems: 'center', paddingVertical: spacing['3xl'] }}>
-                <Text style={{ fontSize: 48 }}>🤖</Text>
+                <Text style={{ fontSize: 48 }}></Text>
                 <Text style={[typography.body.md, { marginTop: spacing.md, textAlign: 'center' }]}>Ask me anything about health, fitness, nutrition, or recovery!</Text>
               </View>
             )}
@@ -130,7 +130,7 @@ export default function CoachScreen() {
       {/* Report View */}
       {activeView === 'report' && report && (
         <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
-          <Text style={[typography.heading.h4, { marginBottom: spacing.xs }]}>📊 Weekly Report</Text>
+          <Text style={[typography.heading.h4, { marginBottom: spacing.xs }]}>Weekly Report</Text>
           <Text style={[typography.body.xs, { color: colors.text.muted, marginBottom: spacing.md }]}>{report.period}</Text>
           <View style={[co.scoreCircle, { borderColor: getScoreColor(report.health_score) + '30' }]}>
             <Text style={[typography.metric.large, { color: getScoreColor(report.health_score) }]}>{report.health_score}</Text>

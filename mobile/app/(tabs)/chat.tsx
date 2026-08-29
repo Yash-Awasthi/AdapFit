@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Send, Bot, User, Mic, Wrench } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarHeight } from '../../src/theme/layout';
 import * as Haptics from 'expo-haptics';
 import { api } from '../../src/services/api';
 import { useTheme } from '../../src/services/theme';
@@ -105,7 +107,9 @@ export default function ChatScreen() {
   const { theme } = useTheme();
   const { llmOverride } = useDevSettings();
   const router = useRouter();
-  const styles = makeStyles(theme);
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useTabBarHeight();
+  const styles = makeStyles(theme, tabBarHeight, insets.top);
   const { sendStreaming } = useStreamChat();
 
   const [messages, setMessages] = useState<Message[]>([
@@ -194,8 +198,7 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {llmOverride && (
         <View style={styles.devBanner}>
@@ -263,15 +266,15 @@ export default function ChatScreen() {
   );
 }
 
-function makeStyles(theme: any) {
+function makeStyles(theme: any, tabBarHeight: number, topInset: number) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
     devBanner: {
       flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center',
-      paddingVertical: 6, paddingTop: 50, backgroundColor: theme.surface,
+      paddingVertical: 6, paddingTop: topInset + 6, backgroundColor: theme.surface,
     },
     devBannerText: { fontSize: 11, color: theme.warning, fontWeight: '600' },
-    list: { padding: 16, paddingBottom: 8, paddingTop: 50 },
+    list: { padding: 16, paddingBottom: 8, paddingTop: topInset + 12 },
     bubble: { maxWidth: '85%', borderRadius: 16, padding: 12, marginBottom: 12 },
     userBubble: { alignSelf: 'flex-end', backgroundColor: theme.primary, borderBottomRightRadius: 4 },
     assistantBubble: { alignSelf: 'flex-start', backgroundColor: theme.surface, borderBottomLeftRadius: 4 },
@@ -280,15 +283,19 @@ function makeStyles(theme: any) {
     bubbleText: { fontSize: 15, lineHeight: 22 },
     userText: { color: '#fff' },
     assistantText: { color: theme.text },
-    quickPrompts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, marginBottom: 12 },
+    quickPrompts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
     quickButton: {
       backgroundColor: theme.surface, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
       borderWidth: 1, borderColor: theme.border,
     },
     quickText: { fontSize: 13, color: theme.primaryLight, fontWeight: '500' },
     inputBar: {
-      flexDirection: 'row', alignItems: 'flex-end', padding: 12, paddingBottom: 24, gap: 8,
+      flexDirection: 'row', alignItems: 'flex-end', padding: 12, gap: 8,
+      // The tab bar is absolutely positioned, so the row has to reserve its
+      // height or the bar covers the input and eats the taps.
+      marginBottom: tabBarHeight,
       borderTopWidth: 1, borderTopColor: theme.border,
+      backgroundColor: theme.background,
     },
     input: {
       flex: 1, backgroundColor: theme.surface, borderRadius: 20, paddingHorizontal: 16,

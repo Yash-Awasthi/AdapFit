@@ -6,15 +6,18 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets, glass } from '../../src/theme';
 
-const API = 'http://localhost:8000/api/v1';
-
+import { API_V1 as API } from '../../src/services/config';
 function MemberCard({ member, onPress }: { member: any; onPress: () => void }) {
   const relationshipColors: Record<string, string> = { parent: colors.health.heart, child: colors.health.sleep, spouse: '#EC4899', sibling: colors.health.energy, self: colors.primary };
   const color = relationshipColors[member.relationship] || colors.primary;
   return (
     <TouchableOpacity style={[ns.memberCard, { borderLeftColor: color }]} onPress={onPress}>
       <View style={[ns.memberAvatar, { backgroundColor: color + '20' }]}>
-        <Text style={{ fontSize: 20 }}>{member.relationship === 'parent' ? '👴' : member.relationship === 'child' ? '👶' : member.relationship === 'spouse' ? '💑' : '👤'}</Text>
+        <Ionicons
+          name={member.relationship === 'parent' ? 'person' : member.relationship === 'child' ? 'happy-outline' : member.relationship === 'spouse' ? 'heart' : 'person-outline'}
+          size={20}
+          color={color}
+        />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[typography.label.lg as any, { color: colors.text.primary }]}>{member.name}</Text>

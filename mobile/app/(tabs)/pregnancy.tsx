@@ -8,16 +8,18 @@ export default function PregnancyScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🤰 Pregnancy Tracker</Text>
+        <Text style={styles.headerTitle}>Pregnancy Tracker</Text>
         <Text style={styles.headerSubtitle}>Week 24 — Third trimester approaching</Text>
       </View>
 
       <View style={styles.tabBar}>
         {(['baby', 'kick', 'appointments', 'tips'] as const).map(tab => (
           <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.activeTab]} onPress={() => setActiveTab(tab)}>
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-              {tab === 'baby' ? '👶' : tab === 'kick' ? '🦶' : tab === 'appointments' ? '📅' : '💡'}
-            </Text>
+            <Ionicons
+              name={tab === 'baby' ? 'happy-outline' : tab === 'kick' ? 'footsteps-outline' : tab === 'appointments' ? 'calendar-outline' : 'bulb-outline'}
+              size={20}
+              color={activeTab === tab ? '#FFF' : '#94A3B8'}
+            />
           </TouchableOpacity>
         ))}
       </View>
@@ -26,7 +28,7 @@ export default function PregnancyScreen() {
         {activeTab === 'baby' && (
           <>
             <View style={styles.babyHero}>
-              <Text style={styles.babySize}>🌽</Text>
+              <Text style={styles.babySize}></Text>
               <Text style={styles.babySizeText}>Baby is the size of an ear of corn</Text>
               <Text style={styles.babyWeight}>~600g / 1.3 lbs</Text>
             </View>
@@ -52,10 +54,10 @@ export default function PregnancyScreen() {
             <View style={styles.kickHero}>
               <Text style={styles.kickCount}>12</Text>
               <Text style={styles.kickLabel}>Kicks counted today</Text>
-              <Text style={styles.kickStatus}>✅ Normal (target: 10 in 2 hours)</Text>
+              <Text style={styles.kickStatus}>Normal (target: 10 in 2 hours)</Text>
             </View>
             <TouchableOpacity style={styles.kickBtn}>
-              <Text style={styles.kickBtnText}>🦶 Start Kick Counting</Text>
+              <Text style={styles.kickBtnText}>Start Kick Counting</Text>
             </TouchableOpacity>
             <Text style={styles.sectionTitle}>Recent Sessions</Text>
             {[
@@ -101,7 +103,7 @@ export default function PregnancyScreen() {
                 <Text style={styles.tipText}>{tip}</Text>
               </View>
             ))}
-            <Text style={styles.sectionTitle}>⚠️ Warning Signs</Text>
+            <Text style={styles.sectionTitle}>Warning Signs</Text>
             {['Severe abdominal pain', 'Heavy vaginal bleeding', 'Fluid leaking', 'Sudden severe swelling', 'Decreased fetal movement'].map((w, i) => (
               <View key={i} style={styles.warningCard}>
                 <Ionicons name="warning" size={16} color="#EF4444" />

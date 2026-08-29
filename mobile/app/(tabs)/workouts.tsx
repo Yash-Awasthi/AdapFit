@@ -6,7 +6,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, A
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets, getScoreColor } from '../../src/theme';
 
-const API = 'http://localhost:8000/api/v1';
+import { API_V1 as API } from '../../src/services/config';
 const api = async (p: string, o?: RequestInit) => { try { const r = await fetch(`${API}${p}`, { headers: { 'Content-Type': 'application/json' }, ...o }); return r.ok ? await r.json() : null; } catch { return null; } };
 
 const MUSCLE_GROUPS = ['All', 'chest', 'back', 'shoulders', 'quads', 'hamstrings', 'glutes', 'core', 'biceps', 'triceps'];
@@ -42,19 +42,19 @@ export default function WorkoutsScreen() {
 
   const startWorkout = async () => {
     const r = await api('/workout-engine/session/start', { method: 'POST', body: '{}' });
-    if (r?.session_id) { setActiveSession(r); Alert.alert('Workout Started! 💪', `Session: ${r.session_id}\nTime: ${r.start_time}`); }
+    if (r?.session_id) { setActiveSession(r); Alert.alert('Workout Started!', `Session: ${r.session_id}\nTime: ${r.start_time}`); }
   };
 
   const completeWorkout = async () => {
     if (!activeSession) return;
     const r = await api(`/workout-engine/session/complete/${activeSession.session_id}`, { method: 'POST' });
-    if (r?.completed) { Alert.alert('Workout Complete! 🎉', `Duration: ${r.duration_min}min\nVolume: ${r.total_volume}kg\nCalories: ${r.total_calories}`); setActiveSession(null); load(); }
+    if (r?.completed) { Alert.alert('Workout Complete!', `Duration: ${r.duration_min}min\nVolume: ${r.total_volume}kg\nCalories: ${r.total_calories}`); setActiveSession(null); load(); }
   };
 
   return (
     <ScrollView style={ws.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
       <View style={ws.header}>
-        <Text style={typography.heading.h1}>🏋️ Workouts</Text>
+        <Text style={typography.heading.h1}>Workouts</Text>
         <Text style={typography.body.sm}>Exercise library, plans & tracking</Text>
       </View>
 
@@ -111,9 +111,18 @@ export default function WorkoutsScreen() {
           <Text style={typography.heading.h4}>{p.name}</Text>
           <Text style={typography.body.sm}>{p.description}</Text>
           <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm }}>
-            <Text style={typography.body.xs}>⏱ {p.duration}min</Text>
-            <Text style={typography.body.xs}>🎯 {p.goal}</Text>
-            <Text style={typography.body.xs}>📊 {p.exercises} exercises</Text>
+            <View style={ws.planMetaItem}>
+              <Ionicons name="time-outline" size={12} color={colors.text.muted} />
+              <Text style={typography.body.xs}>{p.duration}min</Text>
+            </View>
+            <View style={ws.planMetaItem}>
+              <Ionicons name="flag-outline" size={12} color={colors.text.muted} />
+              <Text style={typography.body.xs}>{p.goal}</Text>
+            </View>
+            <View style={ws.planMetaItem}>
+              <Ionicons name="stats-chart-outline" size={12} color={colors.text.muted} />
+              <Text style={typography.body.xs}>{p.exercises} exercises</Text>
+            </View>
           </View>
         </View>
       ))}
@@ -132,7 +141,7 @@ export default function WorkoutsScreen() {
           </View>
           {Object.keys(prs).length > 0 && (
             <>
-              <Text style={[typography.heading.h4, { marginTop: spacing.lg, marginBottom: spacing.sm }]}>🏆 Personal Records</Text>
+              <Text style={[typography.heading.h4, { marginTop: spacing.lg, marginBottom: spacing.sm }]}>Personal Records</Text>
               {Object.entries(prs).map(([ex, data]: [string, any]) => (
                 <View key={ex} style={ws.prRow}>
                   <Text style={typography.label.lg}>{ex}</Text>
@@ -165,6 +174,7 @@ const ws = StyleSheet.create({
   exerciseCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, marginHorizontal: spacing.lg, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.surface.border },
   diffBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.badge },
   planCard: { backgroundColor: colors.bg.card, marginHorizontal: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.surface.border },
+  planMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   statItem: { width: '48%', backgroundColor: colors.bg.input, padding: spacing.lg, borderRadius: radius.md, alignItems: 'center', borderWidth: 1, borderColor: colors.surface.border },
   prRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.surface.divider },

@@ -11,30 +11,32 @@ export const colors = {
   primaryDark: '#4F46E5',
   primaryMuted: '#6366F120',
 
-  // Background layers
+  // Background layers. Desaturated slate rather than near-black blue, which
+  // pushes saturated accents into a visible halo over a long session.
   bg: {
-    deep: '#0A0E1A',         // Deepest background
-    primary: '#0F1629',       // Main screen bg
-    card: '#1A2238',          // Card surfaces
-    elevated: '#1E293B',      // Elevated cards
-    input: '#0F172A',         // Input fields
+    deep: '#0C111C',         // Deepest background
+    primary: '#111827',       // Main screen bg
+    card: '#182031',          // Card surfaces
+    elevated: '#1E2739',      // Elevated cards
+    input: '#141B2A',         // Input fields
     overlay: '#00000080',     // Modal overlay
   },
 
   // Surface & borders
   surface: {
-    card: '#1A2238',
-    border: '#253352',
-    divider: '#1E293B',
+    card: '#182031',
+    border: '#2A3550',
+    divider: '#232D42',
   },
 
-  // Text hierarchy
+  // Text hierarchy. Every value clears WCAG AA (4.5:1) against bg.deep at
+  // body sizes, which constrains how far `muted` can be darkened.
   text: {
     primary: '#F1F5F9',       // Main headings
     secondary: '#CBD5E1',     // Body text
-    muted: '#64748B',         // Captions, labels
+    muted: '#9AA8BF',         // Captions, labels
     inverse: '#0F172A',       // On light backgrounds
-    link: '#818CF8',          // Links
+    link: '#A5B4FC',          // Links
   },
 
   // Semantic colors — Health & Activity
@@ -128,14 +130,14 @@ export const typography = {
   },
   body: {
     lg: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24, color: '#CBD5E1' },
-    md: { fontSize: 14, fontWeight: '400' as const, lineHeight: 20, color: '#CBD5E1' },
-    sm: { fontSize: 12, fontWeight: '400' as const, lineHeight: 16, color: '#94A3B8' },
-    xs: { fontSize: 10, fontWeight: '400' as const, lineHeight: 14, color: '#64748B' },
+    md: { fontSize: 14, fontWeight: '400' as const, lineHeight: 21, color: '#CBD5E1' },
+    sm: { fontSize: 12, fontWeight: '400' as const, lineHeight: 18, color: '#B3BFD2' },
+    xs: { fontSize: 11, fontWeight: '400' as const, lineHeight: 16, color: '#9AA8BF' },
   },
   label: {
     lg: { fontSize: 14, fontWeight: '600' as const, color: '#CBD5E1' },
-    md: { fontSize: 12, fontWeight: '600' as const, color: '#94A3B8' },
-    sm: { fontSize: 10, fontWeight: '600' as const, color: '#64748B' },
+    md: { fontSize: 12, fontWeight: '600' as const, color: '#B3BFD2' },
+    sm: { fontSize: 11, fontWeight: '600' as const, color: '#9AA8BF' },
     tag: { fontSize: 10, fontWeight: '700' as const, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
   },
   metric: {

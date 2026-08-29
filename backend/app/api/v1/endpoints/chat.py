@@ -4,14 +4,15 @@ Context-aware fitness coaching with intent classification, RAG knowledge,
 structured prompt templates, and multi-turn conversation memory.
 """
 import json
+import logging
 import httpx
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from app.core.limiter import make_limiter
 
 from app.core.config import settings
+from app.core.gemini import DEFAULT_MODEL, extract_text, gemini_endpoint
 from app.core.storage import storage
 from app.services.nlp_pipeline import nlp_pipeline
 from app.services.recovery_engine import RecoveryEngine
@@ -22,9 +23,11 @@ from app.services.chat_actions import maybe_execute_action
 from app.services.nl_workout_logger import nl_workout_logger
 from app.services.conversational_memory import conversational_memory
 from app.services.learning_loop import learning_loop
+from app.core.workout_metrics import session_duration_minutes, session_load, session_rpe
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
+limiter = make_limiter()
+logger = logging.getLogger(__name__)
 
 
 class ChatMessage(BaseModel):
@@ -63,7 +66,7 @@ async def _call_gemini(prompt: str, history: List[dict], system: str = "", api_k
     if not key:
         return None
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model or 'gemini-2.0-flash'}:generateContent?key={key}"
+    url, headers = gemini_endpoint(key, model or DEFAULT_MODEL)
 
     messages = []
     if system:
@@ -78,7 +81,9 @@ async def _call_gemini(prompt: str, history: List[dict], system: str = "", api_k
         "contents": messages,
         "generationConfig": {
             "temperature": 0.7,
-            "maxOutputTokens": 300,
+            # Reasoning models spend part of this budget before emitting text,
+            # so a 300-token cap truncated replies mid-sentence.
+            "maxOutputTokens": 1024,
             "topP": 0.9,
             "topK": 40,
         },
@@ -86,12 +91,16 @@ async def _call_gemini(prompt: str, history: List[dict], system: str = "", api_k
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(url, json=payload)
+            resp = await client.post(url, json=payload, headers=headers)
             if resp.status_code == 200:
-                data = resp.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
-        pass
+                text = extract_text(resp.json())
+                if text:
+                    return text
+                logger.warning("Gemini returned no usable text: %s", resp.text[:300])
+            else:
+                logger.warning("Gemini call failed: %s %s", resp.status_code, resp.text[:300])
+    except Exception as exc:
+        logger.warning("Gemini call raised: %s", exc)
     return None
 
 
@@ -108,7 +117,7 @@ async def _call_groq(prompt: str, system: str = "", api_key: Optional[str] = Non
     messages.append({"role": "user", "content": prompt})
 
     payload = {
-        "model": model or "llama-3.3-70b-versatile",
+        "model": model or settings.GROQ_MODEL,
         "messages": messages,
         "temperature": 0.7,
         "max_tokens": 300,
@@ -297,7 +306,7 @@ async def chat(request: Request, req: ChatRequest):
         if recent_workouts:
             context["session_count"] = len(recent_workouts)
             context["avg_rpe"] = round(
-                sum(w.get("session_rpe", 5) for w in recent_workouts) / len(recent_workouts), 1
+                sum(session_rpe(w) for w in recent_workouts) / len(recent_workouts), 1
             )
     except Exception:
         pass

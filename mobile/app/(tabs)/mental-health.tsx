@@ -15,17 +15,21 @@ import {
 } from '../../src/components/PremiumComponents';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API = 'http://localhost:8000/api/v1';
+import { API_V1 as API } from '../../src/services/config';
+import { SCREEN_HEADER_TOP } from '../../src/theme/layout';
+// 1-10 mood value maps to a face on a filled-happy -> outline-happy -> neutral -> outline-sad -> filled-sad gradient.
+const moodFace = (value: number) =>
+  value >= 8 ? 'happy' : value >= 6 ? 'happy-outline' : value === 5 ? 'remove-outline' : value >= 4 ? 'sad-outline' : 'sad';
 
 const MOOD_EMOJIS = [
-  { emoji: '😊', label: 'Happy', value: 8, color: '#22C55E' },
-  { emoji: '😌', label: 'Calm', value: 7, color: '#06B6D4' },
-  { emoji: '😐', label: 'Neutral', value: 5, color: '#F59E0B' },
-  { emoji: '😔', label: 'Sad', value: 3, color: '#6366F1' },
-  { emoji: '😰', label: 'Anxious', value: 2, color: '#EF4444' },
-  { emoji: '😤', label: 'Angry', value: 2, color: '#F97316' },
-  { emoji: '😴', label: 'Tired', value: 4, color: '#8B5CF6' },
-  { emoji: '🥳', label: 'Excited', value: 9, color: '#EC4899' },
+  { label: 'Happy', value: 8, color: '#22C55E' },
+  { label: 'Calm', value: 7, color: '#06B6D4' },
+  { label: 'Neutral', value: 5, color: '#F59E0B' },
+  { label: 'Sad', value: 3, color: '#6366F1' },
+  { label: 'Anxious', value: 2, color: '#EF4444' },
+  { label: 'Angry', value: 2, color: '#F97316' },
+  { label: 'Tired', value: 4, color: '#8B5CF6' },
+  { label: 'Excited', value: 9, color: '#EC4899' },
 ];
 
 const ASSESSMENTS = [
@@ -35,9 +39,9 @@ const ASSESSMENTS = [
 ];
 
 const JOURNAL_ENTRIES = [
-  { date: 'Today', mood: 7, entry: 'Had a great workout this morning. Feeling accomplished.', emoji: '😊' },
-  { date: 'Yesterday', mood: 5, entry: 'Busy day at work, need to manage stress better.', emoji: '😐' },
-  { date: '2 days ago', mood: 8, entry: 'Meditation session was amazing. Clear mind.', emoji: '😌' },
+  { date: 'Today', mood: 7, entry: 'Had a great workout this morning. Feeling accomplished.' },
+  { date: 'Yesterday', mood: 5, entry: 'Busy day at work, need to manage stress better.' },
+  { date: '2 days ago', mood: 8, entry: 'Meditation session was amazing. Clear mind.' },
 ];
 
 const CRISIS_RESOURCES = [
@@ -70,7 +74,7 @@ export default function MentalHealthScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <LinearGradient colors={['#8B5CF6', '#A78BFA']} style={styles.header}>
-        <Text style={styles.headerTitle}>🧠 Mental Health</Text>
+        <Text style={styles.headerTitle}>Mental Health</Text>
         <Text style={styles.headerSubtitle}>Your emotional wellness companion</Text>
       </LinearGradient>
 
@@ -89,7 +93,7 @@ export default function MentalHealthScreen() {
               style={[styles.moodBtn, selectedMood === mood.value && { backgroundColor: mood.color + '25', borderColor: mood.color + '50', transform: [{ scale: 1.1 }] }]}
               onPress={() => setSelectedMood(mood.value)}
             >
-              <Text style={styles.moodEmoji}>{mood.emoji}</Text>
+              <Ionicons name={moodFace(mood.value) as any} size={28} color={mood.color} />
               <Text style={[styles.moodLabel, selectedMood === mood.value && { color: mood.color }]}>{mood.label}</Text>
             </TouchableOpacity>
           ))}
@@ -136,7 +140,10 @@ export default function MentalHealthScreen() {
         <GlassCard key={i} variant="light" style={styles.journalCard}>
           <View style={styles.journalHeader}>
             <Text style={styles.journalDate}>{entry.date}</Text>
-            <Text style={styles.journalMood}>{entry.emoji} {entry.mood}/10</Text>
+            <View style={styles.journalMoodRow}>
+              <Ionicons name={moodFace(entry.mood) as any} size={14} color={colors.health.mental} />
+              <Text style={styles.journalMood}>{entry.mood}/10</Text>
+            </View>
           </View>
           <Text style={styles.journalEntry}>{entry.entry}</Text>
         </GlassCard>
@@ -167,7 +174,7 @@ const styles = StyleSheet.create({
   contentContainer: { paddingBottom: 100 },
 
   // Header
-  header: { paddingTop: 56, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  header: { paddingTop: SCREEN_HEADER_TOP, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
   headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
 
@@ -178,7 +185,6 @@ const styles = StyleSheet.create({
   sectionCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.lg },
   moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
   moodBtn: { alignItems: 'center', width: 72, padding: spacing.sm, borderRadius: radius.lg, backgroundColor: colors.bg.input, borderWidth: 1, borderColor: colors.surface.border },
-  moodEmoji: { fontSize: 28 },
   moodLabel: { fontSize: 10, fontWeight: '600', color: colors.text.muted, marginTop: 4 },
   logMoodBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
@@ -203,6 +209,7 @@ const styles = StyleSheet.create({
   journalCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm },
   journalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
   journalDate: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  journalMoodRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   journalMood: { fontSize: 13, fontWeight: '600', color: colors.health.mental },
   journalEntry: { fontSize: 14, color: colors.text.secondary, lineHeight: 20 },
 

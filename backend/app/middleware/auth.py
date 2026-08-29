@@ -11,6 +11,18 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.auth import decode_token
+from app.core.config import settings
+
+
+def auth_bypass_active() -> bool:
+    """
+    True when JWT validation is switched off for local development.
+
+    Production never honours the flag: an open API is only ever a local
+    convenience, and a stray AUTH_DISABLED in a deployed environment would
+    otherwise expose every user's records.
+    """
+    return settings.AUTH_DISABLED and settings.ENVIRONMENT.lower() != "production"
 
 
 # Public endpoints that don't require authentication
@@ -20,6 +32,11 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/login",
     "/api/v1/auth/register",
     "/api/v1/auth/refresh",
+    "/api/v1/auth-v2/login",
+    "/api/v1/auth-v2/register",
+    "/api/v1/auth-v2/refresh",
+    # User signup (no token exists yet at account creation)
+    "/api/v1/users",
     # Health checks
     "/",
     "/health",
@@ -81,7 +98,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Skip public endpoints
         if is_public_endpoint(path):
             return await call_next(request)
-        
+
+        if auth_bypass_active():
+            request.state.user = {"sub": settings.DEV_USER_ID, "auth": "bypass"}
+            request.state.user_id = settings.DEV_USER_ID
+            return await call_next(request)
+
         # Extract Authorization header
         auth_header = request.headers.get("Authorization", "")
         

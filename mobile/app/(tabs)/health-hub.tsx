@@ -16,8 +16,8 @@ import {
 } from '../../src/components/PremiumComponents';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API = 'http://localhost:8000/api/v1';
-
+import { API_V1 as API } from '../../src/services/config';
+import { SCREEN_HEADER_TOP } from '../../src/theme/layout';
 const api = async (path: string, opts?: RequestInit) => {
   try {
     const r = await fetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -315,7 +315,7 @@ export default function HealthHubScreen() {
     >
       {/* Header */}
       <LinearGradient colors={[colors.primary, '#8B5CF6']} style={styles.header}>
-        <Text style={styles.headerTitle}>🏥 Health Hub</Text>
+        <Text style={styles.headerTitle}>Health Hub</Text>
         <Text style={styles.headerSubtitle}>Your complete health monitoring center</Text>
       </LinearGradient>
 
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   sectionCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.lg },
 
   // Header
-  header: { paddingTop: 56, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  header: { paddingTop: SCREEN_HEADER_TOP, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
   headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
 

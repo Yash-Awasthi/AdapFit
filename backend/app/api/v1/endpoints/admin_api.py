@@ -3,7 +3,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.core.auth import user_manager, decode_token
-from app.core.database import get_database_stats
+from app.core.storage import storage
 
 router = APIRouter()
 
@@ -26,7 +26,7 @@ def _require_admin(authorization: Optional[str] = None) -> dict:
 async def get_system_stats(authorization: Optional[str] = Header(None)):
     """Get system-wide statistics."""
     _require_admin(authorization)
-    db_stats = get_database_stats()
+    db_stats = await storage.get_stats()
     users = user_manager.list_users(limit=10000)
     return {
         "total_users": len(users),
@@ -83,7 +83,7 @@ async def delete_user(user_id: str, authorization: Optional[str] = Header(None))
 async def get_analytics(authorization: Optional[str] = Header(None)):
     """Get health analytics overview (admin only)."""
     _require_admin(authorization)
-    db_stats = get_database_stats()
+    db_stats = await storage.get_stats()
     users = user_manager.list_users(limit=10000)
     return {
         "users": {
@@ -93,11 +93,9 @@ async def get_analytics(authorization: Optional[str] = Header(None)):
         },
         "data": db_stats,
         "feature_usage": {
-            "workouts": db_stats.get("workouts", 0),
-            "meals": db_stats.get("meals", 0),
-            "sleep_sessions": db_stats.get("sleep_sessions", 0),
-            "mood_entries": db_stats.get("mood_entries", 0),
-            "medications": db_stats.get("medications", 0),
+            "workouts": db_stats.get("total_workouts", 0),
+            "workout_logs": db_stats.get("total_workout_logs", 0),
+            "recovery_logs": db_stats.get("total_recovery_logs", 0),
         },
     }
 
@@ -105,5 +103,5 @@ async def get_analytics(authorization: Optional[str] = Header(None)):
 @router.get("/health")
 async def admin_health():
     """Admin health check (no auth required)."""
-    db_stats = get_database_stats()
+    db_stats = await storage.get_stats()
     return {"status": "healthy", "database": db_stats, "version": "2.0.0"}

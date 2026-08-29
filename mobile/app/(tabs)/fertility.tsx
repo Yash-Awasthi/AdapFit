@@ -8,16 +8,18 @@ export default function FertilityScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🌸 Fertility Tracker</Text>
+        <Text style={styles.headerTitle}>Fertility Tracker</Text>
         <Text style={styles.headerSubtitle}>Cycle day 14 — Ovulation window</Text>
       </View>
 
       <View style={styles.tabBar}>
         {(['cycle', 'log', 'insights', 'predict'] as const).map(tab => (
           <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.activeTab]} onPress={() => setActiveTab(tab)}>
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-              {tab === 'cycle' ? '🔄' : tab === 'log' ? '📝' : tab === 'insights' ? '📊' : '🔮'}
-            </Text>
+            <Ionicons
+              name={tab === 'cycle' ? 'sync' : tab === 'log' ? 'create-outline' : tab === 'insights' ? 'stats-chart' : 'sparkles'}
+              size={20}
+              color={activeTab === tab ? '#FFF' : '#94A3B8'}
+            />
           </TouchableOpacity>
         ))}
       </View>
@@ -30,7 +32,7 @@ export default function FertilityScreen() {
                 <Text style={styles.cycleDay}>14</Text>
                 <Text style={styles.cycleLabel}>Day</Text>
               </View>
-              <Text style={styles.cyclePhase}>🔥 Ovulation Phase</Text>
+              <Text style={styles.cyclePhase}>Ovulation Phase</Text>
               <Text style={styles.fertilityStatus}>Peak Fertility</Text>
             </View>
 
@@ -56,11 +58,11 @@ export default function FertilityScreen() {
           <>
             <Text style={styles.sectionTitle}>Today's Log</Text>
             <View style={styles.logCard}>
-              <Text style={styles.logLabel}>🌡️ Basal Body Temperature</Text>
+              <Text style={styles.logLabel}>Basal Body Temperature</Text>
               <Text style={styles.logValue}>36.6°C</Text>
             </View>
             <View style={styles.logCard}>
-              <Text style={styles.logLabel}>💧 Cervical Mucus</Text>
+              <Text style={styles.logLabel}>Cervical Mucus</Text>
               <View style={styles.cmOptions}>
                 {['Dry', 'Sticky', 'Creamy', 'Watery', 'Egg White'].map((cm, i) => (
                   <TouchableOpacity key={cm} style={[styles.cmBtn, i === 4 && styles.cmActive]}>
@@ -70,9 +72,14 @@ export default function FertilityScreen() {
               </View>
             </View>
             <View style={styles.logCard}>
-              <Text style={styles.logLabel}>🧪 LH Strip Result</Text>
+              <Text style={styles.logLabel}>LH Strip Result</Text>
               <View style={styles.lhOptions}>
-                <TouchableOpacity style={[styles.lhBtn, styles.lhPositive]}><Text style={styles.lhText}>Positive ✅</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.lhBtn, styles.lhPositive]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.lhText}>Positive</Text>
+                    <Ionicons name="checkmark-circle" size={16} color="#FFF" />
+                  </View>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.lhBtn}><Text style={styles.lhText}>Negative</Text></TouchableOpacity>
               </View>
             </View>

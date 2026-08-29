@@ -28,6 +28,7 @@ def _ensure_hf_pipeline():
         _HAS_HF = False
 
 from app.core.config import settings
+from app.core.gemini import gemini_endpoint
 
 
 class NLPPipeline:
@@ -134,7 +135,7 @@ class NLPPipeline:
             return self._rule_based_goal_parse(text)
         
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+            url = gemini_endpoint(settings.GEMINI_API_KEY)[0]
             prompt = f"""Parse the following fitness goal description into structured JSON.
 Return ONLY valid JSON with these fields:
 - primary_goal: one of ["hypertrophy", "strength", "endurance", "fat_loss", "general_fitness"]
@@ -201,9 +202,9 @@ User input: "{text}"
             return self._generate_summary_rule_based(recovery_logs, workout_logs)
         try:
             avg_score = sum(r.get("recovery_score", 70) for r in recovery_logs) / max(len(recovery_logs), 1) if recovery_logs else 70
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+            url = gemini_endpoint(settings.GEMINI_API_KEY)[0]
             prompt = f"You are AdapFit AI coach. Avg recovery: {avg_score:.0f}/100. Workouts: {len(workout_logs)}. Write 2-3 sentence summary."
-            payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.5, "maxOutputTokens": 200}}
+            payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.5, "maxOutputTokens": 800}}
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(url, json=payload)
                 if resp.status_code == 200:
