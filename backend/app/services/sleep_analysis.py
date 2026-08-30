@@ -1,230 +1,192 @@
 """
-Sleep Analysis Engine
-
-Provides sleep stage detection, quality scoring, circadian rhythm analysis,
-and sleep debt calculation from wearable sensor data.
+Sleep Analysis Service — Sleep stage detection, quality scoring, circadian rhythm
+Inspired by autosleepscorer, awesome-sleep-tracking, attnsleep
 """
-from dataclasses import dataclass, field
-from typing import Optional
-import statistics
+
 import math
+from typing import List, Dict, Optional, Tuple
+from dataclasses import dataclass
+from enum import Enum
+
+
+class SleepStage(Enum):
+    AWAKE = "awake"
+    LIGHT = "light"
+    DEEP = "deep"
+    REM = "rem"
 
 
 @dataclass
-class SleepStage:
-    """Single sleep stage occurrence."""
-    stage: str  # "awake", "light", "deep", "rem"
-    start_minute: int
-    duration_minutes: int
+class SleepSample:
+    timestamp: float
+    heart_rate: float
+    movement: float
+    hrv: float = 0.0
+    blood_oxygen: float = 98.0
+    skin_temp: float = 36.5
+
+
+@dataclass
+class SleepSegment:
+    stage: SleepStage
+    start_time: float
+    end_time: float
+    duration_minutes: float
 
 
 @dataclass
 class SleepSession:
-    """Complete sleep session data."""
-    bedtime: str
-    wake_time: str
-    total_minutes: int
-    efficiency_pct: float
-    deep_pct: float
-    rem_pct: float
-    light_pct: float
-    awake_pct: float
-    heart_rate_avg: Optional[int] = None
-    hrv_rmssd: Optional[float] = None
-    respiratory_rate: Optional[float] = None
-    temperature_delta: Optional[float] = None  # Deviation from baseline
+    start_time: float
+    end_time: float
+    samples: List[SleepSample]
+    segments: List[SleepSegment] = None
 
 
-# Sleep quality scoring (0-100)
-def calculate_sleep_quality(session: SleepSession) -> dict:
-    """
-    Calculate comprehensive sleep quality score.
-
-    Scoring weights:
-    - Duration (30%): Optimal 7-9h
-    - Efficiency (25%): Time asleep / time in bed
-    - Deep sleep (20%): Optimal 15-25%
-    - REM sleep (15%): Optimal 20-25%
-    - Continuity (10%): Low awake percentage
-    """
-    # Duration score (optimal: 420-540 minutes)
-    if 420 <= session.total_minutes <= 540:
-        duration_score = 100
-    elif session.total_minutes < 420:
-        duration_score = max(0, (session.total_minutes / 420) * 100)
-    else:
-        duration_score = max(0, 100 - (session.total_minutes - 540) / 60 * 10)
-
-    # Efficiency score
-    efficiency_score = min(100, session.efficiency_pct * 1.1)
-
-    # Deep sleep score (optimal: 15-25%)
-    if 15 <= session.deep_pct <= 25:
-        deep_score = 100
-    elif session.deep_pct < 15:
-        deep_score = max(0, (session.deep_pct / 15) * 100)
-    else:
-        deep_score = max(0, 100 - (session.deep_pct - 25) * 5)
-
-    # REM sleep score (optimal: 20-25%)
-    if 20 <= session.rem_pct <= 25:
-        rem_score = 100
-    elif session.rem_pct < 20:
-        rem_score = max(0, (session.rem_pct / 20) * 100)
-    else:
-        rem_score = max(0, 100 - (session.rem_pct - 25) * 5)
-
-    # Continuity score (low awake = better)
-    continuity_score = max(0, 100 - session.awake_pct * 5)
-
-    # Weighted total
-    total = (
-        duration_score * 0.30 +
-        efficiency_score * 0.25 +
-        deep_score * 0.20 +
-        rem_score * 0.15 +
-        continuity_score * 0.10
-    )
-
-    # Grade
-    if total >= 90:
-        grade = "A"
-    elif total >= 80:
-        grade = "B"
-    elif total >= 70:
-        grade = "C"
-    elif total >= 60:
-        grade = "D"
-    else:
-        grade = "F"
-
-    return {
-        "quality_score": round(total, 1),
-        "grade": grade,
-        "breakdown": {
-            "duration": round(duration_score, 1),
-            "efficiency": round(efficiency_score, 1),
-            "deep_sleep": round(deep_score, 1),
-            "rem_sleep": round(rem_score, 1),
-            "continuity": round(continuity_score, 1),
-        },
-        "duration_hours": round(session.total_minutes / 60, 1),
-        "optimal_range": "7-9 hours",
-    }
+@dataclass
+class SleepAnalysis:
+    total_sleep_minutes: float
+    sleep_efficiency: float
+    sleep_onset_minutes: float
+    wake_after_sleep_onset: float
+    deep_sleep_minutes: float
+    light_sleep_minutes: float
+    rem_sleep_minutes: float
+    awake_minutes: float
+    sleep_score: float
+    sleep_stages: Dict[str, float]
+    quality_rating: str
 
 
-# Circadian rhythm analysis
-def analyze_circadian_rhythm(sessions: list[SleepSession]) -> dict:
-    """
-    Analyze circadian rhythm consistency from multiple sleep sessions.
+class SleepAnalyzer:
+    """Pure function sleep analysis from sensor data."""
 
-    Measures:
-    - Bedtime consistency (standard deviation of bedtime)
-    - Wake time consistency
-    - Sleep midpoint stability
-    - Social jetlag (difference between weekday and weekend sleep)
-    """
-    if not sessions:
-        return {"error": "No sessions provided"}
+    @staticmethod
+    def classify_sleep_stage(sample: SleepSample, prev_sample: Optional[SleepSample] = None) -> SleepStage:
+        hr = sample.heart_rate
+        movement = sample.movement
+        hrv = sample.hrv
+        if movement > 0.7 or hr > 85:
+            return SleepStage.AWAKE
+        if hrv > 50 and hr < 65 and movement < 0.3:
+            return SleepStage.REM
+        if hr < 55 and movement < 0.2 and hrv > 40:
+            return SleepStage.DEEP
+        if movement < 0.5 and hr < 75:
+            return SleepStage.LIGHT
+        return SleepStage.LIGHT
 
-    def time_to_minutes(t: str) -> int:
-        """Convert HH:MM to minutes since midnight."""
-        parts = t.split(":")
-        return int(parts[0]) * 60 + int(parts[1])
+    @staticmethod
+    def detect_sleep_segments(samples: List[SleepSample], min_segment_minutes: float = 5.0) -> List[SleepSegment]:
+        if not samples:
+            return []
+        segments = []
+        current_stage = SleepAnalyzer.classify_sleep_stage(samples[0])
+        segment_start = samples[0].timestamp
+        for i in range(1, len(samples)):
+            stage = SleepAnalyzer.classify_sleep_stage(samples[i], samples[i - 1])
+            if stage != current_stage:
+                duration = (samples[i].timestamp - segment_start) / 60.0
+                if duration >= min_segment_minutes:
+                    segments.append(SleepSegment(
+                        stage=current_stage,
+                        start_time=segment_start,
+                        end_time=samples[i].timestamp,
+                        duration_minutes=round(duration, 1)
+                    ))
+                current_stage = stage
+                segment_start = samples[i].timestamp
+        duration = (samples[-1].timestamp - segment_start) / 60.0
+        if duration >= min_segment_minutes:
+            segments.append(SleepSegment(
+                stage=current_stage,
+                start_time=segment_start,
+                end_time=samples[-1].timestamp,
+                duration_minutes=round(duration, 1)
+            ))
+        return segments
 
-    bedtimes = [time_to_minutes(s.bedtime) for s in sessions]
-    wake_times = [time_to_minutes(s.wake_time) for s in sessions]
-    midpoints = [(b + w) // 2 for b, w in zip(bedtimes, wake_times)]
+    @staticmethod
+    def calculate_sleep_efficiency(total_sleep_minutes: float, time_in_bed_minutes: float) -> float:
+        if time_in_bed_minutes <= 0:
+            return 0.0
+        return min(100.0, round(total_sleep_minutes / time_in_bed_minutes * 100, 1))
 
-    # Handle overnight bedtimes (e.g., 23:00 → 1380, 01:00 → 60)
-    # Normalize: if bedtime > wake_time, it crossed midnight
-    normalized_bedtimes = []
-    for b, w in zip(bedtimes, wake_times):
-        if b > w + 120:  # Bedtime is >2h after wake (crossed midnight)
-            normalized_bedtimes.append(b - 1440)  # Wrap to negative
+    @staticmethod
+    def calculate_sleep_score(segments: List[SleepSegment], total_time_minutes: float) -> float:
+        if not segments or total_time_minutes <= 0:
+            return 0.0
+        deep = sum(s.duration_minutes for s in segments if s.stage == SleepStage.DEEP)
+        rem = sum(s.duration_minutes for s in segments if s.stage == SleepStage.REM)
+        light = sum(s.duration_minutes for s in segments if s.stage == SleepStage.LIGHT)
+        awake = sum(s.duration_minutes for s in segments if s.stage == SleepStage.AWAKE)
+        deep_pct = deep / total_time_minutes * 100 if total_time_minutes > 0 else 0
+        rem_pct = rem / total_time_minutes * 100 if total_time_minutes > 0 else 0
+        awake_pct = awake / total_time_minutes * 100 if total_time_minutes > 0 else 0
+        deep_score = min(25, deep_pct * 0.8)
+        rem_score = min(25, rem_pct * 0.7)
+        duration_score = min(25, total_time_minutes / 480 * 25)
+        awake_penalty = max(0, awake_pct - 5) * 0.5
+        score = deep_score + rem_score + duration_score - awake_penalty
+        return round(max(0, min(100, score)), 1)
+
+    @staticmethod
+    def detect_circadian_phase(samples: List[SleepSample]) -> str:
+        if not samples:
+            return "unknown"
+        hr_values = [s.heart_rate for s in samples]
+        avg_hr = sum(hr_values) / len(hr_values)
+        if avg_hr < 55:
+            return "deep_sleep_phase"
+        elif avg_hr < 65:
+            return "light_sleep_phase"
+        elif avg_hr < 75:
+            return "rem_phase"
         else:
-            normalized_bedtimes.append(b)
+            return "awake_phase"
 
-    bedtime_std = statistics.stdev(normalized_bedtimes) if len(normalized_bedtimes) > 1 else 0
-    wake_std = statistics.stdev(wake_times) if len(wake_times) > 1 else 0
-    midpoint_std = statistics.stdev(midpoints) if len(midpoints) > 1 else 0
+    @staticmethod
+    def calculate_sleep_debt(sleep_history: List[float], target_hours: float = 8.0) -> float:
+        if not sleep_history:
+            return 0.0
+        debt = 0.0
+        for actual_hours in sleep_history:
+            debt += target_hours - actual_hours
+        return round(max(0, debt), 1)
 
-    # Consistency score (lower std = more consistent)
-    bedtime_consistency = max(0, 100 - bedtime_std * 2)
-    wake_consistency = max(0, 100 - wake_std * 2)
-
-    # Rhythm regularity
-    avg_bedtime = statistics.mean(normalized_bedtimes)
-    avg_wake = statistics.mean(wake_times)
-
-    return {
-        "consistency_score": round((bedtime_consistency + wake_consistency) / 2, 1),
-        "bedtime_consistency": round(bedtime_consistency, 1),
-        "wake_consistency": round(wake_consistency, 1),
-        "avg_bedtime_minutes": round(avg_bedtime),
-        "avg_wake_minutes": round(avg_wake),
-        "midpoint_stability": round(max(0, 100 - midpoint_std * 2), 1),
-        "bedtime_std_minutes": round(bedtime_std, 1),
-        "wake_std_minutes": round(wake_std, 1),
-        "session_count": len(sessions),
-    }
-
-
-# Sleep debt calculation
-def calculate_sleep_debt(
-    sessions: list[SleepSession],
-    target_hours: float = 8.0,
-) -> dict:
-    """
-    Calculate cumulative sleep debt over a period.
-
-    Sleep debt = target - actual (negative means oversleep).
-    Acute debt (last 1-3 days) matters more than chronic (weeks).
-    """
-    if not sessions:
-        return {"total_debt_hours": 0, "acute_debt_hours": 0, "chronic_debt_hours": 0}
-
-    target_minutes = target_hours * 60
-    debts = [(target_minutes - s.total_minutes) / 60 for s in sessions]
-
-    total_debt = sum(debts)
-    acute_debt = sum(debts[-3:]) if len(debts) >= 3 else sum(debts)
-    chronic_debt = total_debt / len(debts) if debts else 0
-
-    # Severity classification
-    if total_debt <= -3:
-        severity = "oversleeping"
-    elif total_debt <= -1:
-        severity = "well_rested"
-    elif total_debt <= 3:
-        severity = "mild_deficit"
-    elif total_debt <= 7:
-        severity = "moderate_deficit"
-    else:
-        severity = "severe_deficit"
-
-    return {
-        "total_debt_hours": round(total_debt, 1),
-        "acute_debt_hours": round(acute_debt, 1),
-        "chronic_debt_hours": round(chronic_debt, 1),
-        "target_hours": target_hours,
-        "avg_sleep_hours": round(statistics.mean([s.total_minutes / 60 for s in sessions]), 1),
-        "severity": severity,
-        "session_count": len(sessions),
-    }
-
-
-# Sleep stage analysis
-def analyze_stages(sessions: list[SleepSession]) -> dict:
-    """Aggregate sleep stage percentages across sessions."""
-    if not sessions:
-        return {"error": "No sessions"}
-
-    return {
-        "avg_deep_pct": round(statistics.mean([s.deep_pct for s in sessions]), 1),
-        "avg_rem_pct": round(statistics.mean([s.rem_pct for s in sessions]), 1),
-        "avg_light_pct": round(statistics.mean([s.light_pct for s in sessions]), 1),
-        "avg_awake_pct": round(statistics.mean([s.awake_pct for s in sessions]), 1),
-        "deep_sleep_hours": round(statistics.mean([s.total_minutes * s.deep_pct / 100 / 60 for s in sessions]), 1),
-        "rem_sleep_hours": round(statistics.mean([s.total_minutes * s.rem_pct / 100 / 60 for s in sessions]), 1),
-    }
+    @classmethod
+    def analyze_session(cls, session: SleepSession) -> SleepAnalysis:
+        total_time = (session.end_time - session.start_time) / 60.0
+        segments = session.segments or cls.detect_sleep_segments(session.samples)
+        deep = sum(s.duration_minutes for s in segments if s.stage == SleepStage.DEEP)
+        light = sum(s.duration_minutes for s in segments if s.stage == SleepStage.LIGHT)
+        rem = sum(s.duration_minutes for s in segments if s.stage == SleepStage.REM)
+        awake = sum(s.duration_minutes for s in segments if s.stage == SleepStage.AWAKE)
+        total_sleep = deep + light + rem
+        efficiency = cls.calculate_sleep_efficiency(total_sleep, total_time)
+        score = cls.calculate_sleep_score(segments, total_time)
+        if score >= 85:
+            rating = "excellent"
+        elif score >= 70:
+            rating = "good"
+        elif score >= 50:
+            rating = "fair"
+        else:
+            rating = "poor"
+        return SleepAnalysis(
+            total_sleep_minutes=round(total_sleep, 1),
+            sleep_efficiency=efficiency,
+            sleep_onset_minutes=round(segments[0].duration_minutes if segments else 0, 1),
+            wake_after_sleep_onset=round(awake, 1),
+            deep_sleep_minutes=round(deep, 1),
+            light_sleep_minutes=round(light, 1),
+            rem_sleep_minutes=round(rem, 1),
+            awake_minutes=round(awake, 1),
+            sleep_score=score,
+            sleep_stages={
+                "deep": round(deep, 1),
+                "light": round(light, 1),
+                "rem": round(rem, 1),
+                "awake": round(awake, 1),
+            },
+            quality_rating=rating,
+        )

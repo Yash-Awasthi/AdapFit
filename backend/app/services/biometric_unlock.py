@@ -2,7 +2,7 @@
 Biometric Health Data Unlock & Sharing
 Secure sharing of health data with providers, family, and researchers.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import uuid
 import hashlib
@@ -36,7 +36,7 @@ class BiometricDataUnlock:
         duration = custom_duration_days or share_config.get("duration_days", 30)
         data_scope = custom_data_scope or share_config.get("data_scope", "summary")
         share_id = str(uuid.uuid4())[:8]
-        access_token = hashlib.sha256(f"{user_id}_{share_id}_{datetime.now().isoformat()}".encode()).hexdigest()[:16]
+        access_token = hashlib.sha256(f"{user_id}_{share_id}_{datetime.now(timezone.utc).isoformat()}".encode()).hexdigest()[:16]
         
         share = {
             "share_id": share_id,
@@ -48,7 +48,7 @@ class BiometricDataUnlock:
             "data_fields": self.DATA_SCOPES.get(data_scope, []),
             "access_token": access_token,
             "pin_required": pin_code is not None,
-            "expires_at": (datetime.now() + timedelta(days=duration)).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=duration)).isoformat(),
             "is_active": True,
             "created_at": datetime.now().isoformat(),
             "access_count": 0,

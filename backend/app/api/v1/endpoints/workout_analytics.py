@@ -3,14 +3,14 @@ from fastapi import APIRouter, Query
 from app.services.workout_analytics import (
     analyze_volume_trends, analyze_muscle_balance,
     generate_periodization_insight, generate_predictions,
-    WorkoutAnalytics, VolumeTrend, MuscleBalance,
+    WorkoutAnalyticsResponse, VolumeTrend, MuscleBalance,
     PeriodizationInsight, TrendPrediction,
 )
 
 router = APIRouter()
 
 
-@router.get("", response_model=WorkoutAnalytics)
+@router.get("", response_model=WorkoutAnalyticsResponse)
 async def get_analytics(user_id: str = Query("default")):
     """Get comprehensive workout analytics with ML insights."""
     # Get workout data from in-memory store
@@ -50,7 +50,7 @@ async def get_analytics(user_id: str = Query("default")):
     if not insights:
         insights.append("Training is well-balanced. Keep up the consistency!")
 
-    return WorkoutAnalytics(
+    return WorkoutAnalyticsResponse(
         summary={
             "total_workouts": len(workouts),
             "total_volume_load": sum(
