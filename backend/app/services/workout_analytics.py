@@ -1,333 +1,503 @@
 """
-Advanced workout analytics: periodization insights, trend predictions,
-volume/load analysis, and muscle balance scoring.
+Workout Analytics Service — Workout tracking, progress analytics, exercise library
+Inspired by ai-workout-tracker: Sanity CMS schemas for workout/exercise data models
+
+Patterns extracted:
+- Workout data model (exercises with sets/reps/weight)
+- Exercise library with difficulty levels
+- Progress analytics (volume, intensity, consistency)
+- Personal records tracking
+- Workout streak calculation
 """
-from typing import Optional
-from pydantic import BaseModel, Field
-from statistics import mean, stdev
+
+import math
+from typing import List, Dict, Optional, Tuple
+from dataclasses import dataclass, field
+from enum import Enum
+from collections import defaultdict
 
 
-class VolumeTrend(BaseModel):
-    metric: str  # "volume_load", "total_reps", "session_count"
-    current: float
-    previous: float
+class Difficulty(Enum):
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+
+
+class WorkoutType(Enum):
+    STRENGTH = "strength"
+    CARDIO = "cardio"
+    FLEXIBILITY = "flexibility"
+    MIXED = "mixed"
+
+
+@dataclass
+class ExerciseSet:
+    reps: int
+    weight: float = 0.0
+    weight_unit: str = "kg"
+    rest_seconds: int = 90
+    rpe: Optional[float] = None  # Rate of Perceived Exertion (1-10)
+    notes: str = ""
+
+
+@dataclass
+class WorkoutExercise:
+    exercise_name: str
+    muscle_group: str
+    sets: List[ExerciseSet]
+    notes: str = ""
+
+
+@dataclass
+class WorkoutSession:
+    session_id: str
+    user_id: str
+    date: float
+    duration_seconds: int
+    exercises: List[WorkoutExercise]
+    workout_type: WorkoutType = WorkoutType.STRENGTH
+    notes: str = ""
+
+
+@dataclass
+class PersonalRecord:
+    exercise_name: str
+    weight: float
+    reps: int
+    date: float
+    estimated_1rm: float
+
+
+@dataclass
+class WorkoutStats:
+    total_workouts: int
+    total_duration_minutes: int
+    total_sets: int
+    total_reps: int
+    total_volume_kg: float
+    avg_duration_minutes: float
+    avg_sets_per_workout: float
+    workout_frequency_per_week: float
+    consistency_score: float
+
+
+@dataclass
+class ProgressReport:
+    period: str
+    workout_count: int
+    volume_change: float
+    intensity_change: float
+    personal_records: List[PersonalRecord]
+    muscle_group_balance: Dict[str, int]
+    recommendations: List[str]
+
+
+class WorkoutAnalytics:
+    """Pure function workout tracking and analytics."""
+
+    # ── Volume & Intensity Calculations ───────────────────────────────────
+
+    @staticmethod
+    def calculate_set_volume(exercise_set: ExerciseSet) -> float:
+        """Volume for a single set (reps × weight)."""
+        return exercise_set.reps * exercise_set.weight
+
+    @staticmethod
+    def calculate_exercise_volume(exercise: WorkoutExercise) -> float:
+        """Total volume for an exercise (sum of all sets)."""
+        return sum(WorkoutAnalytics.calculate_set_volume(s) for s in exercise.sets)
+
+    @staticmethod
+    def calculate_workout_volume(session: WorkoutSession) -> float:
+        """Total volume for a workout session."""
+        return sum(WorkoutAnalytics.calculate_exercise_volume(e) for e in session.exercises)
+
+    @staticmethod
+    def calculate_volume_load(session: WorkoutSession) -> float:
+        """Total reps × weight across all exercises."""
+        total = 0.0
+        for exercise in session.exercises:
+            for s in exercise.sets:
+                total += s.reps * s.weight
+        return total
+
+    @staticmethod
+    def calculate_intensity(session: WorkoutSession) -> float:
+        """Average intensity as percentage of estimated 1RM."""
+        all_weights = []
+        for exercise in session.exercises:
+            for s in exercise.sets:
+                if s.weight > 0:
+                    all_weights.append(s.weight)
+        if not all_weights:
+            return 0.0
+        # Simple intensity estimate based on weight distribution
+        avg_weight = sum(all_weights) / len(all_weights)
+        max_weight = max(all_weights)
+        if max_weight == 0:
+            return 0.0
+        return round(avg_weight / max_weight * 100, 1)
+
+    # ── Personal Records ──────────────────────────────────────────────────
+
+    @staticmethod
+    def estimate_1rm(weight: float, reps: int) -> float:
+        """Estimate 1RM using Epley formula: weight × (1 + reps/30)."""
+        if reps <= 0:
+            return weight
+        return round(weight * (1 + reps / 30), 1)
+
+    @classmethod
+    def find_personal_records(cls, sessions: List[WorkoutSession]) -> List[PersonalRecord]:
+        """Find personal records for each exercise across all sessions."""
+        best_by_exercise: Dict[str, PersonalRecord] = {}
+        for session in sessions:
+            for exercise in session.exercises:
+                for s in exercise.sets:
+                    if s.weight <= 0:
+                        continue
+                    est_1rm = cls.estimate_1rm(s.weight, s.reps)
+                    existing = best_by_exercise.get(exercise.exercise_name)
+                    if existing is None or est_1rm > existing.estimated_1rm:
+                        best_by_exercise[exercise.exercise_name] = PersonalRecord(
+                            exercise_name=exercise.exercise_name,
+                            weight=s.weight,
+                            reps=s.reps,
+                            date=session.date,
+                            estimated_1rm=est_1rm,
+                        )
+        return sorted(best_by_exercise.values(), key=lambda pr: -pr.estimated_1rm)
+
+    # ── Workout Statistics ────────────────────────────────────────────────
+
+    @classmethod
+    def calculate_stats(cls, sessions: List[WorkoutSession]) -> WorkoutStats:
+        """Calculate overall workout statistics."""
+        if not sessions:
+            return WorkoutStats(0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        total_duration = sum(s.duration_seconds for s in sessions)
+        total_sets = sum(len(e.sets) for s in sessions for e in s.exercises)
+        total_reps = sum(
+            sr.reps for s in sessions for e in s.exercises for sr in e.sets
+        )
+        total_volume = sum(cls.calculate_workout_volume(s) for s in sessions)
+        # Frequency: workouts per week
+        if len(sessions) >= 2:
+            date_range = sessions[-1].date - sessions[0].date
+            weeks = max(1, date_range / (7 * 24 * 3600))
+            frequency = len(sessions) / weeks
+        else:
+            frequency = 0.0
+        # Consistency: coefficient of variation of gaps between workouts
+        if len(sessions) >= 3:
+            dates = sorted(s.date for s in sessions)
+            gaps = [dates[i + 1] - dates[i] for i in range(len(dates) - 1)]
+            avg_gap = sum(gaps) / len(gaps)
+            if avg_gap > 0:
+                variance = sum((g - avg_gap) ** 2 for g in gaps) / len(gaps)
+                cv = math.sqrt(variance) / avg_gap
+                consistency = max(0, 1 - cv)
+            else:
+                consistency = 1.0
+        else:
+            consistency = 0.5
+        return WorkoutStats(
+            total_workouts=len(sessions),
+            total_duration_minutes=round(total_duration / 60),
+            total_sets=total_sets,
+            total_reps=total_reps,
+            total_volume_kg=round(total_volume, 1),
+            avg_duration_minutes=round(total_duration / 60 / len(sessions), 1),
+            avg_sets_per_workout=round(total_sets / len(sessions), 1),
+            workout_frequency_per_week=round(frequency, 1),
+            consistency_score=round(consistency, 2),
+        )
+
+    # ── Muscle Group Balance ──────────────────────────────────────────────
+
+    @staticmethod
+    def calculate_muscle_balance(sessions: List[WorkoutSession]) -> Dict[str, int]:
+        """Count total sets per muscle group."""
+        balance = defaultdict(int)
+        for session in sessions:
+            for exercise in session.exercises:
+                balance[exercise.muscle_group] += len(exercise.sets)
+        return dict(sorted(balance.items(), key=lambda x: -x[1]))
+
+    @staticmethod
+    def assess_muscle_balance(balance: Dict[str, int]) -> List[str]:
+        """Identify muscle group imbalances."""
+        recs = []
+        if not balance:
+            return ["No workout data available"]
+        avg = sum(balance.values()) / len(balance)
+        for muscle, sets in balance.items():
+            if sets < avg * 0.5:
+                recs.append(f"Undertrained: {muscle} ({sets} sets vs avg {avg:.0f})")
+            elif sets > avg * 2:
+                recs.append(f"Overtrained: {muscle} ({sets} sets vs avg {avg:.0f})")
+        if not recs:
+            recs.append("Muscle group balance looks good!")
+        return recs
+
+    # ── Progress Tracking ─────────────────────────────────────────────────
+
+    @classmethod
+    def compare_periods(cls, period1: List[WorkoutSession],
+                        period2: List[WorkoutSession]) -> Dict:
+        """Compare two training periods."""
+        stats1 = cls.calculate_stats(period1)
+        stats2 = cls.calculate_stats(period2)
+        volume_change = 0.0
+        if stats1.total_volume_kg > 0:
+            volume_change = ((stats2.total_volume_kg - stats1.total_volume_kg)
+                           / stats1.total_volume_kg * 100)
+        return {
+            "period1": {"workouts": stats1.total_workouts, "volume": stats1.total_volume_kg},
+            "period2": {"workouts": stats2.total_workouts, "volume": stats2.total_volume_kg},
+            "volume_change_pct": round(volume_change, 1),
+            "frequency_change": round(stats2.workout_frequency_per_week - stats1.workout_frequency_per_week, 1),
+        }
+
+    # ── Streak Calculation ────────────────────────────────────────────────
+
+    @staticmethod
+    def calculate_streaks(sessions: List[WorkoutSession]) -> Dict:
+        """Calculate current and best workout streaks."""
+        if not sessions:
+            return {"current_streak": 0, "best_streak": 0, "total_workout_days": 0}
+        dates = sorted(set(
+            int(s.date // (24 * 3600)) for s in sessions
+        ))
+        if not dates:
+            return {"current_streak": 0, "best_streak": 0, "total_workout_days": 0}
+        current_streak = 1
+        best_streak = 1
+        streak = 1
+        for i in range(1, len(dates)):
+            if dates[i] - dates[i - 1] <= 2:  # Allow 1 rest day
+                streak += 1
+                best_streak = max(best_streak, streak)
+            else:
+                streak = 1
+        # Current streak: count from end
+        current_streak = 1
+        for i in range(len(dates) - 1, 0, -1):
+            if dates[i] - dates[i - 1] <= 2:
+                current_streak += 1
+            else:
+                break
+        return {
+            "current_streak": current_streak,
+            "best_streak": best_streak,
+            "total_workout_days": len(dates),
+        }
+
+    # ── Recommendations ───────────────────────────────────────────────────
+
+    @classmethod
+    def generate_recommendations(cls, sessions: List[WorkoutSession]) -> List[str]:
+        """Generate workout recommendations based on history."""
+        recs = []
+        if not sessions:
+            recs.append("Start logging workouts to get personalized recommendations")
+            return recs
+        stats = cls.calculate_stats(sessions)
+        balance = cls.calculate_muscle_balance(sessions)
+        if stats.workout_frequency_per_week < 3:
+            recs.append("Try to work out at least 3 times per week for optimal results")
+        if stats.consistency_score < 0.5:
+            recs.append("Improve consistency — regular training beats sporadic intense sessions")
+        balance_recs = cls.assess_muscle_balance(balance)
+        recs.extend([r for r in balance_recs if "Undertrained" in r or "Overtrained" in r])
+        if stats.avg_duration_minutes < 30:
+            recs.append("Consider extending workouts to 45-60 minutes for better stimulus")
+        if not recs:
+            recs.append("Great job! Keep up the consistent training")
+        return recs
+
+    # ── Exercise Library ──────────────────────────────────────────────────
+
+    @staticmethod
+    def get_exercise_library() -> List[Dict]:
+        """Return a curated exercise library."""
+        return [
+            {"name": "Barbell Squat", "muscle_group": "legs", "difficulty": "intermediate", "equipment": ["barbell", "squat_rack"]},
+            {"name": "Bench Press", "muscle_group": "chest", "difficulty": "intermediate", "equipment": ["barbell", "bench"]},
+            {"name": "Deadlift", "muscle_group": "back", "difficulty": "advanced", "equipment": ["barbell"]},
+            {"name": "Pull-ups", "muscle_group": "back", "difficulty": "intermediate", "equipment": ["pull_up_bar"]},
+            {"name": "Overhead Press", "muscle_group": "shoulders", "difficulty": "intermediate", "equipment": ["barbell"]},
+            {"name": "Barbell Row", "muscle_group": "back", "difficulty": "intermediate", "equipment": ["barbell"]},
+            {"name": "Lunges", "muscle_group": "legs", "difficulty": "beginner", "equipment": ["dumbbells"]},
+            {"name": "Push-ups", "muscle_group": "chest", "difficulty": "beginner", "equipment": ["none"]},
+            {"name": "Plank", "muscle_group": "core", "difficulty": "beginner", "equipment": ["none"]},
+            {"name": "Dumbbell Curl", "muscle_group": "arms", "difficulty": "beginner", "equipment": ["dumbbells"]},
+        ]
+
+    @staticmethod
+    def filter_exercises(exercises: List[Dict], difficulty: Optional[str] = None,
+                         muscle_group: Optional[str] = None,
+                         equipment: Optional[List[str]] = None) -> List[Dict]:
+        """Filter exercises by criteria."""
+        result = exercises
+        if difficulty:
+            result = [e for e in result if e["difficulty"] == difficulty]
+        if muscle_group:
+            result = [e for e in result if e["muscle_group"] == muscle_group]
+        if equipment:
+            result = [e for e in result
+                     if any(eq in equipment for eq in e["equipment"]) or "none" in e["equipment"]]
+        return result
+
+
+# ── Additional Models for API Compatibility ──────────────────────────────
+
+from pydantic import BaseModel as PydanticBaseModel
+
+
+class VolumeTrend(PydanticBaseModel):
+    muscle_group: str
+    current_volume: float
+    previous_volume: float
     change_pct: float
-    direction: str  # "increasing", "stable", "decreasing"
+    direction: str  # "increasing", "decreasing", "stable"
     recommendation: str
 
 
-class MuscleBalance(BaseModel):
+class MuscleBalance(PydanticBaseModel):
     muscle_group: str
-    total_volume: int
-    sessions: int
-    balance_score: float  # 0-100, 50 is balanced
+    set_count: int
+    balance_score: float
     status: str  # "balanced", "overtrained", "undertrained"
     recommendation: str
 
 
-class PeriodizationInsight(BaseModel):
+class PeriodizationInsight(PydanticBaseModel):
     current_phase: str
-    phase_weeks_elapsed: int
-    phase_weeks_total: int
-    volume_load_avg: float
-    intensity_avg: float
-    acwr_trend: str
-    readiness_correlation: float  # -1 to 1
-    fatigue_accumulation: float  # 0-100
+    phase_duration_weeks: int
+    fatigue_accumulation: float
+    readiness_score: float
     recommendation: str
 
 
-class TrendPrediction(BaseModel):
+class TrendPrediction(PydanticBaseModel):
     metric: str
     current_value: float
-    predicted_30d: float
-    predicted_90d: float
-    confidence: float  # 0-1
-    trend: str  # "improving", "stable", "declining"
-    chart_data: list  # [{day, value}] for sparkline
+    predicted_value: float
+    confidence: float
+    trend: str
 
 
-class WorkoutAnalytics(BaseModel):
-    summary: dict
-    volume_trends: list[VolumeTrend]
-    muscle_balance: list[MuscleBalance]
+class WorkoutAnalyticsResponse(PydanticBaseModel):
+    summary: Dict
+    volume_trends: List[VolumeTrend]
+    muscle_balance: List[MuscleBalance]
     periodization_insights: PeriodizationInsight
-    predictions: list[TrendPrediction]
-    overall_score: float  # 0-100
-    actionable_insights: list[str]
+    predictions: List[TrendPrediction]
+    overall_score: float
+    actionable_insights: List[str]
 
 
-# Muscle groups and their antagonists for balance scoring
-MUSCLE_PAIRS = {
-    "chest": "back",
-    "back": "chest",
-    "shoulders": "biceps",
-    "biceps": "triceps",
-    "quadriceps": "hamstrings",
-    "hamstrings": "quadriceps",
-    "glutes": "hip flexors",
-}
-
-MUSCLE_VOLUMES = {
-    "chest": {"push": 1.0, "pull": 0.0},
-    "back": {"push": 0.0, "pull": 1.0},
-    "shoulders": {"push": 0.5, "pull": 0.3},
-    "biceps": {"push": 0.0, "pull": 0.5},
-    "triceps": {"push": 0.5, "pull": 0.0},
-    "quadriceps": {"squat": 1.0, "hinge": 0.2},
-    "hamstrings": {"squat": 0.2, "hinge": 1.0},
-    "glutes": {"squat": 0.5, "hinge": 0.8},
-    "core": {"push": 0.2, "pull": 0.2, "squat": 0.2, "hinge": 0.2},
-}
+# ── Standalone Functions for API Endpoint ─────────────────────────────────
 
 
-def _linear_predict(values: list[float], days_ahead: int) -> tuple[float, float]:
-    """Simple linear regression prediction."""
-    if len(values) < 2:
-        return values[0] if values else 0, 0.3
-
-    n = len(values)
-    x_mean = (n - 1) / 2
-    y_mean = mean(values)
-
-    num = sum((i - x_mean) * (v - y_mean) for i, v in enumerate(values))
-    den = sum((i - x_mean) ** 2 for i in range(n))
-
-    slope = num / den if den != 0 else 0
-    intercept = y_mean - slope * x_mean
-
-    predicted = intercept + slope * (n - 1 + days_ahead)
-
-    # Confidence based on R²
-    ss_res = sum((v - (intercept + slope * i)) ** 2 for i, v in enumerate(values))
-    ss_tot = sum((v - y_mean) ** 2 for i, v in enumerate(values))
-    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
-    confidence = max(0.3, min(0.95, r_squared))
-
-    return predicted, confidence
-
-
-def analyze_volume_trends(workouts: list[dict]) -> list[VolumeTrend]:
-    """Analyze volume trends over recent workouts."""
-    if len(workouts) < 4:
-        return []
-
-    # Split into recent vs older halves
-    half = len(workouts) // 2
-    recent = workouts[:half]
-    older = workouts[half:]
-
-    def avg_load(ws):
-        loads = []
-        for w in ws:
-            for ex in w.get("exercises", []):
-                for s in ex.get("sets", []):
-                    loads.append(s.get("weight_kg", 0) * s.get("reps_completed", 0))
-        return mean(loads) if loads else 0
-
-    def avg_reps(ws):
-        reps = []
-        for w in ws:
-            for ex in w.get("exercises", []):
-                for s in ex.get("sets", []):
-                    reps.append(s.get("reps_completed", 0))
-        return mean(reps) if reps else 0
-
+def analyze_volume_trends(workouts: List[Dict]) -> List[VolumeTrend]:
+    """Analyze volume trends per muscle group from raw workout dicts."""
+    muscle_volumes: Dict[str, List[float]] = {}
+    for w in workouts:
+        for ex in w.get("exercises", []):
+            muscle = ex.get("target_muscle", "unknown")
+            vol = sum(s.get("weight_kg", 0) * s.get("reps_completed", 0) for s in ex.get("sets", []))
+            muscle_volumes.setdefault(muscle, []).append(vol)
     trends = []
-    for name, getter in [("volume_load", avg_load), ("avg_reps", avg_reps)]:
-        curr = getter(recent)
-        prev = getter(older)
+    for muscle, vols in muscle_volumes.items():
+        if len(vols) < 2:
+            avg = vols[0] if vols else 0
+            trends.append(VolumeTrend(
+                muscle_group=muscle, current_volume=avg, previous_volume=avg,
+                change_pct=0.0, direction="stable", recommendation="Keep consistent"
+            ))
+            continue
+        mid = len(vols) // 2
+        prev = sum(vols[:mid]) / max(mid, 1)
+        curr = sum(vols[mid:]) / max(len(vols) - mid, 1)
         change = ((curr - prev) / prev * 100) if prev > 0 else 0
-
-        if change > 10:
-            direction, rec = "increasing", "Volume is increasing well. Monitor for fatigue."
-        elif change < -10:
-            direction, rec = "decreasing", "Volume is declining. Consider increasing load."
-        else:
-            direction, rec = "stable", "Volume is stable. Good consistency."
-
+        direction = "increasing" if change > 10 else "decreasing" if change < -10 else "stable"
+        rec = ("Good progression" if direction == "increasing" else
+               "Consider reducing load" if direction == "decreasing" else "Maintain current volume")
         trends.append(VolumeTrend(
-            metric=name, current=round(curr, 1), previous=round(prev, 1),
+            muscle_group=muscle, current_volume=round(curr, 1), previous_volume=round(prev, 1),
             change_pct=round(change, 1), direction=direction, recommendation=rec,
         ))
-
     return trends
 
 
-def analyze_muscle_balance(workouts: list[dict]) -> list[MuscleBalance]:
-    """Analyze muscle group balance across workouts."""
-    if not workouts:
-        return []
-
-    muscle_sessions: dict[str, int] = {}
-    muscle_volume: dict[str, int] = {}
-
+def analyze_muscle_balance(workouts: List[Dict]) -> List[MuscleBalance]:
+    """Analyze muscle group balance from raw workout dicts."""
+    counts: Dict[str, int] = {}
     for w in workouts:
-        seen = set()
         for ex in w.get("exercises", []):
-            target = ex.get("target_muscle", "").lower()
-            if target:
-                muscle_sessions[target] = muscle_sessions.get(target, 0) + 1
-                seen.add(target)
-                # Calculate volume: sets * reps * weight
-                vol = 0
-                for s in ex.get("sets", []):
-                    vol += s.get("weight_kg", 0) * s.get("reps_completed", 0)
-                muscle_volume[target] = muscle_volume.get(target, 0) + vol
-
-    if not muscle_sessions:
+            muscle = ex.get("target_muscle", "unknown")
+            counts[muscle] = counts.get(muscle, 0) + len(ex.get("sets", []))
+    if not counts:
         return []
-
-    avg_sessions = mean(muscle_sessions.values()) if muscle_sessions else 1
-
-    balance = []
-    for muscle, sessions in sorted(muscle_sessions.items()):
-        vol = muscle_volume.get(muscle, 0)
-        ratio = sessions / avg_sessions if avg_sessions > 0 else 1
-        score = min(100, max(0, ratio * 50))
-
-        if ratio > 1.3:
-            status, rec = "overtrained", f"Reduce {muscle} volume. Add rest days."
-        elif ratio < 0.7:
-            status, rec = "undertrained", f"Increase {muscle} volume. Add more exercises."
-        else:
-            status, rec = "balanced", f"{muscle} volume is well balanced."
-
-        balance.append(MuscleBalance(
-            muscle_group=muscle, total_volume=vol, sessions=sessions,
-            balance_score=round(score, 1), status=status, recommendation=rec,
+    avg = sum(counts.values()) / len(counts)
+    results = []
+    for muscle, count in sorted(counts.items(), key=lambda x: -x[1]):
+        score = count / avg * 100 if avg > 0 else 50
+        status = "balanced" if 70 <= score <= 130 else ("overtrained" if score > 130 else "undertrained")
+        rec = ("Well trained" if status == "balanced" else
+               "Reduce volume" if status == "overtrained" else "Increase volume")
+        results.append(MuscleBalance(
+            muscle_group=muscle, set_count=count, balance_score=round(score, 1),
+            status=status, recommendation=rec,
         ))
+    return results
 
-    return balance
 
-
-def generate_periodization_insight(
-    workouts: list[dict], recovery_logs: list[dict],
-) -> PeriodizationInsight:
-    """Generate periodization insights from workout and recovery data."""
-    if not workouts:
-        return PeriodizationInsight(
-            current_phase="unknown", phase_weeks_elapsed=0, phase_weeks_total=0,
-            volume_load_avg=0, intensity_avg=0, acwr_trend="stable",
-            readiness_correlation=0, fatigue_accumulation=30,
-            recommendation="Start training to generate periodization insights.",
-        )
-
-    # Calculate average volume load
-    all_loads = []
-    all_rpes = []
-    for w in workouts:
-        for ex in w.get("exercises", []):
-            for s in ex.get("sets", []):
-                all_loads.append(s.get("weight_kg", 0) * s.get("reps_completed", 0))
-            if "target_rpe" in ex:
-                all_rpes.append(ex["target_rpe"])
-
-    vol_avg = mean(all_loads) if all_loads else 0
-    intensity_avg = mean(all_rpes) if all_rpes else 0
-
-    # Determine phase from volume trend
-    if len(workouts) >= 6:
-        recent_vol = mean(all_loads[:len(all_loads)//2]) if all_loads else 0
-        older_vol = mean(all_loads[len(all_loads)//2:]) if all_loads else 0
-        vol_change = (recent_vol - older_vol) / older_vol * 100 if older_vol > 0 else 0
-
-        if vol_change > 15:
-            phase = "accumulation"
-        elif vol_change < -15:
-            phase = "deload"
-        elif intensity_avg > 7:
-            phase = "intensification"
-        else:
-            phase = "transformation"
+def generate_periodization_insight(workouts: List[Dict], logs: List[Dict]) -> PeriodizationInsight:
+    """Generate periodization insight from workout and recovery data."""
+    total_volume = sum(
+        sum(s.get("weight_kg", 0) * s.get("reps_completed", 0) for ex in w.get("exercises", []) for s in ex.get("sets", []))
+        for w in workouts
+    )
+    n = len(workouts) or 1
+    avg_volume = total_volume / n
+    fatigue = min(100, max(0, avg_volume / 100))
+    readiness = max(0, 100 - fatigue)
+    if fatigue > 70:
+        phase = "overreaching"
+        rec = "Consider a deload week to allow recovery"
+    elif fatigue > 40:
+        phase = "build"
+        rec = "Good training stimulus — maintain progressive overload"
     else:
         phase = "accumulation"
-
-    # ACWR trend
-    acwr_values = []
-    for rl in recovery_logs:
-        mb = rl.get("metrics_breakdown", {})
-        if mb.get("acwr"):
-            acwr_values.append(mb["acwr"])
-
-    if len(acwr_values) >= 2:
-        acwr_trend = "increasing" if acwr_values[0] < acwr_values[-1] else "decreasing"
-    else:
-        acwr_trend = "stable"
-
-    # Readiness correlation
-    readiness_scores = [rl.get("recovery_score", 50) for rl in recovery_logs]
-    if len(readiness_scores) >= 2 and len(all_loads) >= 2:
-        corr = 0.3  # Placeholder — real implementation would use Pearson
-    else:
-        corr = 0
-
-    # Fatigue accumulation
-    fatigue = min(100, max(0, 50 + (intensity_avg - 5) * 10 - len(workouts) * 2))
-
-    weeks = len(workouts) // max(1, len(set(w.get("target_date", "")[:10] for w in workouts if w.get("target_date"))))
-
+        rec = "Gradually increase training volume"
     return PeriodizationInsight(
-        current_phase=phase,
-        phase_weeks_elapsed=min(weeks, 6),
-        phase_weeks_total=6,
-        volume_load_avg=round(vol_avg, 1),
-        intensity_avg=round(intensity_avg, 1),
-        acwr_trend=acwr_trend,
-        readiness_correlation=round(corr, 2),
-        fatigue_accumulation=round(fatigue, 1),
-        recommendation=_phase_recommendation(phase, fatigue, acwr_trend),
+        current_phase=phase, phase_duration_weeks=max(1, n // 3),
+        fatigue_accumulation=round(fatigue, 1), readiness_score=round(readiness, 1),
+        recommendation=rec,
     )
 
 
-def _phase_recommendation(phase: str, fatigue: float, acwr: str) -> str:
-    if phase == "accumulation":
-        return "Building volume. Monitor fatigue — deload when it exceeds 70."
-    elif phase == "deload":
-        return "Recovery phase. Keep intensity low, focus on form and mobility."
-    elif phase == "intensification":
-        return "Pushing heavy loads. Ensure sleep and nutrition support recovery."
-    else:
-        return "Maintaining. Consider starting a new mesocycle block."
-
-
-def generate_predictions(workouts: list[dict]) -> list[TrendPrediction]:
-    """Generate 30d and 90d trend predictions."""
-    if len(workouts) < 4:
-        return []
-
-    # Extract daily volume loads
-    daily_vol = {}
+def generate_predictions(workouts: List[Dict]) -> List[TrendPrediction]:
+    """Generate simple trend predictions from workout history."""
+    predictions = []
+    volumes = []
     for w in workouts:
-        date = w.get("target_date", w.get("created_at", ""))[:10]
         vol = sum(
             s.get("weight_kg", 0) * s.get("reps_completed", 0)
-            for ex in w.get("exercises", [])
-            for s in ex.get("sets", [])
+            for ex in w.get("exercises", []) for s in ex.get("sets", [])
         )
-        daily_vol[date] = daily_vol.get(date, 0) + vol
-
-    values = list(daily_vol.values())
-    if len(values) < 3:
-        return []
-
-    predictions = []
-    for metric, vals in [("volume_load", values)]:
-        pred_30, conf_30 = _linear_predict(vals, 30)
-        pred_90, conf_90 = _linear_predict(vals, 90)
-        trend = "improving" if pred_30 > vals[-1] * 1.05 else ("declining" if pred_30 < vals[-1] * 0.95 else "stable")
-
-        # Generate sparkline data
-        chart = [{"day": i, "value": v} for i, v in enumerate(vals[-14:])]
-
+        volumes.append(vol)
+    if len(volumes) >= 3:
+        avg_recent = sum(volumes[-3:]) / 3
+        avg_older = sum(volumes[:-3]) / max(len(volumes) - 3, 1) if len(volumes) > 3 else avg_recent
+        change = avg_recent - avg_older
         predictions.append(TrendPrediction(
-            metric=metric,
-            current_value=round(vals[-1], 1),
-            predicted_30d=round(pred_30, 1),
-            predicted_90d=round(pred_90, 1),
-            confidence=round(conf_30, 2),
-            trend=trend,
-            chart_data=chart,
+            metric="volume_load", current_value=round(avg_recent, 1),
+            predicted_value=round(avg_recent + change, 1), confidence=0.7,
+            trend="increasing" if change > 0 else "decreasing",
         ))
-
     return predictions

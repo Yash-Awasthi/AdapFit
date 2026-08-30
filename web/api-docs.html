@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZFIT API Documentation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a0e1a;
+      color: #e0e0e0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.6;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #00ff88;
+      margin-bottom: 0.5rem;
+      text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+
+    .category {
+      margin-bottom: 2rem;
+    }
+
+    .category-title {
+      font-size: 1.2rem;
+      color: #ffaa00;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #1a2035;
+    }
+
+    .endpoint {
+      background: #0f1423;
+      border: 1px solid #1a2035;
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+
+    .endpoint:hover {
+      border-color: #00ff88;
+    }
+
+    .endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      cursor: pointer;
+    }
+
+    .method {
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.8rem;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .method-GET { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+    .method-POST { background: rgba(255, 170, 0, 0.2); color: #ffaa00; }
+
+    .path {
+      color: #e0e0e0;
+      font-weight: 500;
+    }
+
+    .description {
+      color: #888;
+      margin-left: auto;
+      font-size: 0.9rem;
+    }
+
+    .endpoint-body {
+      display: none;
+      padding: 1rem;
+      border-top: 1px solid #1a2035;
+    }
+
+    .endpoint-body.show {
+      display: block;
+    }
+
+    .response {
+      padding: 1rem;
+      background: #0a0e1a;
+      border-radius: 4px;
+      border-left: 3px solid #00ff88;
+    }
+
+    .response-label {
+      color: #888;
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .response code {
+      color: #00ff88;
+      font-size: 0.9rem;
+    }
+
+    .arrow {
+      transition: transform 0.3s;
+    }
+
+    .arrow.open {
+      transform: rotate(90deg);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: #0f1423;
+      border: 1px solid #1a2035;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      color: #00ff88;
+      font-weight: bold;
+    }
+
+    .stat-label {
+      color: #888;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>💚 ZFIT API Documentation</h1>
+    <p class="subtitle">Health Metrics • Predictions • Wearable Integration • Biofeedback</p>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value">45+</div>
+        <div class="stat-label">Endpoints</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">18</div>
+        <div class="stat-label">Services</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">219</div>
+        <div class="stat-label">Tests</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">100%</div>
+        <div class="stat-label">Pure Functions</div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">🫀 Cardiovascular</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-POST">POST</span>
+          <span class="path">/cardiovascular/analyze</span>
+          <span class="description">Analyze heart rate data</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ resting_hr, max_hr, hr_zones, recovery_rate }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">😴 Sleep Analysis</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-POST">POST</span>
+          <span class="path">/sleep/analyze</span>
+          <span class="description">Analyze sleep stages and quality</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ stages: { deep, rem, light, awake }, score, efficiency }</code>
+          </div>
+        </div>
+      </div>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-GET">GET</span>
+          <span class="path">/sleep/circadian</span>
+          <span class="description">Get circadian rhythm analysis</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ chronotype, optimal_sleep_window, sleep_debt }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">🏃 Activity Recognition</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-POST">POST</span>
+          <span class="path">/activity/detect</span>
+          <span class="description">Detect activity from sensor data</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ activity_type, confidence, duration, calories }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">🍎 Nutrition</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-POST">POST</span>
+          <span class="path">/nutrition/analyze</span>
+          <span class="description">Analyze meal nutritional content</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ calories, macros: { protein, carbs, fat }, micronutrients }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">🩸 Blood Pressure</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-POST">POST</span>
+          <span class="path">/blood-pressure/classify</span>
+          <span class="description">Classify blood pressure reading</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ category: 'normal'|'elevated'|'stage1'|'stage2'|'crisis', risk_level }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">🔮 Predictions</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-GET">GET</span>
+          <span class="path">/predictions/sleep</span>
+          <span class="description">Predict next 7 days sleep score</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ predictions: [{ day, score, confidence_interval: { low, high } }] }</code>
+          </div>
+        </div>
+      </div>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-GET">GET</span>
+          <span class="path">/anomalies/detect</span>
+          <span class="description">Detect health anomalies</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ anomalies: [{ metric, value, baseline, severity, timestamp }] }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">⌚ Wearable Integration</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-POST">POST</span>
+          <span class="path">/wearable/garmin/import</span>
+          <span class="description">Import Garmin Connect data</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ imported: { summaries, workouts, sleep }, duplicates_skipped }</code>
+          </div>
+        </div>
+      </div>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-POST">POST</span>
+          <span class="path">/wearable/strava/import</span>
+          <span class="description">Import Strava activity data</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ imported: { activities, weekly_volume }, training_load }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">🧘 Biofeedback</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-POST">POST</span>
+          <span class="path">/hrv/biofeedback</span>
+          <span class="description">Generate HRV biofeedback session</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ breathing_pace, duration, target_hrv, session_type }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">🏥 HealthKit</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-POST">POST</span>
+          <span class="path">/healthkit/import</span>
+          <span class="description">Import HealthKit data</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ imported_types, record_count, compatibility }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">🌍 Internationalization</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-GET">GET</span>
+          <span class="path">/i18n/strings/{locale}</span>
+          <span class="description">Get localized UI strings</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ locale, strings: { key: value }, direction: 'ltr'|'rtl' }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">♿ Accessibility</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-GET">GET</span>
+          <span class="path">/accessibility/score</span>
+          <span class="description">Score workout accessibility</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ score, wheelchair_friendly, low_impact, seated_alternatives }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">🩺 Illness Detection</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-GET">GET</span>
+          <span class="path">/illness/warning</span>
+          <span class="description">Early illness warning from multi-signal analysis</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ probability, severity, signals: [{ metric, deviation, baseline }] }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">💪 Recovery</h2>
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+          <span class="method method-GET">GET</span>
+          <span class="path">/recovery/readiness</span>
+          <span class="description">Training readiness score</span>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="response">
+            <div class="response-label">Response:</div>
+            <code>{ score, phase: 'overreaching'|'recovered'|'peaked'|'detrained', sports: {...} }</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleEndpoint(header) {
+      const body = header.nextElementSibling;
+      const arrow = header.querySelector('.arrow');
+      body.classList.toggle('show');
+      arrow.classList.toggle('open');
+    }
+  </script>
+</body>
+</html>
