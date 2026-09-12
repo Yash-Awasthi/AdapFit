@@ -17,8 +17,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy application code. `src/` is required: 29 imports across the endpoint
+# layer read `src.*`, and main.py adds the project root to sys.path to reach
+# them. Without it those endpoints fail to import inside the image.
 COPY backend/ .
+COPY src/ ./src/
 
 # Expose port
 EXPOSE 8000

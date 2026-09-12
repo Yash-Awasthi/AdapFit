@@ -11,6 +11,7 @@ Classification follows AHA/ACC 2017 guidelines:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Sequence
 
@@ -158,7 +159,7 @@ def analyze_trends(readings: Sequence[BPReading]) -> BPTrend | None:
     diff_s = second_s - first_s
     diff_d = second_d - first_d
 
-    def trend方向(diff: float) -> str:
+    def trend_direction(diff: float) -> str:
         if diff > 3:
             return "rising"
         elif diff < -3:
@@ -179,8 +180,8 @@ def analyze_trends(readings: Sequence[BPReading]) -> BPTrend | None:
     return BPTrend(
         mean_systolic=round(mean_s, 1),
         mean_diastolic=round(mean_d, 1),
-        systolic_trend=trend方向(diff_s),
-        diastolic_trend=trend方向(diff_d),
+        systolic_trend=trend_direction(diff_s),
+        diastolic_trend=trend_direction(diff_d),
         variability_systolic=round(var_s**0.5, 1),
         variability_diastolic=round(var_d**0.5, 1),
         reading_count=len(readings),
@@ -280,3 +281,171 @@ def assess_risk(
         factors=factors,
         recommendation=rec,
     )
+
+
+# ── Stateful service ─────────────────────────────────────────────────────────
+# The functions above are pure. The blood-pressure endpoints log readings and
+# read them back, so this holds the log and exposes the same analysis as
+# JSON-ready dicts.
+
+SYSTOLIC_RANGE = (50, 300)
+DIASTOLIC_RANGE = (20, 200)
+PULSE_RANGE = (20, 250)
+
+
+class BloodPressureService:
+    """In-memory blood-pressure log with trend and report views."""
+
+    MAX_READINGS = 500
+
+    def __init__(self) -> None:
+        self._readings: list[dict] = []
+
+    def log_reading(
+        self,
+        systolic: int,
+        diastolic: int,
+        pulse: int | None = None,
+        context: str = "resting",
+        notes: str = "",
+    ) -> dict:
+        if not SYSTOLIC_RANGE[0] <= systolic <= SYSTOLIC_RANGE[1]:
+            raise ValueError(
+                f"Systolic must be between {SYSTOLIC_RANGE[0]} and {SYSTOLIC_RANGE[1]} mmHg"
+            )
+        if not DIASTOLIC_RANGE[0] <= diastolic <= DIASTOLIC_RANGE[1]:
+            raise ValueError(
+                f"Diastolic must be between {DIASTOLIC_RANGE[0]} and {DIASTOLIC_RANGE[1]} mmHg"
+            )
+        if systolic <= diastolic:
+            raise ValueError("Systolic must be greater than diastolic")
+        if pulse is not None and not PULSE_RANGE[0] <= pulse <= PULSE_RANGE[1]:
+            raise ValueError(
+                f"Pulse must be between {PULSE_RANGE[0]} and {PULSE_RANGE[1]} bpm"
+            )
+
+        timestamp = datetime.now(timezone.utc).isoformat()
+        reading = BPReading(systolic=float(systolic), diastolic=float(diastolic), timestamp=timestamp)
+        classification = classify_reading(reading)
+
+        entry = {
+            "systolic": systolic,
+            "diastolic": diastolic,
+            "pulse": pulse,
+            "context": context,
+            "notes": notes,
+            "timestamp": timestamp,
+            "classification": classification.classification.value,
+            "description": classification.description,
+            "pulse_pressure": classification.pulse_pressure,
+            "mean_arterial_pressure": classification.mean_arterial_pressure,
+        }
+        self._readings.append(entry)
+        if len(self._readings) > self.MAX_READINGS:
+            self._readings = self._readings[-self.MAX_READINGS:]
+        return entry
+
+    def _as_readings(self, entries: list[dict]) -> list[BPReading]:
+        return [
+            BPReading(
+                systolic=float(e["systolic"]),
+                diastolic=float(e["diastolic"]),
+                timestamp=e.get("timestamp"),
+            )
+            for e in entries
+        ]
+
+    def _recent(self, days: int) -> list[dict]:
+        if days <= 0:
+            return []
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        recent = []
+        for entry in self._readings:
+            try:
+                recorded = datetime.fromisoformat(entry["timestamp"])
+            except (KeyError, ValueError):
+                continue
+            if recorded >= cutoff:
+                recent.append(entry)
+        return recent
+
+    def get_today_readings(self) -> list[dict]:
+        today = datetime.now(timezone.utc).date()
+        readings = []
+        for entry in self._readings:
+            try:
+                recorded = datetime.fromisoformat(entry["timestamp"]).date()
+            except (KeyError, ValueError):
+                continue
+            if recorded == today:
+                readings.append(entry)
+        return readings
+
+    def get_trend(self, days: int = 30) -> dict:
+        entries = self._recent(days)
+        trend = analyze_trends(self._as_readings(entries))
+        if trend is None:
+            return {
+                "days": days,
+                "reading_count": len(entries),
+                "trend": "insufficient_data",
+                "detail": "At least three readings are needed to describe a trend.",
+            }
+        return {
+            "days": days,
+            "reading_count": trend.reading_count,
+            "mean_systolic": trend.mean_systolic,
+            "mean_diastolic": trend.mean_diastolic,
+            "systolic_trend": trend.systolic_trend,
+            "diastolic_trend": trend.diastolic_trend,
+            "variability_systolic": trend.variability_systolic,
+            "variability_diastolic": trend.variability_diastolic,
+            "classification_distribution": trend.classification_distribution,
+        }
+
+    def get_doctor_report(self) -> dict:
+        if not self._readings:
+            return {
+                "reading_count": 0,
+                "summary": "No blood pressure readings have been logged.",
+                "recommendation": "Begin regular blood pressure monitoring.",
+            }
+
+        readings = self._as_readings(self._readings)
+        latest = readings[-1]
+        classification = classify_reading(latest)
+        risk = assess_risk(readings)
+        trend = self.get_trend(30)
+
+        return {
+            "reading_count": len(self._readings),
+            "latest": {
+                "systolic": latest.systolic,
+                "diastolic": latest.diastolic,
+                "timestamp": latest.timestamp,
+                "classification": classification.classification.value,
+                "description": classification.description,
+            },
+            "pulse_pressure": {
+                "value": classification.pulse_pressure,
+                "interpretation": interpret_pulse_pressure(classification.pulse_pressure),
+            },
+            "mean_arterial_pressure": {
+                "value": classification.mean_arterial_pressure,
+                "interpretation": interpret_map(classification.mean_arterial_pressure),
+            },
+            "trend": trend,
+            "risk": {
+                "overall_risk": risk.overall_risk,
+                "risk_score": risk.risk_score,
+                "factors": risk.factors,
+                "recommendation": risk.recommendation,
+            },
+            "note": (
+                "This report is generated from self-reported readings and is not a "
+                "diagnosis. Take it to a clinician for interpretation."
+            ),
+        }
+
+
+blood_pressure_service = BloodPressureService()

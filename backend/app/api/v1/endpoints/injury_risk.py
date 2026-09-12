@@ -1,7 +1,7 @@
 """
 Injury Risk Prediction API endpoints.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from app.services.injury_risk_engine import injury_risk_engine
@@ -30,7 +30,10 @@ async def analyze_injury_risk(req: InjuryAnalysisRequest):
 async def get_region_risk(user_id: str, region: str):
     """Get risk prediction for a specific body region."""
     workout_logs = await storage.get_workout_logs(user_id, 28)
-    result = injury_risk_engine.predict_region_risk(workout_logs, region)
+    try:
+        result = injury_risk_engine.predict_region_risk(workout_logs, region)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown body region: {region}")
     result["user_id"] = user_id
     return result
 

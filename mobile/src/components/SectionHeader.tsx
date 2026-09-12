@@ -1,18 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../services/theme';
+import { spacing } from '../theme';
 
 interface Props {
   title: string;
   action?: string;
   onAction?: () => void;
+  /** Icon element to render before the title */
+  icon?: React.ReactNode;
 }
 
-export function SectionHeader({ title, action, onAction }: Props) {
+export function SectionHeader({ title, action, onAction, icon }: Props) {
   const { theme } = useTheme();
   return (
     <View style={styles.container}>
-      <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+      <View style={styles.titleRow}>
+        {icon}
+        <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+      </View>
       {action && (
         <Text style={[styles.action, { color: theme.primary }]} onPress={onAction}>
           {action}
@@ -27,8 +33,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    marginTop: 8,
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   title: {
     fontSize: 18,
@@ -36,5 +47,6 @@ const styles = StyleSheet.create({
   },
   action: {
     fontSize: 14,
+    fontWeight: '600',
   },
 });

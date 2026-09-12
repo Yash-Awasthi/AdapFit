@@ -1,18 +1,23 @@
 /**
  * Gesture System — Swipe, Pull, Tap, Long Press Utilities
- * Enhanced UX with haptic feedback and smooth transitions
+ * Enhanced UX with haptic feedback and smooth transitions.
+ * All animations use Reanimated worklets (UI thread).
  */
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import {
-  View, Text, TouchableOpacity, StyleSheet, Animated,
-  PanResponder, Dimensions, Platform, Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+  FadeInDown,
+} from 'react-native-reanimated';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme';
 import * as Haptics from 'expo-haptics';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
 
 // ===== SWIPEABLE CARD =====
@@ -28,64 +33,60 @@ interface SwipeableCardProps {
 export const SwipeableCard: React.FC<SwipeableCardProps> = ({
   children, onSwipeLeft, onSwipeRight, leftAction, rightAction, style,
 }) => {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const [swiping, setSwiping] = useState(false);
+  const translateX = useSharedValue(0);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderMove: (_, gesture) => {
-        translateX.setValue(gesture.dx);
-        setSwiping(true);
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx < -SWIPE_THRESHOLD && onSwipeLeft) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          onSwipeLeft();
-        } else if (gesture.dx > SWIPE_THRESHOLD && onSwipeRight) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          onSwipeRight();
-        }
-        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-        setSwiping(false);
-      },
+  const triggerHaptic = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      translateX.value = e.translationX;
     })
-  ).current;
+    .onEnd((e) => {
+      if (e.translationX < -SWIPE_THRESHOLD && onSwipeLeft) {
+        runOnJS(triggerHaptic)();
+        runOnJS(onSwipeLeft)();
+      } else if (e.translationX > SWIPE_THRESHOLD && onSwipeRight) {
+        runOnJS(triggerHaptic)();
+        runOnJS(onSwipeRight)();
+      }
+      translateX.value = withSpring(0, { damping: 15, stiffness: 300 });
+    });
 
-  const leftActionOpacity = translateX.interpolate({
-    inputRange: [-100, -50, 0],
-    outputRange: [1, 0.5, 0],
-  });
-  const rightActionOpacity = translateX.interpolate({
-    inputRange: [0, 50, 100],
-    outputRange: [0, 0.5, 1],
-  });
+  const leftActionStyle = useAnimatedStyle(() => ({
+    opacity: translateX.value < -50 ? Math.min(1, Math.abs(translateX.value + 50) / 50) : 0,
+  }));
+
+  const rightActionStyle = useAnimatedStyle(() => ({
+    opacity: translateX.value > 50 ? Math.min(1, (translateX.value - 50) / 50) : 0,
+  }));
+
+  const contentStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
 
   return (
     <View style={[styles.swipeableContainer, style]}>
-      {/* Left Action */}
       {leftAction && (
-        <Animated.View style={[styles.swipeActionLeft, { opacity: leftActionOpacity, backgroundColor: leftAction.color }]}>
+        <Animated.View style={[styles.swipeActionLeft, leftActionStyle, { backgroundColor: leftAction.color }]}>
           <Ionicons name={leftAction.icon as any} size={24} color="#FFF" />
           <Text style={styles.swipeActionText}>{leftAction.label}</Text>
         </Animated.View>
       )}
 
-      {/* Right Action */}
       {rightAction && (
-        <Animated.View style={[styles.swipeActionRight, { opacity: rightActionOpacity, backgroundColor: rightAction.color }]}>
+        <Animated.View style={[styles.swipeActionRight, rightActionStyle, { backgroundColor: rightAction.color }]}>
           <Ionicons name={rightAction.icon as any} size={24} color="#FFF" />
           <Text style={styles.swipeActionText}>{rightAction.label}</Text>
         </Animated.View>
       )}
 
-      {/* Card Content */}
-      <Animated.View
-        style={[styles.swipeableContent, { transform: [{ translateX }] }]}
-        {...panResponder.panHandlers}
-      >
-        {children}
-      </Animated.View>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[styles.swipeableContent, contentStyle]}>
+          {children}
+        </Animated.View>
+      </GestureDetector>
     </View>
   );
 };
@@ -99,23 +100,26 @@ interface PullToRefreshProps {
 
 export const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, color = colors.primary }) => {
   const [refreshing, setRefreshing] = useState(false);
-  const spinAnim = useRef(new Animated.Value(0)).current;
+  const rotation = useSharedValue(0);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Animated.loop(Animated.timing(spinAnim, { toValue: 1, duration: 1000, useNativeDriver: true })).start();
+    rotation.value = withTiming(360, { duration: 1000 });
     await onRefresh();
-    spinAnim.stopAnimation();
-    spinAnim.setValue(0);
+    rotation.value = 0;
     setRefreshing(false);
   };
+
+  const spinStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
 
   return (
     <View style={styles.pullContainer}>
       {refreshing && (
         <View style={styles.refreshIndicator}>
-          <Animated.View style={{ transform: [{ rotate: spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
+          <Animated.View style={spinStyle}>
             <Ionicons name="refresh" size={20} color={color} />
           </Animated.View>
         </View>
@@ -136,12 +140,18 @@ interface SwipeableTabBarProps {
 export const SwipeableTabBar: React.FC<SwipeableTabBarProps> = ({
   tabs, activeTab, onTabChange, color = colors.primary,
 }) => {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const tabWidth = SCREEN_WIDTH / tabs.length;
+  const { width: screenWidth } = useWindowDimensions();
+  const tabWidth = screenWidth / tabs.length;
+  const indicatorX = useSharedValue(0);
 
-  useEffect(() => {
-    Animated.spring(translateX, { toValue: activeTab * tabWidth, useNativeDriver: true, tension: 50, friction: 10 }).start();
-  }, [activeTab]);
+  React.useEffect(() => {
+    indicatorX.value = withSpring(activeTab * tabWidth, { damping: 15, stiffness: 300 });
+  }, [activeTab, tabWidth]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    width: tabWidth,
+    transform: [{ translateX: indicatorX.value }],
+  }));
 
   return (
     <View style={styles.tabBarContainer}>
@@ -167,14 +177,7 @@ export const SwipeableTabBar: React.FC<SwipeableTabBarProps> = ({
         ))}
       </View>
       <Animated.View
-        style={[
-          styles.tabIndicator,
-          {
-            width: tabWidth,
-            backgroundColor: color,
-            transform: [{ translateX }],
-          },
-        ]}
+        style={[styles.tabIndicator, { backgroundColor: color }, indicatorStyle]}
       />
     </View>
   );
@@ -192,18 +195,14 @@ interface HapticButtonProps {
 export const HapticButton: React.FC<HapticButtonProps> = ({
   children, onPress, haptic = 'medium', style, disabled,
 }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const scale = useSharedValue(1);
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
-  };
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 50, friction: 3 }).start();
-  };
-
-  const handlePress = () => {
-    const hapticMap: Record<string, any> = {
+  const triggerHaptic = useCallback(() => {
+    const hapticMap: Record<string, Haptics.ImpactFeedbackStyle> = {
       light: Haptics.ImpactFeedbackStyle.Light,
       medium: Haptics.ImpactFeedbackStyle.Medium,
       heavy: Haptics.ImpactFeedbackStyle.Heavy,
@@ -212,23 +211,27 @@ export const HapticButton: React.FC<HapticButtonProps> = ({
       warning: Haptics.ImpactFeedbackStyle.Medium,
       error: Haptics.ImpactFeedbackStyle.Light,
     };
-
     Haptics.impactAsync(hapticMap[haptic] || Haptics.ImpactFeedbackStyle.Medium);
-    onPress();
-  };
+  }, [haptic]);
+
+  const tapGesture = Gesture.Tap()
+    .onBegin(() => {
+      scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
+    })
+    .onFinalize(() => {
+      scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    })
+    .onEnd(() => {
+      runOnJS(triggerHaptic)();
+      runOnJS(onPress)();
+    });
 
   return (
-    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
-      <TouchableOpacity
-        onPress={handlePress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        disabled={disabled}
-        activeOpacity={0.8}
-      >
+    <GestureDetector gesture={tapGesture}>
+      <Animated.View style={[animatedStyle, style]}>
         {children}
-      </TouchableOpacity>
-    </Animated.View>
+      </Animated.View>
+    </GestureDetector>
   );
 };
 
@@ -241,23 +244,48 @@ interface LongPressCardProps {
 }
 
 export const LongPressCard: React.FC<LongPressCardProps> = ({ children, onLongPress, onPress, style }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const triggerHaptic = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  }, []);
+
+  const longPressGesture = Gesture.LongPress()
+    .minDuration(500)
+    .onBegin(() => {
+      scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
+    })
+    .onFinalize(() => {
+      scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    })
+    .onEnd(() => {
+      runOnJS(triggerHaptic)();
+      runOnJS(onLongPress)();
+    });
+
+  const tapGesture = Gesture.Tap()
+    .onBegin(() => {
+      scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
+    })
+    .onFinalize(() => {
+      scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    })
+    .onEnd(() => {
+      if (onPress) runOnJS(onPress)();
+    });
+
+  const composed = Gesture.Race(longPressGesture, tapGesture);
 
   return (
-    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
-      <TouchableOpacity
-        onPress={onPress}
-        onPressIn={() => Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true }).start()}
-        onPressOut={() => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 50, friction: 3 }).start()}
-        onLongPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-          onLongPress();
-        }}
-        activeOpacity={0.9}
-      >
+    <GestureDetector gesture={composed}>
+      <Animated.View style={[animatedStyle, style]}>
         {children}
-      </TouchableOpacity>
-    </Animated.View>
+      </Animated.View>
+    </GestureDetector>
   );
 };
 

@@ -1,5 +1,5 @@
 """Body Composition, Hydration & Blood Pressure API"""
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.services.body_composition import body_composition_service
@@ -67,7 +67,10 @@ async def get_hydration_recommendations():
 # Blood Pressure
 @router.post("/bp/log")
 async def log_bp(request: BPLogRequest):
-    return blood_pressure_service.log_reading(request.systolic, request.diastolic, request.pulse, request.context, request.notes)
+    try:
+        return blood_pressure_service.log_reading(request.systolic, request.diastolic, request.pulse, request.context, request.notes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 @router.get("/bp/today")
 async def get_bp_today():

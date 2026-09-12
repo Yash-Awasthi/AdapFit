@@ -1,68 +1,106 @@
 import React from 'react';
-import { Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { useDevSettings } from '../services/devSettings';
 import { useTheme } from '../services/theme';
+import { colors, radius, spacing } from '../theme';
 
 interface Props {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   disabled?: boolean;
   accessibilityLabel?: string;
   accessibilityHint?: string;
 }
 
-export function Button({ title, onPress, variant = 'primary', loading, disabled, accessibilityLabel, accessibilityHint }: Props) {
+export function Button({
+  title,
+  onPress,
+  variant = 'primary',
+  size = 'md',
+  loading,
+  disabled,
+  accessibilityLabel,
+  accessibilityHint,
+}: Props) {
   const { reduceMotion } = useDevSettings();
   const { theme } = useTheme();
   const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const variantColorStyle =
-    variant === 'primary'
-      ? { backgroundColor: theme.primary }
-      : variant === 'secondary'
-      ? { backgroundColor: theme.surface }
-      : null;
-  const textColorStyle =
-    variant === 'primary' ? { color: '#fff' } : variant === 'secondary' ? { color: theme.text } : { color: theme.primaryLight };
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const tapGesture = Gesture.Tap()
+    .onBegin(() => {
+      if (!reduceMotion) scale.value = withSpring(0.96, { damping: 15, stiffness: 300 });
+    })
+    .onFinalize(() => {
+      if (!reduceMotion) scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    })
+    .onEnd(() => {
+      if (!disabled && !loading) {
+        Haptics.selectionAsync();
+        onPress();
+      }
+    });
+
+  const variantStyles = {
+    primary: {
+      container: { backgroundColor: theme.primary },
+      text: { color: '#fff' },
+    },
+    secondary: {
+      container: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
+      text: { color: theme.text },
+    },
+    ghost: {
+      container: { backgroundColor: 'transparent' },
+      text: { color: theme.primaryLight },
+    },
+    danger: {
+      container: { backgroundColor: theme.danger },
+      text: { color: '#fff' },
+    },
+  }[variant];
+
+  const sizeStyles = {
+    sm: { paddingVertical: 8, paddingHorizontal: 16 },
+    md: { paddingVertical: 14, paddingHorizontal: 24 },
+    lg: { paddingVertical: 18, paddingHorizontal: 32 },
+  }[size];
 
   return (
-    <Pressable
-      onPressIn={() => { if (!reduceMotion) scale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
-      onPressOut={() => { if (!reduceMotion) scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
-      onPress={() => { if (!disabled && !loading) { Haptics.selectionAsync(); onPress(); } }}
-      disabled={disabled || loading}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint={accessibilityHint}
-      accessibilityRole="button"
-    >
+    <GestureDetector gesture={tapGesture}>
       <Animated.View
-        style={[styles.button, variant === 'ghost' && styles.ghost, variantColorStyle, disabled && styles.disabled, animatedStyle]}
+        style={[
+          styles.button,
+          sizeStyles,
+          variantStyles.container,
+          disabled && styles.disabled,
+          animatedStyle,
+        ]}
       >
         {loading ? (
-          <ActivityIndicator color={variant === 'primary' ? '#fff' : theme.primaryLight} />
+          <ActivityIndicator color={variant === 'primary' || variant === 'danger' ? '#fff' : theme.primaryLight} />
         ) : (
-          <Text style={[styles.text, textColorStyle]}>{title}</Text>
+          <Text style={[styles.text, variantStyles.text]}>{title}</Text>
         )}
       </Animated.View>
-    </Pressable>
+    </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: radius.button,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  ghost: {
-    backgroundColor: 'transparent',
   },
   disabled: {
     opacity: 0.5,

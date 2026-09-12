@@ -6,6 +6,7 @@ import logging
 import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.core.config import settings
+from app.core.dependencies import authenticate_websocket
 from app.core.gemini import DEFAULT_MODEL, extract_text, gemini_endpoint
 from app.services.rag_knowledge import rag_retriever
 from app.services.chat_actions import maybe_execute_action
@@ -83,6 +84,12 @@ def _rule_fallback(message: str) -> str:
 @router.websocket("/ws/{user_id}")
 async def chat_websocket(websocket: WebSocket, user_id: str):
     """WebSocket endpoint for streaming AI coach responses token-by-token."""
+    # The path names the user whose conversation this is; only that user (or an
+    # admin) may open it. authenticate_websocket closes the socket on refusal.
+    user = await authenticate_websocket(websocket, expected_user_id=user_id)
+    if user is None:
+        return
+
     await websocket.accept()
     history: list[dict] = []
 

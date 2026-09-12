@@ -29,10 +29,10 @@ _PG_SEARCH_SQL = """
     LIMIT $5
 """
 
-# ponytail: asyncpg pools are bound to the loop that created them. All pgvector
-# calls run on this one dedicated background loop so the pool stays usable
-# across sync calls; a future caller of get_pool() on the main loop would need
-# to route through this same bridge instead.
+# asyncpg pools are bound to the loop that created them. All pgvector calls run
+# on this one dedicated background loop so the pool stays usable across sync
+# calls; a future caller of get_pool() on the main loop would need to route
+# through this same bridge instead.
 _bg_loop: Optional[asyncio.AbstractEventLoop] = None
 _bg_lock = threading.Lock()
 

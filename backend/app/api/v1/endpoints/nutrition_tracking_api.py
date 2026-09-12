@@ -1,5 +1,5 @@
 """Nutrition tracking — macro analysis, TDEE, meal quality scoring, dietary restrictions."""
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.services.nutrition_tracking import (
@@ -57,7 +57,10 @@ async def analyze_nutrition(req: DailyIntakeInput):
         target_protein_g=req.target_protein_g,
         target_water_ml=req.target_water_ml,
     )
-    return analyze_daily_intake(intake, req.diet)
+    try:
+        return analyze_daily_intake(intake, req.diet)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown dietary profile: {req.diet}")
 
 
 @router.post("/tdee")

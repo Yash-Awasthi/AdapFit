@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from app.services.fitness_assessment import (
-    estimate_1rm, assess_strength, assess_fitness_test,
+    estimate_1rm, assess_lift_strength, assess_fitness_test,
     available_tests, OneRepMaxEstimate, FitnessTest,
 )
 
@@ -33,14 +33,17 @@ class FitnessAssessment(BaseModel):
 async def calculate_one_rm(request: OneRMRequest):
     """Estimate 1RM from a set of weight x reps."""
     if request.bodyweight_kg:
-        return assess_strength(request.exercise, request.weight_kg, request.reps, request.bodyweight_kg)
+        return assess_lift_strength(request.exercise, request.weight_kg, request.reps, request.bodyweight_kg)
     return estimate_1rm(request.weight_kg, request.reps, request.exercise)
 
 
 @router.post("/test", response_model=FitnessTest)
 async def run_fitness_test(request: FitnessTestRequest):
     """Assess a fitness test result."""
-    return assess_fitness_test(request.test_id, request.result)
+    try:
+        return assess_fitness_test(request.test_id, request.result)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown fitness test: {request.test_id}")
 
 
 @router.get("/tests", response_model=list)

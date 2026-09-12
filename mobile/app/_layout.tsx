@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "../src/services/theme";
+import { QueryProvider } from "../src/services/query-provider";
 import { DevSettingsProvider } from "../src/services/devSettings";
 import { useUserStore } from "../src/stores";
 import { useEffect } from "react";
@@ -76,9 +77,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
-          <DevSettingsProvider>
-            <RootStack />
-          </DevSettingsProvider>
+          <QueryProvider>
+            <DevSettingsProvider>
+              <RootStack />
+            </DevSettingsProvider>
+          </QueryProvider>
         </ThemeProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

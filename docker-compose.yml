@@ -1,8 +1,6 @@
 # AdapFit — Docker Compose
 # Full production stack: Backend + PostgreSQL + Redis + Nginx
 
-version: '3.8'
-
 services:
   # Backend API
   backend:
@@ -15,7 +13,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://adapfit:adapfit_secret@postgres:5432/adapfit
+      - DATABASE_URL=postgresql://adapfit:${POSTGRES_PASSWORD:-adapfit_dev_only}@postgres:5432/adapfit
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-in-production}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
@@ -46,9 +44,12 @@ services:
     environment:
       POSTGRES_DB: adapfit
       POSTGRES_USER: adapfit
-      POSTGRES_PASSWORD: adapfit_secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-adapfit_dev_only}
     ports:
-      - "5432:5432"
+      # Bound to loopback: publishing 5432 on every interface exposes the
+      # database to the host's network. Only the backend container needs it,
+      # and it reaches postgres over the compose network regardless.
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/docs/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
@@ -66,7 +67,7 @@ services:
     container_name: adapfit-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:

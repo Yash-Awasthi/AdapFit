@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import Optional
 
+from app.core.dependencies import authenticate_websocket
+
 router = APIRouter()
 
 # Active connections: user_id -> {sensor_type -> websocket}
@@ -47,6 +49,12 @@ async def sensor_websocket(websocket: WebSocket, user_id: str):
     Client sends: {"type": "sensor_data", "sensor": "hr", "data": {"bpm": 145}}
     Server responds: {"type": "biometrics", "hr": 145, "hrv": 42, "timestamp": "..."}
     """
+    # Frames land in the buffer keyed by the path user_id, so the caller has to
+    # be that user (or an admin). authenticate_websocket closes on refusal.
+    user = await authenticate_websocket(websocket, expected_user_id=user_id)
+    if user is None:
+        return
+
     await websocket.accept()
 
     sensor_type = "unknown"
