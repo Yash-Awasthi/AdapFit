@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 
 class FitnessLevel(Enum):
     EXCELLENT = "Excellent"
@@ -232,3 +234,218 @@ def generate_assessment_report(profile: FitnessProfile) -> dict[str, Any]:
         "recommendations": all_recommendations,
         "bmi": round(profile.bmi, 1),
     }
+
+
+# ── Endpoint-facing models ───────────────────────────────────────────────────
+# The assessment above works in dataclasses and phase functions. The API layer
+# needs flat, serializable shapes, so these models are the wire format and the
+# functions below are the only entry points the endpoints import.
+
+class OneRepMaxEstimate(BaseModel):
+    """Estimated one-rep max for a single lift."""
+    exercise: str
+    weight_kg: float
+    reps: int
+    estimated_1rm: float
+    formula: str = "epley"
+    # Present only when a bodyweight was supplied, so the lift can be read
+    # relative to the person rather than in absolute kilograms.
+    relative_strength: float | None = None
+    level: str | None = None
+    recommendations: list[str] = Field(default_factory=list)
+
+
+class FitnessTest(BaseModel):
+    """A scored result for one standardised fitness test."""
+    test_id: str
+    name: str
+    unit: str
+    result: float
+    rating: str
+    percentile: int
+    level: str
+    recommendations: list[str] = Field(default_factory=list)
+
+
+# Standardised tests, each with descending bands of (minimum result, rating,
+# percentile). A result earns the first band whose minimum it reaches, which is
+# why the bands must stay in descending order.
+FITNESS_TESTS: dict[str, dict[str, Any]] = {
+    "pushups_1min": {
+        "name": "Push-ups (1 minute)",
+        "unit": "reps",
+        "bands": [
+            (50, "excellent", 95),
+            (40, "above_average", 80),
+            (30, "average", 60),
+            (15, "below_average", 25),
+            (0, "poor", 5),
+        ],
+    },
+    "situps_1min": {
+        "name": "Sit-ups (1 minute)",
+        "unit": "reps",
+        "bands": [
+            (45, "excellent", 95),
+            (35, "above_average", 80),
+            (25, "average", 60),
+            (12, "below_average", 25),
+            (0, "poor", 5),
+        ],
+    },
+    "plank_hold": {
+        "name": "Plank hold",
+        "unit": "seconds",
+        "bands": [
+            (180, "excellent", 95),
+            (120, "above_average", 80),
+            (60, "average", 60),
+            (30, "below_average", 25),
+            (0, "poor", 5),
+        ],
+    },
+    "squat_1rm_ratio": {
+        "name": "Back squat (multiple of bodyweight)",
+        "unit": "ratio",
+        "bands": [
+            (1.75, "excellent", 95),
+            (1.25, "above_average", 80),
+            (0.75, "average", 60),
+            (0.5, "below_average", 25),
+            (0.0, "poor", 5),
+        ],
+    },
+    "deadlift_1rm_ratio": {
+        "name": "Deadlift (multiple of bodyweight)",
+        "unit": "ratio",
+        "bands": [
+            (2.0, "excellent", 95),
+            (1.5, "above_average", 80),
+            (1.0, "average", 60),
+            (0.5, "below_average", 25),
+            (0.0, "poor", 5),
+        ],
+    },
+    "sit_reach": {
+        "name": "Sit and reach",
+        "unit": "cm",
+        "bands": [
+            (35, "excellent", 95),
+            (25, "above_average", 80),
+            (15, "average", 60),
+            (5, "below_average", 25),
+            (float("-inf"), "poor", 5),
+        ],
+    },
+}
+
+# Ratio benchmarks used to turn a lift's 1RM into a level, keyed by exercise
+# family. Values are multiples of bodyweight for an average lift.
+LIFT_RATIO_NORMS: dict[str, float] = {
+    "bench": 0.75,
+    "bench press": 0.75,
+    "squat": 1.0,
+    "back squat": 1.0,
+    "deadlift": 1.25,
+    "overhead press": 0.5,
+    "press": 0.5,
+    "row": 0.75,
+    "barbell row": 0.75,
+}
+
+
+def estimate_1rm(weight_kg: float, reps: int, exercise: str) -> OneRepMaxEstimate:
+    """Estimate a one-rep max from a weight x reps set.
+
+    Delegates to the shared Epley implementation so a 1RM means the same thing
+    wherever it is calculated.
+    """
+    from app.services.openweight_format import estimate_1rm as epley_1rm
+
+    estimated = epley_1rm(weight_kg, reps)
+    recommendations = []
+    if reps > 12:
+        recommendations.append(
+            "Sets above 12 reps give a rough 1RM estimate; use a set of 3-6 reps for accuracy."
+        )
+    return OneRepMaxEstimate(
+        exercise=exercise,
+        weight_kg=weight_kg,
+        reps=reps,
+        estimated_1rm=round(estimated, 1),
+        recommendations=recommendations,
+    )
+
+
+def assess_lift_strength(
+    exercise: str,
+    weight_kg: float,
+    reps: int,
+    bodyweight_kg: float,
+) -> OneRepMaxEstimate:
+    """Estimate a one-rep max and read it relative to the lifter's bodyweight."""
+    estimate = estimate_1rm(weight_kg, reps, exercise)
+    if bodyweight_kg <= 0:
+        return estimate
+
+    ratio = estimate.estimated_1rm / bodyweight_kg
+    norm = LIFT_RATIO_NORMS.get(exercise.strip().lower(), 1.0)
+    # Half the average ratio scores 0, twice it scores 100, so an average lift
+    # lands mid-scale rather than at either end.
+    score = max(0.0, min(100.0, ratio / (2 * norm) * 100))
+
+    recommendations = list(estimate.recommendations)
+    if ratio < norm:
+        recommendations.append(
+            f"A {exercise} of {ratio:.2f}x bodyweight is below the {norm:.2f}x average "
+            "for this lift; add volume before peaking."
+        )
+    return estimate.model_copy(
+        update={
+            "relative_strength": round(ratio, 2),
+            "level": classify_level(score).value,
+            "recommendations": recommendations,
+        }
+    )
+
+
+def assess_fitness_test(test_id: str, result: float) -> FitnessTest:
+    """Score a standardised test result against its normative bands."""
+    spec = FITNESS_TESTS.get(test_id)
+    if spec is None:
+        raise KeyError(test_id)
+
+    rating, percentile = "poor", 5
+    for minimum, band_rating, band_percentile in spec["bands"]:
+        if result >= minimum:
+            rating, percentile = band_rating, band_percentile
+            break
+
+    level = classify_level(float(percentile))
+    recommendations = []
+    if rating in ("poor", "below_average"):
+        recommendations.append(
+            f"Build up gradually: repeat {spec['name'].lower()} twice a week and "
+            "retest in four weeks."
+        )
+    elif rating in ("excellent",):
+        recommendations.append("Maintain this with one hard session a week.")
+
+    return FitnessTest(
+        test_id=test_id,
+        name=spec["name"],
+        unit=spec["unit"],
+        result=result,
+        rating=rating,
+        percentile=percentile,
+        level=level.value,
+        recommendations=recommendations,
+    )
+
+
+def available_tests() -> list[dict[str, Any]]:
+    """Catalogue of the tests that can be scored, without their bands."""
+    return [
+        {"test_id": test_id, "name": spec["name"], "unit": spec["unit"]}
+        for test_id, spec in FITNESS_TESTS.items()
+    ]

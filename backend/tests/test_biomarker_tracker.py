@@ -1,213 +1,175 @@
-"""Tests for Biomarker Tracker."""
+"""Tests for Biomarker Tracker — matches actual service API."""
 import pytest
+from datetime import datetime
 from app.services.biomarker_tracker import (
-    parse_reference_range,
-    classify_value,
-    compute_deviation_pct,
-    detect_trend,
-    analyze_biomarker,
-    analyze_panel,
-    track_longitudinal_changes,
-    generate_clinical_summary,
-    Biomarker,
-    REFERENCE_RANGES,
+    BiomarkerStatus,
+    ReferenceRange,
+    BiomarkerReading,
+    BiomarkerTrend,
+    classify_biomarker,
+    status_severity,
+    analyze_trend,
+    convert_unit,
+    generate_biomarker_dashboard,
+    COMMON_REFERENCE_RANGES,
 )
 
 
-class TestParseReferenceRange:
-    def test_normal_range(self):
-        low, high = parse_reference_range("70-100")
-        assert low == 70.0
-        assert high == 100.0
-
-    def test_with_spaces(self):
-        low, high = parse_reference_range("  70 - 100  ")
-        assert low == 70.0
-        assert high == 100.0
-
-    def test_greater_than(self):
-        low, high = parse_reference_range(">60")
-        assert low == 60.0
-        assert high is None
-
-    def test_less_than(self):
-        low, high = parse_reference_range("<4.0")
-        assert low is None
-        assert high == 4.0
-
-    def test_empty(self):
-        low, high = parse_reference_range("")
-        assert low is None
-        assert high is None
-
-    def test_en_dash(self):
-        low, high = parse_reference_range("70–100")
-        assert low == 70.0
-        assert high == 100.0
-
-
-class TestClassifyValue:
+class TestClassifyBiomarker:
     def test_normal(self):
-        assert classify_value(85, 70, 100) == "normal"
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        assert classify_biomarker(85, ref) == BiomarkerStatus.NORMAL
 
     def test_low(self):
-        assert classify_value(65, 70, 100) == "low"
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        assert classify_biomarker(60, ref) == BiomarkerStatus.LOW
 
     def test_high(self):
-        assert classify_value(105, 70, 100) == "high"
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        assert classify_biomarker(110, ref) == BiomarkerStatus.HIGH
 
     def test_critical_low(self):
-        assert classify_value(40, 70, 100) == "critical_low"
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL", critical_low=50)
+        assert classify_biomarker(45, ref) == BiomarkerStatus.CRITICAL_LOW
 
     def test_critical_high(self):
-        assert classify_value(150, 70, 100) == "critical_high"
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL", critical_high=150)
+        assert classify_biomarker(160, ref) == BiomarkerStatus.CRITICAL_HIGH
 
-    def test_no_range(self):
-        assert classify_value(50) == "unknown"
+    def test_boundary_low(self):
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        assert classify_biomarker(70, ref) == BiomarkerStatus.NORMAL
 
-    def test_min_only(self):
-        assert classify_value(50, ref_min=60) == "low"
-        assert classify_value(70, ref_min=60) == "normal"
-
-    def test_max_only(self):
-        assert classify_value(50, ref_max=60) == "normal"
-        assert classify_value(70, ref_max=60) == "high"
+    def test_boundary_high(self):
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        assert classify_biomarker(100, ref) == BiomarkerStatus.NORMAL
 
 
-class TestDeviationPct:
-    def test_at_midpoint(self):
-        assert compute_deviation_pct(85, 70, 100) == 0.0
-
-    def test_above(self):
-        dev = compute_deviation_pct(95, 70, 100)
-        assert dev > 0
-
-    def test_below(self):
-        dev = compute_deviation_pct(75, 70, 100)
-        assert dev < 0
-
-    def test_no_range(self):
-        assert compute_deviation_pct(50) == 0.0
-
-
-class TestDetectTrend:
-    def test_rising(self):
-        values = [10, 12, 14, 16, 18, 20]
-        direction, slope = detect_trend(values)
-        assert direction == "rising"
-        assert slope > 0
-
-    def test_falling(self):
-        values = [20, 18, 16, 14, 12, 10]
-        direction, slope = detect_trend(values)
-        assert direction == "falling"
-        assert slope < 0
-
-    def test_stable(self):
-        values = [10, 10, 10, 10, 10]
-        direction, slope = detect_trend(values)
-        assert direction == "stable"
-
-    def test_insufficient(self):
-        direction, slope = detect_trend([10])
-        assert direction == "insufficient_data"
-
-
-class TestAnalyzeBiomarker:
+class TestStatusSeverity:
     def test_normal(self):
-        marker = Biomarker(
-            name="Glucose",
-            ref_range_min=70,
-            ref_range_max=100,
-            history=[("2024-01-01", 85), ("2024-02-01", 88), ("2024-03-01", 90)],
-        )
-        analysis = analyze_biomarker(marker)
-        assert analysis.name == "Glucose"
-        assert analysis.latest_value == 90
-        assert analysis.status == "normal"
-        assert analysis.data_points == 3
+        assert status_severity(BiomarkerStatus.NORMAL) == 0
 
-    def test_empty_history(self):
-        marker = Biomarker(name="Glucose")
-        analysis = analyze_biomarker(marker)
-        assert analysis.latest_value is None
+    def test_low(self):
+        assert status_severity(BiomarkerStatus.LOW) == 1
 
-    def test_abnormal(self):
-        marker = Biomarker(
-            name="Glucose",
-            ref_range_min=70,
-            ref_range_max=100,
-            history=[("2024-01-01", 110)],
-        )
-        analysis = analyze_biomarker(marker)
-        assert analysis.status == "high"
+    def test_high(self):
+        assert status_severity(BiomarkerStatus.HIGH) == 1
+
+    def test_critical_low(self):
+        assert status_severity(BiomarkerStatus.CRITICAL_LOW) == 4
+
+    def test_critical_high(self):
+        assert status_severity(BiomarkerStatus.CRITICAL_HIGH) == 4
 
 
-class TestAnalyzePanel:
-    def test_basic(self):
-        markers = [
-            Biomarker("Glucose", ref_range_min=70, ref_range_max=100, history=[("2024-01", 85)]),
-            Biomarker("Cholesterol", ref_range_min=0, ref_range_max=200, history=[("2024-01", 180)]),
+class TestAnalyzeTrend:
+    def _make_reading(self, name, value, day):
+        return BiomarkerReading(name=name, value=value, unit="mg/dL",
+                                timestamp=datetime(2024, 1, day))
+
+    def test_rising_trend(self):
+        readings = [self._make_reading("glucose", v, d)
+                    for d, v in enumerate([80, 85, 95, 110, 120], 1)]
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        trend = analyze_trend(readings, ref)
+        assert trend.trend_direction == "rising"
+        assert trend.change_rate > 0
+
+    def test_falling_trend(self):
+        readings = [self._make_reading("glucose", v, d)
+                    for d, v in enumerate([120, 110, 95, 85, 80], 1)]
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        trend = analyze_trend(readings, ref)
+        assert trend.trend_direction == "falling"
+
+    def test_stable_trend(self):
+        readings = [self._make_reading("glucose", v, d)
+                    for d, v in enumerate([85, 86, 85, 84, 85], 1)]
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        trend = analyze_trend(readings, ref)
+        assert trend.trend_direction == "stable"
+
+    def test_single_reading(self):
+        readings = [self._make_reading("glucose", 85, 1)]
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        trend = analyze_trend(readings, ref)
+        assert trend.status == BiomarkerStatus.NORMAL
+        assert trend.trend_direction == "stable"
+
+    def test_empty_raises(self):
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL")
+        with pytest.raises(ValueError):
+            analyze_trend([], ref)
+
+    def test_anomaly_on_critical(self):
+        readings = [self._make_reading("glucose", v, d)
+                    for d, v in enumerate([85, 85, 85, 85, 160], 1)]
+        ref = ReferenceRange(low=70, high=100, unit="mg/dL", critical_high=150)
+        trend = analyze_trend(readings, ref)
+        assert trend.anomaly_detected
+
+
+class TestConvertUnit:
+    def test_same_unit(self):
+        assert convert_unit(100, "mg/dL", "mg/dL") == 100
+
+    def test_mg_to_mmol(self):
+        result = convert_unit(180, "mg/dL", "mmol/L")
+        assert abs(result - 10.0) < 0.01
+
+    def test_mmol_to_mg(self):
+        result = convert_unit(10, "mmol/L", "mg/dL")
+        assert abs(result - 180.18) < 0.1
+
+    def test_unknown_conversion(self):
+        assert convert_unit(100, "mg/dL", "unknown") is None
+
+    def test_ng_to_nmol(self):
+        result = convert_unit(40, "ng/mL", "nmol/L")
+        assert abs(result - 99.84) < 0.1
+
+
+class TestGenerateDashboard:
+    def _make_reading(self, name, value, day):
+        return BiomarkerReading(name=name, value=value, unit="mg/dL",
+                                timestamp=datetime(2024, 1, day))
+
+    def test_empty_readings(self):
+        dashboard = generate_biomarker_dashboard([])
+        assert dashboard["summary"]["total"] == 0
+
+    def test_basic_dashboard(self):
+        readings = [
+            self._make_reading("hemoglobin", 14.0, 1),
+            self._make_reading("glucose_fasting", 85, 1),
         ]
-        result = analyze_panel(markers)
-        assert result["total_markers"] == 2
-        assert result["normal_count"] == 2
-        assert result["health_score"] == 100.0
+        dashboard = generate_biomarker_dashboard(readings)
+        assert dashboard["summary"]["total"] == 2
+        assert dashboard["summary"]["normal"] == 2
 
-    def test_with_abnormal(self):
-        markers = [
-            Biomarker("Glucose", ref_range_min=70, ref_range_max=100, history=[("2024-01", 110)]),
-            Biomarker("Cholesterol", ref_range_min=0, ref_range_max=200, history=[("2024-01", 85)]),
+    def test_critical_alert(self):
+        readings = [
+            self._make_reading("glucose_fasting", 400, 1),
         ]
-        result = analyze_panel(markers)
-        assert result["abnormal_count"] == 1
-        assert result["health_score"] < 100.0
+        dashboard = generate_biomarker_dashboard(readings)
+        assert dashboard["summary"]["critical"] == 1
+        assert len(dashboard["alerts"]) == 1
 
-
-class TestLongitudinalChanges:
-    def test_significant_change(self):
-        markers = [
-            Biomarker("Glucose", history=[
-                ("2024-01", 80), ("2024-02", 85), ("2024-03", 95),
-                ("2024-04", 110), ("2024-05", 120),
-            ]),
+    def test_abnormal_marker(self):
+        readings = [
+            self._make_reading("glucose_fasting", 120, 1),
         ]
-        changes = track_longitudinal_changes(markers)
-        assert len(changes) >= 1
-        assert changes[0]["name"] == "Glucose"
-        assert abs(changes[0]["pct_change"]) > 10
-
-    def test_no_significant(self):
-        markers = [
-            Biomarker("Glucose", history=[
-                ("2024-01", 85), ("2024-02", 86), ("2024-03", 85),
-            ]),
-        ]
-        changes = track_longitudinal_changes(markers)
-        assert len(changes) == 0
+        dashboard = generate_biomarker_dashboard(readings)
+        assert dashboard["summary"]["abnormal"] == 1
 
 
-class TestClinicalSummary:
-    def test_all_normal(self):
-        analyses = [
-            type("A", (), {"status": "normal", "name": "Glucose", "latest_value": 85, "trend": "stable", "trend_slope": 0})(),
-        ]
-        summary = generate_clinical_summary(analyses)
-        assert "normal" in summary.lower()
+class TestCommonReferenceRanges:
+    def test_all_have_valid_ranges(self):
+        for name, ref in COMMON_REFERENCE_RANGES.items():
+            assert ref.low < ref.high
+            assert len(ref.unit) > 0
 
-    def test_with_critical(self):
-        analyses = [
-            type("A", (), {"status": "critical_high", "name": "Glucose", "latest_value": 150, "trend": "rising", "trend_slope": 2.0})(),
-        ]
-        summary = generate_clinical_summary(analyses)
-        assert "CRITICAL" in summary
-
-    def test_empty(self):
-        assert generate_clinical_summary([]) == "No biomarker data available."
-
-
-class TestReferenceRanges:
-    def test_all_have_ranges(self):
-        for name, (low, high, unit) in REFERENCE_RANGES.items():
-            assert low < high
-            assert len(unit) > 0
+    def test_key_markers_present(self):
+        expected = ["hemoglobin", "glucose_fasting", "creatinine", "tsh"]
+        for marker in expected:
+            assert marker in COMMON_REFERENCE_RANGES

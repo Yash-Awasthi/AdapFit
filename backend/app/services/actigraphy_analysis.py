@@ -94,13 +94,13 @@ def detect_actigraphy_metrics(
     sleep_onset = _find_sleep_onset(counts, sleep_threshold)
     sleep_offset = _find_sleep_offset(counts, sleep_threshold)
     frag = _calculate_fragmentation(counts, sleep_threshold)
-    is = _calculate_interdaily_stability(counts)
+    interdaily_stab = _calculate_interdaily_stability(counts)
     iv = _calculate_intradaily_variability(counts)
     return ActigraphyMetrics(
         total_counts=total, active_minutes=active, sedentary_minutes=sedentary,
         sleep_minutes=sleep, awake_minutes=awake,
         sleep_onset=sleep_onset, sleep_offset=sleep_offset,
-        fragmentation_index=frag, interdaily_stability=is, intradaily_variability=iv,
+        fragmentation_index=frag, interdaily_stability=interdaily_stab, intradaily_variability=iv,
     )
 
 

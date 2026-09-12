@@ -8,6 +8,8 @@ from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
+from pydantic import BaseModel, Field
+
 
 class ActivityType(Enum):
     WALKING = "walking"
@@ -267,3 +269,182 @@ class ActivityRecognizer:
             activities=activities,
             intensity_distribution=intensity
         )
+
+
+# ── Endpoint-facing API ─────────────────────────────────────────────────────
+# The recogniser works on SensorSample tuples. Phone and watch clients post
+# flat sensor frames, so these models are the wire format and the functions
+# below convert a request into samples and return JSON-ready dicts.
+
+class SensorReading(BaseModel):
+    """One flat sensor frame as posted by a device."""
+    timestamp: float
+    accel_x: float
+    accel_y: float
+    accel_z: float
+    gyro_x: float = 0.0
+    gyro_y: float = 0.0
+    gyro_z: float = 0.0
+    heart_rate: Optional[float] = None
+
+    def to_sample(self) -> SensorSample:
+        return SensorSample(
+            timestamp=self.timestamp,
+            accelerometer=(self.accel_x, self.accel_y, self.accel_z),
+            gyroscope=(self.gyro_x, self.gyro_y, self.gyro_z),
+            heart_rate=self.heart_rate,
+        )
+
+
+class UserProfile(BaseModel):
+    """Body metrics needed to turn sensor data into energy and distance."""
+    weight_kg: float = Field(default=70.0, ge=20, le=300)
+    height_cm: float = Field(default=170.0, ge=100, le=250)
+    age: int = Field(default=30, ge=10, le=120)
+    sex: str = "unspecified"
+
+
+def _activity_from(value: str) -> ActivityType:
+    try:
+        return ActivityType(value.strip().lower())
+    except ValueError:
+        return ActivityType.UNKNOWN
+
+
+def detect_activity(readings: List[SensorReading], window_seconds: float = 5.0) -> Dict:
+    """Detect the dominant activity in a run of sensor frames."""
+    samples = [r.to_sample() for r in readings]
+    detections = ActivityRecognizer.detect_activities(samples)
+
+    if not detections:
+        single = ActivityRecognizer.classify_activity(samples) if samples else (ActivityType.UNKNOWN, 0.0)
+        return {
+            "activity": single[0].value,
+            "confidence": round(single[1], 3),
+            "windows": 0,
+            "detail": "Not enough data to segment the session into activities.",
+        }
+
+    dominant = max(detections, key=lambda d: d.duration_seconds)
+    return {
+        "activity": dominant.activity.value,
+        "confidence": round(dominant.confidence, 3),
+        "duration_seconds": round(sum(d.duration_seconds for d in detections), 1),
+        "calories_burned": round(sum(d.calories_burned for d in detections), 1),
+        "steps": sum(d.steps for d in detections),
+        "distance_meters": round(sum(d.distance_meters for d in detections), 1),
+        "windows": len(detections),
+        "segments": [
+            {
+                "activity": d.activity.value,
+                "confidence": round(d.confidence, 3),
+                "start_time": d.start_time,
+                "end_time": d.end_time,
+                "duration_seconds": round(d.duration_seconds, 1),
+                "calories_burned": round(d.calories_burned, 1),
+                "steps": d.steps,
+            }
+            for d in detections
+        ],
+    }
+
+
+def count_steps(readings: List[SensorReading], sensitivity: float = 1.2) -> Dict:
+    """Count steps in a run of sensor frames from acceleration peaks."""
+    magnitudes = [
+        ActivityRecognizer.calculate_magnitude((r.accel_x, r.accel_y, r.accel_z))
+        for r in readings
+    ]
+    steps = ActivityRecognizer.detect_step_peaks(magnitudes, sensitivity)
+
+    duration = ((readings[-1].timestamp - readings[0].timestamp)
+                if len(readings) > 1 else 0.0)
+    cadence = round(steps / duration * 60, 1) if duration > 0 else 0.0
+
+    return {
+        "steps": steps,
+        "sensitivity": sensitivity,
+        "duration_seconds": round(duration, 1),
+        "cadence_steps_per_minute": cadence,
+        "samples": len(readings),
+    }
+
+
+def estimate_distance(steps: int, height_cm: float, sex: str) -> Dict:
+    """Estimate walking distance from a step count and body height."""
+    # Stride-to-height ratio: 0.415 for men, 0.413 for women, averaged when the
+    # sex is not given. Matches the walking ratio the recogniser uses.
+    ratio = {"male": 0.415, "female": 0.413}.get(sex.strip().lower(), 0.414)
+    stride_m = height_cm * ratio / 100
+    distance_m = steps * stride_m
+
+    return {
+        "steps": steps,
+        "stride_length_m": round(stride_m, 3),
+        "distance_meters": round(distance_m, 1),
+        "distance_km": round(distance_m / 1000, 3),
+    }
+
+
+def calculate_calories(
+    activity: str,
+    duration_minutes: float,
+    user: UserProfile,
+    heart_rate: Optional[int] = None,
+) -> Dict:
+    """Calorie burn for an activity, weighted by the person's body mass."""
+    activity_type = _activity_from(activity)
+    duration_seconds = duration_minutes * 60
+    calories = ActivityRecognizer.calculate_calories(
+        activity_type, duration_seconds, user.weight_kg
+    )
+
+    max_hr = 220 - user.age
+    intensity = None
+    note = None
+    if heart_rate is not None:
+        # The heart-rate response is a real measurement of effort, so a session
+        # that ran harder than its activity class implies is scaled up to match.
+        intensity = classify_intensity(heart_rate, user.age)
+        if intensity["zone"] in ("vigorous", "maximum"):
+            calories *= 1.1
+            note = "Adjusted upward for a heart-rate response above the activity's typical effort."
+
+    return {
+        "activity": activity_type.value,
+        "duration_minutes": duration_minutes,
+        "met": ActivityRecognizer.METS.get(activity_type, 2.0),
+        "calories": round(calories, 1),
+        "weight_kg": user.weight_kg,
+        "max_heart_rate": max_hr,
+        "heart_rate_intensity": intensity,
+        "note": note,
+    }
+
+
+def classify_intensity(heart_rate: int, age: int) -> Dict:
+    """Classify exercise intensity from heart rate as a percentage of HRmax."""
+    max_hr = 220 - age
+    if max_hr <= 0:
+        return {"zone": "unknown", "percent_max": 0.0, "heart_rate": heart_rate, "max_heart_rate": max_hr}
+
+    percent = max(0.0, min(1.5, heart_rate / max_hr))
+
+    if percent < 0.57:
+        zone, label = "very_light", "Very light — recovery pace"
+    elif percent < 0.64:
+        zone, label = "light", "Light — fat-burning base"
+    elif percent < 0.76:
+        zone, label = "moderate", "Moderate — aerobic base"
+    elif percent < 0.89:
+        zone, label = "vigorous", "Vigorous — threshold work"
+    else:
+        zone, label = "maximum", "Maximum — VO2max and sprint work"
+
+    return {
+        "heart_rate": heart_rate,
+        "max_heart_rate": max_hr,
+        "percent_max": round(percent * 100, 1),
+        "zone": zone,
+        "label": label,
+    }

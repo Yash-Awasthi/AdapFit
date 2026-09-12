@@ -4,6 +4,14 @@ AdapFit — AI-Powered Adaptive Fitness & Recovery Engine
 Entry point. Endpoint routers are auto-discovered by app/core/registry.py.
 Add a new endpoint: drop a file in app/api/v1/endpoints/, export `router`.
 """
+import sys
+from pathlib import Path as _Path
+# Ensure the ZFIT project root is on sys.path so that `src.*` modules
+# (achievements, anomaly, biometrics, etc.) are importable from services.
+_zfit_root = str(_Path(__file__).resolve().parent.parent.parent)
+if _zfit_root not in sys.path:
+    sys.path.insert(0, _zfit_root)
+
 import uuid
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +26,8 @@ from app.core.error_handlers import ErrorHandlingMiddleware
 from app.core.metrics import MetricsMiddleware
 from app.core.validation import ValidationMiddleware
 from app.core.compression import CompressionMiddleware
+from app.middleware.security import SecurityHeadersMiddleware, InputSanitizationMiddleware, RequestLoggingMiddleware
+from app.middleware.auth import AuthMiddleware
 
 setup_logging()
 logger = get_logger("adapfit.main")
@@ -26,6 +36,17 @@ logger = get_logger("adapfit.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("AdapFit starting up...")
+    # ── Startup config validation ─────────────────────────────────────────
+    # Fails fast in production if critical settings (JWT, DB, LLM keys) are
+    # missing or insecure. In dev, logs warnings but continues.
+    try:
+        from app.core.startup_checks import run_startup_checks
+        run_startup_checks()
+    except SystemExit:
+        raise  # production fail-fast
+    except Exception as e:
+        logger.warning(f"Startup checks failed to run: {e}")
+    # ── Initialize services ───────────────────────────────────────────────
     try:
         from app.services.exercise_service import exercise_service
         from app.services.vector_store import vector_store
@@ -73,18 +94,12 @@ app.add_middleware(ValidationMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(ErrorHandlingMiddleware)
 app.add_middleware(CompressionMiddleware)
-try:
-    from app.middleware.security import SecurityHeadersMiddleware, InputSanitizationMiddleware, RequestLoggingMiddleware
-    app.add_middleware(SecurityHeadersMiddleware)
-    app.add_middleware(InputSanitizationMiddleware)
-    app.add_middleware(RequestLoggingMiddleware)
-except ImportError:
-    pass
-try:
-    from app.middleware.auth import AuthMiddleware
-    app.add_middleware(AuthMiddleware)
-except ImportError:
-    pass
+# Imported at module scope on purpose: a failure here must stop startup, not
+# leave the app serving without authentication or security headers.
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(InputSanitizationMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -189,7 +204,11 @@ async def dashboard():
 @app.websocket("/ws/bpm/{user_id}")
 async def bpm_websocket(websocket: WebSocket, user_id: str):
     from app.services.camera_vitals import camera_vitals_service
+    from app.core.dependencies import authenticate_websocket
     import json
+    user = await authenticate_websocket(websocket, expected_user_id=user_id)
+    if user is None:
+        return
     await websocket.accept()
     try:
         while True:
@@ -212,6 +231,10 @@ async def bpm_websocket(websocket: WebSocket, user_id: str):
 @app.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
     from app.services.websocket_manager import ws_manager
+    from app.core.dependencies import authenticate_websocket
+    user = await authenticate_websocket(websocket, expected_user_id=user_id)
+    if user is None:
+        return
     await ws_manager.connect(websocket, user_id)
     try:
         while True:

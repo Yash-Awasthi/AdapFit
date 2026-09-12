@@ -30,8 +30,8 @@ class StressLogRequest(BaseModel):
     notes: str = ""
 
 
-@router.post("/assess")
-async def assess_stress(request: StressAssessRequest):
+@router.post("/evaluations", status_code=201)
+async def create_stress_evaluation(request: StressAssessRequest):
     """Multi-factor stress assessment using biometric and behavioral data."""
     result = stress_engine.assess_stress(request.model_dump(exclude_none=True))
     return {

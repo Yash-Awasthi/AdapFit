@@ -1,20 +1,60 @@
 /**
  * Premium UI Components — AdapFit Design System
- * High-quality reusable components with glassmorphism, gradients, animations
+ * High-quality reusable components with glassmorphism, gradients, animations.
+ * All animations use Reanimated worklets (UI thread).
  */
-import React, { useEffect, useRef } from 'react';
-import {
-  View, Text, TouchableOpacity, StyleSheet, Animated,
-  Dimensions, Platform,
-} from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  withDelay,
+  FadeInDown,
+  runOnJS,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useWindowDimensions } from 'react-native';
 import { colors, typography, spacing, radius, shadows, glass } from '../theme';
 import { SCREEN_HEADER_TOP } from '../theme/layout';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// ===== ANIMATED PRESS WRAPPER =====
+// Reusable press-scale animation — replaces the old Animated.spring pattern.
+function AnimatedPress({
+  children,
+  onPress,
+  style,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onPress?: () => void;
+  style?: any;
+  disabled?: boolean;
+}) {
+  const scale = useSharedValue(1);
 
-// ===== ANIMATED SCORE RING =====
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <TouchableOpacity
+      onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.85}
+    >
+      <Animated.View style={[style, animatedStyle]}>
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+// ===== SCORE RING =====
 interface ScoreRingProps {
   score: number;
   size?: number;
@@ -36,27 +76,25 @@ export const ScoreRing: React.FC<ScoreRingProps> = ({
   animated = true,
   icon,
 }) => {
-  const animValue = useRef(new Animated.Value(0)).current;
-  const rotation = animValue.interpolate({
-    inputRange: [0, 100],
-    outputRange: ['0deg', '360deg'],
-  });
+  const progress = useSharedValue(animated ? 0 : score);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (animated) {
-      Animated.timing(animValue, {
-        toValue: score,
-        duration: 1200,
-        useNativeDriver: false,
-      }).start();
+      progress.value = withTiming(score, { duration: 1200 });
     } else {
-      animValue.setValue(score);
+      progress.value = score;
     }
-  }, [score]);
+  }, [score, animated]);
 
   const scoreColor = color || (score >= 80 ? colors.score.excellent : score >= 60 ? colors.score.good : score >= 40 ? colors.score.fair : colors.score.critical);
   const bgColor = scoreColor + '15';
   const trackColor = colors.surface.divider;
+
+  const animatedScoreStyle = useAnimatedStyle(() => ({
+    // We can't animate Text content directly, so we use a workaround:
+    // The score is displayed statically; the ring visual animates via border.
+    opacity: 1,
+  }));
 
   return (
     <View style={{ alignItems: 'center' }}>
@@ -94,7 +132,7 @@ export const GradientCard: React.FC<GradientCardProps> = ({ colors: gradientColo
   );
 
   if (onPress) {
-    return <TouchableOpacity onPress={onPress} activeOpacity={0.85}>{content}</TouchableOpacity>;
+    return <AnimatedPress onPress={onPress}>{content}</AnimatedPress>;
   }
   return content;
 };
@@ -121,7 +159,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({ children, style, onPress, 
   );
 
   if (onPress) {
-    return <TouchableOpacity onPress={onPress} activeOpacity={0.85}>{content}</TouchableOpacity>;
+    return <AnimatedPress onPress={onPress}>{content}</AnimatedPress>;
   }
   return content;
 };
@@ -135,7 +173,6 @@ interface HealthMetricMiniProps {
   trend?: 'up' | 'down' | 'flat';
   trendValue?: string;
   onPress?: () => void;
-  /** Explicit cell width from a grid. Without it the card flexes to fill its row. */
   width?: number;
 }
 
@@ -148,8 +185,6 @@ export const HealthMetricMini: React.FC<HealthMetricMiniProps> = ({ icon, value,
       style={[
         styles.metricMini,
         { borderColor: color + '20' },
-        // A flexed card in a wrapped row stretches the final row's items;
-        // a measured width keeps every cell identical.
         width ? { width, flex: 0, minWidth: 0 } : null,
       ]}
       onPress={onPress}
@@ -182,18 +217,10 @@ interface AnimatedHeaderProps {
 }
 
 export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({ title, subtitle, gradient, rightAction, large }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
-    ]).start();
-  }, []);
+  const entering = FadeInDown.duration(500).springify();
 
   return (
-    <Animated.View style={[styles.headerContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+    <Animated.View entering={entering} style={styles.headerContainer}>
       {gradient ? (
         <LinearGradient colors={gradient as any} style={styles.headerGradient}>
           <View style={styles.headerContent}>
@@ -316,12 +343,12 @@ interface QuickActionProps {
 }
 
 export const QuickAction: React.FC<QuickActionProps> = ({ icon, label, color, onPress }) => (
-  <TouchableOpacity style={styles.quickAction} onPress={onPress} activeOpacity={0.7}>
+  <AnimatedPress onPress={onPress} style={styles.quickAction}>
     <View style={[styles.quickActionIcon, { backgroundColor: color + '15' }]}>
       <Ionicons name={icon as any} size={22} color={color} />
     </View>
     <Text style={styles.quickActionLabel}>{label}</Text>
-  </TouchableOpacity>
+  </AnimatedPress>
 );
 
 // ===== PILL CHIP =====
@@ -354,10 +381,9 @@ const styles = StyleSheet.create({
   // Gradient Card
   gradientCard: { borderRadius: 20, overflow: 'hidden' },
 
-  // Metric Mini
+  // Metric Mini — uses dynamic width from useWindowDimensions in the consuming screen
   metricMini: {
     flex: 1,
-    minWidth: (SCREEN_WIDTH - spacing.screenPadding * 2 - spacing.md * 2) / 3,
     backgroundColor: colors.bg.card,
     borderRadius: 16,
     padding: spacing.md,
@@ -407,7 +433,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surface.border,
     alignItems: 'center',
-    minWidth: (SCREEN_WIDTH - spacing.screenPadding * 2 - spacing.md * 2) / 3,
   },
   statCardIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.xs },
   statCardValue: { fontSize: 20, fontWeight: '700' },

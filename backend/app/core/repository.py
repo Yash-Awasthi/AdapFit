@@ -246,8 +246,9 @@ class WorkoutRepository:
 
     async def save(self, user_id: str, workout: dict) -> dict:
         user_id = _to_pg("user_id", normalize_user_id(user_id))
-        # ponytail: warmup/cooldown have no columns in the live schema and are dropped here;
-        # ceiling is losing those two fields in postgres/supabase mode until a migration adds them.
+        # Warmup and cooldown have no columns in the live schema and are dropped
+        # here; in postgres/supabase mode those two fields are lost until a
+        # migration adds them.
         exercises = workout.get("exercises") or []
         workout = {**workout, "user_id": user_id}
         pool = await _pool()

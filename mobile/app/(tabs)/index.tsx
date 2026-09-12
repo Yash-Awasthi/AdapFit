@@ -1,12 +1,14 @@
 /**
  * Home Screen — Premium Health Dashboard
- * Modern glassmorphism design with animated elements, health metrics, quick actions
+ * Modern glassmorphism design with animated elements, health metrics, quick actions.
+ * Uses Reanimated worklets for all animations (UI thread).
  */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  RefreshControl, Dimensions, Animated, Platform,
+  RefreshControl, useWindowDimensions,
 } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -15,23 +17,15 @@ import { colors, spacing, radius } from '../../src/theme';
 import { useGrid } from '../../src/theme/layout';
 import {
   ScoreRing, GradientCard, GlassCard, HealthMetricMini,
-  SectionHeaderPremium, ProgressBarPremium, StatCard, QuickAction, PillChip,
+  SectionHeaderPremium, QuickAction,
 } from '../../src/components/PremiumComponents';
-import { InteractiveLineChart, MetricCardWithChart, Sparkline } from '../../src/components/InteractiveCharts';
-import { HapticButton, SwipeableCard } from '../../src/components/GestureSystem';
-import { useToast, QuickAlert } from '../../src/components/ToastSystem';
-import { FloatingActionButton, SectionDivider } from '../../src/components/NavigationHelpers';
+import { MetricCardWithChart } from '../../src/components/InteractiveCharts';
+import { SwipeableCard } from '../../src/components/GestureSystem';
+
+import { FloatingActionButton } from '../../src/components/NavigationHelpers';
 import { TodayDecision } from '../../src/components/TodayDecision';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-import { API_V1 as API } from '../../src/services/config';
-const api = async (path: string, opts?: RequestInit) => {
-  try {
-    const r = await fetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch { return null; }
-};
+import { useStressAssessment, useWellbeingReport } from '../../src/hooks/useHealthData';
 
 // ===== Greeting based on time of day =====
 const getGreeting = () => {
@@ -42,9 +36,17 @@ const getGreeting = () => {
   return { text: 'Good night', icon: 'moon', gradient: ['#2A2A5E', '#312E81'] };
 };
 
+function getScoreLabel(score: number): string {
+  if (score >= 80) return 'Excellent';
+  if (score >= 60) return 'Good';
+  if (score >= 40) return 'Fair';
+  return 'Needs Work';
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const grid = useGrid(3);
   const [refreshing, setRefreshing] = useState(false);
   const [healthScore, setHealthScore] = useState(72);
@@ -54,33 +56,23 @@ export default function HomeScreen() {
   const [sleepScore, setSleepScore] = useState(0);
   const [waterIntake, setWaterIntake] = useState(0);
   const greeting = getGreeting();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  // stressData disabled until real user params are available
+  const { data: stressData, refetch: refetchStress } = useStressAssessment();
+  const { data: wellbeingData, refetch: refetchWellbeing } = useWellbeingReport();
+
+  // Update local state from React Query data
+  useEffect(() => {
+    if (stressData?.overall_score) setStressLevel(stressData.overall_score);
+  }, [stressData]);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-    ]).start();
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    const [stressRes, wellbeingRes, sleepRes] = await Promise.all([
-      api('/stress/assess', { method: 'POST', body: JSON.stringify({ mood_score: 7, energy_level: 6, sleep_quality: 75 }) }),
-      api('/wellbeing/report'),
-      api('/sleep/log', { method: 'POST', body: JSON.stringify({ bedtime: '23:00', wake_time: '07:00', quality_score: 78 }) }),
-    ]);
-    if (stressRes?.overall_score) setStressLevel(stressRes.overall_score);
-    // A placeholder value here is indistinguishable from a real reading, so
-    // only a count the backend actually reported may be displayed.
-    if (typeof wellbeingRes?.step_count === 'number') setSteps(wellbeingRes.step_count);
-    if (typeof sleepRes?.quality_score === 'number') setSleepScore(sleepRes.quality_score);
-  };
+    if (typeof wellbeingData?.step_count === 'number') setSteps(wellbeingData.step_count);
+  }, [wellbeingData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([refetchStress(), refetchWellbeing()]);
     setRefreshing(false);
   };
 
@@ -380,13 +372,6 @@ export default function HomeScreen() {
       <View style={{ height: 100 }} />
     </ScrollView>
   );
-}
-
-function getScoreLabel(score: number): string {
-  if (score >= 80) return 'Excellent';
-  if (score >= 60) return 'Good';
-  if (score >= 40) return 'Fair';
-  return 'Needs Work';
 }
 
 const styles = StyleSheet.create({

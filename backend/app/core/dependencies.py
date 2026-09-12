@@ -144,3 +144,73 @@ async def get_user_id(
     if user:
         return user["id"]
     return "default"
+
+
+def ensure_owner(caller: dict, user_id: Optional[str]) -> None:
+    """
+    Raise 403 unless the caller is the named user or an admin.
+
+    Use this for handlers that take the subject's user_id from the path or
+    query string. `require_owner_or_owner_id` cannot guard those: its argument
+    is evaluated where the dependency is declared, so it only ever compares
+    against a fixed literal, not a value that arrives per request.
+
+        async def get_record(user_id: str, caller: dict = Depends(require_user)):
+            ensure_owner(caller, user_id)
+    """
+    # The development bypass stands in as whoever the request names, so
+    # comparing ids would refuse everything it exists to allow. The bypass can
+    # never be active in production.
+    if auth_bypass_active():
+        return
+    if user_id is None or caller.get("id") == user_id:
+        return
+    if caller.get("role") in ("admin", "superadmin"):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Access denied: not resource owner",
+    )
+
+
+# === WebSocket Authentication ===
+
+# 1008 is the RFC 6455 "policy violation" close code: the handshake was
+# understood but refused, which is what a missing or wrong token is.
+WS_POLICY_VIOLATION = 1008
+
+
+async def authenticate_websocket(websocket, expected_user_id: Optional[str] = None) -> Optional[dict]:
+    """
+    Authenticate a WebSocket handshake and return the caller's user record.
+
+    WebSocket routes never pass through AuthMiddleware, because
+    BaseHTTPMiddleware only receives HTTP scope, so every route has to validate
+    on its own. Call this before accepting the connection:
+
+        user = await authenticate_websocket(websocket, expected_user_id=user_id)
+        if user is None:
+            return
+
+    The token is read from the `token` query parameter, falling back to an
+    Authorization header when a client can send one. An admin may connect to
+    another user's socket; anyone else may only reach their own.
+    """
+    if auth_bypass_active():
+        return _dev_user()
+
+    token = websocket.query_params.get("token")
+    if not token:
+        token = _extract_bearer_token(websocket.headers.get("Authorization"))
+
+    user = _decode_user_from_token(token)
+    if user is None:
+        await websocket.close(code=WS_POLICY_VIOLATION, reason="Authentication required")
+        return None
+
+    if expected_user_id and user["id"] != expected_user_id:
+        if user.get("role") not in ("admin", "superadmin"):
+            await websocket.close(code=WS_POLICY_VIOLATION, reason="Not the owner of this connection")
+            return None
+
+    return user

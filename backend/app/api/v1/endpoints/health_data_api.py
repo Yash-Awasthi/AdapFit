@@ -10,6 +10,7 @@ from typing import Optional
 from app.core.health_data import health_data_store, MEASUREMENT_TYPES
 from app.core.health_validation import PHYSIOLOGICAL_RANGES, validate, compute_confidence
 from app.core.dependencies import require_user
+from app.services.websocket_manager import ws_manager
 
 router = APIRouter()
 
@@ -56,14 +57,48 @@ def _add_validated_record(user_id: str, rec: AddRecordRequest) -> dict:
 
 @router.post("/record")
 async def add_health_record(request: AddRecordRequest, user: dict = Depends(require_user)):
-    """Add a normalized health data record with source attribution."""
-    return _add_validated_record(user["id"], request)
+    """Add a normalized health data record with source attribution.
+
+    Broadcasts the new record to the user's connected WebSocket clients so
+    the mobile app's charts update in real time without polling.
+    """
+    result = _add_validated_record(user["id"], request)
+    # Push a live update only if the record was actually stored (no error key).
+    if isinstance(result, dict) and "error" not in result:
+        try:
+            await ws_manager.push_health_update(
+                user_id=user["id"],
+                measurement_type=request.measurement_type,
+                value=result.get("value", request.value),
+                source=request.source,
+                confidence=result.get("confidence", ""),
+                metadata=result.get("metadata", request.metadata),
+            )
+        except Exception:
+            pass  # WebSocket push must never break the ingestion.
+    return result
 
 
 @router.post("/batch")
 async def add_batch_records(request: BatchAddRequest, user: dict = Depends(require_user)):
-    """Add multiple health records in a single request."""
+    """Add multiple health records in a single request.
+
+    Broadcasts each successfully-stored record to the user's WebSocket clients.
+    """
     results = [_add_validated_record(user["id"], rec) for rec in request.records]
+    for rec, result in zip(request.records, results):
+        if isinstance(result, dict) and "error" not in result:
+            try:
+                await ws_manager.push_health_update(
+                    user_id=user["id"],
+                    measurement_type=rec.measurement_type,
+                    value=result.get("value", rec.value),
+                    source=rec.source,
+                    confidence=result.get("confidence", ""),
+                    metadata=result.get("metadata", rec.metadata),
+                )
+            except Exception:
+                pass
     return {"added": len(results), "results": results}
 
 

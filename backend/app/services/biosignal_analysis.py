@@ -68,7 +68,10 @@ def detect_r_peaks_simple(
     last_peak = -min_rr
 
     for i in range(window_size, n - window_size):
-        if integrated[i] > integrated[i - 1] and integrated[i] > integrated[i + 1]:
+        # A QRS complex wider than one sample integrates to a flat plateau, so
+        # the right-hand comparison must accept equality or no peak is ever
+        # found. Taking >= on the right selects the plateau's last sample.
+        if integrated[i] > integrated[i - 1] and integrated[i] >= integrated[i + 1]:
             if integrated[i] > threshold_i and (i - last_peak) >= min_rr:
                 # Find the actual R-peak in the original signal near this location
                 search_start = max(0, i - window_size)

@@ -38,6 +38,7 @@ ROUTE_MAP = {
     "music": ("/music", ["Workout Music"]),
     "notifications": ("/notifications", ["Notifications"]),
     "export": ("/export", ["Data Export"]),
+    "workout_plans": ("/workout-plans", ["Workout Plans & Recovery"]),
     "workout_analytics": ("/analytics", ["Workout Analytics"]),
     "workout_templates": ("/templates", ["Workout Templates"]),
     "community": ("/community", ["Community"]),
@@ -66,6 +67,7 @@ ROUTE_MAP = {
     "quick_workout": ("/quick-workout", ["Quick Workouts"]),
     "exercise_subs": ("/exercise-subs", ["Exercise Substitutions"]),
     "breathing": ("/breathing", ["Breathing Exercises"]),
+    "breathing_api": ("/breathing-analysis", ["Breathing Analysis"]),
     "workout_stats": ("/workout-stats", ["Workout Stats"]),
     "qr_share": ("/qr-share", ["QR Share"]),
     "exercise_library": ("/exercise-library", ["Exercise Library"]),
@@ -201,6 +203,18 @@ ROUTE_MAP = {
     "rate_limiter_api": ("/rate-limit", ["Rate Limiting"]),
     "export_v2_api": ("/export-v2", ["Export V2"]),
     "integrations_api": ("/integrations", ["Integrations"]),
+    "pose_estimation_api": ("/pose", ["Pose Estimation & Form Check"]),
+    "biomarkers_api": ("/biomarkers", ["Biomarker Tracking"]),
+    "biometrics_api": ("/biometrics", ["ECG & HRV Signal Processing"]),
+    "injury_risk_api": ("/injury-risk-v2", ["Injury Risk Detection"]),
+    "medication_tracker_api": ("/medication-tracker", ["Medication Tracking"]),
+    "rppg_api": ("/rppg", ["Remote Photoplethysmography"]),
+    "anomaly_detection_api": ("/anomaly", ["Health Anomaly Detection"]),
+    "achievements_v3_api": ("/achievements-v3", ["Fitness Gamification"]),
+    "workout_planner_api": ("/planner", ["AI Workout Planner"]),
+    "workout_tracker_api": ("/tracker", ["Workout Tracking & PRs"]),
+    "fitness_chatbot_api": ("/fitness-chat", ["Fitness RAG Chatbot"]),
+    "sensor_api": ("/ble-sensors", ["BLE Sensor Integration"]),
     "recommendations_v2_api": ("/recommendations-v2", ["Recommendations V2"]),
     "community_v2_api": ("/community-v2", ["Community V2"]),
     "moderation_api": ("/moderation", ["Moderation"]),
@@ -228,6 +242,19 @@ ROUTE_MAP = {
 
 # Prefixes to skip (these have special handling or are registered manually)
 SKIP_PREFIXES = {"/metrics"}  # metrics is registered manually at root level in main.py
+
+
+def _prefix_is_baked(router, prefix: str) -> bool:
+    """True when every route path already carries `prefix`.
+
+    A router declared as `APIRouter()` with the segment written into each path
+    looks identical to a router with no prefix and relative paths. The two need
+    opposite handling: the first must not have the generated prefix appended.
+    """
+    routes = [r for r in router.routes if getattr(r, "path", None)]
+    if not routes:
+        return False
+    return all(r.path == prefix or r.path.startswith(prefix + "/") for r in routes)
 
 
 def _strip_baked_prefix(router, baked_prefix: str) -> None:
@@ -295,7 +322,12 @@ def register_endpoints(app: FastAPI, package_path: str = "app.api.v1.endpoints")
                 _strip_baked_prefix(router, router_prefix)
                 router_prefix = ""
 
-            full_prefix = settings.API_V1_STR if router_prefix else f"{settings.API_V1_STR}{prefix}"
+            # A router with no declared prefix may still have the segment baked
+            # into its paths; appending the generated prefix would double it.
+            if not router_prefix and _prefix_is_baked(router, prefix):
+                full_prefix = settings.API_V1_STR
+            else:
+                full_prefix = settings.API_V1_STR if router_prefix else f"{settings.API_V1_STR}{prefix}"
 
             app.include_router(router, prefix=full_prefix, tags=tags)
             registered += 1

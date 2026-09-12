@@ -3,6 +3,7 @@ WebSocket Camera Vitals — Real-time BPM streaming during measurement
 """
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.camera_vitals import camera_vitals_service
+from app.core.dependencies import authenticate_websocket
 import json
 import time
 
@@ -23,6 +24,10 @@ async def websocket_bpm(websocket: WebSocket):
     Server -> Client: {"type": "bpm_update", "bpm": 72, "confidence": 0.85, "signal_quality": 0.9}
     Server -> Client: {"type": "result", "bpm": 72, "hrv": 45, "respiratory_rate": 16}
     """
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
+
     await websocket.accept()
     
     try:

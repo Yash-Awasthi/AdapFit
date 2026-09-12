@@ -18,6 +18,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from app.core.dependencies import authenticate_websocket
+
 router = APIRouter()
 
 # Room state
@@ -153,6 +155,12 @@ async def room_websocket(websocket: WebSocket, room_id: str, user_id: str = Quer
     - {"type": "chat_message", "text": "Nice set!"}
     - {"type": "workout_complete", "exercises_done": 8}
     """
+    # The connection is filed under the query-supplied user_id, so the caller
+    # has to be that user (or an admin).
+    user = await authenticate_websocket(websocket, expected_user_id=user_id)
+    if user is None:
+        return
+
     await websocket.accept()
     _user_connections[user_id] = websocket
 

@@ -54,7 +54,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Run linter
         run: |
@@ -70,17 +70,36 @@ jobs:
 
       - name: Verify project structure
         run: |
-          echo "✅ Checking project structure..."
+          echo "Checking project structure..."
           test -d backend/app
           test -d backend/tests
           test -f backend/app/main.py
-          echo "✅ Structure OK"
+          echo "Structure OK"
 
       - name: Count services
         run: |
-          echo "📊 Services:"
+          echo "Services:"
           ls -1 backend/app/services/*.py | wc -l
-          echo "📊 Tests:"
+          echo "Tests:"
           find backend/tests -name "*.py" | wc -l
-          echo "📊 API endpoints:"
+          echo "API endpoints:"
           find backend/app/api -name "*.py" | wc -l
+
+  container-scan:
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t zfit-backend:scan ./backend
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: zfit-backend:scan
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true

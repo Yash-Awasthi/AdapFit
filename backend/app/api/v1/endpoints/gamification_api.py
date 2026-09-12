@@ -1,5 +1,5 @@
 """Gamification API — XP, badges, streaks, leaderboard"""
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.services.gamification import gamification_service
@@ -40,7 +40,10 @@ async def get_user_badges(user_id: str):
 
 @router.post("/badges/award")
 async def award_badge(request: BadgeRequest):
-    return gamification_service.award_badge(request.user_id, request.badge_id)
+    try:
+        return gamification_service.award_badge(request.user_id, request.badge_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown badge: {request.badge_id}")
 
 
 @router.post("/streak")

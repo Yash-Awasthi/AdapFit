@@ -17,7 +17,7 @@ class SuggestRequest(BaseModel):
     fitness_level: str = "beginner"
 
 
-@router.get("/habits")
+@router.get("/")
 async def get_habits(category: str = "", difficulty: str = ""):
     return {"habits": habit_coach_service.get_habits(category, difficulty)}
 

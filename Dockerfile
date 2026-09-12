@@ -22,9 +22,12 @@ WORKDIR /app
 # Copy installed packages from builder
 COPY --from=builder /install /usr/local
 
-# Copy application code
+# Copy application code. `src/` is required: 29 imports across the endpoint
+# layer read `src.*`, and main.py adds the project root to sys.path to reach
+# them. Without it those endpoints fail to import inside the image.
 COPY backend/ ./backend/
 COPY web/ ./web/
+COPY src/ ./src/
 
 # Set environment variables
 ENV PYTHONPATH=/app/backend

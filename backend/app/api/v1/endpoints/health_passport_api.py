@@ -77,7 +77,7 @@ async def generate_certificate(req: CertificateRequest):
     return health_passport.generate_certificate(req.user_id, req.purpose, req.validity_days)
 
 
-@router.get("/passport/{user_id}")
+@router.get("/{user_id}")
 async def get_passport(user_id: str):
     from app.services.health_passport import health_passport
     return health_passport.get_passport(user_id)

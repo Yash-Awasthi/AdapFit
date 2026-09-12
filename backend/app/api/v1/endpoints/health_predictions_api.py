@@ -8,7 +8,7 @@ from app.services.health_predictions import (
     predict_activity, predict_hrv, detect_anomalies,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/predictions")
 
 
 class DailyMetricInput(BaseModel):
@@ -21,28 +21,28 @@ class DailyMetricInput(BaseModel):
     resting_hr: Optional[int] = None
 
 
-@router.post("/predictions/sleep")
+@router.post("/sleep")
 def sleep_prediction(body: dict):
     history = [DailyMetric(**m) for m in body.get("history", [])]
     days = body.get("days", 7)
     return predict_sleep_score(history, days)
 
 
-@router.post("/predictions/readiness")
+@router.post("/readiness")
 def readiness_prediction(body: dict):
     history = [DailyMetric(**m) for m in body.get("history", [])]
     days = body.get("days", 7)
     return predict_readiness(history, days)
 
 
-@router.post("/predictions/activity")
+@router.post("/activity")
 def activity_prediction(body: dict):
     history = [DailyMetric(**m) for m in body.get("history", [])]
     days = body.get("days", 7)
     return predict_activity(history, days)
 
 
-@router.post("/predictions/hrv")
+@router.post("/hrv")
 def hrv_prediction(body: dict):
     history = [DailyMetric(**m) for m in body.get("history", [])]
     days = body.get("days", 7)

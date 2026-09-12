@@ -1,17 +1,26 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, CARD_SHADOW } from '../services/theme';
+import { colors, spacing, radius } from '../theme';
 
 interface Props {
   label: string;
   value: string | number;
   color?: string;
+  variant?: 'default' | 'compact' | 'highlight';
 }
 
-export function MetricCard({ label, value, color }: Props) {
+export function MetricCard({ label, value, color, variant = 'default' }: Props) {
   const { theme } = useTheme();
+
+  const variantStyles = {
+    default: { padding: 16, borderRadius: 14 },
+    compact: { padding: 12, borderRadius: 12 },
+    highlight: { padding: 16, borderRadius: 14, borderWidth: 2, borderColor: (color || theme.primary) + '40' },
+  }[variant];
+
   return (
-    <View style={[styles.card, CARD_SHADOW, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+    <View style={[styles.card, CARD_SHADOW, { backgroundColor: theme.surface, borderColor: theme.border }, variantStyles]}>
       <Text
         style={[styles.value, { color: color || theme.text }]}
         numberOfLines={1}
@@ -28,9 +37,7 @@ export function MetricCard({ label, value, color }: Props) {
 const styles = StyleSheet.create({
   card: {
     width: '48%',
-    borderRadius: 14,
     borderWidth: 1,
-    padding: 16,
   },
   value: {
     fontSize: 24,
