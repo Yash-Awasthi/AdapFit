@@ -11,7 +11,21 @@ Based on 2025 AI mental health chatbot research (Woebot, Wysa, Elomia):
 
 import time
 import random
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
+
+
+def _stability(scores: list) -> Optional[float]:
+    """
+    1.0 when every check-in reports the same mood, falling as they scatter.
+
+    None below three check-ins: two points do not describe stability.
+    """
+    if len(scores) < 3:
+        return None
+    mean = sum(scores) / len(scores)
+    spread = (sum((s - mean) ** 2 for s in scores) / len(scores)) ** 0.5
+    # A mood scale runs 1-10, so a standard deviation of 3 is scattered.
+    return round(max(0.0, min(1.0, 1 - spread / 3)), 2)
 
 
 class AICompanionService:
@@ -158,7 +172,7 @@ class AICompanionService:
             "check_ins_total": len(checks),
             "avg_mood": round(avg_mood, 1),
             "avg_energy": round(avg_energy, 1),
-            "mood_stability": round(random.uniform(0.6, 0.9), 2),
+            "mood_stability": _stability([c["mood_score"] for c in recent]),
             "trend": "improving" if len(recent) > 5 and recent[-1]["mood_score"] > recent[0]["mood_score"] else "stable",
             "insight": f"Your average mood is {avg_mood:.1f}/10 over {len(recent)} check-ins",
         }

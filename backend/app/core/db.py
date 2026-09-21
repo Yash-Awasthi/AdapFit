@@ -4,16 +4,38 @@ Postgres connection pool (asyncpg), with pgvector codec registration.
 When DATABASE_URL is unset, every function is a no-op returning None — the
 in-memory store in app.core.database stays the working fallback.
 """
+import logging
+
 import asyncpg
 from pgvector.asyncpg import register_vector
 
 from app.core.config import settings
 
+logger = logging.getLogger("adapfit.db")
+
 _pool: asyncpg.Pool | None = None
+
+# Flipped once on the first connection that cannot register the codec, so the
+# warning is logged once rather than per connection.
+_vector_available = True
 
 
 async def _init_connection(conn: asyncpg.Connection) -> None:
-    await register_vector(conn)
+    """
+    Register the pgvector codec when the extension is present.
+
+    Supabase and the pgvector image ship it; a stock Postgres does not, and
+    there registration raises and every connection in the pool fails to open.
+    Semantic exercise search falls back to its in-memory index without it,
+    so the rest of the app stays usable.
+    """
+    try:
+        await register_vector(conn)
+    except Exception as exc:
+        global _vector_available
+        if _vector_available:
+            logger.warning("pgvector not available (%s); vector columns are disabled.", exc)
+        _vector_available = False
 
 
 async def get_pool() -> asyncpg.Pool | None:

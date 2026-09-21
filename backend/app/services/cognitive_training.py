@@ -10,8 +10,15 @@ Based on 2025 cognitive training research:
 """
 
 import time
-import random
 from typing import Dict, List, Optional, Any
+
+
+def _domain_score(sessions, domain: str):
+    """Average score across sessions training this domain, or None if untrained."""
+    scored = [s["score"] for s in sessions if s.get("domain") == domain or s.get("category") == domain]
+    if not scored:
+        return None
+    return min(100, int(sum(scored) / len(scored)))
 
 
 class CognitiveTrainingService:
@@ -166,8 +173,11 @@ class CognitiveTrainingService:
             "brain_health_score": min(100, int(avg_score + avg_accuracy / 2)),
             "memory_score": min(100, int(avg_score * 1.1)),
             "attention_score": min(100, int(avg_accuracy * 1.05)),
-            "processing_speed": min(100, int(70 + random.randint(0, 30))),
-            "flexibility_score": min(100, int(65 + random.randint(0, 35))),
+            # Measured from sessions of the matching exercise type. These were
+            # random numbers sitting beside three real ones, which is what made
+            # them hard to spot.
+            "processing_speed": _domain_score(recent, "processing_speed"),
+            "flexibility_score": _domain_score(recent, "flexibility"),
             "total_training_minutes": profile.get("total_minutes", 0),
             "consistency": "good" if len(sessions) > 5 else "building",
             "recommendation": "Keep training 15 min daily for optimal neuroplasticity" if len(sessions) > 0 else "Start with 5-minute sessions",

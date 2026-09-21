@@ -4,7 +4,6 @@ Pharmacogenomics-based medication management
 """
 from datetime import datetime
 from typing import Dict, List, Optional
-import random
 
 
 class PersonalizedMedicineService:
@@ -105,7 +104,9 @@ class PersonalizedMedicineService:
             "metabolizer_status": metabolizer_status,
             "impact": interaction["impact"],
             "recommendation": recommendation,
-            "confidence": round(random.uniform(0.7, 0.95), 2),
+            # No confidence figure: the recommendation is a lookup against the
+            # gene-drug table, and a number here read as model certainty.
+            "source": "gene-drug interaction table",
             "alternative_medications": self._get_alternatives(med_lower, worst_status),
             "monitoring_requirements": self._get_monitoring(med_lower, worst_status),
         }

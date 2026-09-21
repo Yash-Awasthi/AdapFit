@@ -10,8 +10,44 @@ Based on 2025 health coaching research:
 """
 
 import time
-import random
 from typing import Dict, List, Any
+
+
+def _weekly_streak(completed: list) -> int:
+    """Consecutive weeks, counting back from the most recent, with a session in each."""
+    from datetime import datetime, timedelta
+
+    weeks = set()
+    for session in completed:
+        stamp = session.get("scheduled_at") or session.get("created_at")
+        if not stamp:
+            continue
+        try:
+            when = datetime.fromtimestamp(float(stamp))
+        except (TypeError, ValueError, OSError):
+            continue
+        weeks.add(when.isocalendar()[:2])
+    if not weeks:
+        return 0
+
+    streak, cursor = 0, datetime.now()
+    while cursor.isocalendar()[:2] in weeks:
+        streak += 1
+        cursor -= timedelta(weeks=1)
+    return streak
+
+
+def _milestones(sessions: list, completed: list) -> list:
+    """Milestones actually reached, rather than a fixed list of three."""
+    reached = []
+    if sessions:
+        reached.append("Started coaching journey")
+    if completed:
+        reached.append("Completed first session")
+    streak = _weekly_streak(completed)
+    if streak >= 4:
+        reached.append(f"{streak}-week streak")
+    return reached
 
 
 class HealthCoachingService:
@@ -105,8 +141,8 @@ class HealthCoachingService:
             "total_sessions": len(sessions),
             "completed_sessions": len(completed),
             "total_invested": sum(s["price"] for s in sessions),
-            "current_streak": random.randint(1, 8),
-            "milestones": ["Started coaching journey", "Completed first session", "4-week streak"],
+            "current_streak": _weekly_streak(completed),
+            "milestones": _milestones(sessions, completed),
             "next_session": sessions[-1] if sessions else None,
         }
 

@@ -10,9 +10,29 @@ Based on 2025-2026 AI pose estimation research (MediaPipe, MoveNet):
 """
 
 import time
-import random
 import math
 from typing import Dict, List, Any
+
+
+def _rule_satisfied(rule: dict, angles: dict):
+    """
+    True, False, or None when the joint the rule judges was not visible.
+
+    A rule declares `joint` and either `min_angle`, `max_angle` or both.
+    Rules that declare neither cannot be judged from angles.
+    """
+    joint = rule.get("joint")
+    if joint is None or joint not in angles:
+        return None
+    value = angles[joint]
+    low, high = rule.get("min_angle"), rule.get("max_angle")
+    if low is None and high is None:
+        return None
+    if low is not None and value < low:
+        return False
+    if high is not None and value > high:
+        return False
+    return True
 
 
 class ARFitnessService:
@@ -99,7 +119,16 @@ class ARFitnessService:
         form_feedback = []
         form_score = 100
         for rule in rules.get("form_rules", []):
-            is_good = random.random() > 0.3  # Simulated
+            # Each rule names the angle it judges and the range it wants. A
+            # coin flip used to decide, so the same rep could be praised and
+            # corrected on consecutive frames.
+            is_good = _rule_satisfied(rule, angles)
+            if is_good is None:
+                form_feedback.append({
+                    "rule": rule["name"], "is_correct": None,
+                    "feedback": "Not visible in this frame.",
+                })
+                continue
             feedback = rule["good"] if is_good else rule["bad"]
             form_feedback.append({"rule": rule["name"], "is_correct": is_good, "feedback": feedback})
             if not is_good:
@@ -147,17 +176,43 @@ class ARFitnessService:
             "summary": f"Completed {session['reps']} reps with {avg_form:.0f}% average form",
         }
 
+    # Joint -> the three keypoints whose angle it is, by COCO pose index.
+    JOINTS = {
+        "left_knee": (11, 13, 15),
+        "right_knee": (12, 14, 16),
+        "left_elbow": (5, 7, 9),
+        "right_elbow": (6, 8, 10),
+        "hip_angle": (5, 11, 13),
+        "shoulder_angle": (7, 5, 11),
+    }
+
     def _calculate_angles(self, keypoints: Dict) -> Dict[str, float]:
-        """Calculate joint angles from body keypoints."""
-        # Simplified angle calculation
-        return {
-            "left_knee": random.uniform(80, 170),
-            "right_knee": random.uniform(80, 170),
-            "left_elbow": random.uniform(80, 170),
-            "right_elbow": random.uniform(80, 170),
-            "hip_angle": random.uniform(150, 180),
-            "shoulder_angle": random.uniform(30, 180),
-        }
+        """
+        Joint angles measured from the detected keypoints.
+
+        Every angle used to be a random number in a plausible range, which is
+        what made the rep counter and the form score meaningless: both read
+        from here. A joint whose keypoints are not visible is left out.
+        """
+        from app.services.exercise_form_analyzer import Keypoint, calculate_angle
+
+        def point(index):
+            raw = keypoints.get(index) or keypoints.get(str(index))
+            if not isinstance(raw, dict):
+                return None
+            return Keypoint(
+                x=float(raw.get("x", 0.0)),
+                y=float(raw.get("y", 0.0)),
+                confidence=float(raw.get("confidence", 0.0)),
+            )
+
+        angles = {}
+        for joint, (a, b, c) in self.JOINTS.items():
+            points = [point(a), point(b), point(c)]
+            if any(p is None or p.confidence < 0.3 for p in points):
+                continue
+            angles[joint] = round(calculate_angle(points[0], points[1], points[2]), 1)
+        return angles
 
     def _detect_rep(self, exercise: str, angles: Dict, session: Dict) -> bool:
         """Detect if a rep has been completed based on joint angles."""
@@ -165,7 +220,9 @@ class ARFitnessService:
             return angles.get("left_knee", 180) < 90
         elif exercise == "push_up":
             return angles.get("left_elbow", 180) < 90
-        return random.random() < 0.1
+        # No rule for this exercise: a rep is not counted rather than counted
+        # one frame in ten, which inflated every set.
+        return False
 
     def _get_encouragement(self, form_score: int, reps: int) -> str:
         if form_score >= 90:

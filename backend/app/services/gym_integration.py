@@ -10,7 +10,6 @@ Based on 2025 ClassPass/gym app research:
 """
 
 import time
-import random
 from typing import Dict, List, Any
 
 
@@ -32,14 +31,16 @@ class GymIntegrationService:
             {"id": "g6", "name": "LA Fitness", "type": "standard", "rating": 3.9, "monthly_price": 35, "amenities": ["pool", "classes", "cardio", "weights", "basketball"], "locations": 700, "classpass_credits": 0},
         ]
 
+    # spots_available is None throughout: live availability needs the
+    # booking provider, and an invented count sends people to a full class.
     def _init_classes(self):
         self.classes = [
-            {"id": "c1", "name": "HIIT Blast", "gym": "Orangetheory", "instructor": "Sarah M.", "time": "6:00 AM", "duration_min": 60, "spots_total": 36, "spots_available": random.randint(0, 10), "type": "cardio", "intensity": "high", "classpass_credits": 8},
-            {"id": "c2", "name": "Vinyasa Flow", "gym": "CorePower Yoga", "instructor": "Mike R.", "time": "7:30 AM", "duration_min": 60, "spots_total": 30, "spots_available": random.randint(2, 15), "type": "yoga", "intensity": "moderate", "classpass_credits": 8},
-            {"id": "c3", "name": "Spin Class", "gym": "Equinox", "instructor": "Lisa K.", "time": "12:00 PM", "duration_min": 45, "spots_total": 25, "spots_available": random.randint(0, 8), "type": "cardio", "intensity": "high", "classpass_credits": 10},
-            {"id": "c4", "name": "CrossFit WOD", "gym": "CrossFit Box", "instructor": "Coach Dan", "time": "5:30 PM", "duration_min": 60, "spots_total": 20, "spots_available": random.randint(0, 5), "type": "functional", "intensity": "high", "classpass_credits": 12},
-            {"id": "c5", "name": "Pilates Core", "gym": "Equinox", "instructor": "Emma S.", "time": "9:00 AM", "duration_min": 50, "spots_total": 20, "spots_available": random.randint(3, 12), "type": "pilates", "intensity": "moderate", "classpass_credits": 8},
-            {"id": "c6", "name": "Power Lifting", "gym": "CrossFit Box", "instructor": "Coach Mike", "time": "6:00 PM", "duration_min": 75, "spots_total": 15, "spots_available": random.randint(0, 6), "type": "strength", "intensity": "high", "classpass_credits": 12},
+            {"id": "c1", "name": "HIIT Blast", "gym": "Orangetheory", "instructor": "Sarah M.", "time": "6:00 AM", "duration_min": 60, "spots_total": 36, "spots_available": None, "type": "cardio", "intensity": "high", "classpass_credits": 8},
+            {"id": "c2", "name": "Vinyasa Flow", "gym": "CorePower Yoga", "instructor": "Mike R.", "time": "7:30 AM", "duration_min": 60, "spots_total": 30, "spots_available": None, "type": "yoga", "intensity": "moderate", "classpass_credits": 8},
+            {"id": "c3", "name": "Spin Class", "gym": "Equinox", "instructor": "Lisa K.", "time": "12:00 PM", "duration_min": 45, "spots_total": 25, "spots_available": None, "type": "cardio", "intensity": "high", "classpass_credits": 10},
+            {"id": "c4", "name": "CrossFit WOD", "gym": "CrossFit Box", "instructor": "Coach Dan", "time": "5:30 PM", "duration_min": 60, "spots_total": 20, "spots_available": None, "type": "functional", "intensity": "high", "classpass_credits": 12},
+            {"id": "c5", "name": "Pilates Core", "gym": "Equinox", "instructor": "Emma S.", "time": "9:00 AM", "duration_min": 50, "spots_total": 20, "spots_available": None, "type": "pilates", "intensity": "moderate", "classpass_credits": 8},
+            {"id": "c6", "name": "Power Lifting", "gym": "CrossFit Box", "instructor": "Coach Mike", "time": "6:00 PM", "duration_min": 75, "spots_total": 15, "spots_available": None, "type": "strength", "intensity": "high", "classpass_credits": 12},
         ]
 
     def search_gyms(self, gym_type: str = "", max_price: int = 0, amenity: str = "") -> List[Dict]:
@@ -91,8 +92,18 @@ class GymIntegrationService:
         return {"checked_in": True, "gym": gym_id, "timestamp": time.time(), "message": "Have a great workout!"}
 
     def get_classpass_credits(self, user_id: str) -> Dict[str, Any]:
-        """Get ClassPass credit balance."""
-        return {"credits_remaining": random.randint(15, 45), "credits_used_this_month": random.randint(5, 30), "next_reset": "1st of next month"}
+        """
+        Credit balance, from a linked account.
+
+        This returned a balance between 15 and 45 credits for a user with no
+        ClassPass account at all, which is the sort of number people book
+        against.
+        """
+        return {
+            "status": "not_linked",
+            "credits_remaining": None,
+            "message": "No ClassPass account is linked, so there is no balance to show.",
+        }
 
     def get_my_bookings(self, user_id: str) -> List[Dict]:
         """Get user's upcoming bookings."""

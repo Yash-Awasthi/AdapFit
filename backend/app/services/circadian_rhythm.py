@@ -65,6 +65,53 @@ CHRONOTYPES = {
 }
 
 
+def _minutes_of_day(entry: dict) -> Optional[int]:
+    # Energy entries store "time_of_day", light entries store "time".
+    stamp = entry.get("time_of_day") or entry.get("time")
+    if not isinstance(stamp, str) or ":" not in stamp:
+        return None
+    hours, _, minutes = stamp.partition(":")
+    try:
+        return int(hours) * 60 + int(minutes)
+    except ValueError:
+        return None
+
+
+def _clock_consistency(entries: list) -> int:
+    """
+    100 when entries land at the same time each day, falling as they scatter.
+
+    A two-hour spread in when the day starts is the point where circadian
+    regularity is usually considered lost, so that is where this reaches 0.
+    """
+    times = [t for t in (_minutes_of_day(e) for e in entries) if t is not None]
+    if len(times) < 2:
+        return 50
+    mean = sum(times) / len(times)
+    spread = (sum((t - mean) ** 2 for t in times) / len(times)) ** 0.5
+    return max(0, min(100, int(round(100 - (spread / 120) * 100))))
+
+
+def _day_of(entry: dict) -> str:
+    """Calendar day of an entry, for averaging exposure per day."""
+    stamp = entry.get("timestamp")
+    if not stamp:
+        return ""
+    from datetime import datetime
+
+    return datetime.fromtimestamp(float(stamp)).strftime("%Y-%m-%d")
+
+
+def _light_exposure_score(entries: list) -> int:
+    """Against the 10,000 lux-minutes a day that anchors the body clock."""
+    daily_target = 10000
+    exposure = sum(
+        (e.get("lux") or 0) * (e.get("duration_minutes") or 0) / 60 for e in entries
+    )
+    days = max(1, len({_day_of(e) for e in entries}))
+    return max(0, min(100, int(round((exposure / days) / daily_target * 100))))
+
+
 class CircadianRhythmService:
     """Circadian rhythm optimization and chronotype management."""
 
@@ -167,12 +214,51 @@ class CircadianRhythmService:
         self._energy_log.append(entry)
         return {"logged": True, "average_today": round(sum(e["level"] for e in self._energy_log[-10:]) / min(10, max(1, len(self._energy_log))))}
 
+    TIPS = [
+        "Maintain consistent wake time",
+        "Get 10,000+ lux in the morning",
+        "Avoid blue light 2 hours before bed",
+    ]
+
+    # Days of logs needed before a rhythm is a rhythm rather than a few points.
+    MIN_DAYS = 3
+
     def get_rhythm_score(self) -> dict:
-        consistency = random.randint(65, 95)
-        light_score = random.randint(50, 90)
-        sleep_score = random.randint(60, 95)
-        overall = (consistency + light_score + sleep_score) // 3
-        return {"overall_score": overall, "consistency": consistency, "light_exposure": light_score, "sleep_regularity": sleep_score, "tips": ["Maintain consistent wake time", "Get 10,000+ lux in the morning", "Avoid blue light 2 hours before bed"]}
+        """
+        Circadian regularity from the logs on record.
+
+        The three component scores were each a random number in a flattering
+        range, so the overall score never fell below 58 however irregular the
+        user's days actually were.
+        """
+        light_entries = self._light_log[-30:]
+        energy_entries = self._energy_log[-30:]
+        if len(light_entries) < self.MIN_DAYS and len(energy_entries) < self.MIN_DAYS:
+            return {
+                "status": "insufficient_data",
+                "message": (
+                    f"Log light exposure or energy for at least {self.MIN_DAYS} days "
+                    "to see a rhythm score."
+                ),
+                "light_entries": len(light_entries),
+                "energy_entries": len(energy_entries),
+                "tips": self.TIPS,
+            }
+
+        components = {}
+        if energy_entries:
+            components["consistency"] = _clock_consistency(energy_entries)
+        if light_entries:
+            components["light_exposure"] = _light_exposure_score(light_entries)
+
+        overall = int(round(sum(components.values()) / len(components))) if components else None
+        return {
+            "status": "ok",
+            "overall_score": overall,
+            **components,
+            "days_of_data": max(len(light_entries), len(energy_entries)),
+            "tips": self.TIPS,
+        }
 
 
 from app.core.per_user import per_user, register

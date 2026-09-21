@@ -10,7 +10,6 @@ Based on 2025 research on AI wound assessment:
 """
 
 import time
-import random
 from typing import Dict, List, Optional, Any
 
 
@@ -114,12 +113,19 @@ class WoundCareService:
         image_analysis = {}
         if "image_features" in assessment_data:
             features = assessment_data["image_features"]
+            # Tissue percentages drive the wound bed assessment, and these
+            # defaulted to random values — a photo with no colour analysis
+            # produced a staged wound bed anyway. Absent stays absent.
             image_analysis = {
                 "color_analysis": {
-                    "red_tissue_pct": features.get("red_pct", random.randint(30, 70)),
-                    "yellow_tissue_pct": features.get("yellow_pct", random.randint(5, 25)),
-                    "black_tissue_pct": features.get("black_pct", random.randint(0, 10)),
-                    "pink_tissue_pct": features.get("pink_pct", random.randint(10, 40)),
+                    "red_tissue_pct": features.get("red_pct"),
+                    "yellow_tissue_pct": features.get("yellow_pct"),
+                    "black_tissue_pct": features.get("black_pct"),
+                    "pink_tissue_pct": features.get("pink_pct"),
+                    "measured": all(
+                        isinstance(features.get(k), (int, float))
+                        for k in ("red_pct", "yellow_pct", "black_pct", "pink_pct")
+                    ),
                 },
                 "wound_bed_assessment": self._assess_wound_bed(features),
                 "edge_assessment": self._assess_wound_edges(features),
@@ -228,27 +234,56 @@ class WoundCareService:
             "protocols": protocols,
         }
 
+    @staticmethod
+    def _measured(features: Dict, *keys: str) -> bool:
+        return all(isinstance(features.get(k), (int, float)) for k in keys)
+
     def _assess_wound_bed(self, features: Dict) -> Dict[str, Any]:
+        """
+        Classify the wound bed from measured tissue percentages.
+
+        Unmeasured colours used to read as zero, which staged an unphotographed
+        wound as mixed tissue needing no debridement.
+        """
+        if not self._measured(features, "red_pct", "pink_pct", "yellow_pct", "black_pct"):
+            return {"status": "not_measured", "message": "No tissue colour analysis was supplied."}
+        red, pink = features["red_pct"], features["pink_pct"]
+        yellow, black = features["yellow_pct"], features["black_pct"]
         return {
-            "tissue_type": "granulation" if features.get("red_pct", 0) > 50 else "mixed",
-            "color_healthy": features.get("red_pct", 0) + features.get("pink_pct", 0) > 60,
-            "needs_debridement": features.get("yellow_pct", 0) + features.get("black_pct", 0) > 30,
+            "status": "measured",
+            "tissue_type": "granulation" if red > 50 else "mixed",
+            "color_healthy": red + pink > 60,
+            "needs_debridement": yellow + black > 30,
         }
 
     def _assess_wound_edges(self, features: Dict) -> Dict[str, Any]:
+        """Edge findings the photo supports. Attachment and undermining need a clinician."""
+        if not self._measured(features, "pink_pct"):
+            return {"status": "not_measured"}
         return {
-            "attached": True,
-            "epithelialization": features.get("pink_pct", 0) > 10,
-            "undermining": False,
+            "status": "measured",
+            "epithelialization": features["pink_pct"] > 10,
+            # Not visible in a photograph: both need the wound probed.
+            "attached": features.get("edges_attached"),
+            "undermining": features.get("undermining"),
         }
 
     def _assess_surrounding_skin(self, features: Dict) -> Dict[str, Any]:
-        return {
-            "intact": True,
-            "erythema": False,
-            "maceration": False,
-            "induration": False,
+        """
+        Periwound findings, each absent unless observed.
+
+        These were hard-coded to "skin intact, no erythema", which reports a
+        reassuring examination that nobody performed — and erythema spreading
+        from a wound is the sign that matters most.
+        """
+        observed = {
+            key: features[key]
+            for key in ("intact", "erythema", "maceration", "induration")
+            if key in features
         }
+        if not observed:
+            return {"status": "not_observed", "message": "No periwound observations were recorded."}
+        return {"status": "observed", **observed}
 
     def _assess_infection_risk(self, wound: Dict, data: Dict) -> Dict[str, Any]:
         risk_score = 0

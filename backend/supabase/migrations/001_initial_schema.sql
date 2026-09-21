@@ -6,7 +6,17 @@
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS vector;
+-- pgvector ships with Supabase and with the pgvector Docker image, but not
+-- with a stock Postgres install. Semantic exercise search falls back to an
+-- in-memory index without it, so a missing extension must not stop the whole
+-- schema from applying.
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS vector;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'pgvector unavailable (%); exercise embeddings will be skipped.', SQLERRM;
+END
+$$;
 
 -- ============================================================
 -- 1. USERS & BASELINES
@@ -122,9 +132,18 @@ CREATE TABLE IF NOT EXISTS exercises (
     axial_loading_rating INT CHECK (axial_loading_rating >= 1 AND axial_loading_rating <= 5),
     gif_url TEXT,
     instructions TEXT[],
-    embedding VECTOR(768),  -- pgvector for semantic search
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Added separately so the table exists even where pgvector does not.
+-- 005 sets the final dimension.
+DO $$
+BEGIN
+    ALTER TABLE exercises ADD COLUMN IF NOT EXISTS embedding vector(768);
+EXCEPTION WHEN undefined_object OR undefined_file THEN
+    RAISE NOTICE 'pgvector unavailable; exercises.embedding not created.';
+END
+$$;
 
 -- Vector similarity index (run after pgvector is enabled)
 -- CREATE INDEX IF NOT EXISTS idx_exercises_embedding ON exercises

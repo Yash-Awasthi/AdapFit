@@ -10,7 +10,6 @@ Based on 2025 AI fitness app research:
 """
 
 import time
-import random
 from typing import Dict, List, Any
 
 
@@ -149,31 +148,59 @@ class AIWorkoutCoachService:
         }
 
     def analyze_form(self, user_id: str, exercise: str, pose_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze exercise form from camera/pose data."""
+        """
+        Score form from detected pose keypoints.
+
+        The score and every checkpoint verdict used to be drawn at random while
+        `pose_data` was ignored, so a lifter could be told their depth was good
+        when the camera had not seen them. Angles now come from the pose
+        analyser, which measures them.
+        """
         exercise_info = self.exercise_demos.get(exercise, {})
         if not exercise_info:
             return {"error": "Exercise not found in database"}
 
-        # Simulate form analysis
-        form_score = random.randint(60, 98)
-        corrections = []
-        good_points = []
+        keypoints = (pose_data or {}).get("keypoints")
+        if not keypoints:
+            return {
+                "status": "insufficient_data",
+                "exercise": exercise_info.get("name", exercise),
+                "message": "No pose keypoints were supplied, so form cannot be scored.",
+                "form_checkpoints": exercise_info.get("form_checkpoints", []),
+                "key_cues": exercise_info.get("key_cues", []),
+            }
 
-        for checkpoint in exercise_info.get("form_checkpoints", []):
-            is_good = random.random() > 0.3
-            if is_good:
-                good_points.append(f"✅ {checkpoint.replace('_', ' ').title()} — good")
-            else:
-                mistake = random.choice(exercise_info.get("common_mistakes", ["Check form"]))
-                corrections.append({"checkpoint": checkpoint, "issue": mistake, "fix": random.choice(exercise_info.get("key_cues", ["Focus on form"]))})
+        from app.services.exercise_form_analyzer import Keypoint, analyze_exercise_frame
 
+        points = {
+            int(index): Keypoint(
+                x=float(point.get("x", 0.0)),
+                y=float(point.get("y", 0.0)),
+                confidence=float(point.get("confidence", 0.0)),
+            )
+            for index, point in keypoints.items()
+        }
+        frame = analyze_exercise_frame(points, exercise, pose_data.get("previous_phase"))
+        if "error" in frame:
+            return {
+                "status": "unsupported_exercise",
+                "exercise": exercise_info.get("name", exercise),
+                "message": frame["error"],
+            }
+
+        score = int(frame["form_score"]["score"])
         return {
+            "status": "scored",
             "exercise": exercise_info.get("name", exercise),
-            "form_score": form_score,
-            "grade": "A" if form_score >= 90 else "B" if form_score >= 75 else "C" if form_score >= 60 else "D",
-            "good_form": good_points,
-            "corrections": corrections,
-            "encouragement": "Great form!" if form_score >= 85 else "Good effort — focus on the corrections above",
+            "form_score": score,
+            "grade": "A" if score >= 90 else "B" if score >= 75 else "C" if score >= 60 else "D",
+            "phase": frame["phase"],
+            "joint_angles": frame["angles"],
+            "keypoints_detected": frame["keypoints_detected"],
+            "feedback": frame["form_score"]["feedback"],
+            "angle_deviation": frame["form_score"]["angle_deviation"],
+            "key_cues": exercise_info.get("key_cues", []),
+            "encouragement": "Great form!" if score >= 85 else "Good effort — work on the angle above",
         }
 
     def get_exercise_demo(self, exercise: str) -> Dict[str, Any]:

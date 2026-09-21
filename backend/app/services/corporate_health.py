@@ -29,6 +29,7 @@ class CorporateHealthService:
     """Corporate wellness programs and insurance integration."""
 
     def __init__(self):
+        self._wellness: dict[str, dict] = {}
         self._companies: dict[str, dict] = {}
         self._employee_wellness: dict[str, dict] = {}
         self._insurance_rewards: dict[str, dict] = {}
@@ -47,8 +48,41 @@ class CorporateHealthService:
             return {"error": "Challenge not found"}
         return {"joined": True, "challenge": challenge["name"], "duration": challenge["duration_days"], "reward_points": challenge["reward_points"]}
 
+    COMPONENTS = ("activity", "nutrition", "sleep", "mental", "vitals")
+
+    def record_wellness_components(self, employee_id: str, components: dict) -> dict:
+        """Store component scores an employee's own data produced."""
+        scored = {
+            key: float(components[key]) for key in self.COMPONENTS
+            if isinstance(components.get(key), (int, float))
+        }
+        if not scored:
+            return {"error": "No component scores supplied."}
+        self._wellness[employee_id] = scored
+        return {"recorded": True, "employee_id": employee_id, "components": len(scored)}
+
     def get_employee_wellness_score(self, employee_id: str) -> dict:
-        return {"employee_id": employee_id, "wellness_score": random.randint(60, 95), "components": {"activity": random.randint(50, 100), "nutrition": random.randint(60, 90), "sleep": random.randint(50, 95), "mental": random.randint(60, 100), "vitals": random.randint(70, 100)}}
+        """
+        An employee's wellness score, from recorded components.
+
+        Every component was a random number in a flattering band, so nobody
+        ever scored below 60 — and an employer could have acted on it.
+        """
+        components = self._wellness.get(employee_id)
+        if not components:
+            return {
+                "status": "no_data",
+                "employee_id": employee_id,
+                "wellness_score": None,
+                "message": "No wellness components have been recorded for this employee.",
+                "components_tracked": list(self.COMPONENTS),
+            }
+        return {
+            "status": "ok",
+            "employee_id": employee_id,
+            "wellness_score": int(round(sum(components.values()) / len(components))),
+            "components": components,
+        }
 
     def get_company_dashboard(self, company_id: str) -> dict:
         return {"company_id": company_id, "participation_rate": 78, "avg_wellness_score": 76, "active_challenges": 3, "total_points_earned": 15400, "top_teams": [{"name": "Engineering", "score": 89}, {"name": "Marketing", "score": 82}, {"name": "Sales", "score": 78}], "health_trends": {"activity_up": 12, "stress_down": 8, "sleep_improved": 15}}
@@ -60,5 +94,4 @@ class CorporateHealthService:
         return {"scheduled": True, "type": screening_type, "date": "Next available slot", "location": "On-site wellness center", "reminder": "You'll receive a reminder 24 hours before"}
 
 
-import random
 corporate_health_service = CorporateHealthService()

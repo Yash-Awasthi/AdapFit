@@ -31,8 +31,12 @@ async def log_symptoms(req: SymptomLogRequest):
 
 
 @router.get("/forecast/{location}")
-async def get_pollen_forecast(location: str, days: int = 3):
-    result = allergy_tracker_service.get_pollen_forecast(location, days)
+async def get_pollen_forecast(location: str, days: int = 3, live: bool = True):
+    """Pollen counts for a location, fetched from Open-Meteo by default."""
+    if live:
+        result = await allergy_tracker_service.fetch_pollen(location)
+    else:
+        result = allergy_tracker_service.get_pollen_forecast(location, days)
     return {"success": True, "data": result}
 
 
