@@ -130,4 +130,6 @@ class AICoachService:
         return {"thanked": True, "message": "Thanks for your feedback! This helps me provide better insights."}
 
 
-ai_coach_service = AICoachService()
+from app.core.per_user import per_user, register
+
+ai_coach_service = register("ai_coach.ai_coach_service", per_user(AICoachService))

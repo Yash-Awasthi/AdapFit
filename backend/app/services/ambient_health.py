@@ -347,4 +347,6 @@ class AmbientHealthService:
         return "07:00"
 
 
-ambient_health_service = AmbientHealthService()
+from app.core.per_user import per_user, register
+
+ambient_health_service = register("ambient_health.ambient_health_service", per_user(AmbientHealthService))

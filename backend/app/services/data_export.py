@@ -128,4 +128,6 @@ class DataExportService:
         return samples.get(category, {})
 
 
-data_export_service = DataExportService()
+from app.core.per_user import per_user, register
+
+data_export_service = register("data_export.data_export_service", per_user(DataExportService))

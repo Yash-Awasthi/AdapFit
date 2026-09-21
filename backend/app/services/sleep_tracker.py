@@ -348,4 +348,6 @@ class SleepTrackerService:
 
 
 # Singleton
-sleep_tracker_service = SleepTrackerService()
+from app.core.per_user import per_user, register
+
+sleep_tracker_service = register("sleep_tracker.sleep_tracker_service", per_user(SleepTrackerService))

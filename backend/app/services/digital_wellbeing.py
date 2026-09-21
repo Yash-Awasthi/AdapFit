@@ -478,4 +478,6 @@ class DigitalWellbeingService:
 
 
 # Singleton
-digital_wellbeing_service = DigitalWellbeingService()
+from app.core.per_user import per_user, register
+
+digital_wellbeing_service = register("digital_wellbeing.digital_wellbeing_service", per_user(DigitalWellbeingService))

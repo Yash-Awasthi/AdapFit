@@ -175,4 +175,6 @@ class AnalyticsDashboardService:
         return {"report_title": f"Health Report ({period})", "generated_at": time.strftime("%Y-%m-%d %H:%M"), "dashboard": dashboard, "correlations": correlations, "insights": insights, "feature_usage": usage}
 
 
-analytics_dashboard_service = AnalyticsDashboardService()
+from app.core.per_user import per_user, register
+
+analytics_dashboard_service = register("analytics_dashboard.analytics_dashboard_service", per_user(AnalyticsDashboardService))

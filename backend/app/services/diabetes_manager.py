@@ -158,4 +158,6 @@ class DiabetesManagerService:
         return FOOD_CARB_DATABASE
 
 
-diabetes_manager_service = DiabetesManagerService()
+from app.core.per_user import per_user, register
+
+diabetes_manager_service = register("diabetes_manager.diabetes_manager_service", per_user(DiabetesManagerService))

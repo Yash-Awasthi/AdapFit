@@ -448,4 +448,6 @@ class BloodPressureService:
         }
 
 
-blood_pressure_service = BloodPressureService()
+from app.core.per_user import per_user, register
+
+blood_pressure_service = register("blood_pressure.blood_pressure_service", per_user(BloodPressureService))

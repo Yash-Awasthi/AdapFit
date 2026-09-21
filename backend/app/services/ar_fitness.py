@@ -183,4 +183,6 @@ class ARFitnessService:
         ]
 
 
-ar_fitness_service = ARFitnessService()
+from app.core.per_user import per_user, register
+
+ar_fitness_service = register("ar_fitness.ar_fitness_service", per_user(ARFitnessService))

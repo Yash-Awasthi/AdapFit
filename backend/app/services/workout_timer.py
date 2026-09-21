@@ -177,4 +177,6 @@ class WorkoutTimer:
 
 
 # Singleton
-workout_timer = WorkoutTimer()
+from app.core.per_user import per_user, register
+
+workout_timer = register("workout_timer.workout_timer", per_user(WorkoutTimer))

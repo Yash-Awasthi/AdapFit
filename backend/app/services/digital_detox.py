@@ -213,4 +213,6 @@ class DigitalDetoxService:
             return "Screen time is significantly impacting your wellness. Start with the beginner detox program."
 
 
-digital_detox_service = DigitalDetoxService()
+from app.core.per_user import per_user, register
+
+digital_detox_service = register("digital_detox.digital_detox_service", per_user(DigitalDetoxService))

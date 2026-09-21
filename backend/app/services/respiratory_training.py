@@ -133,4 +133,6 @@ class RespiratoryTrainingService:
         return [{"exercise": s["exercise_name"], "duration": s.get("duration_seconds", 0), "breaths": s.get("breaths_completed", 0), "date": time.strftime("%Y-%m-%d", time.localtime(s["started_at"]))} for s in user_sessions[-limit:]]
 
 
-respiratory_training_service = RespiratoryTrainingService()
+from app.core.per_user import per_user, register
+
+respiratory_training_service = register("respiratory_training.respiratory_training_service", per_user(RespiratoryTrainingService))

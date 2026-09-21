@@ -35,7 +35,7 @@ class DailyHydration(BaseModel):
     goal_met: bool
     log_count: int
     drink_breakdown: dict  # type -> ml
-    hourly分布: dict  # hour -> ml
+    hourly_distribution: dict  # hour -> ml
 
 
 class HydrationStats(BaseModel):
@@ -132,7 +132,7 @@ def _get_daily_summary(user_id: str, date: str) -> DailyHydration:
         date=date, total_ml=total, daily_goal_ml=goal,
         progress_pct=round(min(100, (total / goal) * 100), 1) if goal else 0,
         goal_met=total >= goal, log_count=len(day_logs),
-        drink_breakdown=breakdown, hourly分布=hourly,
+        drink_breakdown=breakdown, hourly_distribution=hourly,
     )
 
 

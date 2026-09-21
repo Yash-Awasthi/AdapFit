@@ -204,4 +204,6 @@ class RealtimeHealthMonitor:
         return device
 
 
-realtime_monitor = RealtimeHealthMonitor()
+from app.core.per_user import per_user, register
+
+realtime_monitor = register("realtime_monitor.realtime_monitor", per_user(RealtimeHealthMonitor))

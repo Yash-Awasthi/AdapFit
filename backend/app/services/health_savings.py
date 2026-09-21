@@ -204,4 +204,6 @@ class HealthSavingsService:
         return self.ACCOUNT_TYPES
 
 
-health_savings = HealthSavingsService()
+from app.core.per_user import per_user, register
+
+health_savings = register("health_savings.health_savings", per_user(HealthSavingsService))

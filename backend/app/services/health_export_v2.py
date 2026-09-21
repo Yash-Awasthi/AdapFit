@@ -71,4 +71,6 @@ class HealthExportV2:
         return self.export_requests.get(export_id, {"error": "Export not found"})
 
 
-health_export_v2 = HealthExportV2()
+from app.core.per_user import per_user, register
+
+health_export_v2 = register("health_export_v2.health_export_v2", per_user(HealthExportV2))

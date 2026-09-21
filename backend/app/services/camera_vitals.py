@@ -430,4 +430,6 @@ class CameraVitalsService:
         }
 
 
-camera_vitals_service = CameraVitalsService()
+from app.core.per_user import per_user, register
+
+camera_vitals_service = register("camera_vitals.camera_vitals_service", per_user(CameraVitalsService))

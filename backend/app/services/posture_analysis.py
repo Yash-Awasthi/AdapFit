@@ -127,4 +127,6 @@ class PostureAnalysisService:
         return {"alert": False, "message": "Good posture maintained!", "checks": session["posture_checks"]}
 
 
-posture_analysis_service = PostureAnalysisService()
+from app.core.per_user import per_user, register
+
+posture_analysis_service = register("posture_analysis.posture_analysis_service", per_user(PostureAnalysisService))

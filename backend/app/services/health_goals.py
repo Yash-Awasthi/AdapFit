@@ -297,4 +297,6 @@ class HealthGoalsService:
 
 
 # Singleton
-health_goals_service = HealthGoalsService()
+from app.core.per_user import per_user, register
+
+health_goals_service = register("health_goals.health_goals_service", per_user(HealthGoalsService))

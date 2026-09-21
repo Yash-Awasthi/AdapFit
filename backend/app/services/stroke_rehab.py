@@ -647,4 +647,6 @@ class StrokeRehabService:
         ]
 
 
-stroke_rehab_service = StrokeRehabService()
+from app.core.per_user import per_user, register
+
+stroke_rehab_service = register("stroke_rehab.stroke_rehab_service", per_user(StrokeRehabService))

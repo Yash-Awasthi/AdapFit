@@ -483,4 +483,6 @@ class MealPlanner:
 
 
 # Singleton
-meal_planner = MealPlanner()
+from app.core.per_user import per_user, register
+
+meal_planner = register("meal_planner.meal_planner", per_user(MealPlanner))

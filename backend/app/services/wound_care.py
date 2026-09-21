@@ -312,4 +312,6 @@ class WoundCareService:
             return {"weeks": 12, "confidence": "low", "status": "Delayed - seek specialist"}
 
 
-wound_care_service = WoundCareService()
+from app.core.per_user import per_user, register
+
+wound_care_service = register("wound_care.wound_care_service", per_user(WoundCareService))

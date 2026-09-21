@@ -328,4 +328,6 @@ class EmergencySOSService:
         return escalated
 
 
-emergency_sos_service = EmergencySOSService()
+from app.core.per_user import per_user, register
+
+emergency_sos_service = register("emergency_sos.emergency_sos_service", per_user(EmergencySOSService))

@@ -24,7 +24,7 @@ _USE_SUPABASE = bool(settings.SUPABASE_URL and settings.SUPABASE_KEY)
 _USE_POSTGRES = bool(settings.DATABASE_URL)
 _USE_DB = _USE_SUPABASE or _USE_POSTGRES
 
-DATA_DIR = Path(os.path.dirname(__file__)).parent / "data"
+DATA_DIR = Path(os.getenv("ADAPFIT_DATA_DIR") or Path(os.path.dirname(__file__)).parent / "data")
 STORE_FILE = DATA_DIR / "store.json"
 
 

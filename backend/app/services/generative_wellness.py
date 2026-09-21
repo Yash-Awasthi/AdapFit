@@ -245,4 +245,6 @@ class GenerativeWellnessService:
         }
 
 
-generative_wellness_service = GenerativeWellnessService()
+from app.core.per_user import per_user, register
+
+generative_wellness_service = register("generative_wellness.generative_wellness_service", per_user(GenerativeWellnessService))

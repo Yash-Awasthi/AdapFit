@@ -19,6 +19,7 @@ from urllib.parse import parse_qsl, urlencode
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.auth import decode_token
+from app.core.per_user import CURRENT_USER
 
 API_PREFIX = "/api/v1/"
 
@@ -95,12 +96,18 @@ class IdentityMiddleware:
             await self.app(scope, receive, send)
             return
 
+        caller = _caller(scope)
+        # Services that keep per-user state read this rather than a parameter,
+        # so it is set for every request, including the ones that pass through
+        # untouched below. Each request runs in its own task context, so the
+        # value cannot leak into another request.
+        CURRENT_USER.set(caller[0] if caller else None)
+
         path = scope.get("path", "")
         if path.startswith(CROSS_USER_PREFIXES):
             await self.app(scope, receive, send)
             return
 
-        caller = _caller(scope)
         if caller is None:
             await self.app(scope, receive, send)
             return

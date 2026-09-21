@@ -417,4 +417,6 @@ class NutrigenomicsService:
         return supplements
 
 
-nutrigenomics_service = NutrigenomicsService()
+from app.core.per_user import per_user, register
+
+nutrigenomics_service = register("nutrigenomics.nutrigenomics_service", per_user(NutrigenomicsService))

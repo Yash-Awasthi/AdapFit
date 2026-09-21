@@ -201,4 +201,6 @@ class VitalSignsService:
         }
 
 
-vital_signs_service = VitalSignsService()
+from app.core.per_user import per_user, register
+
+vital_signs_service = register("vital_signs.vital_signs_service", per_user(VitalSignsService))
