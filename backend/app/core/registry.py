@@ -6,10 +6,13 @@ Each endpoint module should export a `router` attribute.
 Prefix and tags are looked up from ROUTE_MAP below.
 """
 import importlib
+import logging
 import pkgutil
 from pathlib import Path
 from fastapi import FastAPI
 from starlette.routing import compile_path
+
+logger = logging.getLogger("adapfit.registry")
 
 
 # Module name → (prefix, tags) mapping
@@ -285,6 +288,7 @@ def register_endpoints(app: FastAPI, package_path: str = "app.api.v1.endpoints")
     registered = 0
     skipped = 0
     errors = 0
+    failures: list[tuple[str, str]] = []
 
     for _, module_name, is_pkg in pkgutil.iter_modules([str(package_dir)]):
         if is_pkg or module_name.startswith("_"):
@@ -332,9 +336,13 @@ def register_endpoints(app: FastAPI, package_path: str = "app.api.v1.endpoints")
             app.include_router(router, prefix=full_prefix, tags=tags)
             registered += 1
         except Exception as e:
+            # A module that cannot import used to disappear without a trace,
+            # taking its endpoints with it and leaving the API looking healthy.
             errors += 1
+            failures.append((module_name, f"{type(e).__name__}: {e}"))
+            logger.error("Endpoint module %s failed to register: %s", module_name, e, exc_info=True)
 
-    return {"registered": registered, "skipped": skipped, "errors": errors}
+    return {"registered": registered, "skipped": skipped, "errors": errors, "failures": failures}
 
 
 # Lazy import for settings

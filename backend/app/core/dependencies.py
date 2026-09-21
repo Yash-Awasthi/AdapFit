@@ -23,17 +23,17 @@ def _extract_bearer_token(authorization: Optional[str] = Header(None)) -> Option
     return authorization[7:]
 
 
-def _decode_user_from_token(token: Optional[str]) -> Optional[dict]:
+async def _decode_user_from_token(token: Optional[str]) -> Optional[dict]:
     """Decode and validate JWT, return user dict or None."""
     if not token:
         return None
     payload = decode_token(token)
     if not payload or payload.get("type") != "access":
         return None
-    return user_manager.get_user(payload["sub"])
+    return await user_manager.get_user(payload["sub"])
 
 
-def _dev_user() -> dict:
+async def _dev_user() -> dict:
     """
     Stand-in for the authenticated user while the dev bypass is on.
 
@@ -41,7 +41,7 @@ def _dev_user() -> dict:
     `user["id"]` directly and a differently shaped dict turns the bypass into
     a KeyError instead of a 401.
     """
-    existing = user_manager.get_user(settings.DEV_USER_ID)
+    existing = await user_manager.get_user(settings.DEV_USER_ID)
     if existing:
         return existing
     return {
@@ -62,9 +62,9 @@ async def get_current_user(
     Use this when auth is optional (e.g. public endpoints with optional personalization).
     """
     token = _extract_bearer_token(authorization)
-    user = _decode_user_from_token(token)
+    user = await _decode_user_from_token(token)
     if user is None and auth_bypass_active():
-        return _dev_user()
+        return await _dev_user()
     return user
 
 
@@ -77,11 +77,11 @@ async def require_user(
     Use this as the default for any endpoint that needs a logged-in user.
     """
     token = _extract_bearer_token(authorization)
-    user = _decode_user_from_token(token)
+    user = await _decode_user_from_token(token)
     # The middleware bypass does not reach route-level dependencies, so the
     # flag has to be honoured here too for a guarded endpoint to open.
     if not user and auth_bypass_active():
-        return _dev_user()
+        return await _dev_user()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -140,7 +140,7 @@ async def get_user_id(
     if user_id:
         return user_id
     token = _extract_bearer_token(authorization)
-    user = _decode_user_from_token(token)
+    user = await _decode_user_from_token(token)
     if user:
         return user["id"]
     return "default"
@@ -197,13 +197,13 @@ async def authenticate_websocket(websocket, expected_user_id: Optional[str] = No
     another user's socket; anyone else may only reach their own.
     """
     if auth_bypass_active():
-        return _dev_user()
+        return await _dev_user()
 
     token = websocket.query_params.get("token")
     if not token:
         token = _extract_bearer_token(websocket.headers.get("Authorization"))
 
-    user = _decode_user_from_token(token)
+    user = await _decode_user_from_token(token)
     if user is None:
         await websocket.close(code=WS_POLICY_VIOLATION, reason="Authentication required")
         return None

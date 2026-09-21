@@ -8,7 +8,8 @@ changing one path segment. These tests pin the check in place.
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.auth import create_access_token, user_manager
+from app.core.auth import create_access_token
+from tests.conftest import register_user
 from app.core.config import settings
 from app.main import app
 
@@ -23,12 +24,12 @@ def _auth_enforced(monkeypatch):
 
 @pytest.fixture(scope="module")
 def owner():
-    return user_manager.register("mid-owner@example.com", "mid-owner", "Str0ngPassw0rd!")["user"]["id"]
+    return register_user("mid-owner@example.com", "mid-owner")["user"]["id"]
 
 
 @pytest.fixture(scope="module")
 def stranger():
-    return user_manager.register("mid-stranger@example.com", "mid-stranger", "Str0ngPassw0rd!")["user"]["id"]
+    return register_user("mid-stranger@example.com", "mid-stranger")["user"]["id"]
 
 
 def _headers(user_id):

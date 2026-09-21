@@ -42,6 +42,7 @@ class MuscleGroup(Enum):
     SHOULDERS = "shoulders"
     BICEPS = "biceps"
     TRICEPS = "triceps"
+    LEGS = "legs"
     QUADS = "quads"
     HAMSTRINGS = "hamstrings"
     GLUTES = "glutes"

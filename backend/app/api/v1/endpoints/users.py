@@ -2,7 +2,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from app.models.schemas import UserProfileCreate, UserProfileResponse, UserProfileUpdate
 from app.core.storage import storage
-from app.services.spark_processor import spark_analytics
+from app.services import personal_baseline
 
 router = APIRouter()
 
@@ -14,13 +14,8 @@ async def create_user(profile: UserProfileCreate):
 
     user = await storage.create_user(user_data)
 
-    await storage.set_baseline(user["id"], {
-        "hrv_mean_rmssd": 50.0,
-        "hrv_std_rmssd": 10.0,
-        "rhr_baseline": 65.0,
-        "sleep_target_hours": 8.0,
-        "chronic_load_28d": 500.0,
-    })
+    # Population defaults until the user has logged enough to have their own.
+    await storage.set_baseline(user["id"], dict(personal_baseline.DEFAULTS))
 
     await storage.get_agent_memory(user["id"])
 
@@ -54,7 +49,5 @@ async def get_baselines(user_id: str):
 @router.post("/{user_id}/baselines/recalibrate")
 async def recalibrate_baselines(user_id: str):
     """Recalibrate baselines from recent recovery data."""
-    recovery_logs = await storage.get_recovery_logs(user_id, 28)
-    new_baselines = spark_analytics.compute_rolling_baselines(recovery_logs)
-    await storage.set_baseline(user_id, new_baselines)
-    return {"user_id": user_id, "baselines": new_baselines, "method": "rolling_28d"}
+    baseline = await personal_baseline.refresh(user_id)
+    return {"user_id": user_id, "baselines": baseline, "method": "rolling_28d"}

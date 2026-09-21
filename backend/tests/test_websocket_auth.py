@@ -13,7 +13,8 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from app.core.auth import create_access_token, user_manager
+from app.core.auth import create_access_token
+from tests.conftest import register_user
 from app.core.config import settings
 from app.main import app
 
@@ -49,13 +50,13 @@ def _auth_enforced(monkeypatch):
 @pytest.fixture(scope="module")
 def owner():
     """A registered account, whose id the WebSocket paths name."""
-    result = user_manager.register("ws-owner@example.com", "ws-owner", "Str0ngPassw0rd!")
+    result = register_user("ws-owner@example.com", "ws-owner")
     return result["user"]["id"]
 
 
 @pytest.fixture(scope="module")
 def stranger():
-    result = user_manager.register("ws-stranger@example.com", "ws-stranger", "Str0ngPassw0rd!")
+    result = register_user("ws-stranger@example.com", "ws-stranger")
     return result["user"]["id"]
 
 

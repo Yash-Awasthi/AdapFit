@@ -46,6 +46,12 @@ async def lifespan(app: FastAPI):
         raise  # production fail-fast
     except Exception as e:
         logger.warning(f"Startup checks failed to run: {e}")
+    # ── Load accounts ─────────────────────────────────────────────────────
+    # A failure here means nobody can log in, so it stops startup rather than
+    # leaving the API up and answering every login with "invalid credentials".
+    from app.core.auth import user_manager
+    await user_manager.load()
+    logger.info("Accounts loaded: %d", len(user_manager._users))
     # ── Initialize services ───────────────────────────────────────────────
     try:
         from app.services.exercise_service import exercise_service
@@ -138,7 +144,23 @@ if web_dir.exists():
 
 # ─── Auto-discover and register all endpoint routers ───
 from app.core.registry import register_endpoints
-register_endpoints(app)
+_registration = register_endpoints(app)
+logger.info(
+    "Registered %d endpoint modules (%d skipped, %d failed)",
+    _registration["registered"], _registration["skipped"], _registration["errors"],
+)
+if _registration["errors"]:
+    # Serving a partial API is worse than not starting: the missing routes
+    # return 404 and look like a client bug rather than a broken deploy.
+    _broken = ", ".join(f"{name} ({reason})" for name, reason in _registration["failures"])
+    if settings.ENVIRONMENT.lower() == "production":
+        raise RuntimeError(f"Endpoint modules failed to register: {_broken}")
+    logger.error("Endpoint modules failed to register: %s", _broken)
+
+# Added after registration so the middleware can read the finished route table
+# and learn which paths carry a {user_id} segment.
+from app.middleware.identity import IdentityMiddleware
+app.add_middleware(IdentityMiddleware, fastapi_app=app)
 
 
 # ─── Root endpoints ───
