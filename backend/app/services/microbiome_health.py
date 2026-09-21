@@ -10,7 +10,6 @@ Based on 2025 gut microbiome research:
 """
 
 import time
-import random
 from typing import Dict, List, Any
 
 
@@ -75,20 +74,66 @@ class MicrobiomeHealthService:
             "recommendations": self._get_recommendations(score, symptoms, diet, fiber_intake),
         }
 
-    def get_microbiome_profile(self) -> Dict[str, Any]:
-        """Get microbiome composition profile."""
+    def record_test_result(self, user_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Store a microbiome composition from a real sequencing test.
+
+        `abundances` maps a taxon to its relative abundance percentage, and
+        `diversity_score` is whatever index the laboratory reported.
+        """
+        abundances = result.get("abundances") or {}
+        if not isinstance(abundances, dict) or not abundances:
+            return {"status": "invalid", "message": "abundances must map at least one taxon to a percentage."}
+        self.profiles[user_id] = {
+            "abundances": {str(k): float(v) for k, v in abundances.items()},
+            "diversity_score": result.get("diversity_score"),
+            "lab": result.get("lab"),
+            "collected_on": result.get("collected_on"),
+        }
+        return {"status": "recorded", "taxa": len(self.profiles[user_id]["abundances"])}
+
+    def get_microbiome_profile(self, user_id: str) -> Dict[str, Any]:
+        """
+        This user's microbiome composition, from a sequencing test.
+
+        The composition used to be generated: random abundances per taxon and
+        a diversity score between 60 and 95, reported as "within healthy
+        range". Gut composition can only come from a stool sequencing test, so
+        with no test on file there is nothing to report — and the reference
+        information about each taxon is still worth returning.
+        """
+        profile = self.profiles.get(user_id)
+        if not profile:
+            return {
+                "status": "no_test_on_file",
+                "message": (
+                    "Microbiome composition comes from a stool sequencing test. "
+                    "Record a result to see your own composition here."
+                ),
+                "known_beneficial_bacteria": {
+                    name: {"benefits": info["benefits"], "foods": info["foods"], "prebiotics": info["prebiotics"]}
+                    for name, info in self.beneficial_bacteria.items()
+                },
+            }
+
         return {
+            "status": "ok",
+            "lab": profile.get("lab"),
+            "collected_on": profile.get("collected_on"),
+            "diversity_score": profile.get("diversity_score"),
             "beneficial_bacteria": {
                 name: {
-                    "abundance": random.randint(5, 25),
-                    "status": random.choice(["optimal", "moderate", "low"]),
+                    "abundance": profile["abundances"].get(name),
                     "benefits": info["benefits"],
+                    "foods": info["foods"],
                 }
                 for name, info in self.beneficial_bacteria.items()
+                if name in profile["abundances"]
             },
-            "diversity_score": random.randint(60, 95),
-            "diversity_status": "excellent" if random.random() > 0.5 else "good",
-            "key_finding": "Your microbiome diversity is within healthy range",
+            "other_taxa": {
+                taxon: value for taxon, value in profile["abundances"].items()
+                if taxon not in self.beneficial_bacteria
+            },
         }
 
     def get_food_recommendations(self, gut_score: int) -> Dict[str, Any]:

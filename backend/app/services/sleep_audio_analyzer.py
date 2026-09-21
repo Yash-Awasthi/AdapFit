@@ -1,20 +1,32 @@
-"""Sleep Audio Analyzer Service - Snoring, apnea risk, sleep talking detection.
+"""
+Sleep audio scoring from events the recorder detected.
 
-Based on 2025 research on smartphone-based sleep audio analysis:
-- Snoring detection and scoring
-- Sleep apnea risk assessment from audio patterns
-- Sleep talking detection and transcription
-- Bedroom environment noise analysis
-- Sleep quality correlation with audio events
+Detection happens on the device that has the microphone; this service scores
+what it reports. It used to generate the events instead — a random number of
+snoring stretches, breathing pauses and gasps per night — which meant a night
+could come back "high apnea risk, consult a sleep specialist", or clear
+someone who does stop breathing, by chance.
+
+The apnea risk scoring itself is unchanged: it was always real arithmetic over
+the events, and it now runs on events that happened.
 """
 
 import time
-import random
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
+
+EVENT_KEYS = ("snoring_events", "breathing_pauses", "talking_events", "noise_events")
+
+
+def _events(audio_data: Dict[str, Any], key: str) -> List[Dict]:
+    value = audio_data.get(key)
+    return [e for e in value if isinstance(e, dict)] if isinstance(value, list) else []
 
 
 class SleepAudioAnalyzerService:
     """Analyze sleep audio for health insights."""
+
+    EVENT_KEYS = EVENT_KEYS
 
     def __init__(self):
         self.sessions: Dict[str, Dict] = {}
@@ -33,15 +45,38 @@ class SleepAudioAnalyzerService:
         }
 
     def analyze_night_audio(self, user_id: str, audio_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze a night of sleep audio."""
-        session_id = f"sa_{user_id}_{int(time.time())}"
+        """
+        Score one night from the events the recorder detected.
 
-        # Simulate audio analysis
-        total_sleep_min = audio_data.get("duration_minutes", 480)
-        snoring_events = self._generate_snoring_events(total_sleep_min)
-        breathing_pauses = self._generate_breathing_pauses(total_sleep_min)
-        talking_events = self._generate_talking_events(total_sleep_min)
-        noise_events = self._generate_noise_events(total_sleep_min)
+        `audio_data` carries `snoring_events`, `breathing_pauses`,
+        `talking_events` and `noise_events`, each a list the device produced.
+        An empty list means a quiet night; a missing key means the recorder
+        did not report that category, which is not the same thing and is why
+        the two are distinguished below.
+        """
+        total_sleep_min = audio_data.get("duration_minutes")
+        if not isinstance(total_sleep_min, (int, float)) or total_sleep_min <= 0:
+            return {
+                "status": "insufficient_data",
+                "message": "duration_minutes is needed to score a night.",
+            }
+
+        reported = [key for key in self.EVENT_KEYS if key in audio_data]
+        if not reported:
+            return {
+                "status": "insufficient_data",
+                "missing": list(self.EVENT_KEYS),
+                "message": (
+                    "No detected events were supplied. Record a night with the sleep "
+                    "audio recorder, which detects these on the device."
+                ),
+            }
+
+        session_id = f"sa_{user_id}_{int(time.time())}"
+        snoring_events = _events(audio_data, "snoring_events")
+        breathing_pauses = _events(audio_data, "breathing_pauses")
+        talking_events = _events(audio_data, "talking_events")
+        noise_events = _events(audio_data, "noise_events")
 
         # Calculate scores
         snoring_score = len(snoring_events) * 5
@@ -53,6 +88,8 @@ class SleepAudioAnalyzerService:
         session = {
             "session_id": session_id,
             "user_id": user_id,
+            "status": "scored",
+            "categories_reported": reported,
             "date": audio_data.get("date", time.strftime("%Y-%m-%d")),
             "duration_minutes": total_sleep_min,
             "snoring": {
@@ -74,8 +111,10 @@ class SleepAudioAnalyzerService:
                 "total_events": len(talking_events),
             },
             "environment": {
-                "avg_noise_db": random.randint(25, 45),
-                "quietest_hour_db": random.randint(18, 30),
+                # From the recorder's own level measurements, absent when it
+                # reported none. A bedroom's noise floor is measured, not guessed.
+                "avg_noise_db": audio_data.get("avg_noise_db"),
+                "quietest_hour_db": audio_data.get("quietest_hour_db"),
                 "noise_events": len(noise_events),
                 "environment_score": max(0, 100 - len(noise_events) * 5),
             },
@@ -113,37 +152,6 @@ class SleepAudioAnalyzerService:
             {"category": "Environment", "tips": ["Use humidifier", "Keep bedroom cool", "Use anti-snoring pillow"], "evidence": "moderate"},
             {"category": "Medical", "tips": ["Try nasal strips or dilators", "Treat nasal congestion", "Consider CPAP if severe", "See ENT specialist"], "evidence": "strong"},
         ]
-
-    def _generate_snoring_events(self, duration_min: int) -> List[Dict]:
-        count = random.randint(0, min(20, duration_min // 30))
-        events = []
-        for _ in range(count):
-            start = random.randint(0, duration_min)
-            events.append({
-                "start_minute": start,
-                "duration_min": round(random.uniform(0.5, 5), 1),
-                "intensity": random.choice(["light", "moderate", "loud"]),
-            })
-        return sorted(events, key=lambda x: x["start_minute"])
-
-    def _generate_breathing_pauses(self, duration_min: int) -> List[Dict]:
-        count = random.randint(0, min(10, duration_min // 60))
-        events = []
-        for _ in range(count):
-            events.append({
-                "start_minute": random.randint(0, duration_min),
-                "duration_seconds": random.randint(5, 30),
-                "gasping": random.random() < 0.3,
-            })
-        return events
-
-    def _generate_talking_events(self, duration_min: int) -> List[Dict]:
-        count = random.randint(0, min(5, duration_min // 120))
-        return [{"minute": random.randint(0, duration_min), "duration_seconds": random.randint(1, 15), "muffled": True} for _ in range(count)]
-
-    def _generate_noise_events(self, duration_min: int) -> List[Dict]:
-        count = random.randint(0, 3)
-        return [{"minute": random.randint(0, duration_min), "type": random.choice(["traffic", "partner", "pet", "snoring"]), "db": random.randint(35, 60)} for _ in range(count)]
 
     def _assess_apnea_risk(self, snoring: List, pauses: List, data: Dict) -> Dict[str, Any]:
         score = 0

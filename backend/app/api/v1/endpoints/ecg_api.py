@@ -20,9 +20,10 @@ async def get_history(user_id: str, limit: int = 20):
     result = ecg_interpreter_service.get_ecg_history(user_id, limit)
     return {"success": True, "data": result}
 
-@router.get("/afib-risk/{user_id}")
-async def get_afib_risk(user_id: str):
-    result = ecg_interpreter_service.get_afib_risk_assessment(user_id)
+@router.get("/irregularity/{user_id}")
+async def get_irregularity(user_id: str):
+    """How many recordings came back irregular. A count, not a risk score."""
+    result = ecg_interpreter_service.get_irregularity_summary(user_id)
     return {"success": True, "data": result}
 
 @router.get("/hrv/{user_id}")
