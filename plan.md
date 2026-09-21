@@ -1067,3 +1067,148 @@ plus the 30 assertions in the two new files.
   (`main.py`, `challenges_ws.py`, `sleep_analysis.py`, `sleep_analyzer.py`, the
   mobile components) still carries whatever was there before, plus these
   changes.
+
+## Part 7 — Second-pass audit and fixes
+
+Status as of 2026-09-12. This pass re-checked Parts 5 and 6 against the running application —
+importing the app and reading its OpenAPI document — rather than against the source alone. It found
+a deploy-breaking packaging defect, the cause of the route double-prefix bug that Part 6 recorded but
+did not explain, and several smaller faults. It also committed the work that had been sitting in the
+working tree, which the section above previously listed as untouched.
+
+### 1. Neither Dockerfile copied `src/`, so 14 endpoint modules could not import
+
+Both images copy `backend/` and `web/` and stop. Backend code reads 29 times from the `src.*`
+packages, and `main.py` puts the project root on `sys.path` so those imports resolve:
+
+```
+$ grep -rn "from src\.\|import src\." backend/ --include=*.py | wc -l
+29
+$ sed -n '9,13p' backend/app/main.py
+_zfit_root = str(_Path(__file__).resolve().parent.parent.parent)
+if _zfit_root not in sys.path:
+    sys.path.insert(0, _zfit_root)
+```
+
+`_zfit_root` resolves to `/app`, and `/app/src` did not exist in either image. The registry discards
+an endpoint module that fails to import (defect 13), so the failure is silent: those routes simply
+never register. Fourteen packages are affected — `achievements`, `anomaly`, `biomarkers`,
+`biometrics`, `breathing`, `chat`, `injury`, `medication`, `planner`, `pose`, `rppg`, `sensors`,
+`sleep`, `tracker` — and every one of them has an importer, so none is dead code. `railway.toml`
+builds `Dockerfile.backend`, so the production deploy path was affected, not just the compose stack.
+
+Both Dockerfiles now copy `src/` to `/app/src`, which is where `_zfit_root` looks.
+
+Docker is not installed on the machine this audit ran on, so the images were not built. The COPY
+paths were checked against how `main.py` computes the root rather than by building.
+
+### 2. The route double-prefix bug: cause found, 23 paths fixed
+
+Part 6 recorded 23 endpoint URLs with a doubled path segment and left the cause open. The cause is
+that the registry appended the generated prefix to routers that had already written that segment
+into their own paths.
+
+```
+$ sed -n '13p' backend/app/api/v1/endpoints/blood_pressure_api.py
+router = APIRouter()
+$ sed -n '31p' backend/app/api/v1/endpoints/blood_pressure_api.py
+@router.get("/blood-pressure/classify")
+```
+
+The router declares no prefix, so the registry's mismatch branch — which strips a router's own prefix
+when it disagrees with the declared one — never fires, and the generated `/blood-pressure` is
+appended on top of a path that already starts with it. The registry now detects that case with
+`_prefix_is_baked`, using the same reasoning it already applied to a declared prefix that disagrees.
+
+Three modules could not be fixed that way and were corrected at the source instead:
+
+- `health_predictions_api.py` mixed conventions — four routes baked `/predictions/...` and a fifth
+  used a relative `/anomalies/detect`, so no single prefix rule could match it. It now declares
+  `APIRouter(prefix="/predictions")` with five relative paths, which leaves the working
+  `/api/v1/predictions/anomalies/detect` exactly as it was.
+- `health_passport_api.py:80` declared `@router.get("/passport/{user_id}")` under a router whose
+  prefix is already `/passport`, while its eight sibling routes are relative. The segment is removed.
+- `habit_coach_api.py:20` declared `@router.get("/habits")` on a router mapped to `/habits`, producing
+  `/api/v1/habits/habits`. It is now `@router.get("/")`, giving `/api/v1/habits/`.
+
+Verified against the running app:
+
+| Check | Before | After |
+|---|---|---|
+| OpenAPI path templates | 1225 | 1225 |
+| Double-prefixed paths | 23 | **0** |
+| `/api/v1/predictions/sleep` | absent | present |
+| `/api/v1/passport/{user_id}` | absent | present |
+| `/api/v1/habits/habits` | present | absent |
+
+No route was gained or lost, so the count is unchanged and only the mount points moved. Nothing in
+`backend/`, `mobile/` or `web/` referenced either doubled URL, so no caller needed updating.
+
+The project's own check, `backend/scratch/check_route_prefix_fix.py`, exits 0 for the first time.
+Three of its assertions were stale — it whitelisted the two doubles that are now fixed, banned every
+path under `/api/v1/wellness/` even though `wellness_api` legitimately lives there, and expected an
+`/api/v1/recovery-v1/` module that does not exist. Each had been hidden behind the failure before
+it. They now assert what is actually true.
+
+**That check is untracked.** `backend/scratch/` is in `.gitignore` (line 34), so the regression test
+for this bug is not in the repository and cannot run in CI.
+
+### 3. `docker-compose.yml` committed a credential and published the databases
+
+```
+$ grep -nE "POSTGRES_PASSWORD|5432:|6379:" docker-compose.yml   # before
+49:      POSTGRES_PASSWORD: adapfit_secret
+51:      - "5432:5432"
+69:      - "6379:6379"
+```
+
+The password was also repeated verbatim in the backend's `DATABASE_URL` (line 18), so changing one
+without the other would have broken the stack. Postgres and Redis were published on every interface,
+not just loopback, so both were reachable from the host's network. The password now reads from
+`${POSTGRES_PASSWORD:-adapfit_dev_only}` in both places, the two port mappings bind `127.0.0.1`, and
+the obsolete `version:` key is gone.
+
+Compose itself does not need those host ports: the backend reaches both services over the compose
+network by name. The mappings exist only for a developer connecting from the host.
+
+**Not done:** the exposed password has not been rotated. That is the operator's action, and the audit
+cannot perform it. Treat `adapfit_secret` as compromised.
+
+### 4. Smaller findings, recorded and not fixed
+
+- **The audit's own test-count and gate claims were not reproducible as stated.** `python -m pytest
+  tests/ -q` reports **982 passed**, not the 952 the plan header claims; `npx tsc --noEmit` in
+  `mobile/` fails with 13 errors, all in `e2e/app.test.ts` importing an uninstalled `detox`, and the
+  mobile package has no test script and no CI job. `python -m ruff check app/` reports **5480 errors**
+  and exits 1, and `ci.yml` runs it with no `|| true`, so the lint job is red on the committed tree —
+  which also blocks the build job through `needs: [test, lint]`.
+- **`python -m mypy` is not installed** on this machine, so the CI typecheck (`mypy app/
+  --ignore-missing-imports || true`) could not be reproduced. It is masked either way.
+- **`backend/app/core/registry.py` still discards a module that fails to import**, incrementing
+  `errors` that `main.py:141` ignores. This is why finding 1 was invisible.
+- **`/api/v1/openapi.json` is served without authentication** and the `/metrics` endpoint is
+  allowlisted in `middleware/auth.py:54`, exposing route names and counters.
+- **96 of 277 service modules (~23,180 LOC) are never imported**, 65 with zero references anywhere.
+  `backend/app/api/v1/domains/` (25 files) is imported by nothing.
+- **`backend/core_engine/` is never built**, so `is_rust_available()` is always false and every call
+  takes the pure-Python path. No build step exists in either Dockerfile or in CI.
+- **`backend/.env` is on disk with `AUTH_DISABLED=true` and real-looking API keys.** It is gitignored
+  and was never committed, which is why this is not a leak, but the dev environment it configures has
+  authentication switched off for the whole API.
+
+### 5. Repo state
+
+The working tree held 538 changed paths, 457 of them deletions of an unused tooling directory, none of them
+committed. They are now committed in `711427a`. `plan.md` was untracked and is added in that commit.
+
+The fixes are in `75f9f6c`. `registry.py` carries both my change and the route-map entries for the
+absorbed modules that were already uncommitted before this pass.
+
+### Still open
+
+- The items in section 4, plus everything still listed in Part 6 that this pass did not touch: the
+  ~215 unguarded endpoint files that take a `user_id`, the public `/metrics`, the dead services, and
+  the unbuilt Rust engine.
+- Rotate the Postgres password.
+- Build both Docker images somewhere with Docker available, and confirm the `src.*` endpoints
+  register — the fix is reasoned and the COPY paths verified, but the images were never built here.

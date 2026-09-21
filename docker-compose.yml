@@ -18,7 +18,7 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-in-production}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - LOG_LEVEL=info
     depends_on:
       postgres:
@@ -52,7 +52,9 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/docs/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      # The migrations directory, not docs/schema.sql: initdb runs these in
+      # filename order and they are the schema the repository layer targets.
+      - ./backend/supabase/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U adapfit -d adapfit"]
       interval: 10s

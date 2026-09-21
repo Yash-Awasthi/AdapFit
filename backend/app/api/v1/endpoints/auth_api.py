@@ -43,7 +43,7 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
-def _extract_user(authorization: Optional[str] = None) -> Optional[dict]:
+async def _extract_user(authorization: Optional[str] = None) -> Optional[dict]:
     """Extract user from Authorization header."""
     if not authorization:
         return None
@@ -51,13 +51,13 @@ def _extract_user(authorization: Optional[str] = None) -> Optional[dict]:
     payload = decode_token(token)
     if not payload or payload.get("type") != "access":
         return None
-    return user_manager.get_user(payload["sub"])
+    return await user_manager.get_user(payload["sub"])
 
 
 @router.post("/register")
 async def register(request: RegisterRequest):
     """Register a new user account."""
-    result = user_manager.register(request.email, request.username, request.password, request.display_name)
+    result = await user_manager.register(request.email, request.username, request.password, request.display_name)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -67,7 +67,7 @@ async def register(request: RegisterRequest):
 async def login(request: LoginRequest, req: Request):
     """Authenticate and get access tokens."""
     client_ip = req.client.host if req.client else "unknown"
-    result = user_manager.login(request.email, request.password, ip=client_ip)
+    result = await user_manager.login(request.email, request.password, ip=client_ip)
     if "error" in result:
         # Use 401 for credential errors, 423 for locked accounts
         status_code = 423 if "locked" in result["error"].lower() else 401
@@ -78,7 +78,7 @@ async def login(request: LoginRequest, req: Request):
 @router.post("/refresh")
 async def refresh_token(request: RefreshRequest):
     """Refresh access token using refresh token."""
-    result = user_manager.refresh(request.refresh_token)
+    result = await user_manager.refresh(request.refresh_token)
     if "error" in result:
         raise HTTPException(status_code=401, detail=result["error"])
     return result
@@ -87,13 +87,13 @@ async def refresh_token(request: RefreshRequest):
 @router.post("/logout")
 async def logout(request: RefreshRequest):
     """Revoke refresh token (logout)."""
-    return user_manager.logout(request.refresh_token)
+    return await user_manager.logout(request.refresh_token)
 
 
 @router.get("/me")
 async def get_current_user(authorization: Optional[str] = Header(None)):
     """Get current authenticated user profile."""
-    user = _extract_user(authorization)
+    user = await _extract_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return {"user": user}
@@ -102,28 +102,24 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
 @router.put("/me")
 async def update_profile(request: ProfileUpdateRequest, authorization: Optional[str] = Header(None)):
     """Update current user profile."""
-    user = _extract_user(authorization)
+    user = await _extract_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     updates = request.model_dump(exclude_none=True)
-    return user_manager.update_profile(user["id"], updates)
+    return await user_manager.update_profile(user["id"], updates)
 
 
 @router.post("/change-password")
 async def change_password(request: PasswordChangeRequest, authorization: Optional[str] = Header(None)):
     """Change password for authenticated user."""
-    user = _extract_user(authorization)
+    user = await _extract_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    from app.core.auth import verify_password, hash_password
-    user_obj = user_manager._users.get(user["id"])
-    if not user_obj or not verify_password(request.old_password, user_obj.password_hash):
-        raise HTTPException(status_code=400, detail="Current password is incorrect")
-    pw_check = validate_password_strength(request.new_password)
-    if not pw_check["valid"]:
-        raise HTTPException(status_code=400, detail=pw_check["errors"])
-    user_obj.password_hash = hash_password(request.new_password)
-    return {"changed": True}
+    result = await user_manager.change_password(user["id"], request.old_password, request.new_password)
+    if "error" in result:
+        detail = result.get("details") or result["error"]
+        raise HTTPException(status_code=400, detail=detail)
+    return result
 
 
 @router.post("/forgot-password")
@@ -136,7 +132,7 @@ async def forgot_password(request: PasswordResetRequest):
 @router.get("/validate")
 async def validate_token(authorization: Optional[str] = Header(None)):
     """Validate current token and return user info."""
-    user = _extract_user(authorization)
+    user = await _extract_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return {"valid": True, "user": user}
