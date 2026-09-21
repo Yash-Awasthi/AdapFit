@@ -98,9 +98,21 @@ class WorkplaceSafetyService:
             {"defect": "Emergency lighting not functioning", "severity": "medium", "standard": "1910.37", "corrective": "Replace emergency lights"},
         ]
 
-        num_findings = random.randint(1, 4)
-        selected_findings = random.sample(common_findings, min(num_findings, len(common_findings)))
-        for i, finding in enumerate(selected_findings):
+        # The findings were drawn at random from the catalogue below, so an
+        # inspection report listed hazards nobody had looked for — and gave a
+        # compliance score based on them.
+        reported = inspection_data.get("findings")
+        if not isinstance(reported, list):
+            return {
+                "status": "no_findings_supplied",
+                "message": (
+                    "An inspection report needs the findings from the walkthrough. "
+                    "Supply `findings`, or an empty list if nothing was found."
+                ),
+                "common_hazards": common_findings,
+            }
+
+        for i, finding in enumerate(reported):
             findings.append({
                 "id": i + 1,
                 "finding": finding.get("finding", finding.get("defect", "")),

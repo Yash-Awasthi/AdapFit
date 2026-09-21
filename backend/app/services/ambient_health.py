@@ -19,6 +19,7 @@ class AmbientHealthService:
     """Smart home health monitoring and optimization."""
 
     def __init__(self):
+        self._motion_events: Dict[str, List[Dict[str, Any]]] = {}
         self.homes: Dict[str, Dict] = {}
         self.devices: Dict[str, Dict] = {}
         self.alerts: Dict[str, List] = {}
@@ -222,6 +223,13 @@ class AmbientHealthService:
             "recommendations": self._get_sleep_recommendations(metrics, scores),
         }
 
+    def record_motion(self, home_id: str, room: str, hour: int) -> Dict[str, Any]:
+        """Record a motion event a paired sensor detected."""
+        self._motion_events.setdefault(home_id, []).append(
+            {"room": room, "hour": int(hour) % 24, "recorded_at": time.time()}
+        )
+        return {"recorded": True, "home_id": home_id, "room": room}
+
     def get_activity_patterns(self, home_id: str, days: int = 7) -> Dict[str, Any]:
         """Analyze activity patterns from motion sensors."""
         motion_devices = [
@@ -229,13 +237,42 @@ class AmbientHealthService:
             if d.get("home_id") == home_id and d["type"] == "motion_sensor"
         ]
 
-        hourly_activity = {h: random.randint(5, 80) for h in range(24)}
-        room_activity = {room: random.randint(10, 100) for room in ["bedroom", "living_room", "kitchen", "bathroom"]}
+        if not motion_devices:
+            return {
+                "status": "no_sensors",
+                "home_id": home_id,
+                "message": "No motion sensors are paired with this home, so there is no activity to report.",
+            }
 
-        active_hours = sum(1 for v in hourly_activity.values() if v > 30)
-        sedentary_hours = sum(1 for v in hourly_activity.values() if v < 10)
+        # Counted from the events the sensors reported. These were generated
+        # per hour and per room, which meant an empty house looked lived in —
+        # and this feature exists to notice when someone stops moving.
+        events = [
+            e for e in self._motion_events.get(home_id, [])
+            if e.get("hour") is not None
+        ]
+        if not events:
+            return {
+                "status": "no_events",
+                "home_id": home_id,
+                "motion_devices_found": len(motion_devices),
+                "message": "The sensors have not reported any motion yet.",
+            }
+
+        hourly_activity = {h: 0 for h in range(24)}
+        room_activity: Dict[str, int] = {}
+        for event in events:
+            hour = int(event["hour"]) % 24
+            hourly_activity[hour] += 1
+            room = event.get("room")
+            if room:
+                room_activity[room] = room_activity.get(room, 0) + 1
+
+        active_hours = sum(1 for v in hourly_activity.values() if v > 0)
+        sedentary_hours = sum(1 for v in hourly_activity.values() if v == 0)
 
         return {
+            "status": "ok",
             "home_id": home_id,
             "analysis_period_days": days,
             "motion_devices_found": len(motion_devices),

@@ -106,12 +106,33 @@ class HabitCoachService:
             "habits_today": sum(1 for h in habits if h.get("completed_today")),
         }
 
-    def assess_com_b(self, user_id: str, habit_id: str) -> dict:
-        """COM-B Model: Capability, Opportunity, Motivation assessment."""
+    COM_B_QUESTIONS = {
+        "capability": {"physical": "Can you physically do this habit?", "psychological": "Do you know how to do this habit?"},
+        "opportunity": {"physical": "Do you have the time and environment?", "social": "Do others support this habit?"},
+        "motivation": {"reflective": "Do you believe in this habit's value?", "automatic": "Is this habit linked to existing routines?"},
+    }
+
+    def assess_com_b(self, user_id: str, habit_id: str, answers: dict = None) -> dict:
+        """
+        COM-B: capability, opportunity and motivation, as the user rates them.
+
+        The three scores were generated, so the barrier it identified — and the
+        advice that followed — belonged to nobody. Without answers it returns
+        the questions to ask.
+        """
+        answers = answers or {}
+        missing = [key for key in self.COM_B_QUESTIONS if not isinstance(answers.get(key), (int, float))]
+        if missing:
+            return {
+                "status": "questions",
+                "missing": missing,
+                "questions": self.COM_B_QUESTIONS,
+                "message": "Rate each of these from 1 to 10 to see which one is holding the habit back.",
+            }
+
         assessment = {
-            "capability": {"physical": "Can you physically do this habit?", "psychological": "Do you know how to do this habit?", "score": random.randint(6, 10)},
-            "opportunity": {"physical": "Do you have the time and environment?", "social": "Do others support this habit?", "score": random.randint(5, 9)},
-            "motivation": {"reflective": "Do you believe in this habit's value?", "automatic": "Is this habit linked to existing routines?", "score": random.randint(4, 10)},
+            key: {**questions, "score": answers[key]}
+            for key, questions in self.COM_B_QUESTIONS.items()
         }
         total = (assessment["capability"]["score"] + assessment["opportunity"]["score"] + assessment["motivation"]["score"]) / 3
         if total >= 7:

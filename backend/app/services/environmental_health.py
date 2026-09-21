@@ -10,7 +10,6 @@ Based on 2025 EPA/ACSM guidelines:
 """
 
 import time
-import random
 from typing import Dict, List, Optional, Any
 
 
@@ -18,6 +17,9 @@ class EnvironmentalHealthService:
     """Track environmental health factors and provide safety guidance."""
 
     def __init__(self):
+        # Readings keyed by location, from a provider or a monitor.
+        self._air_readings: Dict[str, Dict[str, Any]] = {}
+        self._uv_readings: Dict[str, Dict[str, Any]] = {}
         self.locations: Dict[str, Dict] = {}
         self._init_aqi_scale()
 
@@ -39,49 +41,127 @@ class EnvironmentalHealthService:
             "extreme": {"index": "11+", "protection": "Avoid outdoor exposure, stay in shade", "burn_time_minutes": 10},
         }
 
-    def get空气质量(self, location: str) -> Dict[str, Any]:
-        """Get air quality data for a location (Chinese method name for compatibility)."""
-        return self.get_air_quality(location)
+    @staticmethod
+    def _aqi_level(aqi: int) -> str:
+        return (
+            "good" if aqi <= 50 else
+            "moderate" if aqi <= 100 else
+            "sensitive_groups" if aqi <= 150 else
+            "unhealthy"
+        )
+
+    def record_air_quality(self, location: str, aqi: int, pollutants: Optional[Dict] = None) -> Dict[str, Any]:
+        """
+        Store a reading for a location, from a provider or a monitor.
+
+        The advice tables in this service are real reference material; what it
+        never had was a measurement to apply them to.
+        """
+        self._air_readings[location] = {
+            "aqi": int(aqi),
+            "pollutants": pollutants or {},
+            "recorded_at": time.time(),
+        }
+        return {"recorded": True, "location": location, "aqi": int(aqi)}
+
+    async def fetch_air_quality(self, location: str) -> Dict[str, Any]:
+        """Fetch a live reading, record it, and return the interpreted result."""
+        from app.services import open_meteo
+
+        reading = await open_meteo.air_quality(location)
+        if reading.get("status") != "ok":
+            return {**reading, "location": location, "advice_scale": self.aqi_scale}
+        self.record_air_quality(location, reading["aqi"], reading["pollutants"])
+        result = self.get_air_quality(location)
+        result["source"] = reading["source"]
+        result["observed_at"] = reading["observed_at"]
+        return result
+
+    async def fetch_uv_index(self, location: str) -> Dict[str, Any]:
+        from app.services import open_meteo
+
+        reading = await open_meteo.uv_index(location)
+        if reading.get("status") != "ok":
+            return {**reading, "location": location, "advice_scale": self.uv_scale}
+        self.record_uv_index(location, reading["uv_index"])
+        result = self.get_uv_index(location)
+        result["source"] = reading["source"]
+        result["observed_at"] = reading["observed_at"]
+        return result
+
+    async def fetch_outdoor_exercise_safety(self, location: str, activity: str = "running") -> Dict[str, Any]:
+        """Refresh both readings, then judge conditions."""
+        await self.fetch_air_quality(location)
+        await self.fetch_uv_index(location)
+        return self.get_outdoor_exercise_safety(location, activity)
 
     def get_air_quality(self, location: str) -> Dict[str, Any]:
-        """Get comprehensive air quality data."""
-        aqi = random.randint(15, 180)
-        level = "good" if aqi <= 50 else "moderate" if aqi <= 100 else "sensitive_groups" if aqi <= 150 else "unhealthy"
-        scale_info = self.aqi_scale[level]
+        """
+        Air quality for a location, from the last recorded reading.
 
+        The AQI and every pollutant concentration used to be generated, so the
+        app could advise someone with asthma to train outdoors on a bad-air day
+        or keep them inside on a clear one. With no reading there is no advice.
+        """
+        reading = self._air_readings.get(location)
+        if reading is None:
+            return {
+                "status": "unavailable",
+                "location": location,
+                "reason": "no_reading",
+                "message": (
+                    "No air quality reading for this location. Connect an air quality "
+                    "source or record a reading to get advice here."
+                ),
+                "advice_scale": self.aqi_scale,
+            }
+
+        aqi = reading["aqi"]
+        level = self._aqi_level(aqi)
+        scale_info = self.aqi_scale[level]
         return {
+            "status": "ok",
             "location": location,
             "aqi": aqi,
             "level": level,
+            "recorded_at": reading["recorded_at"],
             "color": scale_info["color"],
             "exercise_advice": scale_info["exercise"],
             "mask_recommended": scale_info["mask"],
             "health_risk": scale_info["risk"],
-            "pollutants": {
-                "pm25": random.randint(5, 80),
-                "pm10": random.randint(10, 100),
-                "ozone": random.randint(20, 60),
-                "no2": random.randint(5, 40),
-                "so2": random.randint(0, 15),
-                "co": round(random.uniform(0.1, 2.0), 1),
-            },
-            "forecast": [
-                {"day": "Tomorrow", "aqi": aqi + random.randint(-20, 20), "level": level},
-                {"day": "Day After", "aqi": aqi + random.randint(-30, 30), "level": level},
-            ],
+            "pollutants": reading["pollutants"],
             "exercise_recommendation": self._get_exercise_recommendation(aqi),
         }
 
-    def get_uv_index(self, location: str) -> Dict[str, Any]:
-        """Get UV index data."""
-        uv = random.randint(1, 11)
-        level = "low" if uv <= 2 else "moderate" if uv <= 5 else "high" if uv <= 7 else "very_high" if uv <= 10 else "extreme"
-        scale = self.uv_scale[level]
+    def record_uv_index(self, location: str, uv_index: float) -> Dict[str, Any]:
+        """Store a UV index reading for a location."""
+        self._uv_readings[location] = {"uv_index": float(uv_index), "recorded_at": time.time()}
+        return {"recorded": True, "location": location, "uv_index": float(uv_index)}
 
+    def get_uv_index(self, location: str) -> Dict[str, Any]:
+        """UV index for a location, from the last recorded reading."""
+        reading = self._uv_readings.get(location)
+        if reading is None:
+            return {
+                "status": "unavailable",
+                "location": location,
+                "reason": "no_reading",
+                "message": "No UV reading for this location.",
+                "advice_scale": self.uv_scale,
+            }
+
+        uv = reading["uv_index"]
+        level = (
+            "low" if uv <= 2 else "moderate" if uv <= 5 else
+            "high" if uv <= 7 else "very_high" if uv <= 10 else "extreme"
+        )
+        scale = self.uv_scale[level]
         return {
+            "status": "ok",
             "location": location,
             "uv_index": uv,
             "level": level,
+            "recorded_at": reading["recorded_at"],
             "protection_needed": scale["protection"],
             "estimated_burn_time_minutes": scale["burn_time_minutes"],
             "sunscreen_spf": "15+" if level == "low" else "30+" if level in ("moderate", "high") else "50+",
@@ -90,9 +170,25 @@ class EnvironmentalHealthService:
         }
 
     def get_outdoor_exercise_safety(self, location: str, activity: str = "running") -> Dict[str, Any]:
-        """Get outdoor exercise safety assessment."""
+        """Whether conditions suit training outdoors, when both readings exist."""
         aqi_data = self.get_air_quality(location)
         uv_data = self.get_uv_index(location)
+
+        missing = [
+            name for name, data in (("air quality", aqi_data), ("UV index", uv_data))
+            if data.get("status") != "ok"
+        ]
+        if missing:
+            return {
+                "status": "unavailable",
+                "location": location,
+                "activity": activity,
+                "missing": missing,
+                "message": (
+                    "No " + " or ".join(missing) + " reading for this location, so there is "
+                    "nothing to base a safety call on."
+                ),
+            }
 
         aqi = aqi_data["aqi"]
         uv = uv_data["uv_index"]
@@ -112,6 +208,7 @@ class EnvironmentalHealthService:
             recommendation = "Great conditions for outdoor exercise!"
 
         return {
+            "status": "ok",
             "location": location,
             "activity": activity,
             "safety_level": safety,

@@ -66,29 +66,32 @@ class AICoachService:
             "personalized": True,
         }
 
-    def get_weekly_report(self) -> dict:
-        """Generate comprehensive weekly health report."""
-        report_text = random.choice(self.WEEKLY_REPORTS).format(
-            workouts=random.randint(3, 6), steps=random.randint(6500, 9000),
-            sleep_score=random.randint(68, 88), stress_change=f"{random.randint(5, 15)}%",
-            habits_completed=random.randint(4, 7), recovery_score=random.randint(65, 90),
-            total_active=random.randint(180, 350), nutrition_pct=random.randint(70, 95),
+    def get_weekly_report(self, week: Optional[dict] = None) -> dict:
+        """
+        Phrase the week's figures.
+
+        Every number in this report — workouts, steps, sleep, recovery — used
+        to be generated, so it read as a summary of a week the user never had.
+        The figures are supplied by the caller, which has the logs.
+        """
+        required = (
+            "workouts", "steps", "sleep_score", "stress_change",
+            "habits_completed", "recovery_score", "total_active", "nutrition_pct",
         )
+        week = week or {}
+        missing = [key for key in required if key not in week]
+        if missing:
+            return {
+                "status": "insufficient_data",
+                "missing": missing,
+                "message": "A weekly report needs the week's figures; none were supplied.",
+            }
+
         return {
+            "status": "ok",
             "period": f"Week of {time.strftime('%b %d, %Y')}",
-            "report": report_text,
-            "health_score": random.randint(68, 88),
-            "highlights": [
-                f"Completed {random.randint(3, 6)} workouts",
-                f"Averaged {random.randint(6500, 9000)} steps/day",
-                f"Sleep score: {random.randint(68, 88)}",
-                f"Stress level: {'improving' if random.random() > 0.3 else 'stable'}",
-            ],
-            "focus_next_week": [
-                "Increase protein intake to hit daily target",
-                "Add 10 minutes to evening wind-down routine",
-                "Try one new healthy recipe from the Content Hub",
-            ],
+            "report": random.choice(self.WEEKLY_REPORTS).format(**{k: week[k] for k in required}),
+            "figures": {k: week[k] for k in required},
         }
 
     def ask_question(self, question: str) -> dict:

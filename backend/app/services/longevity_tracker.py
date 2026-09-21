@@ -80,61 +80,95 @@ class LongevityTrackerService:
             "belong_to_tribe", "loved_ones_first",
         ]
 
-    def assess_longevity(self, user_id: str, lifestyle_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Comprehensive longevity assessment."""
-        profile_id = f"long_{user_id}_{int(time.time())}"
+    # Factors needed before the weighted score means anything. Below this the
+    # weights no longer sum to one and the score is not comparable.
+    MIN_FACTORS_ANSWERED = 4
 
-        # Calculate factor scores
+    def assess_longevity(self, user_id: str, lifestyle_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Score the lifestyle factors the user reported.
+
+        Every unanswered factor used to default to the bottom of its optimal
+        range — that is, to count as already optimal — so an assessment with no
+        answers came back with a flattering score, a biological age four years
+        below the user's own, and a life expectancy. Unanswered factors are now
+        left out of the score and named in `unanswered`.
+        """
+        answered = {
+            name: float(lifestyle_data[name])
+            for name in self.factors
+            if isinstance(lifestyle_data.get(name), (int, float))
+            and not isinstance(lifestyle_data.get(name), bool)
+        }
+        unanswered = [name for name in self.factors if name not in answered]
+
+        if len(answered) < self.MIN_FACTORS_ANSWERED:
+            return {
+                "status": "insufficient_data",
+                "answered": len(answered),
+                "needed": self.MIN_FACTORS_ANSWERED,
+                "unanswered": unanswered,
+                "factors": {
+                    name: {"unit": factor["unit"], "optimal_range": factor["optimal_range"]}
+                    for name, factor in self.factors.items()
+                },
+                "message": (
+                    f"Answer at least {self.MIN_FACTORS_ANSWERED} lifestyle factors to get a score. "
+                    "Unanswered factors are left out rather than assumed to be good."
+                ),
+            }
+
         factor_scores = {}
-        for factor_name, factor in self.factors.items():
-            value = lifestyle_data.get(factor_name, factor["optimal_range"]["min"])
-            score = self._score_factor(factor_name, value, factor)
-            factor_scores[factor_name] = {
+        for name, value in answered.items():
+            factor = self.factors[name]
+            score = self._score_factor(name, value, factor)
+            factor_scores[name] = {
                 "value": value,
                 "score": round(score, 3),
                 "unit": factor["unit"],
                 "status": self._factor_status(value, factor["optimal_range"]),
-                "impact_years": round((score - 0.5) * 8, 1),  # -4 to +4 years impact
             }
 
-        # Calculate biological age
-        chronological_age = lifestyle_data.get("age", 40)
+        # Renormalised over the answered factors, so a partial assessment is
+        # not penalised for the questions it did not cover.
+        total_weight = sum(self.factors[name]["weight"] for name in factor_scores)
         weighted_score = sum(
-            factor_scores[k]["score"] * self.factors[k]["weight"]
-            for k in factor_scores
-        )
-        age_modifier = (1.0 - weighted_score) * 12  # up to 12 years difference
-        biological_age = round(chronological_age + age_modifier - 4, 1)
-        biological_age = max(18, biological_age)
+            factor_scores[name]["score"] * self.factors[name]["weight"] for name in factor_scores
+        ) / total_weight
 
-        # Blue zones alignment
-        blue_zones_score = self._assess_blue_zones(lifestyle_data)
-
-        # Calculate overall longevity score
         longevity_score = round(weighted_score * 100, 1)
-
-        # Life expectancy estimation
-        base_expectancy = 79  # global average
-        life_expectancy_mod = (weighted_score - 0.5) * 16
-        estimated_expectancy = round(base_expectancy + life_expectancy_mod, 1)
+        chronological_age = lifestyle_data.get("age")
 
         profile = {
-            "profile_id": profile_id,
+            "profile_id": f"long_{user_id}_{int(time.time())}",
             "user_id": user_id,
+            "status": "scored",
             "timestamp": time.time(),
             "chronological_age": chronological_age,
-            "biological_age": biological_age,
-            "age_difference": round(chronological_age - biological_age, 1),
             "longevity_score": longevity_score,
+            "factors_answered": len(factor_scores),
+            "factors_total": len(self.factors),
+            "unanswered": unanswered,
             "factor_scores": factor_scores,
-            "blue_zones_alignment": blue_zones_score,
-            "estimated_life_expectancy": estimated_expectancy,
-            "health_span_years": round(estimated_expectancy * (longevity_score / 100), 1),
+            "blue_zones_alignment": self._assess_blue_zones(lifestyle_data),
             "top_interventions": self._prioritize_interventions(factor_scores),
             "longevity_tier": self._get_tier(longevity_score),
+            # Biological age and life expectancy are deliberately absent.
+            # Biological age needs biomarkers — methylation, or a panel — not a
+            # lifestyle questionnaire, and this reported one by adding a
+            # modifier to the user's real age and then subtracting a flat four
+            # years, so everybody came out younger than they are.
+            "biological_age": None,
+            "biological_age_note": (
+                "Not estimated from lifestyle answers alone; it needs biomarker testing."
+            ),
+            "disclaimer": (
+                "A score over the lifestyle factors you reported, useful for comparing "
+                "with your own later answers. It does not predict lifespan."
+            ),
         }
 
-        self.profiles[profile_id] = profile
+        self.profiles[profile["profile_id"]] = profile
         return profile
 
     def track_intervention(self, user_id: str, intervention: Dict[str, Any]) -> Dict[str, Any]:
@@ -182,8 +216,9 @@ class LongevityTrackerService:
             return {"error": "No assessment data available"}
 
         latest = user_profiles[-1]
+        # Biological age is not compared: it is no longer estimated, because a
+        # lifestyle questionnaire cannot produce one.
         population_averages = {
-            "biological_age": 42,
             "longevity_score": 55,
             "exercise_score": 0.45,
             "sleep_score": 0.5,
@@ -191,11 +226,6 @@ class LongevityTrackerService:
         }
 
         comparison = {
-            "biological_age": {
-                "yours": latest["biological_age"],
-                "population_avg": population_averages["biological_age"],
-                "percentile": self._calculate_percentile(latest["biological_age"], population_averages["biological_age"], lower_better=True),
-            },
             "longevity_score": {
                 "yours": latest["longevity_score"],
                 "population_avg": population_averages["longevity_score"],

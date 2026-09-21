@@ -10,7 +10,6 @@ Based on 2025 clinical trial research:
 """
 
 import time
-import random
 from typing import Dict, List, Any
 
 
@@ -63,7 +62,9 @@ class ClinicalTrialService:
                 matches.append({
                     "trial_id": trial["id"],
                     "title": trial["title"],
-                    "match_score": min(100, score + random.randint(0, 20)),
+                    # Was the computed score plus up to 20 points of noise,
+                    # which reordered the matches on every call.
+                    "match_score": min(100, score),
                     "condition": trial["condition"],
                     "phase": trial["phase"],
                     "location": trial["location"],

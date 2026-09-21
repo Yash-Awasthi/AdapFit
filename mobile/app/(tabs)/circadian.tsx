@@ -1,156 +1,344 @@
 /**
- * Circadian Rhythm — Premium Chronotype & Sleep-Wake Optimization
- * Chronotype assessment, light exposure tracking, energy predictions
+ * Circadian Rhythm — chronotype, energy curve and the day it implies.
+ *
+ * Choosing a chronotype refetches the schedule and energy curve rather than
+ * re-styling a fixed one: the peak hours, exercise window and wind-down time
+ * all move with it, and a Wolf shown a Bear's schedule is worse than no
+ * schedule at all.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Dimensions,
+  View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../../src/theme';
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { ScreenWrapper } from '../../src/components/ScreenWrapper';
-import { GlassCard, SectionHeaderPremium, ScoreRing, ProgressBarPremium } from '../../src/components/PremiumComponents';
+import { GlassCard, SectionHeaderPremium, ProgressBarPremium } from '../../src/components/PremiumComponents';
 import { InteractiveBarChart } from '../../src/components/InteractiveCharts';
+import { useApis } from '../../src/hooks/useApi';
+import { postJson, asArray, asNumber } from '../../src/services/http';
 
-const CHRONOTYPES = [
-  { type: 'Lion', icon: 'sunny', description: 'Early riser, peak energy morning', color: '#F59E0B', bestTime: '5:30 AM - 9:00 PM' },
-  { type: 'Bear', icon: 'partly-sunny', description: 'Follows solar cycle, most common', color: '#22C55E', bestTime: '7:00 AM - 11:00 PM' },
-  { type: 'Wolf', icon: 'moon', description: 'Night owl, peak energy evening', color: '#8B5CF6', bestTime: '12:00 PM - 12:00 AM' },
-  { type: 'Dolphin', icon: 'water', description: 'Light sleeper, irregular patterns', color: '#3B82F6', bestTime: '6:00 AM - 10:00 PM' },
-] as const;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const ENERGY_DATA = [
-  { value: 85, label: '6AM', color: '#22C55E' },
-  { value: 95, label: '9AM', color: '#22C55E' },
-  { value: 90, label: '12PM', color: '#22C55E' },
-  { value: 70, label: '3PM', color: '#F59E0B' },
-  { value: 80, label: '6PM', color: '#22C55E' },
-  { value: 60, label: '9PM', color: '#F59E0B' },
-  { value: 30, label: '12AM', color: '#EF4444' },
+type ChronotypeKey = 'lion' | 'bear' | 'wolf' | 'dolphin';
+
+const CHRONOTYPES: { key: ChronotypeKey; label: string; icon: string; color: string }[] = [
+  { key: 'lion', label: 'Lion', icon: 'sunny', color: '#F59E0B' },
+  { key: 'bear', label: 'Bear', icon: 'partly-sunny', color: '#22C55E' },
+  { key: 'wolf', label: 'Wolf', icon: 'moon', color: '#8B5CF6' },
+  { key: 'dolphin', label: 'Dolphin', icon: 'water', color: '#3B82F6' },
 ];
 
+interface ChronotypeInfo {
+  name: string;
+  description: string;
+  wake_time: string;
+  peak_hours: string;
+  wind_down: string;
+  best_exercise: string;
+  tips: string[];
+  percentage: number;
+}
+
+interface EnergyPoint {
+  hour: number;
+  energy_level: number;
+  recommendation: string;
+}
+
+interface ScheduleBlock {
+  time: string;
+  activities?: string[];
+  type?: string;
+}
+
+interface Schedule {
+  chronotype: string;
+  wake_up: string;
+  [block: string]: ScheduleBlock | string;
+}
+
+interface RhythmScore {
+  status: 'ok' | 'insufficient_data';
+  overall_score?: number | null;
+  consistency?: number;
+  light_exposure?: number;
+  days_of_data?: number;
+  message?: string;
+  tips: string[];
+}
+
+// The schedule blocks in the order a day runs, since the response is an object.
+const BLOCK_ORDER = [
+  'morning_routine', 'peak_productivity', 'lunch',
+  'afternoon', 'exercise', 'dinner', 'wind_down',
+];
+
+const BLOCK_STYLE: Record<string, { label: string; icon: string; color: string }> = {
+  morning_routine: { label: 'Morning routine', icon: 'sunny', color: '#F59E0B' },
+  peak_productivity: { label: 'Deep work', icon: 'bulb', color: '#3B82F6' },
+  lunch: { label: 'Lunch', icon: 'restaurant', color: '#F97316' },
+  afternoon: { label: 'Afternoon', icon: 'document', color: '#8B5CF6' },
+  exercise: { label: 'Exercise', icon: 'fitness', color: '#22C55E' },
+  dinner: { label: 'Dinner', icon: 'restaurant', color: '#F97316' },
+  wind_down: { label: 'Wind down', icon: 'moon', color: '#6366F1' },
+};
+
+function energyColor(level: number): string {
+  return level >= 75 ? '#22C55E' : level >= 50 ? '#F59E0B' : '#EF4444';
+}
+
+function hourLabel(hour: number): string {
+  const suffix = hour < 12 ? 'AM' : 'PM';
+  const display = hour % 12 === 0 ? 12 : hour % 12;
+  return `${display}${suffix}`;
+}
+
 export default function CircadianScreen() {
-  const [selectedChronotype, setSelectedChronotype] = useState(1); // Bear
+  const [chronotype, setChronotype] = useState<ChronotypeKey>('bear');
+  const [logging, setLogging] = useState(false);
+
+  const { data, loading, refreshing, refresh, reload } = useApis<{
+    info: ChronotypeInfo;
+    energy: { energy_curve: EnergyPoint[] };
+    schedule: Schedule;
+    rhythm: RhythmScore;
+  }>({
+    info: `/circadian/chronotype/${chronotype}`,
+    energy: `/circadian/energy/${chronotype}`,
+    schedule: `/circadian/schedule/${chronotype}`,
+    rhythm: '/circadian/rhythm-score',
+  });
+
+  const info = data.info ?? null;
+  const rhythm = data.rhythm ?? null;
+  const curve = asArray<EnergyPoint>(data.energy?.energy_curve);
+  const schedule = data.schedule ?? null;
+
+  // Every third hour: eighteen bars do not fit a phone.
+  const chartData = useMemo(
+    () => curve
+      .filter((_, i) => i % 3 === 0)
+      .map((point) => ({
+        value: Math.round(point.energy_level),
+        label: hourLabel(point.hour),
+        color: energyColor(point.energy_level),
+      })),
+    [curve]
+  );
+
+  const peak = useMemo(
+    () => curve.reduce<EnergyPoint | null>((best, p) => (!best || p.energy_level > best.energy_level ? p : best), null),
+    [curve]
+  );
+
+  const logSunlight = async () => {
+    setLogging(true);
+    // 10,000 lux for 20 minutes is the standard morning-light prescription,
+    // which is what this button is for.
+    const result = await postJson('/circadian/light-exposure', {
+      lux: 10000,
+      duration_minutes: 20,
+    });
+    setLogging(false);
+    if (!result) {
+      Alert.alert('Not recorded', 'The light exposure could not be saved.');
+      return;
+    }
+    await reload();
+  };
 
   return (
     <ScreenWrapper
       title="Circadian Rhythm"
       subtitle="Optimize your body clock"
       gradient={['#8B5CF6', '#6366F1']}
-      rightAction={{ icon: 'settings', onPress: () => {} }}
+      loading={loading}
+      refreshing={refreshing}
+      onRefresh={refresh}
     >
-      {/* Chronotype */}
       <SectionHeaderPremium icon="compass" iconColor="#8B5CF6" title="Your Chronotype" />
       <View style={styles.chronotypeGrid}>
-        {CHRONOTYPES.map((ct, i) => (
-          <TouchableOpacity
-            key={i}
-            style={[styles.chronotypeCard, selectedChronotype === i && { borderColor: ct.color + '80', backgroundColor: ct.color + '10' }]}
-            onPress={() => setSelectedChronotype(i)}
-          >
-            <Ionicons name={ct.icon} size={28} color={ct.color} style={styles.chronotypeIcon} />
-            <Text style={[styles.chronotypeType, selectedChronotype === i && { color: ct.color }]}>{ct.type}</Text>
-            <Text style={styles.chronotypeDesc} numberOfLines={2}>{ct.description}</Text>
-          </TouchableOpacity>
-        ))}
+        {CHRONOTYPES.map((ct) => {
+          const selected = ct.key === chronotype;
+          return (
+            <TouchableOpacity
+              key={ct.key}
+              style={[styles.chronotypeCard, selected && { borderColor: ct.color + '80', backgroundColor: ct.color + '10' }]}
+              onPress={() => setChronotype(ct.key)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${ct.label} chronotype`}
+            >
+              <Ionicons name={ct.icon as any} size={28} color={ct.color} style={styles.chronotypeIcon} />
+              <Text style={[styles.chronotypeType, selected && { color: ct.color }]}>{ct.label}</Text>
+              <Text style={styles.chronotypeDesc} numberOfLines={2}>
+                {selected && info ? info.description : ''}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Energy Curve */}
+      {info && (
+        <GlassCard variant="light" style={styles.sectionCard}>
+          <Text style={styles.infoTitle}>{info.name}</Text>
+          <Text style={styles.infoLine}>Wake {info.wake_time} · Wind down {info.wind_down}</Text>
+          <Text style={styles.infoLine}>Peak hours {info.peak_hours}</Text>
+          <Text style={styles.infoLine}>Best exercise {info.best_exercise}</Text>
+          <Text style={styles.infoShare}>{info.percentage}% of people share this chronotype</Text>
+        </GlassCard>
+      )}
+
       <SectionHeaderPremium icon="trending-up" iconColor="#22C55E" title="Energy Curve" />
       <GlassCard variant="light" style={styles.sectionCard}>
-        <InteractiveBarChart data={ENERGY_DATA} height={160} showValues />
-        <Text style={styles.energyInsight}>Your peak focus hours are 9-11 AM. Schedule deep work here.</Text>
+        {chartData.length > 0 ? (
+          <>
+            <InteractiveBarChart data={chartData} height={160} showValues />
+            {peak && (
+              <Text style={styles.energyInsight}>
+                Peak energy around {hourLabel(peak.hour)}. {peak.recommendation}
+              </Text>
+            )}
+          </>
+        ) : (
+          <Text style={styles.emptyText}>The energy curve could not be loaded.</Text>
+        )}
       </GlassCard>
 
-      {/* Light Exposure */}
-      <SectionHeaderPremium icon="sunny" iconColor="#F59E0B" title="Light Exposure" />
+      <SectionHeaderPremium icon="sunny" iconColor="#F59E0B" title="Rhythm Regularity" />
       <GlassCard variant="light" style={styles.sectionCard}>
-        <View style={styles.lightRow}>
-          <View style={styles.lightStat}>
-            <Ionicons name="sunny" size={24} color="#F59E0B" />
-            <Text style={styles.lightValue}>4.2h</Text>
-            <Text style={styles.lightLabel}>Outdoor Light</Text>
-          </View>
-          <View style={styles.lightStat}>
-            <Ionicons name="phone-portrait" size={24} color="#3B82F6" />
-            <Text style={styles.lightValue}>6.5h</Text>
-            <Text style={styles.lightLabel}>Screen Time</Text>
-          </View>
-          <View style={styles.lightStat}>
-            <Ionicons name="moon" size={24} color="#8B5CF6" />
-            <Text style={styles.lightValue}>2h</Text>
-            <Text style={styles.lightLabel}>Dark Exposure</Text>
-          </View>
-        </View>
-        <ProgressBarPremium value={4.2} max={8} color="#F59E0B" height={6} showLabel label="Daily Light Target" />
+        {rhythm?.status === 'ok' ? (
+          <>
+            <View style={styles.lightRow}>
+              <View style={styles.lightStat}>
+                <Ionicons name="repeat" size={24} color="#22C55E" />
+                <Text style={styles.lightValue}>{asNumber(rhythm.consistency)}</Text>
+                <Text style={styles.lightLabel}>Consistency</Text>
+              </View>
+              <View style={styles.lightStat}>
+                <Ionicons name="sunny" size={24} color="#F59E0B" />
+                <Text style={styles.lightValue}>{asNumber(rhythm.light_exposure)}</Text>
+                <Text style={styles.lightLabel}>Light</Text>
+              </View>
+              <View style={styles.lightStat}>
+                <Ionicons name="calendar" size={24} color="#8B5CF6" />
+                <Text style={styles.lightValue}>{asNumber(rhythm.days_of_data)}</Text>
+                <Text style={styles.lightLabel}>Days logged</Text>
+              </View>
+            </View>
+            <ProgressBarPremium
+              value={asNumber(rhythm.overall_score)}
+              max={100}
+              color="#8B5CF6"
+              height={6}
+              showLabel
+              label="Overall rhythm score"
+            />
+          </>
+        ) : (
+          <Text style={styles.emptyText}>
+            {rhythm?.message ?? 'Log your morning light and daily energy to see how regular your rhythm is.'}
+          </Text>
+        )}
+        <TouchableOpacity
+          style={styles.logButton}
+          onPress={logSunlight}
+          disabled={logging}
+          accessibilityRole="button"
+          accessibilityLabel="Log twenty minutes of morning sunlight"
+        >
+          <Ionicons name="sunny" size={16} color="#FFF" />
+          <Text style={styles.logButtonText}>{logging ? 'Saving…' : 'Log 20 min of sunlight'}</Text>
+        </TouchableOpacity>
       </GlassCard>
 
-      {/* Optimal Schedule */}
       <SectionHeaderPremium icon="calendar" iconColor={colors.health.calm} title="Optimal Schedule" />
       <GlassCard variant="light" style={styles.sectionCard}>
-        {[
-          { time: '6:00 AM', activity: 'Wake + Sunlight', icon: 'sunny', color: '#F59E0B' },
-          { time: '7:00 AM', activity: 'Exercise', icon: 'fitness', color: '#22C55E' },
-          { time: '9:00 AM', activity: 'Deep Work', icon: 'bulb', color: '#3B82F6' },
-          { time: '12:00 PM', activity: 'Lunch + Walk', icon: 'restaurant', color: '#F97316' },
-          { time: '3:00 PM', activity: 'Light Tasks', icon: 'document', color: '#8B5CF6' },
-          { time: '6:00 PM', activity: 'Dinner', icon: 'restaurant', color: '#F97316' },
-          { time: '9:00 PM', activity: 'Wind Down', icon: 'moon', color: '#6366F1' },
-          { time: '10:30 PM', activity: 'Sleep', icon: 'bed', color: '#312E81' },
-        ].map((item, i) => (
-          <View key={i} style={[styles.scheduleItem, i < 7 && { borderBottomWidth: 1, borderBottomColor: colors.surface.divider }]}>
-            <Text style={styles.scheduleTime}>{item.time}</Text>
-            <View style={[styles.scheduleIcon, { backgroundColor: item.color + '15' }]}>
-              <Ionicons name={item.icon as any} size={14} color={item.color} />
+        {schedule ? (
+          <>
+            <View style={styles.scheduleItem}>
+              <Text style={styles.scheduleTime}>{schedule.wake_up as string}</Text>
+              <View style={[styles.scheduleIcon, { backgroundColor: '#F59E0B15' }]}>
+                <Ionicons name="alarm" size={14} color="#F59E0B" />
+              </View>
+              <Text style={styles.scheduleActivity}>Wake up</Text>
             </View>
-            <Text style={styles.scheduleActivity}>{item.activity}</Text>
-          </View>
-        ))}
+            {BLOCK_ORDER.map((key) => {
+              const block = schedule[key];
+              if (!block || typeof block === 'string') return null;
+              const style = BLOCK_STYLE[key];
+              return (
+                <View key={key} style={[styles.scheduleItem, styles.scheduleDivider]}>
+                  <Text style={styles.scheduleTime}>{block.time}</Text>
+                  <View style={[styles.scheduleIcon, { backgroundColor: style.color + '15' }]}>
+                    <Ionicons name={style.icon as any} size={14} color={style.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.scheduleActivity}>{style.label}</Text>
+                    {block.activities && (
+                      <Text style={styles.scheduleDetail} numberOfLines={2}>
+                        {block.activities.join(' · ')}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        ) : (
+          <Text style={styles.emptyText}>The schedule could not be loaded.</Text>
+        )}
       </GlassCard>
 
-      {/* Tips */}
-      <GlassCard variant="primary" style={styles.sectionCard}>
-        <View style={styles.tipRow}>
-          <Ionicons name="bulb" size={20} color={colors.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.tipTitle}>Circadian Tip</Text>
-            <Text style={styles.tipText}>Get 10 minutes of sunlight within 30 minutes of waking to anchor your circadian rhythm.</Text>
+      {info?.tips?.length ? (
+        <GlassCard variant="primary" style={styles.sectionCard}>
+          <View style={styles.tipRow}>
+            <Ionicons name="bulb" size={20} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tipTitle}>Circadian Tips</Text>
+              {info.tips.map((tip, i) => (
+                <Text key={i} style={styles.tipText}>• {tip}</Text>
+              ))}
+            </View>
           </View>
-        </View>
-      </GlassCard>
+        </GlassCard>
+      ) : null}
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.md },
-
-  // Chronotype
   chronotypeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, paddingHorizontal: spacing.screenPadding, marginBottom: spacing.lg },
-  chronotypeCard: { width: (SCREEN_WIDTH - spacing.screenPadding * 2 - spacing.md) / 2, backgroundColor: colors.bg.card, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.surface.border, alignItems: 'center' },
+  chronotypeCard: { width: (SCREEN_WIDTH - spacing.screenPadding * 2 - spacing.md) / 2, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.surface.border, backgroundColor: colors.bg.card, alignItems: 'center' },
   chronotypeIcon: { marginBottom: spacing.xs },
-  chronotypeType: { fontSize: 16, fontWeight: '700', color: colors.text.primary },
-  chronotypeDesc: { fontSize: 11, color: colors.text.muted, textAlign: 'center', marginTop: 4 },
+  chronotypeType: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
+  chronotypeDesc: { fontSize: 11, color: colors.text.muted, textAlign: 'center', marginTop: 2, minHeight: 28 },
 
-  // Energy
-  energyInsight: { fontSize: 12, color: colors.text.muted, marginTop: spacing.md, lineHeight: 18 },
+  sectionCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.lg },
+  infoTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary, marginBottom: spacing.xs },
+  infoLine: { fontSize: 13, color: colors.text.secondary, marginTop: 2 },
+  infoShare: { fontSize: 12, color: colors.text.muted, marginTop: spacing.sm },
 
-  // Light
-  lightRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.lg },
+  energyInsight: { fontSize: 13, color: colors.text.secondary, marginTop: spacing.md, lineHeight: 19 },
+  emptyText: { fontSize: 13, color: colors.text.muted, lineHeight: 19 },
+
+  lightRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.md },
   lightStat: { alignItems: 'center' },
-  lightValue: { fontSize: 18, fontWeight: '800', color: colors.text.primary, marginTop: 4 },
-  lightLabel: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  lightValue: { fontSize: 20, fontWeight: '800', color: colors.text.primary, marginTop: 4 },
+  lightLabel: { fontSize: 11, color: colors.text.muted },
 
-  // Schedule
+  logButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.md, paddingVertical: spacing.md, borderRadius: radius.md, backgroundColor: '#F59E0B' },
+  logButtonText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+
   scheduleItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
-  scheduleTime: { fontSize: 13, fontWeight: '600', color: colors.text.muted, width: 60 },
-  scheduleIcon: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  scheduleActivity: { fontSize: 14, fontWeight: '600', color: colors.text.primary, flex: 1 },
+  scheduleDivider: { borderTopWidth: 1, borderTopColor: colors.surface.divider },
+  scheduleTime: { fontSize: 12, color: colors.text.muted, width: 90 },
+  scheduleIcon: { width: 26, height: 26, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  scheduleActivity: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
+  scheduleDetail: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
 
-  // Tips
   tipRow: { flexDirection: 'row', gap: spacing.md },
-  tipTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginBottom: 4 },
-  tipText: { fontSize: 13, color: colors.text.secondary, lineHeight: 18 },
+  tipTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginBottom: spacing.xs },
+  tipText: { fontSize: 12, color: colors.text.secondary, lineHeight: 18, marginTop: 2 },
 });

@@ -10,8 +10,21 @@ Based on 2025 voice journaling research (Kalmora, Gloam AI, Sonde Health):
 """
 
 import time
-import random
 from typing import Dict, List, Any
+
+
+def _stability(valences: list):
+    """
+    1.0 when every entry sits at the same valence, falling as they scatter.
+
+    None below three entries: two points do not describe stability.
+    """
+    if len(valences) < 3:
+        return None
+    mean = sum(valences) / len(valences)
+    spread = (sum((v - mean) ** 2 for v in valences) / len(valences)) ** 0.5
+    # Valence runs 0-1, so a standard deviation of 0.35 is fully scattered.
+    return round(max(0.0, min(1.0, 1 - spread / 0.35)), 2)
 
 
 class VoiceDiaryService:
@@ -34,13 +47,37 @@ class VoiceDiaryService:
             "neutral": {"color": "#94A3B8", "valence": 0.5, "energy": 0.5},
         }
 
+    def _plain_entry(self, user_id: str, audio_data: Dict[str, Any]) -> Dict[str, Any]:
+        """The entry as recorded, with no mood reading attached."""
+        entry = {
+            "entry_id": f"vd_{user_id}_{int(time.time())}",
+            "user_id": user_id,
+            "timestamp": time.time(),
+            "duration_seconds": audio_data.get("duration_seconds", 60),
+            "transcript": audio_data.get("transcript", "[Voice recording]"),
+            "detected_emotion": None,
+        }
+        self.entries.setdefault(user_id, []).append(entry)
+        return entry
+
     def create_entry(self, user_id: str, audio_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a voice diary entry with AI analysis."""
         if user_id not in self.entries:
             self.entries[user_id] = []
 
-        # Simulate AI emotion detection
-        detected_emotion = random.choice(list(self.emotions.keys()))
+        # Supplied by whatever analysed the audio. Choosing an emotion at
+        # random and reporting it at 70-95% confidence told people how they felt.
+        detected_emotion = audio_data.get("detected_emotion")
+        if detected_emotion not in self.emotions:
+            return {
+                "status": "no_tone_analysis",
+                "message": (
+                    "No emotion analysis came with this recording, so the entry is saved "
+                    "without a mood reading."
+                ),
+                "known_emotions": list(self.emotions),
+                "entry": self._plain_entry(user_id, audio_data),
+            }
         emotion_data = self.emotions[detected_emotion]
 
         entry = {
@@ -49,17 +86,14 @@ class VoiceDiaryService:
             "timestamp": time.time(),
             "duration_seconds": audio_data.get("duration_seconds", 60),
             "transcript": audio_data.get("transcript", "[Voice recording]"),
+            "status": "analysed",
             "detected_emotion": detected_emotion,
-            "emotion_confidence": round(random.uniform(0.7, 0.95), 2),
+            "emotion_confidence": audio_data.get("emotion_confidence"),
             "valence": emotion_data["valence"],
             "energy": emotion_data["energy"],
             "emotion_color": emotion_data["color"],
-            "speech_features": {
-                "speaking_rate": random.uniform(120, 200),
-                "pitch_mean": random.uniform(100, 300),
-                "volume": random.uniform(0.3, 0.9),
-                "pause_frequency": random.uniform(0.1, 0.5),
-            },
+            # Measured by the recorder, absent when it reported none.
+            "speech_features": audio_data.get("speech_features", {}),
             "ai_reflection": self._generate_reflection(detected_emotion, audio_data.get("transcript", "")),
             "follow_up_questions": self._get_follow_up_questions(detected_emotion),
             "tags": self._auto_tag(detected_emotion, audio_data.get("transcript", "")),
@@ -94,7 +128,7 @@ class VoiceDiaryService:
             "dominant_emotion": dominant,
             "emotion_distribution": emotion_counts,
             "average_valence": round(avg_valence, 2),
-            "mood_stability": round(random.uniform(0.6, 0.9), 2),
+            "mood_stability": _stability([e["valence"] for e in recent]),
             "trend": "improving" if avg_valence > 0.6 else "stable" if avg_valence > 0.4 else "needs_attention",
             "insight": self._generate_trend_insight(dominant, avg_valence),
         }

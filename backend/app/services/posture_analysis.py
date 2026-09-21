@@ -12,7 +12,6 @@ Features:
 - Customized posture improvement plans
 """
 import time
-import random
 from typing import Optional
 from dataclasses import dataclass, field
 
@@ -46,11 +45,23 @@ class PostureAnalysisService:
         self._session_data: dict[str, dict] = {}
 
     def analyze_posture(self, body_landmarks: dict = None) -> dict:
-        """Analyze posture from body landmarks (or simulate)."""
-        if body_landmarks:
-            issues = self._detect_issues(body_landmarks)
-        else:
-            issues = random.choice([["good_posture"], ["head_forward"], ["rounded_shoulders"], ["kyphosis"]])
+        """
+        Assess posture from detected body landmarks.
+
+        Without landmarks this picked a finding at random — one call in four
+        reported kyphosis to someone whose posture had never been looked at.
+        """
+        if not body_landmarks:
+            return {
+                "status": "insufficient_data",
+                "message": (
+                    "No body landmarks were supplied. Capture a posture photo so the "
+                    "pose detector can measure head and shoulder angles."
+                ),
+                "needs": ["head_angle", "shoulder_angle"],
+            }
+
+        issues = self._detect_issues(body_landmarks)
 
         score = 100
         detected = []
@@ -62,6 +73,7 @@ class PostureAnalysisService:
 
         score = max(0, score)
         assessment = {
+            "status": "assessed",
             "posture_score": score,
             "grade": "A" if score >= 90 else "B" if score >= 75 else "C" if score >= 60 else "D" if score >= 40 else "F",
             "detected_issues": detected,

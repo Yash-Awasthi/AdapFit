@@ -10,8 +10,7 @@ Based on 2025-2026 digital twin healthcare research:
 """
 
 import time
-import random
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 
 class DigitalTwinService:
@@ -132,44 +131,73 @@ class DigitalTwinService:
             "overall_health": twin.get("health_score", 75),
             "body_systems": systems,
             "vitals": twin.get("vital_baselines", {}),
-            "age": twin.get("age", 35),
-            "biological_age_estimate": twin.get("age", 35) - random.randint(0, 5),
+            "age": twin.get("age"),
+            # Biological age needs a validated model over real biomarkers.
+            # It was chronological age minus a random 0-5 years.
+            "biological_age_estimate": None,
+            "biological_age_note": "Not estimated: this needs biomarker data the app does not hold.",
         }
 
     def get_prediction(self, user_id: str, metric: str, months: int = 12) -> Dict[str, Any]:
-        """Predict health metric trajectory."""
+        """
+        Where a metric is heading.
+
+        This returned a twelve-month forecast built by adding a random offset
+        to the current value, each point carrying a confidence that fell with
+        distance as though a model were behind it. Forecasting a metric needs
+        a history to fit against, so this reports what is on record instead.
+        """
         twin = self.twins.get(user_id, {})
-        current = twin.get("vital_baselines", {}).get("resting_hr", 72)
-
-        predictions = []
-        for m in range(months + 1):
-            predictions.append({
-                "month": m,
-                "value": round(current + random.uniform(-2, 2), 1),
-                "confidence": max(0.5, 0.95 - m * 0.03),
-            })
-
+        current = twin.get("vital_baselines", {}).get(metric)
+        if current is None:
+            return {
+                "status": "unavailable",
+                "metric": metric,
+                "message": f"No recorded baseline for {metric}, so there is nothing to project from.",
+            }
         return {
+            "status": "current_only",
             "metric": metric,
             "current_value": current,
-            "predictions": predictions,
-            "trend": "stable",
-            "confidence_note": "Predictions based on current lifestyle patterns",
+            "months_requested": months,
+            "message": (
+                "Projection is not available: it needs a fitted model over your own "
+                "history, which this does not have."
+            ),
         }
+
+    BODY_SYSTEMS = (
+        "cardiovascular", "respiratory", "musculoskeletal",
+        "nervous", "digestive", "endocrine", "immune",
+    )
 
     def _init_body_systems(self, data: Dict) -> Dict[str, Any]:
+        """
+        Per-system scores, only where the profile carries something to score.
+
+        Every system used to open at roughly 80 with a random spread and the
+        status "good" — an organ-by-organ clean bill of health for a profile
+        that had just been created.
+        """
+        supplied = data.get("body_systems") or {}
         return {
-            "cardiovascular": {"score": 80 + random.randint(-10, 10), "status": "good"},
-            "respiratory": {"score": 85 + random.randint(-5, 10), "status": "good"},
-            "musculoskeletal": {"score": 75 + random.randint(-10, 15), "status": "good"},
-            "nervous": {"score": 82 + random.randint(-5, 10), "status": "good"},
-            "digestive": {"score": 78 + random.randint(-10, 15), "status": "good"},
-            "endocrine": {"score": 80 + random.randint(-10, 10), "status": "good"},
-            "immune": {"score": 76 + random.randint(-10, 15), "status": "good"},
+            system: (
+                {"score": supplied[system], "status": "reported"}
+                if isinstance(supplied.get(system), (int, float))
+                else {"score": None, "status": "not_assessed"}
+            )
+            for system in self.BODY_SYSTEMS
         }
 
-    def _calculate_health_score(self, data: Dict) -> int:
-        return min(100, max(40, 75 + random.randint(-15, 20)))
+    def _calculate_health_score(self, data: Dict) -> Optional[int]:
+        """Average of the system scores actually reported, or None."""
+        scores = [
+            value for value in (data.get("body_systems") or {}).values()
+            if isinstance(value, (int, float))
+        ]
+        if not scores:
+            return None
+        return int(round(sum(scores) / len(scores)))
 
     def _assess_risk_factors(self, data: Dict) -> List[str]:
         risks = []

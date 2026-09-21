@@ -4,13 +4,14 @@ Continuous monitoring, alert thresholds, care team notifications
 """
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-import random
 
 
 class RemoteMonitoringService:
     """IoT-based remote patient monitoring platform"""
 
     def __init__(self):
+        # Readings were never kept, which is why the trend had to be invented.
+        self._readings: dict[str, list[dict]] = {}
         self.device_types = {
             "blood_pressure_monitor": {
                 "metrics": ["systolic", "diastolic", "pulse"],
@@ -140,11 +141,23 @@ class RemoteMonitoringService:
                     alerts.append({"metric": "SpO2", "value": value, "severity": "high", "message": f"Oxygen saturation low: {value}%"})
                     status = "alert"
 
+        recorded_at = datetime.now()
+        stored = self._readings.setdefault(patient_id, [])
+        for metric, value in readings.items():
+            if isinstance(value, (int, float)):
+                stored.append({
+                    "metric": metric,
+                    "value": float(value),
+                    "date": recorded_at.strftime("%Y-%m-%d"),
+                    "recorded_at": recorded_at.isoformat(),
+                })
+
         return {
+            "status": "ok",
             "patient_id": patient_id,
             "device_type": device_type,
             "readings": readings,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": recorded_at.isoformat(),
             "status": status,
             "alerts": alerts,
             "alerts_count": len(alerts),
@@ -163,19 +176,25 @@ class RemoteMonitoringService:
         return (now + timedelta(hours=4)).isoformat()
 
     def get_vital_trends(self, patient_id: str, metric: str, days: int = 30) -> Dict:
-        """Get trends for a specific vital metric"""
-        # Simulate trend data
-        base_values = {
-            "systolic": 125, "diastolic": 82, "heart_rate": 72,
-            "blood_glucose": 110, "oxygen_saturation": 97, "weight": 75,
-        }
-        base = base_values.get(metric, 50)
+        """
+        Trend for one metric across this patient's recorded readings.
 
-        readings = []
-        for i in range(days):
-            date = (datetime.now() - timedelta(days=days - i)).strftime("%Y-%m-%d")
-            value = base + random.uniform(-5, 5)
-            readings.append({"date": date, "value": round(value, 1)})
+        The history used to be generated around a textbook value — 125/82,
+        glucose 110 — so a trend came back for a patient who had never taken a
+        reading, and a real deterioration was averaged away by invented points.
+        """
+        readings = [
+            {"date": r["date"], "value": r["value"]}
+            for r in self._readings.get(patient_id, [])
+            if r.get("metric") == metric
+        ][-days:]
+        if len(readings) < 2:
+            return {
+                "status": "insufficient_data",
+                "metric": metric,
+                "readings_available": len(readings),
+                "message": f"Need at least two {metric} readings to show a trend.",
+            }
 
         values = [r["value"] for r in readings]
         avg = sum(values) / len(values)
@@ -189,6 +208,7 @@ class RemoteMonitoringService:
                 trend = "decreasing"
 
         return {
+            "status": "ok",
             "patient_id": patient_id,
             "metric": metric,
             "period_days": days,
