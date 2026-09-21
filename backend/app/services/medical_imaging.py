@@ -4,7 +4,10 @@ Deep learning-based image analysis for dermatological conditions
 """
 from datetime import datetime
 from typing import Dict, List, Optional
-import random
+
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 class MedicalImagingService:
@@ -56,14 +59,35 @@ class MedicalImagingService:
             "Clinical recommendation generation",
         ]
 
+    # The four measured ABCDE inputs. Evolution is the fifth and is a yes/no
+    # the user answers, so it is not required to score the other four.
+    REQUIRED_FEATURES = ("asymmetry_score", "border_irregularity", "color_variation", "diameter_mm")
+
     def analyze_skin_lesion(self, image_features: Dict) -> Dict:
-        """Analyze skin lesion from extracted image features"""
-        # Simulate AI analysis based on provided features
-        asymmetry = image_features.get("asymmetry_score", random.uniform(0, 1))
-        border = image_features.get("border_irregularity", random.uniform(0, 1))
-        color_var = image_features.get("color_variation", random.uniform(0, 1))
-        diameter = image_features.get("diameter_mm", random.uniform(1, 15))
-        evolution = image_features.get("evolution_detected", False)
+        """
+        Score a lesion against the ABCDE criteria from measured image features.
+
+        Every feature must be supplied. These defaulted to random values, so a
+        request carrying no measurements at all could return "High suspicion
+        for melanoma" — or miss one — purely by chance.
+        """
+        missing = [f for f in self.REQUIRED_FEATURES if not _is_number(image_features.get(f))]
+        if missing:
+            return {
+                "status": "insufficient_data",
+                "missing_features": missing,
+                "message": (
+                    "Cannot score this lesion: " + ", ".join(missing) + " were not measured. "
+                    "A lesion that cannot be measured needs a clinician to look at it, not a score."
+                ),
+                "self_monitoring": self._get_self_monitoring_tips(),
+            }
+
+        asymmetry = float(image_features["asymmetry_score"])
+        border = float(image_features["border_irregularity"])
+        color_var = float(image_features["color_variation"])
+        diameter = float(image_features["diameter_mm"])
+        evolution = bool(image_features.get("evolution_detected", False))
 
         # ABCDE scoring
         abcde_score = 0
@@ -102,46 +126,59 @@ class MedicalImagingService:
         # Risk classification
         if abcde_score >= 4:
             risk = "critical"
-            recommendation = "URGENT: See dermatologist within 48 hours. High suspicion for melanoma."
-            confidence = random.uniform(0.75, 0.95)
+            recommendation = "See a dermatologist within 48 hours. Four or more ABCDE criteria are met."
         elif abcde_score >= 2:
             risk = "high"
-            recommendation = "Schedule dermatologist appointment within 2 weeks. Biopsy may be needed."
-            confidence = random.uniform(0.60, 0.85)
+            recommendation = "Book a dermatologist appointment within two weeks. Several ABCDE criteria are met."
         elif abcde_score >= 1:
             risk = "medium"
-            recommendation = "Monitor closely. Follow up with dermatologist at next visit."
-            confidence = random.uniform(0.50, 0.75)
+            recommendation = "Monitor and mention it at your next appointment. One ABCDE criterion is met."
         else:
             risk = "low"
-            recommendation = "Likely benign. Continue regular self-examinations."
-            confidence = random.uniform(0.70, 0.90)
+            recommendation = "No ABCDE criterion is met. Keep up regular self-examination."
 
         return {
             "analysis_id": f"SA-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             "timestamp": datetime.now().isoformat(),
+            "status": "scored",
             "abcde_score": abcde_score,
             "abcde_details": abcde_details,
             "risk_level": risk,
-            "confidence": round(confidence, 2),
+            "criteria_met": abcde_score,
+            "criteria_assessed": 5 if "evolution_detected" in image_features else 4,
             "recommendation": recommendation,
+            # ABCDE is a screening prompt to get a lesion looked at, not a
+            # classifier, so no probability is offered for it.
+            "disclaimer": (
+                "An ABCDE screening score from the supplied measurements. It does not "
+                "diagnose or rule out skin cancer; only a clinician can."
+            ),
             "differential_diagnosis": self._get_differential(abcde_score, asymmetry, border, color_var),
             "follow_up_schedule": self._get_follow_up(risk),
             "self_monitoring": self._get_self_monitoring_tips(),
         }
 
     def _get_differential(self, score: int, asym: float, border: float, color: float) -> List[Dict]:
-        """Generate differential diagnosis"""
-        conditions = []
+        """
+        What a clinician would want to rule out at this score.
+
+        No probabilities. These were random percentages, so a lesion could be
+        told it was "Melanoma, 47.3%" — a number with nothing behind it, on the
+        one subject where a number carries the most weight.
+        """
         if score >= 3:
-            conditions.append({"condition": "Melanoma", "probability": round(random.uniform(30, 60), 1), "urgency": "urgent"})
-            conditions.append({"condition": "Atypical Nevus", "probability": round(random.uniform(20, 40), 1), "urgency": "moderate"})
-        elif score >= 1:
-            conditions.append({"condition": "Benign Nevus", "probability": round(random.uniform(40, 70), 1), "urgency": "routine"})
-            conditions.append({"condition": "Seborrheic Keratosis", "probability": round(random.uniform(15, 35), 1), "urgency": "routine"})
-        else:
-            conditions.append({"condition": "Benign Lesion", "probability": round(random.uniform(70, 90), 1), "urgency": "routine"})
-        return conditions
+            return [
+                {"condition": "Melanoma", "urgency": "urgent", "note": "Needs to be ruled out at this score."},
+                {"condition": "Atypical nevus", "urgency": "moderate", "note": "Common cause of an irregular appearance."},
+            ]
+        if score >= 1:
+            return [
+                {"condition": "Benign nevus", "urgency": "routine", "note": "Ordinary moles can meet one criterion."},
+                {"condition": "Seborrhoeic keratosis", "urgency": "routine", "note": "Benign, and often irregular in colour."},
+            ]
+        return [
+            {"condition": "Benign lesion", "urgency": "routine", "note": "No criterion met. Keep watching for change."},
+        ]
 
     def _get_follow_up(self, risk: str) -> Dict:
         """Get follow-up schedule based on risk"""

@@ -16,8 +16,8 @@ async def assess_gut(req: AssessmentRequest):
     return {"success": True, "data": result}
 
 @router.get("/profile")
-async def get_microbiome_profile():
-    return {"success": True, "data": microbiome_health_service.get_microbiome_profile()}
+async def get_microbiome_profile(user_id: str = "default"):
+    return {"success": True, "data": microbiome_health_service.get_microbiome_profile(user_id)}
 
 @router.get("/food-recommendations")
 async def get_food_recs(score: int = 70):

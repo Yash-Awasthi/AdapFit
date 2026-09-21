@@ -13,8 +13,21 @@ class TemperatureRequest(BaseModel):
 
 
 class SpO2Request(BaseModel):
-    red_avg: float = 0.6
-    infrared_avg: float = 0.7
+    # Required: a default would turn a request carrying no signal into a
+    # confident saturation reading.
+    red_avg: float
+    infrared_avg: float
+    pulse_rate: Optional[int] = None
+
+
+class ECGRecordRequest(BaseModel):
+    """An ECG a device measured. Intervals it did not report stay absent."""
+    heart_rate: int
+    rhythm: str = "normal"
+    pr_interval_ms: Optional[float] = None
+    qrs_duration_ms: Optional[float] = None
+    qt_interval_ms: Optional[float] = None
+    abnormalities: list[str] = []
 
 
 @router.post("/ecg/start")
@@ -39,7 +52,16 @@ async def analyze_rhythm(readings: list[dict] | None = None):
 
 @router.post("/spo2")
 async def estimate_spo2(request: SpO2Request):
-    return vital_signs_service.estimate_spo2(request.red_avg, request.infrared_avg)
+    return vital_signs_service.estimate_spo2(request.red_avg, request.infrared_avg, request.pulse_rate)
+
+
+@router.post("/ecg/record")
+async def record_ecg(request: ECGRecordRequest):
+    """Store an ECG measured by a device that has the hardware for one."""
+    return vital_signs_service.record_ecg(
+        request.heart_rate, request.rhythm, request.pr_interval_ms,
+        request.qrs_duration_ms, request.qt_interval_ms, request.abnormalities,
+    )
 
 
 @router.get("/spo2/history")
