@@ -87,4 +87,6 @@ class DeviceSyncService:
         return samples.get(dt, {})
 
 
-device_sync_service = DeviceSyncService()
+from app.core.per_user import per_user, register
+
+device_sync_service = register("device_sync.device_sync_service", per_user(DeviceSyncService))

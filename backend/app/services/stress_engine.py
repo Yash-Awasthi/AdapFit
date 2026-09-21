@@ -538,4 +538,6 @@ class StressEngine:
 
 
 # Singleton
-stress_engine = StressEngine()
+from app.core.per_user import per_user, register
+
+stress_engine = register("stress_engine.stress_engine", per_user(StressEngine))

@@ -148,4 +148,6 @@ class HealthCalendarService:
         return {"adherence_rate": round(taken / max(1, total) * 100), "total_doses": total, "taken": taken, "missed": total - taken}
 
 
-health_calendar_service = HealthCalendarService()
+from app.core.per_user import per_user, register
+
+health_calendar_service = register("health_calendar.health_calendar_service", per_user(HealthCalendarService))

@@ -114,4 +114,6 @@ class RehabilitationService:
         return {"injury": program.get("name", "Unknown"), "duration_weeks": program.get("duration_weeks", 0), "current_progress": progress, "estimate": estimate, "avg_pain": round(avg_pain, 1), "recommendation": "Follow your PT's guidance and don't rush recovery."}
 
 
-rehabilitation_service = RehabilitationService()
+from app.core.per_user import per_user, register
+
+rehabilitation_service = register("rehabilitation.rehabilitation_service", per_user(RehabilitationService))

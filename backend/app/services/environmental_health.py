@@ -168,4 +168,6 @@ class EnvironmentalHealthService:
         return tips
 
 
-environmental_health_service = EnvironmentalHealthService()
+from app.core.per_user import per_user, register
+
+environmental_health_service = register("environmental_health.environmental_health_service", per_user(EnvironmentalHealthService))

@@ -439,4 +439,6 @@ class NutritionLoggerService:
 
 
 # Singleton
-nutrition_logger_service = NutritionLoggerService()
+from app.core.per_user import per_user, register
+
+nutrition_logger_service = register("nutrition_logger.nutrition_logger_service", per_user(NutritionLoggerService))

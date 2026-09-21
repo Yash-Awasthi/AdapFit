@@ -228,4 +228,6 @@ class ChronicPainService:
         return self.cbt_techniques
 
 
-chronic_pain_service = ChronicPainService()
+from app.core.per_user import per_user, register
+
+chronic_pain_service = register("chronic_pain.chronic_pain_service", per_user(ChronicPainService))

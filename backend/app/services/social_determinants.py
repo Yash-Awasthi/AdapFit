@@ -157,4 +157,6 @@ class SocialDeterminantsService:
         return all_resources
 
 
-social_determinants_service = SocialDeterminantsService()
+from app.core.per_user import per_user, register
+
+social_determinants_service = register("social_determinants.social_determinants_service", per_user(SocialDeterminantsService))

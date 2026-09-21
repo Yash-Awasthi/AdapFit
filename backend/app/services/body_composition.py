@@ -55,4 +55,6 @@ class BodyCompositionService:
         return {"weight_trend": "stable", "body_fat_trend": "decreasing", "measurements": {"waist": "82cm (-2cm)", "chest": "98cm (+1cm)", "arms": "34cm (+0.5cm)"}}
 
 
-body_composition_service = BodyCompositionService()
+from app.core.per_user import per_user, register
+
+body_composition_service = register("body_composition.body_composition_service", per_user(BodyCompositionService))

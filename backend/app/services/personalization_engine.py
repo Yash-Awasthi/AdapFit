@@ -416,4 +416,6 @@ class PersonalizationEngine:
 
 
 # Singleton
-personalization_engine = PersonalizationEngine()
+from app.core.per_user import per_user, register
+
+personalization_engine = register("personalization_engine.personalization_engine", per_user(PersonalizationEngine))

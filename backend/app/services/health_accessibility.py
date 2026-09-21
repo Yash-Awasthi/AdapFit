@@ -79,4 +79,6 @@ class HealthAccessibility:
         ]
 
 
-health_accessibility = HealthAccessibility()
+from app.core.per_user import per_user, register
+
+health_accessibility = register("health_accessibility.health_accessibility", per_user(HealthAccessibility))

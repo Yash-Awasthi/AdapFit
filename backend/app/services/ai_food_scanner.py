@@ -520,4 +520,6 @@ class AIFoodScannerService:
         return foods
 
 
-ai_food_scanner_service = AIFoodScannerService()
+from app.core.per_user import per_user, register
+
+ai_food_scanner_service = register("ai_food_scanner.ai_food_scanner_service", per_user(AIFoodScannerService))

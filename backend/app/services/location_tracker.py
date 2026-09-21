@@ -436,4 +436,6 @@ class LocationTrackerService:
 
 
 # Singleton
-location_tracker_service = LocationTrackerService()
+from app.core.per_user import per_user, register
+
+location_tracker_service = register("location_tracker.location_tracker_service", per_user(LocationTrackerService))

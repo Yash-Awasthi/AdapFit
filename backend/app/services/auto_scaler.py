@@ -169,4 +169,6 @@ class AutoScalerEngine:
         return min(100.0, rpe_fatigue + volume_fatigue + drop_fatigue)
 
 
-auto_scaler = AutoScalerEngine()
+from app.core.per_user import per_user, register
+
+auto_scaler = register("auto_scaler.auto_scaler", per_user(AutoScalerEngine))

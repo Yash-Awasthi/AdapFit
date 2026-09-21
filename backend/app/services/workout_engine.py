@@ -285,4 +285,6 @@ class WorkoutEngineService:
         ]
 
 
-workout_engine_service = WorkoutEngineService()
+from app.core.per_user import per_user, register
+
+workout_engine_service = register("workout_engine.workout_engine_service", per_user(WorkoutEngineService))

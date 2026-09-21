@@ -17,7 +17,8 @@ from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
 
-ACCOUNTS_FILE = Path(__file__).resolve().parent.parent / "data" / "accounts.json"
+DATA_DIR = Path(os.getenv("ADAPFIT_DATA_DIR") or Path(__file__).resolve().parent.parent / "data")
+ACCOUNTS_FILE = DATA_DIR / "accounts.json"
 
 # Columns on `users` that carry an account rather than a fitness profile.
 _ACCOUNT_COLUMNS = (

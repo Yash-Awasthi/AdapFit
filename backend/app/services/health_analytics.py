@@ -151,4 +151,6 @@ class HealthAnalyticsService:
         ]
 
 
-health_analytics_service = HealthAnalyticsService()
+from app.core.per_user import per_user, register
+
+health_analytics_service = register("health_analytics.health_analytics_service", per_user(HealthAnalyticsService))

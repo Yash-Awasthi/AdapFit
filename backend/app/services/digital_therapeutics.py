@@ -219,4 +219,6 @@ class DigitalTherapeuticsService:
         return [e for e in self.enrollments.values() if e["user_id"] == user_id]
 
 
-dtx_service = DigitalTherapeuticsService()
+from app.core.per_user import per_user, register
+
+dtx_service = register("digital_therapeutics.dtx_service", per_user(DigitalTherapeuticsService))

@@ -134,4 +134,6 @@ class MeditationService:
         return [{"name": s["name"], "duration": s.get("actual_duration", 0), "date": time.strftime("%Y-%m-%d", time.localtime(s["started_at"]))} for s in completed[-limit:]]
 
 
-meditation_service = MeditationService()
+from app.core.per_user import per_user, register
+
+meditation_service = register("meditation.meditation_service", per_user(MeditationService))

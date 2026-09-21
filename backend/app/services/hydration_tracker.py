@@ -49,4 +49,6 @@ class HydrationTrackerService:
         return recs
 
 
-hydration_service = HydrationTrackerService()
+from app.core.per_user import per_user, register
+
+hydration_service = register("hydration_tracker.hydration_service", per_user(HydrationTrackerService))

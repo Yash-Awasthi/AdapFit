@@ -196,4 +196,6 @@ class WorkplaceErgonomicsService:
         }
 
 
-workplace_ergonomics_service = WorkplaceErgonomicsService()
+from app.core.per_user import per_user, register
+
+workplace_ergonomics_service = register("workplace_ergonomics.workplace_ergonomics_service", per_user(WorkplaceErgonomicsService))

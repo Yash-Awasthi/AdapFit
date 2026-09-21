@@ -268,4 +268,6 @@ class MedicalImagingService:
         ]
 
 
-medical_imaging_service = MedicalImagingService()
+from app.core.per_user import per_user, register
+
+medical_imaging_service = register("medical_imaging.medical_imaging_service", per_user(MedicalImagingService))

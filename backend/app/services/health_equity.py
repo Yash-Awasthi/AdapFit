@@ -128,4 +128,6 @@ class HealthEquityService:
         return outcome
 
 
-health_equity = HealthEquityService()
+from app.core.per_user import per_user, register
+
+health_equity = register("health_equity.health_equity", per_user(HealthEquityService))

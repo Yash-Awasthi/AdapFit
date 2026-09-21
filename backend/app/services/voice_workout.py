@@ -339,4 +339,6 @@ class VoiceWorkoutLogger:
         }
 
 
-voice_workout_logger = VoiceWorkoutLogger()
+from app.core.per_user import per_user, register
+
+voice_workout_logger = register("voice_workout.voice_workout_logger", per_user(VoiceWorkoutLogger))

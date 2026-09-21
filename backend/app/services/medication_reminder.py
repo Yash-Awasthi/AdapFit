@@ -200,4 +200,6 @@ class MedicationReminderService:
         return streak
 
 
-medication_reminder_service = MedicationReminderService()
+from app.core.per_user import per_user, register
+
+medication_reminder_service = register("medication_reminder.medication_reminder_service", per_user(MedicationReminderService))

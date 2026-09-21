@@ -73,4 +73,6 @@ class HealthRewardsService:
         return title
 
 
-health_rewards_service = HealthRewardsService()
+from app.core.per_user import per_user, register
+
+health_rewards_service = register("health_rewards.health_rewards_service", per_user(HealthRewardsService))

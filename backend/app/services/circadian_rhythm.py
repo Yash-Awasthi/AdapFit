@@ -175,4 +175,6 @@ class CircadianRhythmService:
         return {"overall_score": overall, "consistency": consistency, "light_exposure": light_score, "sleep_regularity": sleep_score, "tips": ["Maintain consistent wake time", "Get 10,000+ lux in the morning", "Avoid blue light 2 hours before bed"]}
 
 
-circadian_rhythm_service = CircadianRhythmService()
+from app.core.per_user import per_user, register
+
+circadian_rhythm_service = register("circadian_rhythm.circadian_rhythm_service", per_user(CircadianRhythmService))

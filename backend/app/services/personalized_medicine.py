@@ -220,4 +220,6 @@ class PersonalizedMedicineService:
         }
 
 
-personalized_medicine_service = PersonalizedMedicineService()
+from app.core.per_user import per_user, register
+
+personalized_medicine_service = register("personalized_medicine.personalized_medicine_service", per_user(PersonalizedMedicineService))

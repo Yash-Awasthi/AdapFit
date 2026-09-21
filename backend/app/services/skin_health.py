@@ -148,4 +148,6 @@ class SkinHealthService:
         }
 
 
-skin_health_service = SkinHealthService()
+from app.core.per_user import per_user, register
+
+skin_health_service = register("skin_health.skin_health_service", per_user(SkinHealthService))

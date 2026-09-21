@@ -351,4 +351,6 @@ class ContinuousLearningLoop:
 
 
 # Singleton
-learning_loop = ContinuousLearningLoop()
+from app.core.per_user import per_user, register
+
+learning_loop = register("learning_loop.learning_loop", per_user(ContinuousLearningLoop))

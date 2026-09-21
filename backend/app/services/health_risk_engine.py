@@ -212,4 +212,6 @@ class HealthRiskEngine:
         return self._risk_history.get(user_id, [])
 
 
-health_risk_engine = HealthRiskEngine()
+from app.core.per_user import per_user, register
+
+health_risk_engine = register("health_risk_engine.health_risk_engine", per_user(HealthRiskEngine))
