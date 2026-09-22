@@ -4,6 +4,7 @@ from app.services.fertility_tracker import FertilityTrackerService
 from app.services.health_equity import HealthEquityService
 from app.services.health_savings import HealthSavingsService
 from app.services.ambient_health import AmbientHealthService
+from app.services.genomics_insights import GenomicsInsightsService
 
 
 def test_substance_use_clamps_do_not_crash():
@@ -63,3 +64,14 @@ def test_ambient_health_reports_no_data_instead_of_a_fixed_fifty():
 
     homes = svc.get_homes()
     assert len(homes) == 1 and homes[0]["home_id"] == home["home_id"]
+
+
+def test_genomics_only_reports_genes_actually_uploaded():
+    svc = GenomicsInsightsService()
+    profile = svc.analyze_genetic_data("u1", {"variants": {"LCT": "tolerant"}})
+
+    traits = {t["trait"]: t for t in profile["genetic_traits"]}
+    assert list(traits.keys()) == ["Lactose Tolerance"]
+
+    pgx = profile["pharmacogenomics"]
+    assert pgx["CYP2D6"]["type"] == "not_tested"

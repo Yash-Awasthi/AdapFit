@@ -1,186 +1,293 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+/**
+ * Fertility Tracker — cycle prediction from a real logged history.
+ *
+ * Prediction needs a profile and at least one daily log; insights need
+ * seven. Each stage says what it is waiting for instead of showing day 14
+ * of a cycle nobody logged.
+ */
+import React, { useCallback, useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
+  StatusBar, ActivityIndicator, RefreshControl, Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, spacing, typography } from '../../src/theme';
+import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { useApis } from '../../src/hooks/useApi';
+import { postJson } from '../../src/services/http';
+import { useUserStore } from '../../src/stores';
+
+const CM_OPTIONS = ['dry', 'sticky', 'creamy', 'watery', 'egg_white'];
+
+interface Predict {
+  error?: string;
+  current_cycle_day?: number;
+  current_phase?: string;
+  next_period?: string;
+  days_until_period?: number;
+  estimated_ovulation?: string;
+  is_fertile?: boolean;
+}
+
+interface Insights {
+  message?: string;
+  days_logged?: number;
+  days_tracked?: number;
+  bbt_analysis?: { average: number; shift_detected: boolean; interpretation: string };
+  cervical_mucus?: { fertile_type_days: number; pattern: string };
+  cycle_regularity?: { regular: boolean | null; variation_days: number | null; assessment: string };
+  fertility_score?: number;
+}
 
 export default function FertilityScreen() {
-  const [activeTab, setActiveTab] = useState<'cycle' | 'log' | 'insights' | 'predict'>('cycle');
+  const userId = useUserStore((s) => s.userId);
+  const [busy, setBusy] = useState(false);
+  const [cycleLength, setCycleLength] = useState('28');
+  const [periodLength, setPeriodLength] = useState('5');
+  const [lastPeriod, setLastPeriod] = useState('');
+  const [bbt, setBbt] = useState('');
+  const [cm, setCm] = useState('dry');
+  const [lhPositive, setLhPositive] = useState(false);
+  const [spotting, setSpotting] = useState(false);
+
+  const { data, loading, refresh, refreshing, reload } = useApis<{
+    predict: { data: Predict };
+    insights: { data: Insights };
+  }>({
+    predict: `/fertility/predict/${userId}`,
+    insights: `/fertility/insights/${userId}`,
+  });
+
+  const predict = data.predict?.data;
+  const insights = data.insights?.data;
+  const needsProfile = predict?.error === 'Set up profile first';
+  const needsFirstLog = predict?.error === 'No cycle data logged yet' || predict?.error === 'Cannot determine last period start';
+  const hasPrediction = !!predict && !predict.error;
+
+  const setup = useCallback(async () => {
+    const cLen = Number(cycleLength);
+    const pLen = Number(periodLength);
+    if (!Number.isFinite(cLen) || cLen < 15 || cLen > 60) {
+      Alert.alert('Cycle length needed', 'Enter your average cycle length in days (15-60).');
+      return;
+    }
+    setBusy(true);
+    const result = await postJson('/fertility/profile', {
+      user_id: userId,
+      profile_data: {
+        average_cycle_length: Math.round(cLen),
+        average_period_length: Math.round(pLen) || 5,
+        last_period_start: lastPeriod.trim() || undefined,
+      },
+    });
+    setBusy(false);
+    if (!result) {
+      Alert.alert('Not set up', 'The profile could not be created.');
+      return;
+    }
+    await reload();
+  }, [cycleLength, periodLength, lastPeriod, userId, reload]);
+
+  const logToday = useCallback(async () => {
+    setBusy(true);
+    const result = await postJson('/fertility/log', {
+      user_id: userId,
+      date: new Date().toISOString().slice(0, 10),
+      data: {
+        bbt: bbt.trim() ? Number(bbt) : undefined,
+        cervical_mucus: cm,
+        lh_strip: lhPositive ? 'positive' : 'negative',
+        spotting,
+      },
+    });
+    setBusy(false);
+    if (!result) {
+      Alert.alert('Not recorded', 'The entry could not be saved.');
+      return;
+    }
+    setBbt('');
+    await reload();
+  }, [bbt, cm, lhPositive, spotting, userId, reload]);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#EC4899" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Fertility Tracker</Text>
-        <Text style={styles.headerSubtitle}>Cycle day 14 — Ovulation window</Text>
-      </View>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#EC4899" />}
+      >
+        <LinearGradient colors={['#EC4899', '#F472B6', '#0F1629']} style={styles.hero}>
+          <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)' }]}>Fertility Tracker</Text>
+          {hasPrediction ? (
+            <>
+              <Text style={[typography.heading.h1, { color: '#fff', marginTop: 4, textTransform: 'capitalize' }]}>
+                {predict!.current_phase} phase
+              </Text>
+              <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)', marginTop: 4 }]}>
+                Cycle day {predict!.current_cycle_day} · {predict!.is_fertile ? 'Fertile window' : 'Not currently fertile'}
+              </Text>
+            </>
+          ) : (
+            <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)', marginTop: 8 }]}>
+              {needsProfile ? 'Set up your cycle to begin.' : 'Log a day to get predictions.'}
+            </Text>
+          )}
+        </LinearGradient>
 
-      <View style={styles.tabBar}>
-        {(['cycle', 'log', 'insights', 'predict'] as const).map(tab => (
-          <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && styles.activeTab]} onPress={() => setActiveTab(tab)}>
-            <Ionicons
-              name={tab === 'cycle' ? 'sync' : tab === 'log' ? 'create-outline' : tab === 'insights' ? 'stats-chart' : 'sparkles'}
-              size={20}
-              color={activeTab === tab ? '#FFF' : '#94A3B8'}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <ScrollView style={styles.content}>
-        {activeTab === 'cycle' && (
-          <>
-            <View style={styles.cycleHero}>
-              <View style={styles.cycleRing}>
-                <Text style={styles.cycleDay}>14</Text>
-                <Text style={styles.cycleLabel}>Day</Text>
-              </View>
-              <Text style={styles.cyclePhase}>Ovulation Phase</Text>
-              <Text style={styles.fertilityStatus}>Peak Fertility</Text>
-            </View>
-
-            <View style={styles.fertileWindow}>
-              <Text style={styles.fertileTitle}>Fertile Window</Text>
-              <View style={styles.fertileBar}>
-                {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(d => (
-                  <View key={d} style={[styles.fertileDay, d >= 10 && d <= 15 && styles.fertileActive, d === 14 && styles.fertilePeak]}>
-                    <Text style={styles.fertileDayText}>{d}</Text>
-                  </View>
-                ))}
-              </View>
-              <View style={styles.fertileLegend}>
-                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#334155' }]} /><Text style={styles.legendText}>Low</Text></View>
-                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} /><Text style={styles.legendText}>Fertile</Text></View>
-                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#EC4899' }]} /><Text style={styles.legendText}>Peak</Text></View>
-              </View>
-            </View>
-          </>
+        {needsProfile && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="Set Up Cycle" icon="sync" iconColor="#EC4899" />
+            <GlassCard>
+              <TextInput
+                style={styles.input}
+                placeholder="Average cycle length (days)"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="numeric"
+                value={cycleLength}
+                onChangeText={setCycleLength}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Average period length (days)"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="numeric"
+                value={periodLength}
+                onChangeText={setPeriodLength}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Last period start (YYYY-MM-DD, optional)"
+                placeholderTextColor={colors.text.muted}
+                value={lastPeriod}
+                onChangeText={setLastPeriod}
+              />
+              <TouchableOpacity style={styles.primaryBtn} onPress={setup} disabled={busy}>
+                <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Save cycle'}</Text>
+              </TouchableOpacity>
+            </GlassCard>
+          </View>
         )}
 
-        {activeTab === 'log' && (
-          <>
-            <Text style={styles.sectionTitle}>Today's Log</Text>
-            <View style={styles.logCard}>
-              <Text style={styles.logLabel}>Basal Body Temperature</Text>
-              <Text style={styles.logValue}>36.6°C</Text>
-            </View>
-            <View style={styles.logCard}>
-              <Text style={styles.logLabel}>Cervical Mucus</Text>
-              <View style={styles.cmOptions}>
-                {['Dry', 'Sticky', 'Creamy', 'Watery', 'Egg White'].map((cm, i) => (
-                  <TouchableOpacity key={cm} style={[styles.cmBtn, i === 4 && styles.cmActive]}>
-                    <Text style={[styles.cmText, i === 4 && styles.cmTextActive]}>{cm}</Text>
+        {!needsProfile && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="Today's Log" icon="create" iconColor="#EC4899" />
+            <GlassCard>
+              <TextInput
+                style={styles.input}
+                placeholder="Basal body temperature °C (optional)"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="decimal-pad"
+                value={bbt}
+                onChangeText={setBbt}
+              />
+              <Text style={styles.helperText}>Cervical mucus</Text>
+              <View style={styles.chipRow}>
+                {CM_OPTIONS.map((o) => (
+                  <TouchableOpacity key={o} style={[styles.chip, cm === o && styles.chipActive]} onPress={() => setCm(o)}>
+                    <Text style={[styles.chipText, cm === o && styles.chipTextActive]}>{o.replace('_', ' ')}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
-            <View style={styles.logCard}>
-              <Text style={styles.logLabel}>LH Strip Result</Text>
-              <View style={styles.lhOptions}>
-                <TouchableOpacity style={[styles.lhBtn, styles.lhPositive]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={styles.lhText}>Positive</Text>
-                    <Ionicons name="checkmark-circle" size={16} color="#FFF" />
-                  </View>
+              <View style={styles.toggleRow}>
+                <TouchableOpacity style={[styles.toggleBtn, lhPositive && styles.toggleActive]} onPress={() => setLhPositive(!lhPositive)}>
+                  <Text style={[styles.toggleText, lhPositive && styles.toggleTextActive]}>LH Positive</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.lhBtn}><Text style={styles.lhText}>Negative</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.toggleBtn, spotting && styles.toggleActive]} onPress={() => setSpotting(!spotting)}>
+                  <Text style={[styles.toggleText, spotting && styles.toggleTextActive]}>Spotting / Period</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          </>
+              <TouchableOpacity style={styles.primaryBtn} onPress={logToday} disabled={busy}>
+                <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Log today'}</Text>
+              </TouchableOpacity>
+            </GlassCard>
+          </View>
         )}
 
-        {activeTab === 'insights' && (
-          <>
-            <Text style={styles.sectionTitle}>Cycle Insights</Text>
-            <View style={styles.insightCard}>
-              <Text style={styles.insightTitle}>Cycle Regularity</Text>
-              <Text style={styles.insightValue}>Regular (±2 days)</Text>
-              <Text style={styles.insightDesc}>Average cycle: 28 days</Text>
-            </View>
-            <View style={styles.insightCard}>
-              <Text style={styles.insightTitle}>BBT Pattern</Text>
-              <Text style={styles.insightValue}>Shift detected</Text>
-              <Text style={styles.insightDesc}>Temperature rose 0.3°C — ovulation likely</Text>
-            </View>
-            <View style={styles.insightCard}>
-              <Text style={styles.insightTitle}>CM Pattern</Text>
-              <Text style={styles.insightValue}>Fertile pattern</Text>
-              <Text style={styles.insightDesc}>Egg white mucus observed — peak fertility</Text>
-            </View>
-          </>
+        {hasPrediction && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="Predictions" icon="calendar" iconColor="#EC4899" />
+            <GlassCard>
+              <View style={styles.predRow}>
+                <Ionicons name="calendar" size={20} color="#EC4899" />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={[typography.body.md, { color: colors.text.primary }]}>Next period</Text>
+                  <Text style={[typography.body.sm, { color: colors.text.muted }]}>{predict!.next_period} · in {predict!.days_until_period} days</Text>
+                </View>
+              </View>
+              <View style={styles.predRow}>
+                <Ionicons name="flower" size={20} color="#EC4899" />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={[typography.body.md, { color: colors.text.primary }]}>Estimated ovulation</Text>
+                  <Text style={[typography.body.sm, { color: colors.text.muted }]}>{predict!.estimated_ovulation}</Text>
+                </View>
+              </View>
+            </GlassCard>
+          </View>
         )}
 
-        {activeTab === 'predict' && (
-          <>
-            <Text style={styles.sectionTitle}>Predictions</Text>
-            <View style={styles.predCard}>
-              <Ionicons name="calendar" size={24} color="#EC4899" />
-              <View style={styles.predInfo}>
-                <Text style={styles.predTitle}>Next Period</Text>
-                <Text style={styles.predValue}>September 12, 2026</Text>
-                <Text style={styles.predSub}>In 14 days</Text>
-              </View>
-            </View>
-            <View style={styles.predCard}>
-              <Ionicons name="flower" size={24} color="#EC4899" />
-              <View style={styles.predInfo}>
-                <Text style={styles.predTitle}>Next Ovulation</Text>
-                <Text style={styles.predValue}>September 28, 2026</Text>
-                <Text style={styles.predSub}>Day 14 of next cycle</Text>
-              </View>
-            </View>
-          </>
-        )}
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Cycle Insights" icon="stats-chart" iconColor={colors.health.calm} />
+          {!insights || insights.message ? (
+            <Text style={styles.emptyText}>{insights?.message ?? 'Log at least 7 days for insights'} ({insights?.days_logged ?? 0}/7)</Text>
+          ) : (
+            <GlassCard>
+              <Text style={[typography.body.md, { color: colors.text.primary }]}>
+                Regularity: {insights.cycle_regularity?.regular === null ? 'Not enough cycles yet' : insights.cycle_regularity?.assessment}
+              </Text>
+              {insights.bbt_analysis && (
+                <Text style={[typography.body.sm, { color: colors.text.muted, marginTop: 6 }]}>
+                  BBT avg {insights.bbt_analysis.average}°C · {insights.bbt_analysis.interpretation}
+                </Text>
+              )}
+              {insights.cervical_mucus && (
+                <Text style={[typography.body.sm, { color: colors.text.muted, marginTop: 6 }]}>
+                  Cervical mucus: {insights.cervical_mucus.pattern.replace('_', ' ')}
+                </Text>
+              )}
+            </GlassCard>
+          )}
+        </View>
+        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A' },
-  header: { paddingTop: 50, paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#1E293B' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#F8FAFC' },
-  headerSubtitle: { fontSize: 14, color: '#94A3B8', marginTop: 4 },
-  tabBar: { flexDirection: 'row', backgroundColor: '#1E293B', paddingHorizontal: 16, paddingVertical: 8 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  activeTab: { backgroundColor: '#EC4899' },
-  tabText: { fontSize: 20 },
-  activeTabText: { color: '#FFF' },
-  content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
-  cycleHero: { alignItems: 'center', marginBottom: 20 },
-  cycleRing: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: '#EC4899', justifyContent: 'center', alignItems: 'center', backgroundColor: '#1E293B' },
-  cycleDay: { fontSize: 42, fontWeight: 'bold', color: '#EC4899' },
-  cycleLabel: { fontSize: 14, color: '#94A3B8' },
-  cyclePhase: { fontSize: 18, fontWeight: 'bold', color: '#F8FAFC', marginTop: 12 },
-  fertilityStatus: { fontSize: 14, color: '#EC4899', marginTop: 4, fontWeight: '600' },
-  fertileWindow: { backgroundColor: '#1E293B', borderRadius: 12, padding: 16, marginBottom: 16 },
-  fertileTitle: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 12 },
-  fertileBar: { flexDirection: 'row', gap: 4, justifyContent: 'center' },
-  fertileDay: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#334155', justifyContent: 'center', alignItems: 'center' },
-  fertileActive: { backgroundColor: '#F59E0B' },
-  fertilePeak: { backgroundColor: '#EC4899' },
-  fertileDayText: { fontSize: 8, color: '#FFF', fontWeight: 'bold' },
-  fertileLegend: { flexDirection: 'row', gap: 16, marginTop: 10, justifyContent: 'center' },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 10, color: '#94A3B8' },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 12 },
-  logCard: { backgroundColor: '#1E293B', borderRadius: 12, padding: 16, marginBottom: 12 },
-  logLabel: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 8 },
-  logValue: { fontSize: 24, fontWeight: 'bold', color: '#EC4899' },
-  cmOptions: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  cmBtn: { backgroundColor: '#334155', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  cmActive: { backgroundColor: '#EC4899' },
-  cmText: { fontSize: 12, color: '#94A3B8' },
-  cmTextActive: { color: '#FFF', fontWeight: 'bold' },
-  lhOptions: { flexDirection: 'row', gap: 8 },
-  lhBtn: { flex: 1, backgroundColor: '#334155', borderRadius: 8, padding: 12, alignItems: 'center' },
-  lhPositive: { backgroundColor: '#10B981' },
-  lhText: { fontSize: 14, fontWeight: '600', color: '#FFF' },
-  insightCard: { backgroundColor: '#1E293B', borderRadius: 12, padding: 14, marginBottom: 10 },
-  insightTitle: { fontSize: 13, color: '#94A3B8' },
-  insightValue: { fontSize: 18, fontWeight: 'bold', color: '#F8FAFC', marginTop: 4 },
-  insightDesc: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  predCard: { backgroundColor: '#1E293B', borderRadius: 12, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  predInfo: { flex: 1 },
-  predTitle: { fontSize: 14, color: '#94A3B8' },
-  predValue: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC' },
-  predSub: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  container: { flex: 1, backgroundColor: colors.bg.deep },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 100 },
+  hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
+  helperText: { color: colors.text.muted, fontSize: 13, marginBottom: 8 },
+  emptyText: { color: colors.text.muted, fontSize: 13 },
+  predRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  input: {
+    backgroundColor: colors.bg.card, borderRadius: 12, padding: 12, color: colors.text.primary,
+    borderWidth: 1, borderColor: colors.surface.border, marginBottom: 10,
+  },
+  primaryBtn: { backgroundColor: '#EC4899', borderRadius: 12, padding: 14, alignItems: 'center' },
+  primaryBtnText: { color: '#fff', fontWeight: '700' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border },
+  chipActive: { backgroundColor: '#EC489920', borderColor: '#EC4899' },
+  chipText: { color: colors.text.muted, fontSize: 12, textTransform: 'capitalize' },
+  chipTextActive: { color: '#EC4899', fontWeight: '700' },
+  toggleRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  toggleBtn: { flex: 1, padding: 10, borderRadius: 10, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border, alignItems: 'center' },
+  toggleActive: { backgroundColor: '#10B98120', borderColor: '#10B981' },
+  toggleText: { color: colors.text.muted, fontSize: 12, fontWeight: '600' },
+  toggleTextActive: { color: '#10B981' },
 });

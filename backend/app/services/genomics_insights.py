@@ -216,9 +216,17 @@ class GenomicsInsightsService:
         }
 
     def _analyze_pharmacogenomics(self, variants: Dict) -> Dict[str, Any]:
+        """Only reports a metabolizer type for a gene the upload actually covered."""
         results = {}
         for gene, info in self.drug_metabolism.items():
-            gene_variant = variants.get(gene, "normal")
+            if gene not in variants:
+                results[gene] = {
+                    "type": "not_tested",
+                    "affected_drugs": info["drugs"],
+                    "action": "Not in the uploaded data — consult a specialist before relying on standard dosing.",
+                }
+                continue
+            gene_variant = variants[gene]
             results[gene] = {
                 "type": gene_variant,
                 "affected_drugs": info["drugs"],
@@ -239,11 +247,17 @@ class GenomicsInsightsService:
         return results
 
     def _analyze_traits(self, variants: Dict) -> List[Dict]:
+        """Only reports a trait for a gene that was actually in the uploaded data."""
+        gene_confidence = {
+            "LCT": ("Lactose Tolerance", 0.95),
+            "CYP1A2": ("Caffeine Metabolism", 0.9),
+            "ALDH2": ("Alcohol Flush", 0.92),
+            "VDR": ("Vitamin D Synthesis", 0.85),
+        }
         return [
-            {"trait": "Lactose Tolerance", "status": variants.get("LCT", "tolerant"), "confidence": 0.95},
-            {"trait": "Caffeine Metabolism", "status": variants.get("CYP1A2", "normal"), "confidence": 0.9},
-            {"trait": "Alcohol Flush", "status": variants.get("ALDH2", "normal"), "confidence": 0.92},
-            {"trait": "Vitamin D Synthesis", "status": variants.get("VDR", "normal"), "confidence": 0.85},
+            {"trait": trait, "status": variants[gene], "confidence": confidence}
+            for gene, (trait, confidence) in gene_confidence.items()
+            if gene in variants
         ]
 
     def _get_disease_recommendations(self, disease: str, risk: float) -> List[str]:

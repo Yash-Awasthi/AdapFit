@@ -1,151 +1,217 @@
 /**
- * Health Equity — Community Health & Social Determinants
- * SDOH scoring, community resources, intervention recommendations, outcome tracking.
+ * Health Equity — community SDOH scoring and local resources.
+ *
+ * The overall score only counts categories someone actually scored, so a
+ * community with one category filled in shows that one score, not five
+ * invented 50s averaged in with it.
  */
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, StatusBar } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
+  StatusBar, ActivityIndicator, RefreshControl, Alert,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, spacing, radius, typography } from '../../src/theme';
-import { ScoreRing, GlassCard, SectionHeaderPremium, ProgressBarPremium } from '../../src/components/PremiumComponents';
-import { RadarChart, BarChart } from '../../src/components/HealthCharts';
+import { colors, spacing, typography } from '../../src/theme';
+import { ScoreRing, GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { useApi, useApis } from '../../src/hooks/useApi';
+import { postJson, asArray } from '../../src/services/http';
+import { useUserStore } from '../../src/stores';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CATEGORIES = [
+  { key: 'economic_stability', label: 'Economic Stability' },
+  { key: 'education_access', label: 'Education Access' },
+  { key: 'healthcare_access', label: 'Healthcare Access' },
+  { key: 'neighborhood_environment', label: 'Neighborhood' },
+  { key: 'social_community', label: 'Social & Community' },
+  { key: 'food_security', label: 'Food Security' },
+];
 
-const mockData = {
-  communityName: 'Downtown Community',
-  overallScore: 58,
-  equityGrade: 'C',
-  categories: [
-    { name: 'Economic Stability', score: 45, icon: 'cash', color: '#F59E0B' },
-    { name: 'Education Access', score: 62, icon: 'school', color: '#06B6D4' },
-    { name: 'Healthcare Access', score: 38, icon: 'medical', color: '#EF4444' },
-    { name: 'Neighborhood', score: 55, icon: 'home', color: '#8B5CF6' },
-    { name: 'Social Support', score: 70, icon: 'people', color: '#22C55E' },
-    { name: 'Food Security', score: 52, icon: 'nutrition', color: '#F97316' },
-  ],
-  interventions: [
-    { name: 'Telehealth Bridge Program', impact: 'high', cost: 'low', category: 'Healthcare', color: '#EF4444' },
-    { name: 'Community Health Worker', impact: 'high', cost: 'moderate', category: 'Healthcare', color: '#EF4444' },
-    { name: 'SNAP Enrollment Assistance', impact: 'high', cost: 'low', category: 'Food', color: '#F97316' },
-    { name: 'Mobile Food Pantry', impact: 'high', cost: 'moderate', category: 'Food', color: '#F97316' },
-    { name: 'Transportation Vouchers', impact: 'moderate', cost: 'low', category: 'Healthcare', color: '#EF4444' },
-  ],
-  resources: [
-    { name: 'Community Health Center', type: 'Health Clinic', distance: '0.5 mi', phone: '555-0100' },
-    { name: 'Downtown Food Bank', type: 'Food Bank', distance: '1.2 mi', phone: '555-0101' },
-    { name: 'Mental Health Alliance', type: 'Mental Health', distance: '0.8 mi', phone: '555-0102' },
-    { name: 'Job Training Center', type: 'Job Center', distance: '1.5 mi', phone: '555-0103' },
-  ],
-  outcomes: [
-    { intervention: 'Telehealth Bridge', metric: 'Appointments Kept', before: 60, after: 85 },
-    { intervention: 'Mobile Food Pantry', metric: 'Food Security', before: 35, after: 68 },
-    { intervention: 'Transportation Vouchers', metric: 'No-Shows', before: 40, after: 15 },
-  ],
-};
-
-const radarData = mockData.categories.map(c => ({ label: c.name.split(' ')[0], value: c.score, color: c.color }));
+interface Community { id: string; name: string; population: number; overall_score: number; equity_grade?: string }
+interface Recommendation { name: string; impact: string; cost: string; target_category: string; description: string }
+interface Resource { id: string; name: string; type: string; address: string; phone: string }
 
 export default function HealthEquityScreen() {
+  const userId = useUserStore((s) => s.userId);
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState('');
+  const [population, setPopulation] = useState('');
+  const [scores, setScores] = useState<Record<string, string>>({});
+
+  const { data: communitiesData, loading: communitiesLoading, reload: reloadCommunities } = useApi<Community[]>('/health-equity/communities');
+  const communities = asArray<Community>(communitiesData);
+  const community = communities[0];
+
+  const { data, loading, refresh, refreshing, reload } = useApis<{
+    recommendations: Recommendation[];
+    resources: Resource[];
+  }>(community ? {
+    recommendations: `/health-equity/recommendations/${community.id}`,
+    resources: `/health-equity/resources/${community.id}`,
+  } : null);
+
+  const recommendations = asArray<Recommendation>(data.recommendations);
+  const resources = asArray<Resource>(data.resources);
+
+  const createCommunity = useCallback(async () => {
+    if (!name.trim() || !population.trim()) {
+      Alert.alert('Details needed', 'Enter a community name and population.');
+      return;
+    }
+    setBusy(true);
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const result = await postJson(`/health-equity/community/create`, {
+      community_id: `${id}-${userId}`,
+      name: name.trim(),
+      population: Math.round(Number(population)) || 0,
+    });
+    setBusy(false);
+    if (!result) {
+      Alert.alert('Not created', 'The community profile could not be created.');
+      return;
+    }
+    await reloadCommunities();
+  }, [name, population, userId, reloadCommunities]);
+
+  const submitScores = useCallback(async () => {
+    const entered = Object.fromEntries(
+      Object.entries(scores).filter(([, v]) => v.trim()).map(([k, v]) => [k, Number(v)])
+    );
+    if (Object.keys(entered).length === 0) {
+      Alert.alert('No scores entered', 'Score at least one category, 0-100.');
+      return;
+    }
+    setBusy(true);
+    const result = await postJson('/health-equity/sdoh/score', { community_id: community!.id, category_scores: entered });
+    setBusy(false);
+    if (!result) {
+      Alert.alert('Not saved', 'The scores could not be saved.');
+      return;
+    }
+    await reloadCommunities();
+    await reload();
+  }, [scores, community, reloadCommunities, reload]);
+
+  if (communitiesLoading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#6366F1" />
+      </View>
+    );
+  }
+
+  if (!community) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <LinearGradient colors={['#6366F1', '#8B5CF6', '#0F1629']} style={styles.hero}>
+            <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)' }]}>Health Equity</Text>
+            <Text style={[typography.heading.h1, { color: '#fff', marginTop: 4 }]}>Register a Community</Text>
+          </LinearGradient>
+          <View style={styles.section}>
+            <GlassCard>
+              <TextInput
+                style={styles.input}
+                placeholder="Community name"
+                placeholderTextColor={colors.text.muted}
+                value={name}
+                onChangeText={setName}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Population"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="numeric"
+                value={population}
+                onChangeText={setPopulation}
+              />
+              <TouchableOpacity style={styles.primaryBtn} onPress={createCommunity} disabled={busy}>
+                <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Create'}</Text>
+              </TouchableOpacity>
+            </GlassCard>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  const scored = community.overall_score > 0;
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#6366F1" />}
+      >
         <LinearGradient colors={['#6366F1', '#8B5CF6', '#0F1629']} style={styles.hero}>
           <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)' }]}>Health Equity</Text>
-          <Text style={[typography.heading.h1, { color: '#fff', marginTop: 4 }]}>{mockData.communityName}</Text>
-          <View style={styles.scoreRow}>
-            <ScoreRing score={mockData.overallScore} size={100} color={colors.health.activity} />
-            <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.6)' }]}>SDOH Score</Text>
-              <Text style={[typography.metric.large, { color: '#fff' }]}>{mockData.overallScore}/100</Text>
-              <Text style={[typography.body.sm, { color: colors.health.warning }]}>Grade: {mockData.equityGrade}</Text>
+          <Text style={[typography.heading.h1, { color: '#fff', marginTop: 4 }]}>{community.name}</Text>
+          {scored ? (
+            <View style={styles.scoreRow}>
+              <ScoreRing score={community.overall_score} size={100} color={colors.health.activity} />
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.6)' }]}>SDOH Score</Text>
+                <Text style={[typography.metric.large, { color: '#fff' }]}>{community.overall_score}/100</Text>
+                <Text style={[typography.body.sm, { color: colors.health.warning }]}>Grade: {community.equity_grade}</Text>
+              </View>
             </View>
-          </View>
+          ) : (
+            <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.6)', marginTop: 8 }]}>Score categories below to see a rating.</Text>
+          )}
         </LinearGradient>
 
         <View style={styles.section}>
-          <SectionHeaderPremium title="SDOH Categories" icon="analytics" iconColor="#6366F1" />
-          {mockData.categories.map((cat, i) => (
-            <View key={i} style={styles.categoryRow}>
-              <View style={[styles.catIcon, { backgroundColor: cat.color + '18' }]}>
-                <Ionicons name={cat.icon as any} size={16} color={cat.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[typography.body.md, { color: colors.text.primary }]}>{cat.name}</Text>
-                <View style={[styles.catBar, { backgroundColor: cat.color + '20' }]}>
-                  <View style={[styles.catBarFill, { width: `${cat.score}%`, backgroundColor: cat.color }]} />
-                </View>
-              </View>
-              <Text style={[typography.body.md, { color: cat.color, fontWeight: '600', width: 40, textAlign: 'right' }]}>{cat.score}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <SectionHeaderPremium title="SDOH Radar" icon="pulse" iconColor="#8B5CF6" />
-          <GlassCard style={{ alignItems: 'center' }}>
-            <RadarChart data={radarData} size={200} />
+          <SectionHeaderPremium title="Score SDOH Categories" icon="analytics" iconColor="#6366F1" />
+          <GlassCard>
+            <Text style={styles.helperText}>0-100, higher is better. Leave blank what you can't estimate.</Text>
+            {CATEGORIES.map((c) => (
+              <TextInput
+                key={c.key}
+                style={styles.input}
+                placeholder={c.label}
+                placeholderTextColor={colors.text.muted}
+                keyboardType="numeric"
+                value={scores[c.key] ?? ''}
+                onChangeText={(v) => setScores((prev) => ({ ...prev, [c.key]: v }))}
+              />
+            ))}
+            <TouchableOpacity style={styles.primaryBtn} onPress={submitScores} disabled={busy}>
+              <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Save scores'}</Text>
+            </TouchableOpacity>
           </GlassCard>
         </View>
 
         <View style={styles.section}>
-          <SectionHeaderPremium title="Recommended Interventions" icon="bulb" iconColor={colors.health.energy} />
-          {mockData.interventions.map((int, i) => (
-            <View key={i} style={styles.interventionCard}>
-              <View style={[styles.intIcon, { backgroundColor: int.color + '18' }]}>
-                <Ionicons name="flash" size={16} color={int.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[typography.body.md, { color: colors.text.primary }]}>{int.name}</Text>
-                <Text style={[typography.body.xs, { color: colors.text.muted }]}>{int.category} • Impact: {int.impact} • Cost: {int.cost}</Text>
-              </View>
-              <View style={[styles.impactBadge, { backgroundColor: int.impact === 'high' ? colors.health.success + '20' : colors.health.warning + '20' }]}>
-                <Text style={[typography.body.xs, { color: int.impact === 'high' ? colors.health.success : colors.health.warning }]}>{int.impact}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <SectionHeaderPremium title="Community Resources" icon="location" iconColor={colors.primary} />
-          {mockData.resources.map((r, i) => (
-            <View key={i} style={styles.resourceCard}>
-              <View style={[styles.resIcon, { backgroundColor: colors.primary + '18' }]}>
-                <Ionicons name="location" size={16} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
+          <SectionHeaderPremium title="Recommended Interventions" icon="bulb" iconColor="#F59E0B" />
+          {loading ? (
+            <ActivityIndicator color="#6366F1" />
+          ) : recommendations.length === 0 ? (
+            <Text style={styles.emptyText}>{scored ? 'No weak categories found.' : 'Score a category below 60 to see recommendations.'}</Text>
+          ) : (
+            recommendations.map((r, i) => (
+              <GlassCard key={`${r.name}-${i}`} style={{ marginBottom: 10 }}>
                 <Text style={[typography.body.md, { color: colors.text.primary }]}>{r.name}</Text>
-                <Text style={[typography.body.xs, { color: colors.text.muted }]}>{r.type} • {r.distance}</Text>
-              </View>
-              <Ionicons name="call" size={18} color={colors.primary} />
-            </View>
-          ))}
+                <Text style={[typography.body.xs, { color: colors.text.muted, marginTop: 4 }]}>{r.description}</Text>
+              </GlassCard>
+            ))
+          )}
         </View>
 
         <View style={styles.section}>
-          <SectionHeaderPremium title="Outcomes" icon="trending-up" iconColor={colors.health.calm} />
-          {mockData.outcomes.map((o, i) => (
-            <GlassCard key={i} style={{ marginBottom: 10 }}>
-              <Text style={[typography.label.md, { color: colors.text.primary }]}>{o.intervention}</Text>
-              <Text style={[typography.body.xs, { color: colors.text.muted, marginTop: 4 }]}>{o.metric}</Text>
-              <View style={styles.outcomeRow}>
-                <View style={styles.outcomeBox}>
-                  <Text style={[typography.body.xs, { color: colors.text.muted }]}>Before</Text>
-                  <Text style={[typography.metric.small, { color: colors.health.danger }]}>{o.before}%</Text>
-                </View>
-                <Ionicons name="arrow-forward" size={16} color={colors.text.muted} />
-                <View style={styles.outcomeBox}>
-                  <Text style={[typography.body.xs, { color: colors.text.muted }]}>After</Text>
-                  <Text style={[typography.metric.small, { color: colors.health.success }]}>{o.after}%</Text>
-                </View>
-                <View style={[styles.improvementBadge, { backgroundColor: colors.health.success + '20' }]}>
-                  <Ionicons name="trending-up" size={12} color={colors.health.success} />
-                  <Text style={[typography.body.sm, { color: colors.health.success, fontWeight: '600' }]}>+{o.after - o.before}%</Text>
-                </View>
-              </View>
-            </GlassCard>
-          ))}
+          <SectionHeaderPremium title="Local Resources" icon="location" iconColor="#22C55E" />
+          {resources.length === 0 ? (
+            <Text style={styles.emptyText}>No resources added yet.</Text>
+          ) : (
+            resources.map((r) => (
+              <GlassCard key={r.id} style={{ marginBottom: 10 }}>
+                <Text style={[typography.body.md, { color: colors.text.primary }]}>{r.name}</Text>
+                <Text style={[typography.body.xs, { color: colors.text.muted, marginTop: 2 }]}>{r.type} · {r.address}</Text>
+              </GlassCard>
+            ))
+          )}
         </View>
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -155,21 +221,18 @@ export default function HealthEquityScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
+  center: { justifyContent: 'center', alignItems: 'center', flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   scoreRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
   section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
-  categoryRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 10 },
-  catIcon: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  catBar: { height: 6, borderRadius: 3, marginTop: 4, overflow: 'hidden' },
-  catBarFill: { height: '100%', borderRadius: 3 },
-  interventionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.surface.border, gap: 10 },
-  intIcon: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  impactBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  resourceCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.surface.border, gap: 10 },
-  resIcon: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  outcomeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 10 },
-  outcomeBox: { alignItems: 'center' },
-  improvementBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginLeft: 'auto' },
+  helperText: { color: colors.text.muted, fontSize: 13, marginBottom: 8 },
+  emptyText: { color: colors.text.muted, fontSize: 13 },
+  input: {
+    backgroundColor: colors.bg.card, borderRadius: 12, padding: 12, color: colors.text.primary,
+    borderWidth: 1, borderColor: colors.surface.border, marginBottom: 10,
+  },
+  primaryBtn: { backgroundColor: '#6366F1', borderRadius: 12, padding: 14, alignItems: 'center' },
+  primaryBtnText: { color: '#fff', fontWeight: '700' },
 });
