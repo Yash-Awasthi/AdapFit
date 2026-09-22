@@ -39,6 +39,6 @@ async def get_flagged(limit: int = 50):
 
 
 @router.get("/helplines/{country}")
-async def get_helplines(country: str = "us"):
+async def get_helplines(country: str = "india"):
     from app.services.health_chat_moderation import chat_moderation
     return chat_moderation.get_helplines(country)

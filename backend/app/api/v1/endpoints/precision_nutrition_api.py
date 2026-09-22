@@ -30,6 +30,12 @@ async def create_profile(req: CreateProfileRequest):
     return precision_nutrition.create_nutrition_profile(req.user_id, req.microbiome_type, req.metabolic_type, req.allergies, req.preferences)
 
 
+@router.get("/profile/{user_id}")
+async def get_profile(user_id: str):
+    from app.services.precision_nutrition import precision_nutrition
+    return precision_nutrition.get_nutrition_profile(user_id)
+
+
 @router.get("/meal-plan/{user_id}")
 async def get_meal_plan(user_id: str, days: int = 7):
     from app.services.precision_nutrition import precision_nutrition

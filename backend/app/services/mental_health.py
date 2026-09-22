@@ -15,6 +15,8 @@ from typing import Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
+from app.services.safety_policy import CRISIS_LINES
+
 
 class MoodLevel(Enum):
     VERY_LOW = 1
@@ -87,9 +89,7 @@ class MentalHealthService:
 
     # Crisis resources
     CRISIS_RESOURCES = [
-        {"name": "National Suicide Prevention Lifeline", "number": "988", "available": "24/7", "country": "US"},
-        {"name": "Crisis Text Line", "number": "Text HOME to 741741", "available": "24/7", "country": "US"},
-        {"name": "SAMHSA Helpline", "number": "1-800-662-4357", "available": "24/7", "country": "US"},
+        *CRISIS_LINES,
         {"name": "International Association for Suicide Prevention", "number": "https://www.iasp.info/resources/Crisis_Centres/", "available": "24/7", "country": "International"},
     ]
 
@@ -97,7 +97,7 @@ class MentalHealthService:
     COPING_STRATEGIES = {
         1: [
             "Reach out to someone you trust right now",
-            "If you're in crisis, call 988 (Suicide Prevention Lifeline)",
+            "If you're in crisis, call Tele-MANAS on 14416 (free, 24/7)",
             "Try the 5-4-3-2-1 grounding technique: name 5 things you see, 4 you touch, 3 you hear, 2 you smell, 1 you taste",
             "Put your feet on the ground and take 5 slow breaths",
         ],

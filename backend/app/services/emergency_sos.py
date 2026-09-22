@@ -211,7 +211,7 @@ class EmergencySOSService:
                 "phone": primary.phone if primary else "None",
                 "relationship": primary.relationship if primary else "",
             } if primary else None,
-            "emergency_number": "911",
+            "emergency_number": "112",
             "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
 

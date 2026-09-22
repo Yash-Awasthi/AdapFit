@@ -1229,7 +1229,7 @@ with every feature reachable and wired rather than a demo against one fake user.
   the `e2e/` failures are missing detox types and predate this branch).
 - The whole loop runs against real PostgreSQL 17 and survives a restart —
   `python -m scripts.verify_postgres` from `backend/` is that check.
-- 58 of 71 mobile screens read live data. It was 34.
+- 67 of 71 mobile screens read live data. It was 34.
 
 ### 1. Identity binding — the largest defect
 
@@ -1316,6 +1316,13 @@ Every one now derives from real input or reports that the input is missing.
 measurement across all 280 services, with an explicit allowlist for the uses
 that pick wording or generate an id.
 
+Camera heart rate has since been finished: `react-native-vision-camera` reads
+the back camera's RGB buffer with the torch on, and the averages go to the
+same CHROM estimator (`rppg_api.py`) instead of standing idle behind the
+`FRAME_SAMPLING_AVAILABLE` switch. Untested on real hardware — no Android SDK
+or device in this environment; verify torch behavior and finger-placement
+signal quality on a phone before shipping.
+
 ### 6. Real data where it was invented
 
 Air quality, UV index and pollen come from Open-Meteo, which is free and needs
@@ -1343,17 +1350,40 @@ database; the compose file feeds the same directory to initdb.
 - Docker images: still not built. Postgres runs natively instead.
 - The public `/metrics` endpoint: still open.
 
+### 9. The last nine screens
+
+addiction-recovery, ambient, fertility, genomics, health-equity,
+health-savings, precision-nutrition, pregnancy, and remote-monitoring all
+read real data now, each behind a setup flow and an honest empty state
+rather than the fixed sample it shipped with.
+
+Wiring them surfaced the same class of bug Part 8.5 fixed elsewhere:
+
+- Sobriety and journal mood clamps called `max()` on a bare int, which
+  raises `TypeError` on every craving or journal entry.
+- Genomics defaulted an untested gene to "normal" at 85-95% confidence —
+  a pharmacogenomics panel that could tell a poor CYP2D6 metabolizer their
+  codeine dose was fine without ever seeing that gene.
+- Health equity silently scored missing SDOH categories at 50 and folded
+  them into the weighted average, so scoring one category out of six
+  produced a grade for all six.
+- Health savings marked every expense HSA/FSA-eligible regardless of
+  category.
+- Fertility's cycle-regularity check always returned "regular, ±2 days"
+  with no logged cycles behind it.
+- Ambient health's environment score fell back to a fixed 50 when no
+  device had reported a reading.
+
+`tests/test_nine_screens_backend_fixes.py` covers each. Two services
+(ambient health, health equity) needed a `get_homes`/`get_communities`
+style lookup added, since a per-user singleton has no way to hand back an
+id the mobile app never stored.
+
 ### Still open
 
-- Nine screens still render fixed sample data: addiction-recovery, ambient,
-  fertility, genomics, health-equity, health-savings, precision-nutrition,
-  pregnancy, remote-monitoring. All have working backends. None carries the
-  safety weight of the ones done first.
-- Camera heart rate needs a frame processor. The analysis half is real and
-  server-side (`rppg_api.py`, CHROM and green-channel); what is missing is
-  per-frame pixel access, which `expo-camera` does not provide. The switch is
-  `FRAME_SAMPLING_AVAILABLE` in `app/camera-heart-rate.tsx`.
-- Posture assessment needs the same: a pose detector supplying body landmarks.
+- Posture assessment needs a pose detector supplying body landmarks —
+  the same per-frame pixel access gap camera heart rate had, still open
+  there.
 - The telemedicine and hospital directories are sample data and now say so. They
   need a real provider before they mean anything.
 - The Postgres superuser password is winget's default. Fine on loopback, worth

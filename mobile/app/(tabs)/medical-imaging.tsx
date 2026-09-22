@@ -19,7 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius } from '../../src/theme';
 import { ScreenWrapper } from '../../src/components/ScreenWrapper';
 import { GlassCard, SectionHeaderPremium, ProgressBarPremium } from '../../src/components/PremiumComponents';
-import { postJson, asArray } from '../../src/services/http';
+import { postJson } from '../../src/services/http';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -34,7 +34,6 @@ interface LesionResult {
   abcde_details?: Record<string, ABCDEDetail>;
   risk_level?: string;
   recommendation?: string;
-  differential_diagnosis?: { condition: string; urgency: string; note: string }[];
   follow_up_schedule?: { next_exam: string; specialist: string; imaging: string };
   self_monitoring?: string[];
   disclaimer?: string;
@@ -148,21 +147,6 @@ export default function MedicalImagingScreen() {
               </View>
             ))}
           </GlassCard>
-
-          {asArray(result.differential_diagnosis).length > 0 && (
-            <>
-              <SectionHeaderPremium icon="medical" iconColor={tint} title="What a Clinician Would Rule Out" />
-              {result.differential_diagnosis!.map((item, i) => (
-                <GlassCard key={i} variant="light" style={styles.sectionCard}>
-                  <Text style={styles.conditionName}>{item.condition}</Text>
-                  <Text style={styles.conditionNote}>{item.note}</Text>
-                  <Text style={[styles.conditionUrgency, { color: item.urgency === 'urgent' ? '#EF4444' : colors.text.muted }]}>
-                    {item.urgency}
-                  </Text>
-                </GlassCard>
-              ))}
-            </>
-          )}
 
           {result.follow_up_schedule && (
             <GlassCard variant="light" style={styles.sectionCard}>
@@ -320,7 +304,4 @@ const styles = StyleSheet.create({
   detailLabel: { fontSize: 14, color: colors.text.muted, textTransform: 'capitalize' },
   detailValue: { fontSize: 14, fontWeight: '700', textTransform: 'capitalize' },
 
-  conditionName: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
-  conditionNote: { fontSize: 13, color: colors.text.muted, marginTop: 4, lineHeight: 18 },
-  conditionUrgency: { fontSize: 12, fontWeight: '700', marginTop: 6, textTransform: 'capitalize' },
 });

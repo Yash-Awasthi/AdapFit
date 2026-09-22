@@ -1,40 +1,27 @@
 /**
  * Camera Heart Rate Measurement — rPPG (Remote Photoplethysmography)
  *
- * rPPG reads the pulse from tiny colour changes in the skin, which needs the
- * green channel of each camera frame at around 30 fps. `expo-camera` exposes
- * no per-frame pixel access, so this build cannot sample it, and the screen
- * says so rather than measuring.
- *
- * It used to synthesise the signal — `128 + sin(t) * 10 + random()` — which
- * always produced roughly 60 BPM with a confidence beside it, and offered to
- * save that as the user's resting heart rate.
- *
- * The analysis half is real and already server-side
- * (POST /api/v1/rppg/estimate-hr-chrom, CHROM and green-channel methods). To
- * finish this feature, add a frame processor — react-native-vision-camera, or
- * a small native module — and post the RGB averages it yields to that
- * endpoint. FRAME_SAMPLING_AVAILABLE is the switch.
+ * rPPG reads the pulse from tiny colour changes in the skin. A frame
+ * processor (react-native-vision-camera) samples the back camera's RGB
+ * buffer with the torch on — finger over the lens, illuminated from
+ * inside — and the averages are posted to the CHROM estimator at
+ * POST /api/v1/rppg/estimate-hr-chrom. The final BPM and confidence shown
+ * on completion come from that response, not from on-device peak-picking.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions,
-  StatusBar, Platform, Alert,
+  StatusBar, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import {
+  Camera, useCameraDevice, useCameraPermission, useFrameOutput,
+} from 'react-native-vision-camera';
+import { runOnJS } from 'react-native-worklets';
 import { colors, typography, spacing } from '../src/theme';
-
-/**
- * Whether this build can read pixels from camera frames.
- *
- * Flip to true once a frame processor supplies real green-channel averages to
- * `handleFrame`. Until then no pulse is reported, because a number here is
- * indistinguishable from a measured one.
- */
-const FRAME_SAMPLING_AVAILABLE = false;
+import { api } from '../src/services/api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -44,8 +31,9 @@ const MEASUREMENT_DURATION = 30; // seconds
 const MIN_SAMPLES_FOR_BPM = 150; // 5 seconds minimum
 const BPM_MIN = 40;
 const BPM_MAX = 200;
+const FRAME_RESOLUTION = { width: 100, height: 100 };
 
-type MeasurementState = 'idle' | 'calibrating' | 'measuring' | 'complete' | 'error';
+type MeasurementState = 'idle' | 'calibrating' | 'measuring' | 'analyzing' | 'complete' | 'error';
 
 interface HeartRateReading {
   bpm: number;
@@ -56,7 +44,8 @@ interface HeartRateReading {
 
 export default function CameraHeartRateScreen() {
   const router = useRouter();
-  const [permission, requestPermission] = useCameraPermissions();
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice('back');
   const [state, setState] = useState<MeasurementState>('idle');
   const [bpm, setBpm] = useState<number | null>(null);
   const [confidence, setConfidence] = useState(0);
@@ -66,12 +55,63 @@ export default function CameraHeartRateScreen() {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
-  const cameraRef = useRef<any>(null);
-  const frameBuffer = useRef<number[]>([]);
   const greenChannelAvg = useRef<number[]>([]);
+  const roiPixels = useRef<number[][]>([]);
   const startTimeRef = useRef<number>(0);
   const measurementTimer = useRef<NodeJS.Timeout | null>(null);
   const frameCountRef = useRef(0);
+
+  const pushSample = useCallback((r: number, g: number, b: number) => {
+    roiPixels.current.push([r, g, b]);
+    if (roiPixels.current.length > 10000) roiPixels.current.shift();
+
+    greenChannelAvg.current.push(g);
+    frameCountRef.current++;
+
+    const last30 = greenChannelAvg.current.slice(-30);
+    if (last30.length >= 10) {
+      const mean = last30.reduce((a, s) => a + s, 0) / last30.length;
+      const variance = last30.reduce((sum, s) => sum + (s - mean) ** 2, 0) / last30.length;
+      const cv = Math.sqrt(variance) / mean;
+      if (cv > 0.01) setSignalQuality('good');
+      else if (cv > 0.003) setSignalQuality('fair');
+      else setSignalQuality('poor');
+    }
+
+    if (frameCountRef.current >= MIN_SAMPLES_FOR_BPM && frameCountRef.current % 30 === 0) {
+      const liveBpm = calculateBPM();
+      if (liveBpm && liveBpm >= BPM_MIN && liveBpm <= BPM_MAX) {
+        setBpm(Math.round(liveBpm));
+      }
+    }
+  }, []);
+
+  const frameOutput = useFrameOutput({
+    targetResolution: FRAME_RESOLUTION,
+    pixelFormat: 'rgb',
+    onFrame(frame) {
+      'worklet';
+      const buffer = frame.getPixelBuffer();
+      const pixels = new Uint8Array(buffer);
+      const isBGRA = frame.pixelFormat.includes('bgra');
+      const redOffset = isBGRA ? 2 : 0;
+      const blueOffset = isBGRA ? 0 : 2;
+
+      let rSum = 0, gSum = 0, bSum = 0, count = 0;
+      // Stride of 16 pixels (64 bytes) keeps this cheap at 30fps on a 100x100 buffer.
+      for (let i = 0; i + 3 < pixels.length; i += 64) {
+        rSum += pixels[i + redOffset];
+        gSum += pixels[i + 1];
+        bSum += pixels[i + blueOffset];
+        count++;
+      }
+      frame.dispose();
+
+      if (count > 0) {
+        runOnJS(pushSample)(rSum / count, gSum / count, bSum / count);
+      }
+    },
+  });
 
   // Pulse animation
   useEffect(() => {
@@ -94,20 +134,24 @@ export default function CameraHeartRateScreen() {
   }, []);
 
   const startMeasurement = useCallback(async () => {
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
+    if (!hasPermission) {
+      const granted = await requestPermission();
+      if (!granted) {
         Alert.alert('Camera Permission', 'Camera access is needed to measure heart rate.');
         return;
       }
     }
+    if (!device) {
+      Alert.alert('No Camera', 'No back camera is available on this device.');
+      return;
+    }
 
     setState('calibrating');
-    frameBuffer.current = [];
+    roiPixels.current = [];
     greenChannelAvg.current = [];
     frameCountRef.current = 0;
 
-    // Calibration phase
+    // Calibration phase — lets the torch settle and the finger seat over the lens.
     setTimeout(() => {
       setState('measuring');
       startTimeRef.current = Date.now();
@@ -122,25 +166,33 @@ export default function CameraHeartRateScreen() {
         }
       }, 100);
     }, 2000);
-  }, [permission]);
+  }, [hasPermission, device]);
 
-  const completeMeasurement = useCallback(() => {
+  const completeMeasurement = useCallback(async () => {
     if (measurementTimer.current) clearInterval(measurementTimer.current);
+    setState('analyzing');
 
-    const finalBpm = calculateBPM();
-    if (finalBpm && finalBpm >= BPM_MIN && finalBpm <= BPM_MAX) {
-      const conf = calculateConfidence();
-      const reading: HeartRateReading = {
-        bpm: Math.round(finalBpm),
-        confidence: conf,
-        timestamp: Date.now(),
-        duration: MEASUREMENT_DURATION,
-      };
-      setBpm(reading.bpm);
-      setConfidence(reading.confidence);
-      setReadings(prev => [reading, ...prev].slice(0, 10));
-      setState('complete');
-    } else {
+    try {
+      const result = await api.post('/api/v1/rppg/estimate-hr-chrom', {
+        roi_pixels: roiPixels.current,
+        timestamp: Date.now() / 1000,
+      });
+      const finalBpm = result?.heart_rate_bpm;
+      if (typeof finalBpm === 'number' && finalBpm >= BPM_MIN && finalBpm <= BPM_MAX) {
+        const reading: HeartRateReading = {
+          bpm: Math.round(finalBpm),
+          confidence: result?.confidence ?? 0,
+          timestamp: Date.now(),
+          duration: MEASUREMENT_DURATION,
+        };
+        setBpm(reading.bpm);
+        setConfidence(reading.confidence);
+        setReadings(prev => [reading, ...prev].slice(0, 10));
+        setState('complete');
+      } else {
+        setState('error');
+      }
+    } catch {
       setState('error');
     }
   }, []);
@@ -180,59 +232,6 @@ export default function CameraHeartRateScreen() {
     return bpm;
   };
 
-  const calculateConfidence = (): number => {
-    const samples = greenChannelAvg.current;
-    if (samples.length < MIN_SAMPLES_FOR_BPM) return 0;
-
-    // Confidence based on signal quality (variance relative to mean)
-    const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
-    const variance = samples.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / samples.length;
-    const cv = Math.sqrt(variance) / mean; // Coefficient of variation
-
-    // Good signal has clear pulsation (CV between 0.5% and 5%)
-    if (cv >= 0.005 && cv <= 0.05) return Math.min(0.95, 0.7 + cv * 10);
-    if (cv > 0.05) return Math.max(0.3, 0.7 - (cv - 0.05) * 5);
-    return Math.max(0.2, cv * 100);
-  };
-
-  const handleFrame = useCallback((event: any) => {
-    if (state !== 'measuring') return;
-
-    try {
-      // Extract green channel average from camera frame
-      // In production, use expo-camera frame processing
-      const frame = event?.data;
-      if (!frame) return;
-
-      // The frame's green-channel average, supplied by a frame processor.
-      // Nothing is derived when it is absent: the synthetic signal that used
-      // to stand in here produced a plausible pulse from no measurement.
-      const greenAvg = typeof frame?.greenAverage === 'number' ? frame.greenAverage : null;
-      if (greenAvg === null) return;
-      greenChannelAvg.current.push(greenAvg);
-      frameCountRef.current++;
-
-      // Update signal quality indicator
-      const last30 = greenChannelAvg.current.slice(-30);
-      if (last30.length >= 10) {
-        const mean = last30.reduce((a, b) => a + b, 0) / last30.length;
-        const variance = last30.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / last30.length;
-        const cv = Math.sqrt(variance) / mean;
-        if (cv > 0.01) setSignalQuality('good');
-        else if (cv > 0.003) setSignalQuality('fair');
-        else setSignalQuality('poor');
-      }
-
-      // Live BPM estimate
-      if (frameCountRef.current >= MIN_SAMPLES_FOR_BPM && frameCountRef.current % 30 === 0) {
-        const liveBpm = calculateBPM();
-        if (liveBpm && liveBpm >= BPM_MIN && liveBpm <= BPM_MAX) {
-          setBpm(Math.round(liveBpm));
-        }
-      }
-    } catch {}
-  }, [state]);
-
   const resetMeasurement = useCallback(() => {
     setState('idle');
     setBpm(null);
@@ -240,6 +239,7 @@ export default function CameraHeartRateScreen() {
     setProgress(0);
     setSignalQuality('poor');
     greenChannelAvg.current = [];
+    roiPixels.current = [];
     frameCountRef.current = 0;
   }, []);
 
@@ -253,12 +253,13 @@ export default function CameraHeartRateScreen() {
 
       {/* Camera Preview */}
       <View style={styles.cameraContainer}>
-        {permission?.granted ? (
-          <CameraView
-            ref={cameraRef}
+        {hasPermission && device ? (
+          <Camera
             style={styles.camera}
-            facing="front"
-            onCameraReady={() => {}}
+            device={device}
+            isActive={state === 'measuring' || state === 'calibrating'}
+            outputs={state === 'measuring' ? [frameOutput] : []}
+            torchMode={state === 'measuring' || state === 'calibrating' ? 'on' : 'off'}
           />
         ) : (
           <View style={styles.cameraPlaceholder}>
@@ -285,31 +286,7 @@ export default function CameraHeartRateScreen() {
 
           {/* Center Content */}
           <View style={styles.centerContent}>
-            {state === 'idle' && !FRAME_SAMPLING_AVAILABLE && (
-              <View style={styles.idleContent}>
-                <View style={styles.cameraIcon}>
-                  <Ionicons name="hardware-chip-outline" size={48} color="#FFF" />
-                </View>
-                <Text style={[typography.heading.h2, { color: '#FFF', marginTop: 20 }]}>
-                  Not available in this build
-                </Text>
-                <Text style={[typography.body.md, { color: 'rgba(255,255,255,0.7)', marginTop: 8, textAlign: 'center', paddingHorizontal: 32 }]}>
-                  Reading a pulse from the camera needs frame-by-frame pixel access, which
-                  this build does not have. Rather than show you a number it did not
-                  measure, it shows you this.
-                </Text>
-                <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.55)', marginTop: 16, textAlign: 'center', paddingHorizontal: 32 }]}>
-                  Your resting heart rate still arrives from a paired watch or band, and you
-                  can enter it yourself in the morning check-in.
-                </Text>
-                <TouchableOpacity style={styles.startButton} onPress={() => router.push('/checkin' as any)}>
-                  <Ionicons name="create" size={22} color="#FFF" />
-                  <Text style={[typography.label.lg, { color: '#FFF' }]}>Go to check-in</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {state === 'idle' && FRAME_SAMPLING_AVAILABLE && (
+            {state === 'idle' && (
               <View style={styles.idleContent}>
                 <View style={styles.cameraIcon}>
                   <Ionicons name="camera" size={48} color="#FFF" />
@@ -318,7 +295,7 @@ export default function CameraHeartRateScreen() {
                   Measure Heart Rate
                 </Text>
                 <Text style={[typography.body.md, { color: 'rgba(255,255,255,0.7)', marginTop: 8, textAlign: 'center', paddingHorizontal: 32 }]}>
-                  Place your finger over the camera lens. Stay still for 30 seconds.
+                  Cover the rear camera and flash with your fingertip. Stay still for 30 seconds.
                 </Text>
                 <TouchableOpacity style={styles.startButton} onPress={startMeasurement}>
                   <Ionicons name="play" size={24} color="#FFF" />
@@ -376,6 +353,19 @@ export default function CameraHeartRateScreen() {
                     {Math.round(progress * MEASUREMENT_DURATION)}s / {MEASUREMENT_DURATION}s
                   </Text>
                 </View>
+              </View>
+            )}
+
+            {state === 'analyzing' && (
+              <View style={styles.measuringContent}>
+                <Animated.View style={styles.pulseRing}>
+                  <View style={styles.pulseInner}>
+                    <Ionicons name="pulse" size={40} color={colors.health.heart} />
+                  </View>
+                </Animated.View>
+                <Text style={[typography.heading.h3, { color: '#FFF', marginTop: 20 }]}>
+                  Analyzing...
+                </Text>
               </View>
             )}
 
@@ -452,18 +442,6 @@ export default function CameraHeartRateScreen() {
             </View>
           ))}
         </View>
-      )}
-
-      {/* Camera Frame Processor (hidden) */}
-      {state === 'measuring' && permission?.granted && (
-        <CameraView
-          ref={cameraRef}
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
-          facing="front"
-          onCameraReady={() => {
-            // Start frame processing
-          }}
-        />
       )}
     </View>
   );

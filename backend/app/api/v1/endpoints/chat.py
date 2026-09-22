@@ -19,6 +19,7 @@ from app.services.recovery_engine import RecoveryEngine
 from app.services.intent_classifier import intent_classifier, entity_extractor
 from app.services.rag_knowledge import rag_retriever
 from app.services.coach_prompts import coach_prompts
+from app.services.safety_policy import triage
 from app.services.chat_actions import maybe_execute_action
 from app.services.nl_workout_logger import nl_workout_logger
 from app.services.conversational_memory import conversational_memory
@@ -58,6 +59,7 @@ class ChatResponse(BaseModel):
     knowledge_sources: Optional[List[str]] = None
     follow_up_suggestions: Optional[List[str]] = None
     action: Optional[Dict[str, Any]] = None
+    safety: Optional[Dict[str, Any]] = None
 
 
 async def _call_gemini(prompt: str, history: List[dict], system: str = "", api_key: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
@@ -235,6 +237,13 @@ def _generate_follow_ups(intent: str, context: dict) -> List[str]:
 @limiter.limit("30/minute")
 async def chat(request: Request, req: ChatRequest):
     """AI fitness coach chat with intent classification, RAG, and structured prompts."""
+
+    flagged = triage(req.message)
+    if flagged:
+        return ChatResponse(
+            reply=flagged["reply"], intent=flagged["category"], confidence=1.0,
+            safety={"category": flagged["category"], "resources": flagged["resources"]},
+        )
 
     # 1. Classify intent and extract entities
     intent_result = intent_classifier.classify(req.message)

@@ -17,7 +17,7 @@ class FirstAidService:
                 "icon": "❤️",
                 "steps": [
                     {"step": 1, "action": "Check responsiveness", "detail": "Tap shoulders and shout 'Are you OK?'", "time": "5 seconds"},
-                    {"step": 2, "action": "Call 911 / activate emergency response", "detail": "If alone, put phone on speaker", "time": "10 seconds"},
+                    {"step": 2, "action": "Call 112 / activate emergency response", "detail": "If alone, put phone on speaker", "time": "10 seconds"},
                     {"step": 3, "action": "Check breathing", "detail": "Look for chest rise for 10 seconds", "time": "10 seconds"},
                     {"step": 4, "action": "Begin chest compressions", "detail": "Heel of hand on center of chest, push hard and fast, 100-120/min, full recoil", "time": "until AED"},
                     {"step": 5, "action": "Deliver 30 compressions", "detail": "30:2 ratio if trained, compression-only if untrained", "time": "about 15 seconds"},
@@ -83,12 +83,12 @@ class FirstAidService:
                     {"step": 1, "action": "F — Face drooping", "detail": "Ask person to smile. Is one side drooping?", "time": "30 seconds"},
                     {"step": 2, "action": "A — Arm weakness", "detail": "Ask person to raise both arms. Does one drift down?", "time": "30 seconds"},
                     {"step": 3, "action": "S — Speech difficulty", "detail": "Ask person to repeat a simple sentence. Is speech slurred?", "time": "30 seconds"},
-                    {"step": 4, "action": "T — Time to call 911", "detail": "Note exact time symptoms began — critical for treatment", "time": "immediate"},
+                    {"step": 4, "action": "T — Time to call 112", "detail": "Note exact time symptoms began — critical for treatment", "time": "immediate"},
                     {"step": 5, "action": "Monitor and keep safe", "detail": "Keep person calm, lying on affected side if vomiting, do NOT give food/drink", "time": "until EMS"}
                 ],
                 "key_points": [
                     "Time is brain — every minute counts",
-                    "Do NOT drive to hospital yourself — call 911",
+                    "Do NOT drive to hospital yourself — call 112",
                     "Note the exact time symptoms started",
                     "Do NOT give aspirin (could be hemorrhagic stroke)",
                     "Keep airway clear if vomiting"
@@ -115,7 +115,7 @@ class FirstAidService:
                 "severity_levels": [
                     {"level": "First degree", "description": "Red, painful, no blisters (sunburn-like)", "treatment": "Cool water, aloe vera, OTC pain relief"},
                     {"level": "Second degree", "description": "Red, blistered, very painful", "treatment": "Cool water, sterile dressing, seek medical care"},
-                    {"level": "Third degree", "description": "White/charred, may be painless (nerve damage)", "treatment": "Cover, call 911 immediately"}
+                    {"level": "Third degree", "description": "White/charred, may be painless (nerve damage)", "treatment": "Cover, call 112 immediately"}
                 ]
             },
             "allergic_reaction": {
@@ -125,15 +125,15 @@ class FirstAidService:
                 "steps": [
                     {"step": 1, "action": "Recognize symptoms", "detail": "Hives, swelling (face/throat), difficulty breathing, rapid pulse, dizziness", "time": "immediate"},
                     {"step": 2, "action": "Administer epinephrine auto-injector (EpiPen)", "detail": "Outer thigh (through clothing if needed), hold 10 seconds", "time": "immediate"},
-                    {"step": 3, "action": "Call 911", "detail": "Even after EpiPen, anaphylaxis can recur", "time": "immediately"},
+                    {"step": 3, "action": "Call 112", "detail": "Even after EpiPen, anaphylaxis can recur", "time": "immediately"},
                     {"step": 4, "action": "Lay person flat, elevate legs", "detail": "Unless breathing is difficult — then allow them to sit up", "time": "ongoing"},
                     {"step": 5, "action": "Second dose if no improvement", "detail": "After 5-15 minutes if symptoms persist", "time": "5-15 min"},
                     {"step": 6, "action": "Begin CPR if needed", "detail": "If person stops breathing", "time": "if needed"}
                 ],
                 "key_points": [
-                    "EpiPen first, 911 second (but do both)",
+                    "EpiPen first, 112 second (but do both)",
                     "EpiPen goes in outer thigh — can inject through clothing",
-                    "Always call 911 even after EpiPen — biphasic reaction possible",
+                    "Always call 112 even after EpiPen — biphasic reaction possible",
                     "Common triggers: peanuts, tree nuts, shellfish, bee stings, medications, latex"
                 ]
             },
@@ -167,12 +167,12 @@ class FirstAidService:
                     {
                         "name": "Heat Exhaustion",
                         "symptoms": ["Heavy sweating", "Cold/pale/clammy skin", "Weak/pulse", "Nausea", "Headache", "Dizziness"],
-                        "treatment": ["Move to cool environment", "Loosen clothing", "Cool wet cloths on neck/armpits/groin", "Sip water", "If vomiting → 911"]
+                        "treatment": ["Move to cool environment", "Loosen clothing", "Cool wet cloths on neck/armpits/groin", "Sip water", "If vomiting → 112"]
                     },
                     {
                         "name": "Heat Stroke (EMERGENCY)",
                         "symptoms": ["High body temp >103°F", "Hot/red/dry skin", "Rapid strong pulse", "Loss of consciousness"],
-                        "treatment": ["CALL 911 IMMEDIATELY", "Move to cooler area", "Cool rapidly with any means (ice, cold water)", "Do NOT give fluids if unconscious", "Monitor breathing"]
+                        "treatment": ["CALL 112 IMMEDIATELY", "Move to cooler area", "Cool rapidly with any means (ice, cold water)", "Do NOT give fluids if unconscious", "Monitor breathing"]
                     }
                 ]
             },
@@ -185,7 +185,7 @@ class FirstAidService:
                     {"step": 2, "action": "Warm center first", "detail": "Neck, head, chest, groin — use skin-to-skin contact if needed", "time": "immediate"},
                     {"step": 3, "action": "Give warm, sweet beverages", "detail": "Only if conscious and able to swallow", "time": "ongoing"},
                     {"step": 4, "action": "Handle gently", "detail": "Rough movement can cause cardiac arrest", "time": "always"},
-                    {"step": 5, "action": "Call 911 if severe", "detail": "Confusion, slurred speech, drowsiness, loss of consciousness", "time": "if severe"}
+                    {"step": 5, "action": "Call 112 if severe", "detail": "Confusion, slurred speech, drowsiness, loss of consciousness", "time": "if severe"}
                 ]
             },
             "fractures": {
@@ -215,7 +215,7 @@ class FirstAidService:
                 "steps": [
                     "Check scene safety",
                     "Check responsiveness — tap and shout",
-                    "Call 911 or send someone",
+                    "Call 112 or send someone",
                     "Open airway (head tilt-chin lift)",
                     "Check breathing (look, listen, feel — 10 seconds)",
                     "Begin compressions: 30 compressions",
@@ -235,7 +235,7 @@ class FirstAidService:
                 "steps": [
                     "Check scene safety",
                     "Check responsiveness",
-                    "Call 911",
+                    "Call 112",
                     "Open airway",
                     "Check breathing",
                     "Begin compressions: 30 compressions (or 15:2 if 2 rescuers)",
@@ -252,7 +252,7 @@ class FirstAidService:
                 "name": "Infant CPR (Age <1)",
                 "steps": [
                     "Check responsiveness — flick sole of foot",
-                    "Call 911",
+                    "Call 112",
                     "Open airway (neutral position)",
                     "Check breathing",
                     "Begin compressions: 30 compressions",
@@ -443,14 +443,14 @@ class FirstAidService:
 
         # Determine urgency
         if life_threatening_signs:
-            urgency = "CRITICAL — Call 911 IMMEDIATELY"
+            urgency = "CRITICAL — Call 112 IMMEDIATELY"
             action = "Act now — follow protocol below"
         elif urgent_signs:
             urgency = "URGENT — Seek medical attention"
             action = "Follow first aid protocol, seek care"
         else:
             urgency = "Assessment inconclusive"
-            action = "If symptoms are severe, call 911 or go to ER"
+            action = "If symptoms are severe, call 112 or go to ER"
 
         return {
             "urgency_level": urgency,

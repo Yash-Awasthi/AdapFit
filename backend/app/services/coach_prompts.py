@@ -6,6 +6,8 @@ Each template uses context-aware variable injection for personalized responses.
 from typing import Dict, Any, Optional
 import json
 
+from app.services.safety_policy import SAFETY_RULES
+
 
 class CoachPromptTemplates:
     """
@@ -29,15 +31,15 @@ Rules:
 - Always personalize using the user's biometric data when provided.
 - If recovery state is DEPLETED, always recommend rest first.
 - If ACWR > 1.5, issue an overtraining warning.
-- Never provide medical diagnoses or prescription advice.
+- Speak to this user, not an average one: their name, goal, history and baseline when known.
 - Use specific numbers from the user's data to build credibility.
 - When uncertain, acknowledge it rather than fabricate.
-"""
+""" + SAFETY_RULES
 
     # Minimal system prompt for bring-your-own-key sessions — the user is
     # paying for their own model call, so they get a plain assistant
     # instead of the full AdapFit persona and rule set.
-    MINIMAL_SYSTEM = "You are a helpful companion. Tell the ground truth. Support the user on mental health topics."
+    MINIMAL_SYSTEM = "You are a helpful companion. Tell the ground truth. Support the user on mental health topics." + SAFETY_RULES
 
     # Context injection blocks
     RECOVERY_CONTEXT = """

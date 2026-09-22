@@ -1,141 +1,176 @@
 /**
- * Precision Nutrition — Microbiome-Based Diet Dashboard
- * Microbiome profile, metabolic type, personalized meal plan, food recommendations, supplements.
+ * Precision Nutrition — microbiome/metabolic-type profile and real food log.
+ *
+ * The gut health score the old sample showed was never computed anywhere
+ * in the backend, so it's gone; what's here is the profile you set up and
+ * the food you actually logged today.
  */
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, StatusBar } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
+  StatusBar, ActivityIndicator, RefreshControl, Alert,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, spacing, radius, typography } from '../../src/theme';
-import { ScoreRing, GlassCard, SectionHeaderPremium, ProgressBarPremium } from '../../src/components/PremiumComponents';
+import { colors, spacing, typography } from '../../src/theme';
+import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { useApis } from '../../src/hooks/useApi';
+import { postJson, asArray } from '../../src/services/http';
+import { useUserStore } from '../../src/stores';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const MICROBIOME_TYPES = ['bacteroides_high', 'firmicutes_high', 'prevotella_high', 'balanced'];
+const METABOLIC_TYPES = ['slow_oxidizer', 'moderate_oxidizer', 'fast_oxidizer'];
 
-const mockData = {
-  microbiomeType: 'Firmicutes-Dominant',
-  metabolicType: 'Moderate Oxidizer',
-  gutHealthScore: 72,
-  macros: { carbs: 200, protein: 150, fat: 67 },
-  mealPlan: [
-    { day: 'Monday', meals: [
-      { type: 'Breakfast', foods: ['Oatmeal with blueberries', 'Green tea'], cal: 380 },
-      { type: 'Lunch', foods: ['Grilled salmon quinoa bowl', 'Mixed greens'], cal: 520 },
-      { type: 'Snack', foods: ['Greek yogurt with nuts'], cal: 180 },
-      { type: 'Dinner', foods: ['Lentil soup with fermented veggies'], cal: 480 },
-    ]},
-    { day: 'Tuesday', meals: [
-      { type: 'Breakfast', foods: ['Kefir smoothie', 'Chia seeds'], cal: 350 },
-      { type: 'Lunch', foods: ['Mediterranean chickpea salad'], cal: 450 },
-      { type: 'Snack', foods: ['Kimchi rice crackers'], cal: 120 },
-      { type: 'Dinner', foods: ['Baked cod with sweet potato'], cal: 500 },
-    ]},
-  ],
-  foodRecommendations: [
-    { category: 'Fermented', items: ['Yogurt', 'Kefir', 'Kimchi', 'Sauerkraut', 'Miso'], score: 10, color: '#22C55E' },
-    { category: 'Prebiotic Rich', items: ['Garlic', 'Onion', 'Asparagus', 'Oats', 'Banana'], score: 9, color: '#06B6D4' },
-    { category: 'Omega-3 Rich', items: ['Salmon', 'Mackerel', 'Walnuts', 'Flaxseed'], score: 9, color: '#8B5CF6' },
-    { category: 'Polyphenol Rich', items: ['Blueberries', 'Green tea', 'Dark chocolate', 'Turmeric'], score: 8, color: '#F59E0B' },
-  ],
-  supplements: [
-    { name: 'Probiotics', dosage: '10B CFU daily', timing: 'Morning', goal: 'Gut Health' },
-    { name: 'Omega-3', dosage: '2000mg EPA/DHA', timing: 'With meals', goal: 'Inflammation' },
-    { name: 'Vitamin D3', dosage: '2000 IU', timing: 'Morning', goal: 'Immunity' },
-    { name: 'Magnesium', dosage: '400mg', timing: 'Evening', goal: 'Sleep' },
-  ],
-  nutrientsToday: { calories: 1530, target: 2000, protein: 95, targetP: 150, fiber: 22, targetF: 35, water: 5, targetW: 8 },
-};
+interface Profile { status?: string; microbiome?: { name: string }; metabolic?: { name: string }; macros?: { carbs_g: number; protein_g: number; fat_g: number } }
+interface FoodRec { category: string; items: string[]; benefits: string; personalized_score: number }
+interface DailySummary { total_calories: number; meals_logged: number }
 
 export default function PrecisionNutritionScreen() {
+  const userId = useUserStore((s) => s.userId);
+  const [busy, setBusy] = useState(false);
+  const [microbiome, setMicrobiome] = useState('balanced');
+  const [metabolic, setMetabolic] = useState('moderate_oxidizer');
+  const [meal, setMeal] = useState('');
+  const [items, setItems] = useState('');
+  const [calories, setCalories] = useState('');
+
+  const { data, loading, refresh, refreshing, reload } = useApis<{
+    profile: Profile;
+    foods: FoodRec[];
+    daily: DailySummary;
+  }>({
+    profile: `/precision-nutrition/profile/${userId}`,
+    foods: `/precision-nutrition/food-recommendations/${userId}`,
+    daily: `/precision-nutrition/daily-summary/${userId}`,
+  });
+
+  const profile = data.profile;
+  const hasProfile = !!profile && profile.status !== 'no_data';
+  const foods = asArray<FoodRec>(data.foods);
+  const daily = data.daily;
+
+  const setup = useCallback(async () => {
+    setBusy(true);
+    const result = await postJson('/precision-nutrition/profile/create', {
+      user_id: userId, microbiome_type: microbiome, metabolic_type: metabolic,
+    });
+    setBusy(false);
+    if (!result) {
+      Alert.alert('Not saved', 'The profile could not be created.');
+      return;
+    }
+    await reload();
+  }, [userId, microbiome, metabolic, reload]);
+
+  const logFood = useCallback(async () => {
+    const cals = Number(calories);
+    if (!meal.trim() || !items.trim() || !Number.isFinite(cals) || cals <= 0) {
+      Alert.alert('Details needed', 'Enter the meal, items, and calories.');
+      return;
+    }
+    setBusy(true);
+    const result = await postJson('/precision-nutrition/food/log', {
+      user_id: userId, meal: meal.trim(), items: items.split(',').map((s) => s.trim()).filter(Boolean), calories: Math.round(cals),
+    });
+    setBusy(false);
+    if (!result) {
+      Alert.alert('Not saved', 'The entry could not be logged.');
+      return;
+    }
+    setMeal(''); setItems(''); setCalories('');
+    await reload();
+  }, [meal, items, calories, userId, reload]);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#22C55E" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#22C55E" />}
+      >
         <LinearGradient colors={['#22C55E', '#10B981', '#0F1629']} style={styles.hero}>
           <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)' }]}>Precision Nutrition</Text>
-          <Text style={[typography.heading.h1, { color: '#fff', marginTop: 4 }]}>Your Microbiome</Text>
-          <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.6)', marginTop: 2 }]}>{mockData.microbiomeType} • {mockData.metabolicType}</Text>
-          <View style={styles.scoreRow}>
-            <ScoreRing score={mockData.gutHealthScore} size={100} color="#22C55E" />
-            <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.6)' }]}>Gut Health Score</Text>
-              <Text style={[typography.metric.large, { color: '#fff' }]}>{mockData.gutHealthScore}/100</Text>
-              <Text style={[typography.body.sm, { color: '#22C55E' }]}>Above Average</Text>
-            </View>
-          </View>
+          {hasProfile ? (
+            <>
+              <Text style={[typography.heading.h1, { color: '#fff', marginTop: 4 }]}>{profile!.microbiome?.name}</Text>
+              <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.6)', marginTop: 2 }]}>{profile!.metabolic?.name}</Text>
+              {profile!.macros && (
+                <Text style={[typography.body.sm, { color: '#fff', marginTop: 12 }]}>
+                  Target: {profile!.macros.carbs_g}g carbs · {profile!.macros.protein_g}g protein · {profile!.macros.fat_g}g fat
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)', marginTop: 8 }]}>Set up your profile to get recommendations.</Text>
+          )}
         </LinearGradient>
 
-        <View style={styles.section}>
-          <SectionHeaderPremium title="Today's Nutrition" icon="nutrition" iconColor="#22C55E" />
-          <View style={styles.macroRow}>
-            {[
-              { label: 'Calories', value: mockData.nutrientsToday.calories, target: mockData.nutrientsToday.target, unit: 'kcal', color: '#22C55E' },
-              { label: 'Protein', value: mockData.nutrientsToday.protein, target: mockData.nutrientsToday.targetP, unit: 'g', color: '#EF4444' },
-              { label: 'Fiber', value: mockData.nutrientsToday.fiber, target: mockData.nutrientsToday.targetF, unit: 'g', color: '#06B6D4' },
-            ].map((m, i) => (
-              <View key={i} style={styles.macroCard}>
-                <Text style={[typography.body.xs, { color: colors.text.muted }]}>{m.label}</Text>
-                <Text style={[typography.metric.small, { color: m.color }]}>{m.value}</Text>
-                <Text style={[typography.body.xs, { color: colors.text.muted }]}>/ {m.target} {m.unit}</Text>
-                <View style={[styles.macroBar, { backgroundColor: m.color + '20' }]}>
-                  <View style={[styles.macroBarFill, { width: `${Math.min(m.value / m.target * 100, 100)}%`, backgroundColor: m.color }]} />
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <SectionHeaderPremium title="Food Recommendations" icon="leaf" iconColor="#10B981" />
-          {mockData.foodRecommendations.map((f, i) => (
-            <GlassCard key={i} style={{ marginBottom: 10 }}>
-              <View style={styles.foodHeader}>
-                <Text style={[typography.label.md, { color: f.color }]}>{f.category}</Text>
-                <View style={[styles.scoreBadge, { backgroundColor: f.color + '20' }]}>
-                  <Text style={[typography.body.sm, { color: f.color, fontWeight: '700' }]}>{f.score}/10</Text>
-                </View>
-              </View>
-              <View style={styles.foodItems}>
-                {f.items.map((item, j) => (
-                  <View key={j} style={[styles.foodPill, { borderColor: f.color + '30' }]}>
-                    <Text style={[typography.body.xs, { color: f.color }]}>{item}</Text>
-                  </View>
+        {!hasProfile && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="Set Up Profile" icon="analytics" iconColor="#22C55E" />
+            <GlassCard>
+              <Text style={styles.helperText}>Microbiome type</Text>
+              <View style={styles.chipRow}>
+                {MICROBIOME_TYPES.map((m) => (
+                  <TouchableOpacity key={m} style={[styles.chip, microbiome === m && styles.chipActive]} onPress={() => setMicrobiome(m)}>
+                    <Text style={[styles.chipText, microbiome === m && styles.chipTextActive]}>{m.replace('_', ' ')}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
-            </GlassCard>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <SectionHeaderPremium title="Meal Plan" icon="calendar" iconColor={colors.primary} />
-          {mockData.mealPlan.map((day, i) => (
-            <GlassCard key={i} style={{ marginBottom: 10 }}>
-              <Text style={[typography.label.md, { color: colors.primary, marginBottom: 10 }]}>{day.day}</Text>
-              {day.meals.map((meal, j) => (
-                <View key={j} style={styles.mealRow}>
-                  <Text style={[typography.body.sm, { color: colors.text.muted, width: 70 }]}>{meal.type}</Text>
-                  <Text style={[typography.body.sm, { color: colors.text.primary, flex: 1 }]}>{meal.foods.join(', ')}</Text>
-                  <Text style={[typography.body.xs, { color: colors.text.muted }]}>{meal.cal} cal</Text>
-                </View>
-              ))}
-            </GlassCard>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <SectionHeaderPremium title="Supplement Protocol" icon="medical" iconColor={colors.health.energy} />
-          {mockData.supplements.map((s, i) => (
-            <View key={i} style={styles.supplementCard}>
-              <View style={[styles.supIcon, { backgroundColor: colors.health.energy + '18' }]}>
-                <Ionicons name="medical" size={16} color={colors.health.energy} />
+              <Text style={styles.helperText}>Metabolic type</Text>
+              <View style={styles.chipRow}>
+                {METABOLIC_TYPES.map((m) => (
+                  <TouchableOpacity key={m} style={[styles.chip, metabolic === m && styles.chipActive]} onPress={() => setMetabolic(m)}>
+                    <Text style={[styles.chipText, metabolic === m && styles.chipTextActive]}>{m.replace('_', ' ')}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[typography.body.md, { color: colors.text.primary }]}>{s.name}</Text>
-                <Text style={[typography.body.xs, { color: colors.text.muted }]}>{s.dosage} • {s.timing}</Text>
-              </View>
-              <Text style={[typography.body.xs, { color: colors.health.energy }]}>{s.goal}</Text>
+              <TouchableOpacity style={styles.primaryBtn} onPress={setup} disabled={busy}>
+                <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Save profile'}</Text>
+              </TouchableOpacity>
+            </GlassCard>
+          </View>
+        )}
+
+        {hasProfile && (
+          <>
+            <View style={styles.section}>
+              <SectionHeaderPremium title="Log a Meal" icon="restaurant" iconColor="#F59E0B" />
+              <GlassCard>
+                <TextInput style={styles.input} placeholder="Meal (e.g. breakfast)" placeholderTextColor={colors.text.muted} value={meal} onChangeText={setMeal} />
+                <TextInput style={styles.input} placeholder="Items, comma separated" placeholderTextColor={colors.text.muted} value={items} onChangeText={setItems} />
+                <TextInput style={styles.input} placeholder="Calories" placeholderTextColor={colors.text.muted} keyboardType="numeric" value={calories} onChangeText={setCalories} />
+                <TouchableOpacity style={styles.primaryBtn} onPress={logFood} disabled={busy}>
+                  <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Log meal'}</Text>
+                </TouchableOpacity>
+              </GlassCard>
+              {daily && (
+                <Text style={[styles.helperText, { marginTop: 8 }]}>
+                  Today: {daily.total_calories} cal across {daily.meals_logged} meal{daily.meals_logged === 1 ? '' : 's'}
+                </Text>
+              )}
             </View>
-          ))}
-        </View>
+
+            <View style={styles.section}>
+              <SectionHeaderPremium title="Food Recommendations" icon="nutrition" iconColor="#22C55E" />
+              {foods.map((f) => (
+                <GlassCard key={f.category} style={{ marginBottom: 10 }}>
+                  <Text style={[typography.body.md, { color: colors.text.primary, textTransform: 'capitalize' }]}>{f.category.replace('_', ' ')}</Text>
+                  <Text style={[typography.body.xs, { color: colors.text.muted, marginTop: 4 }]}>{f.items.join(', ')}</Text>
+                </GlassCard>
+              ))}
+            </View>
+          </>
+        )}
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -144,20 +179,21 @@ export default function PrecisionNutritionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
+  center: { justifyContent: 'center', alignItems: 'center' },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
   section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
-  macroRow: { flexDirection: 'row', gap: 10 },
-  macroCard: { flex: 1, backgroundColor: colors.bg.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: colors.surface.border, alignItems: 'center' },
-  macroBar: { width: '100%', height: 4, borderRadius: 2, marginTop: 6, overflow: 'hidden' },
-  macroBarFill: { height: '100%', borderRadius: 2 },
-  foodHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  scoreBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  foodItems: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  foodPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
-  mealRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: colors.surface.divider },
-  supplementCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.surface.border, gap: 10 },
-  supIcon: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  helperText: { color: colors.text.muted, fontSize: 13, marginBottom: 8 },
+  input: {
+    backgroundColor: colors.bg.card, borderRadius: 12, padding: 12, color: colors.text.primary,
+    borderWidth: 1, borderColor: colors.surface.border, marginBottom: 10,
+  },
+  primaryBtn: { backgroundColor: '#22C55E', borderRadius: 12, padding: 14, alignItems: 'center' },
+  primaryBtnText: { color: '#fff', fontWeight: '700' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border },
+  chipActive: { backgroundColor: '#22C55E20', borderColor: '#22C55E' },
+  chipText: { color: colors.text.muted, fontSize: 12, textTransform: 'capitalize' },
+  chipTextActive: { color: '#22C55E', fontWeight: '700' },
 });

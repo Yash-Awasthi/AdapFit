@@ -13,6 +13,8 @@ import time
 import random
 from typing import Dict, List, Any
 
+from app.services.safety_policy import CRISIS_LINES
+
 
 class PeerSupportService:
     """Peer support matching and accountability partnerships."""
@@ -116,10 +118,7 @@ class PeerSupportService:
         return {
             "escalated": True,
             "resources": [
-                {"name": "National Suicide Prevention Lifeline", "number": "988", "available": "24/7"},
-                {"name": "Crisis Text Line", "number": "Text HOME to 741741", "available": "24/7"},
-                {"name": "SAMHSA Helpline", "number": "1-800-662-4357", "available": "24/7"},
-                {"name": "NAMI Helpline", "number": "1-800-950-6264", "available": "Mon-Fri 10am-10pm ET"},
+                *CRISIS_LINES,
             ],
             "message": "You're not alone. Professional help is available 24/7. Please reach out.",
         }
