@@ -1,115 +1,245 @@
 /**
- * Analytics — Premium Health Analytics Dashboard
- * Animated charts, metric cards with sparklines, insights
+ * Analytics — the user's own recovery log history.
+ *
+ * Read from the recovery logs rather than a separate analytics store: these
+ * are the same rows the recovery score and daily decision are computed from,
+ * so the trends here cannot disagree with the number on the home screen.
+ *
+ * A metric with no readings is left out of the list instead of being drawn
+ * flat at zero, which reads as "you did nothing" rather than "nothing was
+ * recorded".
  */
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Dimensions, Animated,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../../src/theme';
 import { ScreenWrapper } from '../../src/components/ScreenWrapper';
-import { GlassCard, SectionHeaderPremium, PillChip } from '../../src/components/PremiumComponents';
+import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
 import { MetricCardWithChart, InteractiveBarChart, InteractiveRingChart } from '../../src/components/InteractiveCharts';
-import { StaggeredList } from '../../src/components/AnimationSystem';
+import { useApi } from '../../src/hooks/useApi';
+import { asArray } from '../../src/services/http';
 
-const METRICS = [
-  { title: 'Heart Rate', value: '72 bpm', change: '-3%', changeType: 'down' as const, data: [75, 73, 74, 72, 71, 72, 72], color: colors.health.heart, icon: 'heart' },
-  { title: 'Steps', value: '8,200', change: '+12%', changeType: 'up' as const, data: [6500, 7000, 7200, 7800, 8000, 8100, 8200], color: colors.health.activity, icon: 'footsteps' },
-  { title: 'Sleep Score', value: '78', change: '+5%', changeType: 'up' as const, data: [70, 72, 74, 75, 76, 77, 78], color: colors.health.sleep, icon: 'moon' },
-  { title: 'Calories', value: '2,150', change: '+3%', changeType: 'up' as const, data: [2000, 2050, 2100, 2120, 2130, 2140, 2150], color: colors.health.energy, icon: 'flame' },
+interface RecoveryLog {
+  log_date?: string;
+  recovery_score?: number | null;
+  hrv_rmssd?: number | null;
+  resting_heart_rate?: number | null;
+  sleep_duration_hours?: number | null;
+  sleep_score?: number | null;
+  steps?: number | null;
+  active_calories?: number | null;
+  soreness_score?: number | null;
+  fatigue_score?: number | null;
+}
+
+const RANGES: { label: string; days: number }[] = [
+  { label: '1W', days: 7 },
+  { label: '1M', days: 30 },
+  { label: '3M', days: 90 },
+  { label: '1Y', days: 365 },
 ];
 
-const WEEKLY_DATA = [
-  { value: 6500, label: 'Mon', color: colors.health.activity },
-  { value: 8200, label: 'Tue', color: colors.health.activity },
-  { value: 7100, label: 'Wed', color: colors.health.activity },
-  { value: 9300, label: 'Thu', color: colors.health.calm },
-  { value: 8800, label: 'Fri', color: colors.health.activity },
-  { value: 5200, label: 'Sat', color: colors.health.heart },
-  { value: 8200, label: 'Sun', color: colors.health.activity },
+type MetricKey = keyof RecoveryLog;
+
+const METRICS: {
+  key: MetricKey;
+  title: string;
+  icon: string;
+  color: string;
+  format: (v: number) => string;
+  // Whether a fall is an improvement, which decides the arrow's colour.
+  lowerIsBetter?: boolean;
+}[] = [
+  { key: 'recovery_score', title: 'Recovery Score', icon: 'battery-charging', color: colors.health.calm, format: (v) => String(Math.round(v)) },
+  { key: 'resting_heart_rate', title: 'Resting Heart Rate', icon: 'heart', color: colors.health.heart, format: (v) => `${Math.round(v)} bpm`, lowerIsBetter: true },
+  { key: 'hrv_rmssd', title: 'HRV (RMSSD)', icon: 'pulse', color: colors.health.mental, format: (v) => `${Math.round(v)} ms` },
+  { key: 'sleep_duration_hours', title: 'Sleep', icon: 'moon', color: colors.health.sleep, format: (v) => `${v.toFixed(1)} h` },
+  { key: 'steps', title: 'Steps', icon: 'footsteps', color: colors.health.activity, format: (v) => Math.round(v).toLocaleString() },
+  { key: 'active_calories', title: 'Active Calories', icon: 'flame', color: colors.health.energy, format: (v) => Math.round(v).toLocaleString() },
 ];
 
-const DISTRIBUTION = [
-  { value: 35, color: colors.health.heart, label: 'Exercise' },
-  { value: 25, color: colors.health.sleep, label: 'Sleep' },
-  { value: 20, color: colors.health.nutrition, label: 'Nutrition' },
-  { value: 15, color: colors.health.mental, label: 'Mental' },
-  { value: 5, color: '#F59E0B', label: 'Other' },
-];
+function numbers(logs: RecoveryLog[], key: MetricKey): number[] {
+  return logs
+    .map((log) => log[key])
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+}
+
+function percentChange(series: number[]): { change: string; changeType: 'up' | 'down' | 'flat' } | null {
+  if (series.length < 4) return null;
+  const half = Math.floor(series.length / 2);
+  const earlier = series.slice(0, half);
+  const recent = series.slice(half);
+  const before = earlier.reduce((a, b) => a + b, 0) / earlier.length;
+  const after = recent.reduce((a, b) => a + b, 0) / recent.length;
+  if (before === 0) return null;
+  const delta = ((after - before) / before) * 100;
+  if (Math.abs(delta) < 1) return { change: 'steady', changeType: 'flat' };
+  return {
+    change: `${delta > 0 ? '+' : ''}${delta.toFixed(0)}%`,
+    changeType: delta > 0 ? 'up' : 'down',
+  };
+}
+
+function weekdayLabel(isoDate?: string): string {
+  if (!isoDate) return '';
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleDateString([], { weekday: 'short' });
+}
 
 export default function AnalyticsScreen() {
-  const [timeRange, setTimeRange] = useState('1W');
+  const [range, setRange] = useState(RANGES[0]);
+  const { data, loading, refreshing, refresh } = useApi<{ items: RecoveryLog[]; count: number }>(
+    `/recovery-logs?days=${range.days}`,
+    [range.days]
+  );
+
+  const logs = asArray<RecoveryLog>(data?.items);
+
+  const metricCards = useMemo(
+    () => METRICS.map((metric) => {
+      const series = numbers(logs, metric.key);
+      if (series.length === 0) return null;
+      const latest = series[series.length - 1];
+      const movement = percentChange(series);
+      // An improvement is drawn as "up" whichever direction the number moved.
+      const changeType = movement && metric.lowerIsBetter && movement.changeType !== 'flat'
+        ? (movement.changeType === 'down' ? 'up' : 'down')
+        : movement?.changeType;
+      return {
+        ...metric,
+        value: metric.format(latest),
+        data: series.slice(-14),
+        change: movement?.change,
+        changeType,
+        readings: series.length,
+      };
+    }).filter(Boolean) as (typeof METRICS[number] & {
+      value: string; data: number[]; change?: string; changeType?: 'up' | 'down' | 'flat'; readings: number;
+    })[],
+    [logs]
+  );
+
+  const activity = useMemo(() => {
+    const withSteps = logs.filter((l) => typeof l.steps === 'number');
+    return withSteps.slice(-7).map((log) => ({
+      value: Math.round(log.steps as number),
+      label: weekdayLabel(log.log_date),
+      color: colors.health.activity,
+    }));
+  }, [logs]);
+
+  // The latest day's recovery breakdown, which is what the score is made of.
+  const breakdown = useMemo(() => {
+    const latest = logs[logs.length - 1];
+    if (!latest) return [];
+    const parts: { value: number | null | undefined; color: string; label: string }[] = [
+      { value: latest.sleep_score, color: colors.health.sleep, label: 'Sleep' },
+      { value: typeof latest.hrv_rmssd === 'number' ? Math.min(100, latest.hrv_rmssd) : null, color: colors.health.mental, label: 'HRV' },
+      {
+        value: typeof latest.soreness_score === 'number' ? (10 - latest.soreness_score) * 10 : null,
+        color: colors.health.heart,
+        label: 'Freshness',
+      },
+    ];
+    return parts.flatMap((part) =>
+      typeof part.value === 'number' ? [{ value: part.value, color: part.color, label: part.label }] : []
+    );
+  }, [logs]);
+
+  const latestScore = logs.length ? logs[logs.length - 1].recovery_score : null;
 
   return (
     <ScreenWrapper
       title="Analytics"
       subtitle="Your health insights"
       gradient={['#06B6D4', '#3B82F6']}
-      rightAction={{ icon: 'download', onPress: () => {} }}
+      loading={loading}
+      refreshing={refreshing}
+      onRefresh={refresh}
     >
-      {/* Time Range */}
       <View style={styles.timeRow}>
-        {['1W', '1M', '3M', '6M', '1Y'].map(t => (
-          <TouchableOpacity key={t} style={[styles.timePill, timeRange === t && styles.timePillActive]} onPress={() => setTimeRange(t)}>
-            <Text style={[styles.timePillText, timeRange === t && styles.timePillTextActive]}>{t}</Text>
-          </TouchableOpacity>
-        ))}
+        {RANGES.map((option) => {
+          const active = option.label === range.label;
+          return (
+            <TouchableOpacity
+              key={option.label}
+              style={[styles.timePill, active && styles.timePillActive]}
+              onPress={() => setRange(option)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`Last ${option.days} days`}
+            >
+              <Text style={[styles.timePillText, active && styles.timePillTextActive]}>{option.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Metric Cards with Charts */}
-      <StaggeredList staggerDelay={100} animationType="slideIn">
-        {METRICS.map((m, i) => (
-          <View key={i} style={{ paddingHorizontal: spacing.screenPadding }}>
-            <MetricCardWithChart {...m} />
-          </View>
-        ))}
-      </StaggeredList>
+      {logs.length === 0 ? (
+        <GlassCard variant="light" style={styles.chartCard}>
+          <Text style={styles.emptyTitle}>Nothing logged in this period</Text>
+          <Text style={styles.emptyText}>
+            Complete a morning check-in and your recovery, sleep, heart rate and activity
+            trends build up here.
+          </Text>
+        </GlassCard>
+      ) : (
+        <>
+          {metricCards.map((metric) => (
+            <View key={String(metric.key)} style={{ paddingHorizontal: spacing.screenPadding }}>
+              <MetricCardWithChart
+                title={metric.title}
+                value={metric.value}
+                change={metric.change}
+                changeType={metric.changeType}
+                data={metric.data}
+                color={metric.color}
+                icon={metric.icon}
+              />
+            </View>
+          ))}
 
-      {/* Weekly Activity Bar Chart */}
-      <SectionHeaderPremium icon="bar-chart" iconColor={colors.health.activity} title="Weekly Activity" />
-      <GlassCard variant="light" style={styles.chartCard}>
-        <InteractiveBarChart data={WEEKLY_DATA} height={180} showValues />
-      </GlassCard>
+          {activity.length > 0 && (
+            <>
+              <SectionHeaderPremium icon="bar-chart" iconColor={colors.health.activity} title="Recent Activity" />
+              <GlassCard variant="light" style={styles.chartCard}>
+                <InteractiveBarChart data={activity} height={180} showValues />
+              </GlassCard>
+            </>
+          )}
 
-      {/* Health Distribution Ring */}
-      <SectionHeaderPremium icon="pie-chart" iconColor={colors.primary} title="Health Distribution" />
-      <GlassCard variant="light" style={styles.chartCard}>
-        <InteractiveRingChart
-          segments={DISTRIBUTION}
-          size={180}
-          strokeWidth={24}
-          centerValue="100%"
-          centerLabel="Health"
-        />
-      </GlassCard>
+          {breakdown.length > 0 && (
+            <>
+              <SectionHeaderPremium icon="pie-chart" iconColor={colors.primary} title="Latest Recovery Breakdown" />
+              <GlassCard variant="light" style={styles.chartCard}>
+                <InteractiveRingChart
+                  segments={breakdown}
+                  size={180}
+                  strokeWidth={24}
+                  centerValue={typeof latestScore === 'number' ? String(Math.round(latestScore)) : '—'}
+                  centerLabel="Recovery"
+                />
+              </GlassCard>
+            </>
+          )}
 
-      {/* Insights */}
-      <SectionHeaderPremium icon="bulb" iconColor="#F59E0B" title="Insights" />
-      <GlassCard variant="primary" style={styles.insightCard}>
-        <View style={styles.insightRow}>
-          <View style={styles.insightIcon}>
-            <Ionicons name="trending-up" size={20} color={colors.health.calm} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.insightTitle}>Activity Up 12%</Text>
-            <Text style={styles.insightText}>Your step count has increased significantly this week. Great progress!</Text>
-          </View>
-        </View>
-      </GlassCard>
-      <GlassCard variant="light" style={styles.insightCard}>
-        <View style={styles.insightRow}>
-          <View style={[styles.insightIcon, { backgroundColor: '#F59E0B15' }]}>
-            <Ionicons name="moon" size={20} color="#F59E0B" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.insightTitle}>Sleep Quality Improving</Text>
-            <Text style={styles.insightText}>Deep sleep increased 15% over the past week.</Text>
-          </View>
-        </View>
-      </GlassCard>
+          <SectionHeaderPremium icon="information-circle" iconColor="#F59E0B" title="About These Numbers" />
+          <GlassCard variant="light" style={styles.insightCard}>
+            <View style={styles.insightRow}>
+              <View style={[styles.insightIcon, { backgroundColor: '#F59E0B15' }]}>
+                <Ionicons name="calendar" size={20} color="#F59E0B" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.insightTitle}>{logs.length} days logged</Text>
+                <Text style={styles.insightText}>
+                  Changes compare the second half of this period with the first. A metric you
+                  have not recorded is left out rather than shown as zero.
+                </Text>
+              </View>
+            </View>
+          </GlassCard>
+        </>
+      )}
     </ScreenWrapper>
   );
 }
@@ -122,6 +252,8 @@ const styles = StyleSheet.create({
   timePillTextActive: { color: '#FFF' },
 
   chartCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.lg },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
+  emptyText: { fontSize: 13, color: colors.text.muted, marginTop: 4, lineHeight: 19 },
 
   insightCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm },
   insightRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

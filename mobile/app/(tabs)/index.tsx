@@ -3,7 +3,7 @@
  * Modern glassmorphism design with animated elements, health metrics, quick actions.
  * Uses Reanimated worklets for all animations (UI thread).
  */
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   RefreshControl, useWindowDimensions,
@@ -25,7 +25,8 @@ import { SwipeableCard } from '../../src/components/GestureSystem';
 import { FloatingActionButton } from '../../src/components/NavigationHelpers';
 import { TodayDecision } from '../../src/components/TodayDecision';
 
-import { useStressAssessment, useWellbeingReport } from '../../src/hooks/useHealthData';
+import { useApis } from '../../src/hooks/useApi';
+import { asArray, asNumber, postJson } from '../../src/services/http';
 
 // ===== Greeting based on time of day =====
 const getGreeting = () => {
@@ -43,38 +44,64 @@ function getScoreLabel(score: number): string {
   return 'Needs Work';
 }
 
+interface RecoveryLog {
+  recovery_score?: number | null;
+  hrv_rmssd?: number | null;
+  resting_heart_rate?: number | null;
+  sleep_score?: number | null;
+  steps?: number | null;
+  active_calories?: number | null;
+  soreness_score?: number | null;
+  fatigue_score?: number | null;
+}
+
+interface HydrationToday {
+  total_ml: number;
+  daily_goal_ml: number;
+  progress_pct: number;
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const grid = useGrid(3);
-  const [refreshing, setRefreshing] = useState(false);
-  const [healthScore, setHealthScore] = useState(72);
-  const [bpm, setBpm] = useState<number | null>(null);
-  const [stressLevel, setStressLevel] = useState(35);
-  const [steps, setSteps] = useState(0);
-  const [sleepScore, setSleepScore] = useState(0);
-  const [waterIntake, setWaterIntake] = useState(0);
   const greeting = getGreeting();
 
-  // stressData disabled until real user params are available
-  const { data: stressData, refetch: refetchStress } = useStressAssessment();
-  const { data: wellbeingData, refetch: refetchWellbeing } = useWellbeingReport();
+  // The same recovery log the score and the daily decision are computed from,
+  // so nothing on this screen can disagree with the decision card below.
+  const { data, refreshing, refresh, reload } = useApis<{
+    recovery: { items: RecoveryLog[] };
+    hydration: HydrationToday;
+  }>({
+    recovery: '/recovery-logs?days=1',
+    hydration: '/hydration/today',
+  });
 
-  // Update local state from React Query data
-  useEffect(() => {
-    if (stressData?.overall_score) setStressLevel(stressData.overall_score);
-  }, [stressData]);
+  const latest: RecoveryLog | null = asArray<RecoveryLog>(data.recovery?.items).slice(-1)[0] ?? null;
+  const healthScore = typeof latest?.recovery_score === 'number' ? Math.round(latest.recovery_score) : null;
+  const bpm = typeof latest?.resting_heart_rate === 'number' ? latest.resting_heart_rate : null;
+  const sleepScore = typeof latest?.sleep_score === 'number' ? Math.round(latest.sleep_score) : null;
+  const steps = typeof latest?.steps === 'number' ? latest.steps : null;
+  const calories = typeof latest?.active_calories === 'number' ? Math.round(latest.active_calories) : null;
+  // Soreness and fatigue run 1-10 where higher is worse; strain is the pair
+  // inverted onto 0-100 so it reads the same way as every other tile.
+  const strain = typeof latest?.soreness_score === 'number' && typeof latest?.fatigue_score === 'number'
+    ? Math.round(((latest.soreness_score + latest.fatigue_score) / 2) * 10)
+    : null;
 
-  useEffect(() => {
-    if (typeof wellbeingData?.step_count === 'number') setSteps(wellbeingData.step_count);
-  }, [wellbeingData]);
+  const glassesTarget = 8;
+  const totalMl = asNumber(data.hydration?.total_ml);
+  const goalMl = asNumber(data.hydration?.daily_goal_ml, 2000);
+  const glassMl = Math.max(1, Math.round(goalMl / glassesTarget));
+  const waterIntake = Math.min(glassesTarget, Math.floor(totalMl / glassMl));
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([refetchStress(), refetchWellbeing()]);
-    setRefreshing(false);
+  const logGlass = async () => {
+    await postJson('/hydration/log', { amount_ml: glassMl, drink_type: 'water' });
+    await reload();
   };
+
+  const onRefresh = refresh;
 
   const quickActions = [
     { icon: 'heart', label: 'Heart Rate', color: colors.health.heart, route: '/health-hub' },
@@ -85,13 +112,14 @@ export default function HomeScreen() {
     { icon: 'meditate', label: 'Meditate', color: colors.health.calm, route: '/meditation' },
   ];
 
+  // "--" wherever nothing was recorded. A zero would read as a measurement.
   const healthMetrics = [
-    { icon: 'heart', value: bpm ?? '--', label: 'BPM', color: colors.health.heart },
-    { icon: 'walk', value: steps ? steps.toLocaleString() : '--', label: 'Steps', color: colors.health.activity },
-    { icon: 'moon', value: sleepScore || '--', label: 'Sleep', color: colors.health.sleep },
-    { icon: 'flame', value: steps ? Math.floor(steps * 0.04) : '--', label: 'Calories', color: colors.health.energy },
-    { icon: 'water', value: `${waterIntake}/8`, label: 'Water', color: '#3B82F6' },
-    { icon: 'leaf', value: stressLevel, label: 'Stress', color: colors.health.calm },
+    { icon: 'heart', value: bpm ?? '--', label: 'Resting HR', color: colors.health.heart },
+    { icon: 'walk', value: steps !== null ? steps.toLocaleString() : '--', label: 'Steps', color: colors.health.activity },
+    { icon: 'moon', value: sleepScore ?? '--', label: 'Sleep', color: colors.health.sleep },
+    { icon: 'flame', value: calories !== null ? calories.toLocaleString() : '--', label: 'Calories', color: colors.health.energy },
+    { icon: 'water', value: `${waterIntake}/${glassesTarget}`, label: 'Water', color: '#3B82F6' },
+    { icon: 'leaf', value: strain ?? '--', label: 'Strain', color: colors.health.calm },
   ];
 
   return (
@@ -124,31 +152,35 @@ export default function HomeScreen() {
           {/* Health Score Ring */}
           <View style={styles.heroScoreRow}>
             <ScoreRing
-              score={healthScore}
+              score={healthScore ?? 0}
               size={110}
               strokeWidth={8}
               color="#FFF"
-              label="HEALTH"
-              sublabel={getScoreLabel(healthScore)}
+              label="RECOVERY"
+              sublabel={healthScore !== null ? getScoreLabel(healthScore) : 'No check-in'}
             />
             <View style={styles.heroScoreDetails}>
-              <Text style={styles.heroScoreTitle}>Your Health Score</Text>
+              <Text style={styles.heroScoreTitle}>Today's Recovery</Text>
               <Text style={styles.heroScoreSubtitle}>
-                {healthScore >= 80 ? "You're doing amazing!" : healthScore >= 60 ? 'Keep up the good work!' : 'Let\'s improve together'}
+                {healthScore === null
+                  ? 'Check in this morning to see where you stand'
+                  : healthScore >= 80 ? "You're recovered — make it count"
+                  : healthScore >= 60 ? 'Solid. Train as planned'
+                  : 'Take it easy today'}
               </Text>
               <View style={styles.heroScoreBreakdown}>
-                <View style={styles.heroBreakdownItem}>
-                  <View style={[styles.heroBreakdownDot, { backgroundColor: colors.health.heart }]} />
-                  <Text style={styles.heroBreakdownText}>Heart: 85</Text>
-                </View>
-                <View style={styles.heroBreakdownItem}>
-                  <View style={[styles.heroBreakdownDot, { backgroundColor: colors.health.sleep }]} />
-                  <Text style={styles.heroBreakdownText}>Sleep: 78</Text>
-                </View>
-                <View style={styles.heroBreakdownItem}>
-                  <View style={[styles.heroBreakdownDot, { backgroundColor: colors.health.activity }]} />
-                  <Text style={styles.heroBreakdownText}>Activity: 72</Text>
-                </View>
+                {[
+                  { label: 'HRV', value: latest?.hrv_rmssd, color: colors.health.heart, unit: 'ms' },
+                  { label: 'Sleep', value: sleepScore, color: colors.health.sleep, unit: '' },
+                  { label: 'Steps', value: steps, color: colors.health.activity, unit: '' },
+                ].map((part) => (
+                  <View key={part.label} style={styles.heroBreakdownItem}>
+                    <View style={[styles.heroBreakdownDot, { backgroundColor: part.color }]} />
+                    <Text style={styles.heroBreakdownText}>
+                      {part.label}: {typeof part.value === 'number' ? Math.round(part.value) : '--'}{typeof part.value === 'number' ? part.unit : ''}
+                    </Text>
+                  </View>
+                ))}
               </View>
             </View>
           </View>
@@ -202,14 +234,20 @@ export default function HomeScreen() {
         />
         <GlassCard variant="light" style={styles.activityRingsCard}>
           <View style={styles.activityRingsRow}>
-            <ScoreRing score={Math.min(100, (steps / 10000) * 100)} size={100} strokeWidth={8} color={colors.health.heart} label="MOVE" />
-            <ScoreRing score={Math.min(100, (steps / 10000) * 80)} size={100} strokeWidth={8} color={colors.health.calm} label="EXERCISE" />
-            <ScoreRing score={Math.min(100, sleepScore)} size={100} strokeWidth={8} color={colors.health.sleep} label="STAND" />
+            <ScoreRing score={steps !== null ? Math.min(100, (steps / 10000) * 100) : 0} size={100} strokeWidth={8} color={colors.health.heart} label="STEPS" />
+            <ScoreRing score={calories !== null ? Math.min(100, (calories / 600) * 100) : 0} size={100} strokeWidth={8} color={colors.health.calm} label="ENERGY" />
+            <ScoreRing score={sleepScore ?? 0} size={100} strokeWidth={8} color={colors.health.sleep} label="SLEEP" />
           </View>
           <View style={styles.activityRingsLabels}>
-            <Text style={styles.activityRingsLabel}>Move: {Math.floor(steps * 0.04)} kcal</Text>
-            <Text style={styles.activityRingsLabel}>Exercise: 23 min</Text>
-            <Text style={styles.activityRingsLabel}>Stand: 9/12 hrs</Text>
+            <Text style={styles.activityRingsLabel}>
+              {steps !== null ? `${steps.toLocaleString()} steps` : 'Steps: not recorded'}
+            </Text>
+            <Text style={styles.activityRingsLabel}>
+              {calories !== null ? `${calories} kcal` : 'Energy: not recorded'}
+            </Text>
+            <Text style={styles.activityRingsLabel}>
+              {sleepScore !== null ? `Sleep score ${sleepScore}` : 'Sleep: not recorded'}
+            </Text>
           </View>
         </GlassCard>
       </View>
@@ -225,18 +263,18 @@ export default function HomeScreen() {
         <View style={styles.wellnessRow}>
           <GlassCard variant="health" healthType="calm" style={styles.wellnessCard} onPress={() => router.push('/health-hub' as any)}>
             <Ionicons name="leaf" size={24} color={colors.health.calm} />
-            <Text style={styles.wellnessCardValue}>{stressLevel}</Text>
-            <Text style={styles.wellnessCardLabel}>Stress Level</Text>
+            <Text style={styles.wellnessCardValue}>{strain ?? '--'}</Text>
+            <Text style={styles.wellnessCardLabel}>Soreness & Fatigue</Text>
             <View style={styles.miniProgressBar}>
-              <View style={[styles.miniProgressFill, { width: `${stressLevel}%`, backgroundColor: colors.health.calm }]} />
+              <View style={[styles.miniProgressFill, { width: `${strain ?? 0}%`, backgroundColor: colors.health.calm }]} />
             </View>
           </GlassCard>
           <GlassCard variant="health" healthType="sleep" style={styles.wellnessCard} onPress={() => router.push('/sleep-tracker' as any)}>
             <Ionicons name="moon" size={24} color={colors.health.sleep} />
-            <Text style={styles.wellnessCardValue}>{sleepScore}</Text>
+            <Text style={styles.wellnessCardValue}>{sleepScore ?? '--'}</Text>
             <Text style={styles.wellnessCardLabel}>Sleep Score</Text>
             <View style={styles.miniProgressBar}>
-              <View style={[styles.miniProgressFill, { width: `${sleepScore}%`, backgroundColor: colors.health.sleep }]} />
+              <View style={[styles.miniProgressFill, { width: `${sleepScore ?? 0}%`, backgroundColor: colors.health.sleep }]} />
             </View>
           </GlassCard>
         </View>
@@ -256,7 +294,9 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={i}
                   style={[styles.waterGlass, i < waterIntake && styles.waterGlassFilled]}
-                  onPress={() => setWaterIntake(i < waterIntake ? i : i + 1)}
+                  onPress={logGlass}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Log a glass of water. ${waterIntake} of ${glassesTarget} today`}
                 >
                   <Ionicons
                     name={i < waterIntake ? 'water' : 'water-outline'}
@@ -267,9 +307,11 @@ export default function HomeScreen() {
               ))}
             </View>
             <View style={styles.hydrationInfo}>
-              <Text style={styles.hydrationCount}>{waterIntake}/8</Text>
-              <Text style={styles.hydrationLabel}>glasses today</Text>
-              <Text style={styles.hydrationPercent}>{Math.round((waterIntake / 8) * 100)}% of goal</Text>
+              <Text style={styles.hydrationCount}>{waterIntake}/{glassesTarget}</Text>
+              <Text style={styles.hydrationLabel}>{totalMl} ml today</Text>
+              <Text style={styles.hydrationPercent}>
+                {goalMl > 0 ? Math.round((totalMl / goalMl) * 100) : 0}% of goal
+              </Text>
             </View>
           </View>
         </GlassCard>

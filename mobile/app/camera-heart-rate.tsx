@@ -1,16 +1,20 @@
 /**
  * Camera Heart Rate Measurement — rPPG (Remote Photoplethysmography)
  *
- * Measures heart rate in real-time using the phone camera.
- * Uses green channel analysis from facial video to detect
- * blood flow changes and calculate BPM.
+ * rPPG reads the pulse from tiny colour changes in the skin, which needs the
+ * green channel of each camera frame at around 30 fps. `expo-camera` exposes
+ * no per-frame pixel access, so this build cannot sample it, and the screen
+ * says so rather than measuring.
  *
- * Features:
- * - Real-time BPM display with confidence indicator
- * - Measurement progress bar
- * - Historical heart rate readings
- * - Calibration animation
- * - Privacy: no frames are stored or uploaded
+ * It used to synthesise the signal — `128 + sin(t) * 10 + random()` — which
+ * always produced roughly 60 BPM with a confidence beside it, and offered to
+ * save that as the user's resting heart rate.
+ *
+ * The analysis half is real and already server-side
+ * (POST /api/v1/rppg/estimate-hr-chrom, CHROM and green-channel methods). To
+ * finish this feature, add a frame processor — react-native-vision-camera, or
+ * a small native module — and post the RGB averages it yields to that
+ * endpoint. FRAME_SAMPLING_AVAILABLE is the switch.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -22,6 +26,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { colors, typography, spacing } from '../src/theme';
+
+/**
+ * Whether this build can read pixels from camera frames.
+ *
+ * Flip to true once a frame processor supplies real green-channel averages to
+ * `handleFrame`. Until then no pulse is reported, because a number here is
+ * indistinguishable from a measured one.
+ */
+const FRAME_SAMPLING_AVAILABLE = false;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -191,8 +204,11 @@ export default function CameraHeartRateScreen() {
       const frame = event?.data;
       if (!frame) return;
 
-      // Simulate green channel extraction (real implementation uses native module)
-      const greenAvg = 128 + Math.sin(Date.now() / 1000 * Math.PI * 2) * 10 + Math.random() * 5;
+      // The frame's green-channel average, supplied by a frame processor.
+      // Nothing is derived when it is absent: the synthetic signal that used
+      // to stand in here produced a plausible pulse from no measurement.
+      const greenAvg = typeof frame?.greenAverage === 'number' ? frame.greenAverage : null;
+      if (greenAvg === null) return;
       greenChannelAvg.current.push(greenAvg);
       frameCountRef.current++;
 
@@ -269,7 +285,31 @@ export default function CameraHeartRateScreen() {
 
           {/* Center Content */}
           <View style={styles.centerContent}>
-            {state === 'idle' && (
+            {state === 'idle' && !FRAME_SAMPLING_AVAILABLE && (
+              <View style={styles.idleContent}>
+                <View style={styles.cameraIcon}>
+                  <Ionicons name="hardware-chip-outline" size={48} color="#FFF" />
+                </View>
+                <Text style={[typography.heading.h2, { color: '#FFF', marginTop: 20 }]}>
+                  Not available in this build
+                </Text>
+                <Text style={[typography.body.md, { color: 'rgba(255,255,255,0.7)', marginTop: 8, textAlign: 'center', paddingHorizontal: 32 }]}>
+                  Reading a pulse from the camera needs frame-by-frame pixel access, which
+                  this build does not have. Rather than show you a number it did not
+                  measure, it shows you this.
+                </Text>
+                <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.55)', marginTop: 16, textAlign: 'center', paddingHorizontal: 32 }]}>
+                  Your resting heart rate still arrives from a paired watch or band, and you
+                  can enter it yourself in the morning check-in.
+                </Text>
+                <TouchableOpacity style={styles.startButton} onPress={() => router.push('/checkin' as any)}>
+                  <Ionicons name="create" size={22} color="#FFF" />
+                  <Text style={[typography.label.lg, { color: '#FFF' }]}>Go to check-in</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {state === 'idle' && FRAME_SAMPLING_AVAILABLE && (
               <View style={styles.idleContent}>
                 <View style={styles.cameraIcon}>
                   <Ionicons name="camera" size={48} color="#FFF" />

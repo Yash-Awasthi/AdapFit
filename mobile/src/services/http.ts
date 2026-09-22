@@ -17,6 +17,10 @@ export async function postJson<T>(path: string, body?: unknown): Promise<T | nul
   return sendJson<T>(path, 'POST', body);
 }
 
+export async function patchJson<T>(path: string, body?: unknown): Promise<T | null> {
+  return sendJson<T>(path, 'PATCH', body);
+}
+
 async function sendJson<T>(path: string, method: string, body?: unknown): Promise<T | null> {
   try {
     const res = await fetch(path.startsWith('http') ? path : `${API_V1}${path}`, {
