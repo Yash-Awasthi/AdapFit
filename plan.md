@@ -1212,3 +1212,153 @@ absorbed modules that were already uncommitted before this pass.
 - Rotate the Postgres password.
 - Build both Docker images somewhere with Docker available, and confirm the `src.*` endpoints
   register — the fix is reasoned and the COPY paths verified, but the images were never built here.
+
+---
+
+## Part 8 — Multi-user, persistence, and the fabricated readings
+
+Branch: `multi-user-personalization`, 16 commits on top of `6e1b019`.
+
+Scope agreed at the start: a real multi-user product, running on local Postgres,
+with every feature reachable and wired rather than a demo against one fake user.
+
+### Verified state
+
+- 1,395 backend tests pass. The suite was 9 red at the start of this work.
+- Mobile typechecks clean (`npx tsc --noEmit`, 0 errors under `app/` and `src/`;
+  the `e2e/` failures are missing detox types and predate this branch).
+- The whole loop runs against real PostgreSQL 17 and survives a restart —
+  `python -m scripts.verify_postgres` from `backend/` is that check.
+- 58 of 71 mobile screens read live data. It was 34.
+
+### 1. Identity binding — the largest defect
+
+229 endpoint files, 4 of which used an auth dependency. 144 path templates and
+195 query parameters took the subject's `user_id` straight from the request, so
+any account could read any other by changing one segment.
+
+The fix is one middleware, `app/middleware/identity.py`, rather than 500 edits
+that only have to be forgotten once: the parameter is bound to the caller's
+token before routing, across the path, the query string and the JSON body.
+
+The worse half was omission, not substitution. Handlers declare
+`user_id: str = Query("default")`, so a request that simply left it out landed
+every account in one shared bucket — which is how the app had been running. The
+middleware injects it when absent.
+
+`/api/v1/admin/`, `/api/v1/medical-id/` and `/api/v1/forums/reputation/` are
+exempt because naming another user is the point of those routes; each already
+carries its own check. `tests/test_identity_binding.py` sweeps every registered
+route, so a new one cannot quietly reopen the hole.
+
+### 2. Accounts and sessions are durable
+
+`UserManager` kept accounts in a process dictionary, so a restart deleted every
+registration. They now write through to the `users` table (migration 007) or to
+a local file, account ids are UUIDs matching the profile row, and refresh tokens
+persist and rotate on use.
+
+### 3. The recovery score is actually personal
+
+`RecoveryEngine.compute_daily_recovery` has always accepted a baseline.
+`recovery.py` never passed one, so every user in the system was scored against
+the population defaults — HRV 50±10, sleep 8h. The central claim of the product
+was not wired.
+
+`app/services/personal_baseline.py` starts at those defaults and shifts toward
+the user's own measurements as readings accumulate, reaching full confidence at
+14 readings, and refreshes after every check-in. `tests/test_end_to_end_loop.py`
+holds the property that matters: the same 60 ms reading scores high for a user
+whose normal is 40 and low for one whose normal is 75.
+
+### 4. Per-user service state
+
+55 feature services were module-level singletons holding plain dicts, so one
+medication list, one hydration total and one sleep log were shared by every
+account on the server. `app/core/per_user.py` gives each caller its own
+instance, resolved from the request identity, which converts a service by
+changing the line that constructs it rather than every endpoint that calls it.
+
+Services holding reference data or genuinely shared state — the exercise
+catalogue, forums, community, family — are deliberately untouched.
+
+### 5. Fabricated clinical readings
+
+Around twenty services returned measurements that nothing had measured. This was
+not visible in review, because a fabricated reading looks exactly like a real
+one. The worst of them:
+
+- **ECG interpretation** chose a rhythm with `random.choice` and reported it at
+  85–99% confidence. Roughly one call in five announced atrial fibrillation and
+  advised a cardiologist within 24 hours. It now derives heart rate and rhythm
+  regularity from measured R-R intervals through the existing HRV analyser, and
+  never names an arrhythmia — that is a diagnosis, not something intervals give.
+- **Skin lesion scoring** defaulted the four ABCDE features to random values, so
+  a request carrying no measurements could return high suspicion for melanoma —
+  or miss one — by chance, with an invented probability attached to the word.
+- **Cardiac rehab** defaulted age to 65, and the target heart-rate zone is
+  derived from age, so a 45-year-old was given a 65-year-old's training ceiling.
+  Blood pressure defaulted to "120/80" and oxygen saturation to 97, silencing
+  the alerts the daily log exists to raise for exactly the patient who recorded
+  nothing.
+- **Sleep audio** generated the night it was meant to be scoring.
+- **Voice analysis** screened for Parkinson's, depression and cognitive decline
+  from features that defaulted to random numbers, with the client computing each
+  risk with `Math.random()` on top. The screening is gone; acoustic measurements
+  and personal trends remain.
+- **Air quality, pollen and ER wait times** were invented. Those are numbers
+  people act on with asthma, hay fever or an emergency.
+- **Camera heart rate** synthesised its own green-channel signal, always
+  yielding about 60 BPM with a confidence beside it.
+
+Every one now derives from real input or reports that the input is missing.
+`tests/test_no_random_measurements.py` fails on any new random-generated
+measurement across all 280 services, with an explicit allowlist for the uses
+that pick wording or generate an id.
+
+### 6. Real data where it was invented
+
+Air quality, UV index and pollen come from Open-Meteo, which is free and needs
+no API key (`app/services/open_meteo.py`). Coverage is reported honestly: the
+pollen model covers Europe, and outside it the API returns nulls, which surface
+as "no coverage" rather than as a zero count.
+
+### 7. Postgres
+
+Installed natively via winget — Docker Desktop needs WSL2 and a reboot, and
+neither was present. The schema applies to a stock Postgres now: migration 000
+supplies the `auth.uid()` the Supabase RLS policies in 002 expect, and pgvector
+is optional in both the schema and the connection pool, since a stock install
+does not ship it. Semantic exercise search falls back to its in-memory index.
+
+`python -m scripts.apply_migrations` applies pending migrations to an existing
+database; the compose file feeds the same directory to initdb.
+
+### Closing the Part 7 list
+
+- The ~215 unguarded endpoint files: closed by the identity middleware.
+- Rotate the Postgres password: the Supabase project no longer resolves and its
+  entry is commented out in `.env`; the local database has a generated password.
+  The old Supabase key is still worth rotating if it was used anywhere else.
+- Docker images: still not built. Postgres runs natively instead.
+- The public `/metrics` endpoint: still open.
+
+### Still open
+
+- Nine screens still render fixed sample data: addiction-recovery, ambient,
+  fertility, genomics, health-equity, health-savings, precision-nutrition,
+  pregnancy, remote-monitoring. All have working backends. None carries the
+  safety weight of the ones done first.
+- Camera heart rate needs a frame processor. The analysis half is real and
+  server-side (`rppg_api.py`, CHROM and green-channel); what is missing is
+  per-frame pixel access, which `expo-camera` does not provide. The switch is
+  `FRAME_SAMPLING_AVAILABLE` in `app/camera-heart-rate.tsx`.
+- Posture assessment needs the same: a pose detector supplying body landmarks.
+- The telemedicine and hospital directories are sample data and now say so. They
+  need a real provider before they mean anything.
+- The Postgres superuser password is winget's default. Fine on loopback, worth
+  changing if the machine is shared.
+- `/metrics` is still public.
+- The endpoint and service sprawl from Part 6 phase 6 is untouched, except that
+  `chronic-pain-v2` and `pregnancy-v2` were deleted — both were registered in
+  the tab layout but linked from nowhere.

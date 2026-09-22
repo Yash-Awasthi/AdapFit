@@ -395,6 +395,102 @@ export const api = {
   health: () =>
     request<{ status: string; version: string; services: any }>('/health'),
 
+  // Addiction Recovery / Substance Use
+  getSobrietyStatus: (userId: string) =>
+    request<any>(`/api/v1/substance-use/sobriety/${userId}`),
+
+  createRecoveryProfile: (data: { user_id: string; substance: string; start_date: string; mat_medication?: string }) =>
+    request<any>('/api/v1/substance-use/profile/create', { method: 'POST', body: JSON.stringify(data) }),
+
+  getCravingAnalytics: (userId: string) =>
+    request<any>(`/api/v1/substance-use/craving/analytics/${userId}`),
+
+  logCraving: (data: { user_id: string; intensity: number; trigger: string; location: string; duration_min: number; coping_strategy_used?: string }) =>
+    request<any>('/api/v1/substance-use/craving/log', { method: 'POST', body: JSON.stringify(data) }),
+
+  getRecoveryProfile: (userId: string) =>
+    request<any>(`/api/v1/substance-use/profile/${userId}`),
+
+  getSupportContacts: (userId: string) =>
+    request<any[]>(`/api/v1/substance-use/support/${userId}`),
+
+  // Ambient Health
+  getAmbientEnvironmentHealth: (homeId: string) =>
+    request<any>(`/api/v1/ambient/health/${homeId}`),
+
+  getAmbientSleepEnvironment: (homeId: string) =>
+    request<any>(`/api/v1/ambient/sleep/${homeId}`),
+
+  // Fertility
+  getFertilityPrediction: (userId: string) =>
+    request<any>(`/api/v1/fertility/predict/${userId}`),
+
+  getFertilityInsights: (userId: string) =>
+    request<any>(`/api/v1/fertility/insights/${userId}`),
+
+  setupFertilityProfile: (data: { user_id: string; profile_data: Record<string, any> }) =>
+    request<any>('/api/v1/fertility/profile', { method: 'POST', body: JSON.stringify(data) }),
+
+  logFertilityDaily: (data: { user_id: string; date: string; data: Record<string, any> }) =>
+    request<any>('/api/v1/fertility/log', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Genomics
+  getGenomicsProfile: (userId: string) =>
+    request<any>(`/api/v1/genomics/profile/${userId}`),
+
+  analyzeGenetics: (data: { user_id: string; genetic_data: Record<string, any> }) =>
+    request<any>('/api/v1/genomics/analyze', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Health Equity
+  getHealthEquityRecommendations: (communityId: string) =>
+    request<any>(`/api/v1/health-equity/recommendations/${communityId}`),
+
+  getHealthEquityResources: (communityId: string) =>
+    request<any>(`/api/v1/health-equity/resources/${communityId}`),
+
+  // Health Savings
+  getHealthSavingsSummary: (userId: string) =>
+    request<any>(`/api/v1/health-savings/summary/${userId}`),
+
+  getHealthSavingsTransactions: (userId: string, limit = 20) =>
+    request<any>(`/api/v1/health-savings/transactions/${userId}?limit=${limit}`),
+
+  getHealthSavingsCategories: () =>
+    request<any>('/api/v1/health-savings/categories', undefined, LONG_CACHE_TTL),
+
+  // Precision Nutrition
+  getPrecisionNutritionSummary: (userId: string) =>
+    request<any>(`/api/v1/precision-nutrition/daily-summary/${userId}`),
+
+  getFoodRecommendations: (userId: string) =>
+    request<any>(`/api/v1/precision-nutrition/food-recommendations/${userId}`),
+
+  getSupplementProtocol: (userId: string, goal: string) =>
+    request<any>(`/api/v1/precision-nutrition/supplements/${userId}/${goal}`),
+
+  getMealPlanPrecision: (userId: string, days = 7) =>
+    request<any>(`/api/v1/precision-nutrition/meal-plan/${userId}?days=${days}`),
+
+  // Pregnancy
+  getPregnancyWeekInfo: (userId: string) =>
+    request<any>(`/api/v1/pregnancy/week-info/${userId}`),
+
+  getKickHistory: (userId: string, limit = 10) =>
+    request<any>(`/api/v1/pregnancy/kick-history/${userId}?limit=${limit}`),
+
+  logKickCount: (data: { user_id: string; data: { kicks: number; duration_minutes: number } }) =>
+    request<any>('/api/v1/pregnancy/kick-counter', { method: 'POST', body: JSON.stringify(data) }),
+
+  setupPregnancy: (data: { user_id: string; data: Record<string, any> }) =>
+    request<any>('/api/v1/pregnancy/setup', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Remote Monitoring
+  getMonitoringDashboard: (patientId: string) =>
+    request<any>(`/api/v1/remote-monitoring/dashboard/${patientId}`),
+
+  getVitalTrend: (patientId: string, metric: string, days = 30) =>
+    request<any>(`/api/v1/remote-monitoring/trends/${patientId}?metric=${metric}&days=${days}`),
+
   // Generic POST, used by the offline sync daemon for batch endpoints
   post: (path: string, body: any) =>
     request<any>(path, { method: 'POST', body: JSON.stringify(body) }),

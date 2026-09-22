@@ -87,7 +87,7 @@ class SubstanceUseService:
         entry = {
             "id": str(uuid.uuid4()),
             "user_id": user_id,
-            "intensity": min(max(intensity), 10),
+            "intensity": max(min(intensity, 10), 0),
             "trigger": trigger,
             "location": location,
             "duration_min": duration_min,
@@ -122,7 +122,7 @@ class SubstanceUseService:
         entry = {
             "id": str(uuid.uuid4()),
             "user_id": user_id,
-            "mood": min(max(mood), 10),
+            "mood": max(min(mood, 10), 0),
             "content": content,
             "gratitude": gratitude or [],
             "timestamp": datetime.now().isoformat(),
@@ -162,6 +162,9 @@ class SubstanceUseService:
         }
         self.support_contacts.setdefault(user_id, []).append(contact)
         return contact
+
+    def get_support_contacts(self, user_id: str) -> List[dict]:
+        return self.support_contacts.get(user_id, [])
 
     def get_craving_analytics(self, user_id: str) -> dict:
         logs = self.craving_logs.get(user_id, [])

@@ -20,10 +20,6 @@ class VoiceAnalysisRequest(BaseModel):
     audio_features: Dict[str, Any]
 
 
-class ExerciseRequest(BaseModel):
-    target: str
-
-
 @router.post("/analyze")
 async def analyze_voice(req: VoiceAnalysisRequest):
     """Measure a recording and compare it with this user's previous ones."""
@@ -44,7 +40,7 @@ async def list_features():
     return {"success": True, "data": list(voice_biomarker_service.REQUIRED_FEATURES)}
 
 
-@router.post("/exercises")
-async def get_exercises(req: ExerciseRequest):
-    result = voice_biomarker_service.get_voice_exercises(req.target)
-    return {"success": True, "data": result}
+@router.get("/exercises")
+async def get_exercises(target: str = "depression"):
+    """Vocal exercises for one training target. A read, so a GET."""
+    return {"success": True, "data": voice_biomarker_service.get_voice_exercises(target)}

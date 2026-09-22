@@ -250,7 +250,32 @@ class FertilityTrackerService:
         return "transitioning"
 
     def _assess_regularity(self, user_id: str) -> Dict[str, Any]:
-        return {"regular": True, "variation_days": 2, "assessment": "Your cycles appear regular"}
+        """Cycle-length variation from logged period starts. Needs two full cycles to say anything."""
+        logs = sorted(self.daily_logs.get(user_id, []), key=lambda l: l["date"])
+        period_starts: List[datetime] = []
+        prev_date: Optional[datetime] = None
+        for log in logs:
+            if not log.get("spotting"):
+                continue
+            try:
+                d = datetime.strptime(log["date"], "%Y-%m-%d")
+            except (ValueError, TypeError):
+                continue
+            if prev_date is None or (d - prev_date).days > 1:
+                period_starts.append(d)
+            prev_date = d
+
+        if len(period_starts) < 3:
+            return {"regular": None, "variation_days": None, "assessment": "Not enough cycles logged to assess regularity yet."}
+
+        lengths = [(b - a).days for a, b in zip(period_starts, period_starts[1:])]
+        variation = max(lengths) - min(lengths)
+        regular = variation <= 7
+        return {
+            "regular": regular,
+            "variation_days": variation,
+            "assessment": "Your cycles appear regular" if regular else "Your cycles show more variation than typical",
+        }
 
     def _calculate_daily_fertility_score(self, log: Dict) -> int:
         if not log:

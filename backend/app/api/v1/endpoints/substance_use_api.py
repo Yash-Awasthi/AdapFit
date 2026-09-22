@@ -93,3 +93,15 @@ async def get_sobriety_status(user_id: str):
 async def add_support_contact(req: AddSupportContactRequest):
     from app.services.substance_use import substance_use_service
     return substance_use_service.add_support_contact(req.user_id, req.name, req.relationship, req.phone, req.is_sponsor)
+
+
+@router.get("/support/{user_id}")
+async def get_support_contacts(user_id: str):
+    from app.services.substance_use import substance_use_service
+    return substance_use_service.get_support_contacts(user_id)
+
+
+@router.get("/profile/{user_id}")
+async def get_recovery_profile(user_id: str):
+    from app.services.substance_use import substance_use_service
+    return substance_use_service.profiles.get(user_id) or {"status": "no_profile"}

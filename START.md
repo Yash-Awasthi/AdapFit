@@ -1,5 +1,44 @@
 # AdapFit — How to Run
 
+## Database (PostgreSQL)
+
+The app runs against Postgres. Without `DATABASE_URL` set it falls back to an
+in-memory store that writes to `backend/app/data/`, which is fine for a quick
+look but loses concurrency and query power.
+
+```bash
+# One-off, if Postgres is not installed:
+winget install --id PostgreSQL.PostgreSQL.17 --exact
+
+# Create the role and database (as the postgres superuser):
+psql -U postgres -h 127.0.0.1 -c "CREATE ROLE adapfit LOGIN PASSWORD '<pick-one>'"
+psql -U postgres -h 127.0.0.1 -c "CREATE DATABASE adapfit OWNER adapfit"
+```
+
+Put the connection string in `backend/.env`:
+
+```
+DATABASE_URL=postgresql://adapfit:<password>@127.0.0.1:5432/adapfit
+```
+
+Then apply the schema:
+
+```bash
+cd backend
+python -m scripts.apply_migrations          # apply what is pending
+python -m scripts.apply_migrations --list   # show status, change nothing
+```
+
+pgvector is optional. Without it the schema still applies and semantic
+exercise search falls back to an in-memory index.
+
+To check the whole loop against the database — register, log check-ins, read a
+decision, then re-read it all in a fresh process:
+
+```bash
+python -m scripts.verify_postgres
+```
+
 ## Backend (FastAPI)
 
 ```bash
@@ -24,12 +63,23 @@ Scan the QR code with Expo Go or press `a` for Android emulator.
 
 ## Environment Variables
 
-Backend reads from `backend/app/core/config.py`. Optional:
+Backend reads from `backend/app/core/config.py`. `.env` is gitignored.
 
 ```
+DATABASE_URL=postgresql://...   # Postgres; in-memory fallback without it
+JWT_SECRET_KEY=...              # Required in production; random per run otherwise
 GEMINI_API_KEY=your_key_here    # For AI features (works without it via fallbacks)
 GROQ_API_KEY=your_key_here      # For LLM streaming
+ADAPFIT_DATA_DIR=...            # Where the file-backed store writes
+AUTH_DISABLED=true              # Local convenience; ignored when ENVIRONMENT=production
 ```
+
+`AUTH_DISABLED` switches off JWT validation for local work. It is ignored in
+production, but note that it also switches off the identity binding that ties
+every request to its caller — so with it on, the app behaves as a single-user
+one. Turn it off to exercise multi-user behaviour.
+
+Air quality, UV and pollen come from Open-Meteo, which needs no key or account.
 
 ## What's Running
 
@@ -46,8 +96,11 @@ GROQ_API_KEY=your_key_here      # For LLM streaming
 Mobile (React Native/Expo)
     ↕ HTTP + WebSocket
 Backend (FastAPI/Python)
-    ↕ In-memory storage (suppliable with PostgreSQL)
+    ↕ PostgreSQL (in-memory + file fallback when DATABASE_URL is unset)
 ```
+
+Every request is bound to its authenticated user before routing, so a handler
+never sees another account's id. See `backend/app/middleware/identity.py`.
 
 ## Key Features Working End-to-End
 

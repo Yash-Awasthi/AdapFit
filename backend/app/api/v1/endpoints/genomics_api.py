@@ -23,6 +23,12 @@ async def analyze_genetics(req: GeneticAnalysisRequest):
     return {"success": True, "data": result}
 
 
+@router.get("/profile/{user_id}")
+async def get_latest_profile(user_id: str):
+    result = genomics_insights_service.get_latest_profile(user_id)
+    return {"success": True, "data": result}
+
+
 @router.post("/drug-safety")
 async def check_drug_safety(req: DrugSafetyRequest):
     result = genomics_insights_service.check_drug_safety(req.user_id, req.medications)

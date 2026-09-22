@@ -97,6 +97,10 @@ class AmbientHealthService:
         }
         return self.homes[home_id]
 
+    def get_homes(self) -> List[Dict]:
+        """Homes registered by the current user."""
+        return list(self.homes.values())
+
     def register_device(self, home_id: str, device_config: Dict[str, Any]) -> Dict[str, Any]:
         """Register an IoT device for health monitoring."""
         device_id = f"dev_{int(time.time())}_{random.randint(1000, 9999)}"
@@ -170,7 +174,15 @@ class AmbientHealthService:
                                     for r, d in zip(readings, room_devices)) / len(readings)
                     room_scores[room] = {"score": round(avg_score, 1), "devices": len(room_devices)}
 
-        overall = sum(r["score"] for r in room_scores.values()) / max(1, len(room_scores)) if room_scores else 50
+        if not room_scores:
+            return {
+                "home_id": home_id,
+                "status": "no_data",
+                "message": "No device has reported a reading yet.",
+                "device_count": len(home["devices"]),
+            }
+
+        overall = sum(r["score"] for r in room_scores.values()) / len(room_scores)
 
         return {
             "home_id": home_id,
@@ -192,7 +204,7 @@ class AmbientHealthService:
             if self.devices.get(d, {}).get("room") == "bedroom"
         ]
 
-        metrics = {"noise": 25, "light": 3, "temperature": 19, "humidity": 45}
+        metrics: Dict[str, float] = {}
         for dev_id in bedroom_devices:
             device = self.devices[dev_id]
             reading = device.get("last_reading", {})
@@ -205,15 +217,25 @@ class AmbientHealthService:
             if "humidity" in reading:
                 metrics["humidity"] = reading["humidity"]
 
-        # Score each metric
-        scores = {
-            "noise": max(0, 100 - max(0, metrics["noise"] - 30) * 4),
-            "darkness": max(0, 100 - max(0, metrics["light"] - 5) * 10),
-            "temperature": 100 - abs(metrics["temperature"] - 18) * 8,
-            "humidity": 100 - abs(metrics["humidity"] - 45) * 2,
-        }
+        if not metrics:
+            return {
+                "home_id": home_id,
+                "status": "no_data",
+                "message": "No bedroom sensor has reported a reading yet.",
+            }
 
-        overall = sum(scores.values()) / len(scores)
+        # Score each metric that was actually reported
+        scores = {}
+        if "noise" in metrics:
+            scores["noise"] = max(0, 100 - max(0, metrics["noise"] - 30) * 4)
+        if "light" in metrics:
+            scores["darkness"] = max(0, 100 - max(0, metrics["light"] - 5) * 10)
+        if "temperature" in metrics:
+            scores["temperature"] = 100 - abs(metrics["temperature"] - 18) * 8
+        if "humidity" in metrics:
+            scores["humidity"] = 100 - abs(metrics["humidity"] - 45) * 2
+
+        overall = sum(scores.values()) / max(1, len(scores))
 
         return {
             "home_id": home_id,
@@ -361,13 +383,13 @@ class AmbientHealthService:
 
     def _get_sleep_recommendations(self, metrics: Dict, scores: Dict) -> List[str]:
         recs = []
-        if metrics["noise"] > 35:
+        if metrics.get("noise", 0) > 35:
             recs.append("Use white noise machine or earplugs")
-        if metrics["light"] > 5:
+        if metrics.get("light", 0) > 5:
             recs.append("Use blackout curtains or sleep mask")
-        if metrics["temperature"] > 21:
+        if metrics.get("temperature", 0) > 21:
             recs.append("Lower bedroom temperature to 16-19°C for better sleep")
-        if metrics["humidity"] < 35:
+        if metrics.get("humidity", 100) < 35:
             recs.append("Add humidity to prevent dry airways")
         return recs
 

@@ -72,16 +72,20 @@ class HealthEquityService:
         weighted_total = 0
         total_weight = 0
         category_results = {}
-        
+
         for cat_key, cat_config in self.SDOH_CATEGORIES.items():
-            raw_score = category_scores.get(cat_key, 50)
-            normalized = min(max(raw_score, 0), 100)
+            if cat_key not in category_scores:
+                continue
+            normalized = min(max(category_scores[cat_key], 0), 100)
             weighted = normalized * cat_config["weight"]
             weighted_total += weighted
             total_weight += cat_config["weight"]
             category_results[cat_key] = {"name": cat_config["name"], "score": normalized, "weight": cat_config["weight"], "weighted_score": round(weighted, 2)}
-        
-        overall = round(weighted_total / max(total_weight, 0.01), 1)
+
+        if not category_results:
+            return {"error": "No category scores provided"}
+
+        overall = round(weighted_total / total_weight, 1)
         profile["sdoh_scores"] = category_results
         profile["overall_score"] = overall
         profile["equity_grade"] = "A" if overall >= 80 else "B" if overall >= 65 else "C" if overall >= 50 else "D" if overall >= 35 else "F"
