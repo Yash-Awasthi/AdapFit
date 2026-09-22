@@ -64,6 +64,10 @@ class HealthEquityService:
         self.community_profiles[community_id] = profile
         return profile
 
+    def get_communities(self) -> List[dict]:
+        """Communities registered by the current user."""
+        return list(self.community_profiles.values())
+
     def calculate_sdoh_score(self, community_id: str, category_scores: Dict[str, float]) -> dict:
         profile = self.community_profiles.get(community_id)
         if not profile:

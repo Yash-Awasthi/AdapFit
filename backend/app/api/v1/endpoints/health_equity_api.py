@@ -43,6 +43,12 @@ async def create_community(req: CreateCommunityRequest):
     return health_equity.create_community_profile(req.community_id, req.name, req.population, req.demographics)
 
 
+@router.get("/communities")
+async def list_communities():
+    from app.services.health_equity import health_equity
+    return health_equity.get_communities()
+
+
 @router.post("/sdoh/score")
 async def calculate_sdoh(req: SDOHScoreRequest):
     from app.services.health_equity import health_equity
