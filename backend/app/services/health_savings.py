@@ -126,7 +126,7 @@ class HealthSavingsService:
         
         account["balance"] -= amount
         account["total_expenses"] += amount
-        
+
         transaction = {
             "id": str(uuid.uuid4()),
             "type": "expense",
@@ -136,7 +136,7 @@ class HealthSavingsService:
             "provider_name": provider_name,
             "date": date or datetime.now().isoformat(),
             "receipt_url": receipt_url,
-            "eligible": True,
+            "eligible": self.check_eligibility(category)["eligible"],
             "tax_year": datetime.now().year,
             "balance_after": account["balance"],
             "timestamp": datetime.now().isoformat(),
@@ -192,9 +192,14 @@ class HealthSavingsService:
         return transactions[-limit:]
 
     def check_eligibility(self, category: str) -> dict:
+        needle = category.lower().replace(" ", "_").replace("-", "_").strip("_").rstrip("s")
         for cat, items in self.ELIGIBLE_EXPENSES.items():
-            if category.lower().replace(" ", "_") in items or cat == category.lower().replace(" ", "_"):
+            if cat == needle:
                 return {"eligible": True, "category": cat, "description": category}
+            for item in items:
+                item_singular = item.rstrip("s")
+                if needle in item_singular or item_singular in needle:
+                    return {"eligible": True, "category": cat, "description": category}
         return {"eligible": False, "category": category, "note": "Consult your plan documents for eligibility"}
 
     def get_eligible_categories(self) -> dict:

@@ -28,6 +28,12 @@ async def register_home(req: HomeRequest):
     return {"success": True, "data": result}
 
 
+@router.get("/homes")
+async def list_homes():
+    result = ambient_health_service.get_homes()
+    return {"success": True, "data": result}
+
+
 @router.post("/device")
 async def register_device(req: DeviceRequest):
     result = ambient_health_service.register_device(req.home_id, req.device_config)

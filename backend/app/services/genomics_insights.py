@@ -161,6 +161,13 @@ class GenomicsInsightsService:
         self.profiles[profile_id] = profile
         return profile
 
+    def get_latest_profile(self, user_id: str) -> Dict[str, Any]:
+        """Most recent genetic analysis on file for this user, or a clear no-data marker."""
+        user_profiles = [p for p in self.profiles.values() if p["user_id"] == user_id]
+        if not user_profiles:
+            return {"status": "no_data", "message": "No genetic data uploaded yet."}
+        return {"status": "ok", **max(user_profiles, key=lambda p: p["timestamp"])}
+
     def check_drug_safety(self, user_id: str, medications: List[str]) -> Dict[str, Any]:
         """Check genetic compatibility with medications."""
         user_profiles = [p for p in self.profiles.values() if p["user_id"] == user_id]

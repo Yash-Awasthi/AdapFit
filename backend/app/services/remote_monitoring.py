@@ -12,6 +12,8 @@ class RemoteMonitoringService:
     def __init__(self):
         # Readings were never kept, which is why the trend had to be invented.
         self._readings: dict[str, list[dict]] = {}
+        self._devices: dict[str, list[dict]] = {}
+        self._alerts: dict[str, list[dict]] = {}
         self.device_types = {
             "blood_pressure_monitor": {
                 "metrics": ["systolic", "diastolic", "pulse"],
@@ -64,18 +66,20 @@ class RemoteMonitoringService:
             return {"success": False, "error": f"Unknown device type: {device_type}"}
 
         device_config = self.device_types[device_type]
-
-        return {
-            "success": True,
+        device = {
             "device_id": f"DEV-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             "patient_id": patient_id,
             "device_type": device_type,
+            "name": device_info.get("name", device_type.replace("_", " ").title()),
             "metrics_tracked": device_config["metrics"],
             "measurement_frequency": device_config["frequency"],
             "alert_thresholds": device_config["alert_thresholds"],
             "setup_instructions": self._get_setup_instructions(device_type),
             "data_sync_enabled": True,
+            "registered_at": datetime.now().isoformat(),
         }
+        self._devices.setdefault(patient_id, []).append(device)
+        return {"success": True, **device}
 
     def _get_setup_instructions(self, device_type: str) -> List[str]:
         """Get device setup instructions"""
@@ -151,6 +155,10 @@ class RemoteMonitoringService:
                     "date": recorded_at.strftime("%Y-%m-%d"),
                     "recorded_at": recorded_at.isoformat(),
                 })
+        if alerts:
+            self._alerts.setdefault(patient_id, []).extend(
+                {**a, "recorded_at": recorded_at.isoformat()} for a in alerts
+            )
 
         return {
             "status": "ok",
@@ -221,24 +229,51 @@ class RemoteMonitoringService:
         }
 
     def get_monitoring_dashboard(self, patient_id: str) -> Dict:
-        """Get comprehensive monitoring dashboard"""
+        """Comprehensive monitoring dashboard, built from what this patient's devices have actually reported."""
+        devices = self._devices.get(patient_id, [])
+        readings = self._readings.get(patient_id, [])
+        alerts = self._alerts.get(patient_id, [])
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        units = {
+            "pulse": "bpm", "heart_rate": "bpm", "blood_glucose": "mg/dL",
+            "oxygen_saturation": "%", "weight": "kg", "steps": "steps",
+        }
+
+        def latest_and_trend(metric: str) -> Optional[Dict]:
+            points = [r for r in readings if r["metric"] == metric]
+            if not points:
+                return None
+            latest = points[-1]
+            trend = "stable"
+            if len(points) >= 2:
+                delta = points[-1]["value"] - points[0]["value"]
+                if abs(delta) >= max(1.0, abs(points[0]["value"]) * 0.03):
+                    trend = "increasing" if delta > 0 else "decreasing"
+            unit = units.get(metric, "")
+            return {"latest": f"{latest['value']:g}{(' ' + unit) if unit else ''}", "trend": trend}
+
+        vital_summary: Dict[str, Dict] = {}
+        systolic = latest_and_trend("systolic")
+        diastolic = latest_and_trend("diastolic")
+        if systolic and diastolic:
+            vital_summary["blood_pressure"] = {
+                "latest": f"{systolic['latest'].split()[0]}/{diastolic['latest'].split()[0]}",
+                "trend": systolic["trend"],
+            }
+        for metric in ("heart_rate", "blood_glucose", "oxygen_saturation", "weight"):
+            result = latest_and_trend(metric)
+            if result:
+                vital_summary[metric] = result
+
         return {
             "patient_id": patient_id,
-            "connected_devices": 3,
-            "active_alerts": 0,
-            "measurements_today": 6,
-            "adherence_rate": 92,
-            "last_sync": datetime.now().isoformat(),
-            "vital_summary": {
-                "blood_pressure": {"latest": "122/78", "trend": "stable", "status": "normal"},
-                "heart_rate": {"latest": "72 bpm", "trend": "stable", "status": "normal"},
-                "blood_glucose": {"latest": "105 mg/dL", "trend": "decreasing", "status": "normal"},
-                "oxygen_saturation": {"latest": "97%", "trend": "stable", "status": "normal"},
-                "weight": {"latest": "74.5 kg", "trend": "decreasing", "status": "normal"},
-            },
-            "upcoming_appointments": [
-                {"date": (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d"), "type": "Follow-up", "provider": "Dr. Smith"},
-            ],
+            "connected_devices": len(devices),
+            "active_alerts": len(alerts),
+            "measurements_today": sum(1 for r in readings if r["date"] == today),
+            "vital_summary": vital_summary,
+            "recent_alerts": alerts[-5:],
+            "last_sync": readings[-1]["recorded_at"] if readings else None,
         }
 
 

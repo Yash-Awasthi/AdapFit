@@ -79,6 +79,11 @@ class TelemedicineService:
         for doc_id in self._doctors:
             self._availability[doc_id] = list(slots)
 
+    DIRECTORY_NOTICE = (
+        "Sample directory: these clinicians are example data, not a connected "
+        "telehealth provider."
+    )
+
     def list_doctors(self, specialty: Optional[str] = None, available_today: bool = False, search: str = "", page: int = 1, page_size: int = 20) -> dict:
         doctors = list(self._doctors.values())
         if specialty:
@@ -89,7 +94,13 @@ class TelemedicineService:
             q = search.lower()
             doctors = [d for d in doctors if q in d["name"].lower() or q in d["specialty"].lower() or q in d["bio"].lower()]
         start = (page - 1) * page_size
-        return {"doctors": doctors[start:start + page_size], "total": len(doctors), "page": page}
+        return {
+            "doctors": doctors[start:start + page_size],
+            "total": len(doctors),
+            "page": page,
+            "directory": "sample",
+            "notice": self.DIRECTORY_NOTICE,
+        }
 
     def get_doctor(self, doctor_id: str) -> Optional[dict]:
         return self._doctors.get(doctor_id)
@@ -119,7 +130,20 @@ class TelemedicineService:
             consultation_fee=doctor["consultation_fee"],
         )
         self._appointments.append(appt)
-        return {"appointment": {"id": appt.id, "doctor": doctor["name"], "specialty": doctor["specialty"], "date": date, "time": time_slot, "fee": doctor["consultation_fee"], "status": appt.status}}
+        return {
+            "appointment": {
+                "id": appt.id, "doctor": doctor["name"], "specialty": doctor["specialty"],
+                "date": date, "time": time_slot, "fee": doctor["consultation_fee"],
+                "status": appt.status,
+            },
+            # Stated on the booking itself, not only in the directory listing:
+            # nobody should come away believing a clinician is expecting them.
+            "directory": "sample",
+            "notice": (
+                "This directory is sample data, not a connected telehealth provider. "
+                "No clinician has been contacted and no appointment exists outside this app."
+            ),
+        }
 
     def cancel_appointment(self, appointment_id: str) -> dict:
         for a in self._appointments:

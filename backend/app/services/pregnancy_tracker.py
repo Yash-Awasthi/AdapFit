@@ -21,6 +21,7 @@ class PregnancyTrackerService:
     def __init__(self):
         self.profiles: Dict[str, Dict] = {}
         self.daily_logs: Dict[str, List] = {}
+        self.kick_sessions: Dict[str, List] = {}
         self._init_fetal_development()
 
     def _init_fetal_development(self):
@@ -69,9 +70,14 @@ class PregnancyTrackerService:
         }
 
         week = profile["current_week"]
-        profile["trimester"] = 1 if week <= 12 else 2 if week <= 26 else 3
-        profile["baby_size"] = self.weekly_development.get(week, {}).get("size", "developing")
-        profile["upcoming_appointments"] = [a for a in self.prenatal_appointments if a["week"] >= week][:3]
+        if week is None:
+            profile["trimester"] = None
+            profile["baby_size"] = None
+            profile["upcoming_appointments"] = []
+        else:
+            profile["trimester"] = 1 if week <= 12 else 2 if week <= 26 else 3
+            profile["baby_size"] = self.weekly_development.get(week, {}).get("size", "developing")
+            profile["upcoming_appointments"] = [a for a in self.prenatal_appointments if a["week"] >= week][:3]
 
         self.profiles[user_id] = profile
         return profile
@@ -110,6 +116,13 @@ class PregnancyTrackerService:
             return {"error": "Set up pregnancy profile first"}
 
         week = profile["current_week"]
+        if week is None:
+            return {
+                "status": "week_unknown",
+                "message": "Add your last period date to see week-by-week development.",
+                "days_until_due": self._days_until_due(profile.get("due_date")),
+            }
+
         dev = self.weekly_development.get(week, self.weekly_development.get(40))
         next_week_dev = self.weekly_development.get(week + 1, dev)
 
@@ -126,17 +139,32 @@ class PregnancyTrackerService:
 
     def kick_counter(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Track baby kicks."""
-        kicks = data.get("kicks", 10)
-        duration_min = data.get("duration_minutes", 10)
+        if "kicks" not in data or "duration_minutes" not in data:
+            return {"error": "kicks and duration_minutes are required"}
+        kicks = data["kicks"]
+        duration_min = data["duration_minutes"]
+        session = {
+            "date": data.get("date", time.strftime("%Y-%m-%d")),
+            "kicks": kicks,
+            "duration_minutes": duration_min,
+            "rate": round(kicks / max(1, duration_min), 1),
+            "status": "normal" if kicks >= 6 else "low",
+            "recorded_at": time.time(),
+        }
+        self.kick_sessions.setdefault(user_id, []).append(session)
 
         return {
             "kicks_counted": kicks,
             "duration_minutes": duration_min,
-            "rate": round(kicks / max(1, duration_min), 1),
+            "rate": session["rate"],
             "normal_range": "6-10 kicks in 2 hours",
-            "status": "normal" if kicks >= 6 else "low — try again after a snack",
+            "status": session["status"] if kicks >= 6 else "low — try again after a snack",
             "tip": "Best time to count: baby is usually most active after meals",
         }
+
+    def get_kick_history(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Recent kick-counting sessions, most recent first."""
+        return list(reversed(self.kick_sessions.get(user_id, [])))[:limit]
 
     def contraction_timer(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Time contractions and assess labor progress."""
@@ -151,7 +179,7 @@ class PregnancyTrackerService:
             intervals.append(diff)
 
         avg_interval = sum(intervals) / len(intervals)
-        avg_duration = data.get("avg_duration_seconds", 45)
+        avg_duration = data.get("avg_duration_seconds")
 
         if avg_interval <= 5 * 60:
             phase = "active_labor"
@@ -195,26 +223,26 @@ class PregnancyTrackerService:
             },
         }
 
-    def _calculate_week(self, last_period: str) -> int:
+    def _calculate_week(self, last_period: Optional[str]) -> Optional[int]:
         if not last_period:
-            return 20
+            return None
         try:
             from datetime import datetime
             lmp = datetime.strptime(last_period, "%Y-%m-%d")
             days = (datetime.now() - lmp).days
             return max(1, min(42, days // 7))
         except (ValueError, TypeError):
-            return 20
+            return None
 
-    def _days_until_due(self, due_date: Optional[str]) -> int:
+    def _days_until_due(self, due_date: Optional[str]) -> Optional[int]:
         if not due_date:
-            return 140
+            return None
         try:
             from datetime import datetime
             due = datetime.strptime(due_date, "%Y-%m-%d")
             return max(0, (due - datetime.now()).days)
         except (ValueError, TypeError):
-            return 140
+            return None
 
     def _get_weekly_tips(self, week: int) -> List[str]:
         if week <= 12:

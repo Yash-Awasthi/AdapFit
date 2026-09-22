@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  RefreshControl, Dimensions, ActivityIndicator, Animated,
+  RefreshControl, Dimensions, ActivityIndicator, Animated, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,22 +47,20 @@ const BPMSection: React.FC = () => {
     }
   }, [measuring]);
 
-  const start = async () => {
-    setMeasuring(true); setBpm(null); setElapsed(0);
-    await api('/camera/bpm/start', { method: 'POST', body: '{}' });
-    let t = 0;
-    const iv = setInterval(async () => {
-      t++; setElapsed(t);
-      const r = await api('/camera/bpm/frame', {
-        method: 'POST', body: JSON.stringify({ rgb_values: [150 + Math.random() * 50, 120 + Math.random() * 40, 100 + Math.random() * 30], face_detection_confidence: 0.88 }),
-      });
-      if (r?.current_bpm) setBpm(r.current_bpm);
-      if (t >= 12) {
-        const final = await api('/camera/bpm/result');
-        if (final) { setBpm(final.bpm); setHrv(final.hrv_estimate); }
-        setMeasuring(false); clearInterval(iv);
-      }
-    }, 1000);
+  /**
+   * rPPG needs the average red, green and blue of each camera frame at around
+   * 30 fps. `expo-camera` gives no access to frame pixels, so this build has
+   * nothing to send.
+   *
+   * It used to send `150 + Math.random() * 50` as the red channel and so on,
+   * with a face-detection confidence of 0.88, which meant the heart rate that
+   * came back was computed from noise and displayed as the user\'s pulse.
+   */
+  const start = () => {
+    Alert.alert(
+      'Not available in this build',
+      'Reading a pulse from the camera needs frame-by-frame pixel access, which this build does not have. Your resting heart rate still comes from a paired watch or band, and you can enter it in the morning check-in.'
+    );
   };
 
   const bpmColor = bpm ? (bpm < 60 ? '#3B82F6' : bpm < 100 ? colors.score.excellent : colors.score.fair) : colors.primary;
@@ -87,11 +85,6 @@ const BPMSection: React.FC = () => {
           <View style={styles.bpmCenter}>
             <ScoreRing score={bpm} size={130} strokeWidth={8} color={bpmColor} label="BPM" />
             <View style={styles.bpmMetaRow}>
-              <View style={styles.bpmMetaItem}>
-                <Ionicons name="checkmark-circle" size={14} color={colors.score.excellent} />
-                <Text style={[typography.body.sm, { color: colors.score.excellent }]}> 85%</Text>
-                <Text style={typography.body.xs}> Confidence</Text>
-              </View>
               {hrv && (
                 <View style={styles.bpmMetaItem}>
                   <Ionicons name="pulse" size={14} color={colors.health.calm} />
@@ -111,11 +104,11 @@ const BPMSection: React.FC = () => {
               <Ionicons name="camera" size={28} color={colors.primary} />
             </View>
             <Text style={[typography.body.md, { marginTop: spacing.md, textAlign: 'center', color: colors.text.secondary }]}>
-              Place finger on camera to measure heart rate
+              Camera heart rate is not available in this build
             </Text>
             <TouchableOpacity style={styles.primaryBtn} onPress={start}>
-              <Ionicons name="play" size={18} color="#FFF" />
-              <Text style={styles.primaryBtnText}>Start Measurement</Text>
+              <Ionicons name="information-circle" size={18} color="#FFF" />
+              <Text style={styles.primaryBtnText}>Why not?</Text>
             </TouchableOpacity>
           </View>
         )}

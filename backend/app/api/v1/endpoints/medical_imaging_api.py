@@ -3,16 +3,22 @@ Medical Imaging AI API Endpoints
 """
 from fastapi import APIRouter
 from typing import Dict, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/medical-imaging", tags=["Medical Imaging AI"])
 
 
 class SkinLesionRequest(BaseModel):
-    asymmetry_score: float = 0.3
-    border_irregularity: float = 0.2
-    color_variation: float = 0.3
-    diameter_mm: float = 4.0
+    """
+    Measurements of a lesion. None of them default.
+
+    They used to, which meant a request carrying no measurements at all still
+    produced an ABCDE verdict about skin cancer from four constants.
+    """
+    asymmetry_score: float = Field(ge=0, le=1)
+    border_irregularity: float = Field(ge=0, le=1)
+    color_variation: float = Field(ge=0, le=1)
+    diameter_mm: float = Field(gt=0, le=100)
     evolution_detected: bool = False
 
 

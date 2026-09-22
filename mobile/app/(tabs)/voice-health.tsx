@@ -1,68 +1,114 @@
+/**
+ * Voice Health — vocal exercises, and acoustic trends where a recording
+ * supplied measurements.
+ *
+ * This screen used to screen for Parkinson's, depression, anxiety and
+ * cognitive decline, computing each risk with `Math.random()` in the client
+ * and showing a confidence beside it. Voice does carry real signal for some
+ * of those conditions, but nothing in this app implements a validated
+ * instrument, and a number with nothing behind it is worst on exactly these
+ * subjects.
+ *
+ * What is real: the vocal exercises, and the acoustic features of a recording
+ * compared with the user's own earlier ones.
+ */
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Dimensions } from 'react-native';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useApis } from '../../src/hooks/useApi';
+import { asArray } from '../../src/services/http';
+import { useUserStore } from '../../src/stores';
 
-const { width } = Dimensions.get('window');
+type Tab = 'exercises' | 'trends';
 
-const TAB_ICONS = { screen: 'search-outline', exercises: 'barbell', trends: 'trending-up-outline' } as const;
-const TAB_LABELS = { screen: 'Screen', exercises: 'Exercises', trends: 'Trends' } as const;
+const TAB_ICONS: Record<Tab, string> = { exercises: 'barbell', trends: 'trending-up-outline' };
+const TAB_LABELS: Record<Tab, string> = { exercises: 'Exercises', trends: 'Trends' };
 
-const DISEASES = [
-  { id: 'depression', name: 'Depression', icon: 'body-outline', color: '#7C3AED', desc: 'Speech pattern analysis for mood disorders' },
-  { id: 'heart_disease', name: 'Heart Health', icon: 'heart', color: '#EF4444', desc: 'Vocal tremor and breath support analysis' },
-  { id: 'cognitive_decline', name: 'Cognitive Health', icon: 'bulb-outline', color: '#3B82F6', desc: 'Word finding and coherence assessment' },
-  { id: 'parkinsons', name: "Parkinson's", icon: 'flask-outline', color: '#10B981', desc: 'Voice tremor and monotonicity detection' },
-  { id: 'respiratory', name: 'Respiratory', icon: 'pulse-outline', color: '#06B6D4', desc: 'Breath pattern and lung function analysis' },
-  { id: 'anxiety', name: 'Anxiety', icon: 'alert-circle-outline', color: '#F59E0B', desc: 'Speech tempo and hesitation detection' },
+interface VoiceExercise {
+  name: string;
+  duration: string;
+  description: string;
+  benefit: string;
+}
+
+interface FeatureTrend {
+  feature: string;
+  status: 'ok' | 'insufficient_data';
+  data_points?: number;
+  latest?: number;
+  change?: number;
+  direction?: string;
+  average?: number;
+  message?: string;
+}
+
+// The exercise sets the service groups by. Named for what they train rather
+// than for a condition, because that is what they actually do.
+const EXERCISE_TARGETS = [
+  { key: 'depression', label: 'Energy & range', icon: 'sunny-outline', color: '#F59E0B' },
+  { key: 'parkinsons', label: 'Volume & clarity', icon: 'volume-high-outline', color: '#8B5CF6' },
+  { key: 'cognitive', label: 'Fluency', icon: 'chatbubbles-outline', color: '#3B82F6' },
+  { key: 'respiratory', label: 'Breath support', icon: 'fitness-outline', color: '#22C55E' },
+];
+
+// Shown in the trends tab. These are the measurements a recording supplies.
+const TRACKED_FEATURES = [
+  { key: 'voice_tremor', label: 'Tremor' },
+  { key: 'speech_rate', label: 'Speech rate' },
+  { key: 'pitch_variability', label: 'Pitch variability' },
+  { key: 'breath_support', label: 'Breath support' },
 ];
 
 export default function VoiceHealthScreen() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [selectedDisease, setSelectedDisease] = useState<string | null>(null);
-  const [results, setResults] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'screen' | 'exercises' | 'trends'>('screen');
+  const userId = useUserStore((s) => s.userId);
+  const [activeTab, setActiveTab] = useState<Tab>('exercises');
+  const [target, setTarget] = useState(EXERCISE_TARGETS[0].key);
 
-  const startAnalysis = (disease: string) => {
-    setSelectedDisease(disease);
-    setIsRecording(true);
+  const { data, loading, refreshing, refresh } = useApis<{
+    exercises: { data: VoiceExercise[] };
+    tremor: { data: FeatureTrend };
+    rate: { data: FeatureTrend };
+    pitch: { data: FeatureTrend };
+    breath: { data: FeatureTrend };
+  }>({
+    exercises: `/voice-biomarker/exercises?target=${target}`,
+    tremor: `/voice-biomarker/trend/${userId}/voice_tremor`,
+    rate: `/voice-biomarker/trend/${userId}/speech_rate`,
+    pitch: `/voice-biomarker/trend/${userId}/pitch_variability`,
+    breath: `/voice-biomarker/trend/${userId}/breath_support`,
+  });
 
-    setTimeout(() => {
-      setIsRecording(false);
-      setResults({
-        disease,
-        risk_score: Math.random() * 30 + 5,
-        confidence: 0.85 + Math.random() * 0.1,
-        risk_level: 'low',
-        biomarkers_detected: ['speech_rate', 'pitch_variability'],
-        recommendations: ['Continue monitoring', 'Practice voice exercises'],
-      });
-    }, 3000);
+  const exercises = asArray<VoiceExercise>(data.exercises?.data);
+  const trends: Record<string, FeatureTrend | undefined> = {
+    voice_tremor: data.tremor?.data,
+    speech_rate: data.rate?.data,
+    pitch_variability: data.pitch?.data,
+    breath_support: data.breath?.data,
   };
-
-  const exercises = [
-    { name: 'Humming Meditation', duration: '5 min', benefit: 'Increases vocal energy', target: 'depression' },
-    { name: 'Word Association Sprint', duration: '5 min', benefit: 'Improves word-finding speed', target: 'cognitive' },
-    { name: 'Sustained Phonation', duration: '5 min', benefit: 'Increases breath support', target: 'respiratory' },
-    { name: 'Emotional Reading', duration: '10 min', benefit: 'Expands vocal range', target: 'depression' },
-    { name: 'Complex Sentence Practice', duration: '10 min', benefit: 'Enhances language complexity', target: 'cognitive' },
-    { name: 'Diaphragmatic Speech', duration: '10 min', benefit: 'Strengthens breath control', target: 'respiratory' },
-  ];
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Voice Health Analysis</Text>
-        <Text style={styles.headerSubtitle}>AI-powered disease screening from your voice</Text>
+        <Text style={styles.headerTitle} accessibilityRole="header">Voice Health</Text>
+        <Text style={styles.headerSubtitle}>Vocal exercises and acoustic trends</Text>
       </View>
 
       <View style={styles.tabBar}>
-        {(['screen', 'exercises', 'trends'] as const).map(tab => (
+        {(['exercises', 'trends'] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, activeTab === tab && styles.activeTab]}
             onPress={() => setActiveTab(tab)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === tab }}
           >
-            <Ionicons name={TAB_ICONS[tab]} size={14} color={activeTab === tab ? '#FFFFFF' : '#94A3B8'} />
+            <Ionicons
+              name={TAB_ICONS[tab] as any}
+              size={16}
+              color={activeTab === tab ? '#FFFFFF' : '#94A3B8'}
+            />
             <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
               {TAB_LABELS[tab]}
             </Text>
@@ -70,109 +116,116 @@ export default function VoiceHealthScreen() {
         ))}
       </View>
 
-      <ScrollView style={styles.content}>
-        {activeTab === 'screen' && (
-          <>
-            <Text style={styles.sectionTitle}>Select Health Area to Screen</Text>
-            {DISEASES.map(disease => (
-              <TouchableOpacity
-                key={disease.id}
-                style={styles.diseaseCard}
-                onPress={() => startAnalysis(disease.id)}
-                disabled={isRecording}
-              >
-                <View style={styles.diseaseLeft}>
-                  <Ionicons name={disease.icon as any} size={28} color={disease.color} style={styles.diseaseIcon} />
-                  <View style={styles.diseaseInfo}>
-                    <Text style={styles.diseaseName}>{disease.name}</Text>
-                    <Text style={styles.diseaseDesc}>{disease.desc}</Text>
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#3B82F6" />
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.content}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#3B82F6" />}
+        >
+          {activeTab === 'exercises' && (
+            <>
+              <Text style={styles.sectionTitle}>What would you like to work on?</Text>
+              <View style={styles.targetRow}>
+                {EXERCISE_TARGETS.map((option) => {
+                  const on = option.key === target;
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      style={[styles.targetChip, on && { backgroundColor: option.color }]}
+                      onPress={() => setTarget(option.key)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      accessibilityLabel={option.label}
+                    >
+                      <Ionicons name={option.icon as any} size={14} color={on ? '#FFF' : option.color} />
+                      <Text style={[styles.targetText, on && styles.targetTextOn]}>{option.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {exercises.length === 0 ? (
+                <Text style={styles.emptyText}>The exercise list could not be loaded.</Text>
+              ) : (
+                exercises.map((exercise, i) => (
+                  <View key={i} style={styles.exerciseCard}>
+                    <View style={styles.exerciseHeader}>
+                      <Text style={styles.exerciseName}>{exercise.name}</Text>
+                      <Text style={styles.exerciseDuration}>{exercise.duration}</Text>
+                    </View>
+                    <Text style={styles.exerciseDesc}>{exercise.description}</Text>
+                    <Text style={styles.exerciseBenefit}>{exercise.benefit}</Text>
                   </View>
-                </View>
-                <View style={[styles.scanBadge, { backgroundColor: disease.color + '20' }]}>
-                  <Ionicons
-                    name={isRecording && selectedDisease === disease.id ? 'hourglass-outline' : 'mic-outline'}
-                    size={12}
-                    color={disease.color}
-                  />
-                  <Text style={[styles.scanBadgeText, { color: disease.color }]}>
-                    {isRecording && selectedDisease === disease.id ? 'Analyzing...' : 'Scan'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                ))
+              )}
+            </>
+          )}
 
-            {results && (
-              <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>Analysis Results</Text>
-                <View style={styles.resultScore}>
-                  <Text style={styles.scoreValue}>{results.risk_score.toFixed(1)}%</Text>
-                  <Text style={styles.scoreLabel}>Risk Score</Text>
-                </View>
-                <Text style={styles.resultConfidence}>
-                  Confidence: {(results.confidence * 100).toFixed(0)}%
-                </Text>
-                <Text style={styles.resultRisk}>
-                  Risk Level: <Text style={{ color: '#10B981', fontWeight: 'bold' }}>{results.risk_level.toUpperCase()}</Text>
-                </Text>
-                <Text style={styles.resultBiomarkers}>
-                  Biomarkers: {results.biomarkers_detected.join(', ')}
-                </Text>
-              </View>
-            )}
-          </>
-        )}
+          {activeTab === 'trends' && (
+            <>
+              <Text style={styles.sectionTitle}>Your Voice Over Time</Text>
+              <Text style={styles.emptyText}>
+                Each of these is measured from a recording and compared with your own earlier
+                ones. They are acoustic measurements, not a screening for any condition.
+              </Text>
+              {TRACKED_FEATURES.map((feature) => {
+                const trend = trends[feature.key];
+                const ok = trend?.status === 'ok';
+                return (
+                  <View key={feature.key} style={styles.trendCard}>
+                    <View style={styles.trendHeader}>
+                      <Text style={styles.trendName}>{feature.label}</Text>
+                      {ok && (
+                        <View style={styles.trendDirection}>
+                          <Ionicons
+                            name={trend!.direction === 'increased' ? 'arrow-up' : trend!.direction === 'decreased' ? 'arrow-down' : 'remove'}
+                            size={14}
+                            color="#94A3B8"
+                          />
+                          <Text style={styles.trendChange}>
+                            {trend!.change !== undefined ? Math.abs(trend!.change).toFixed(2) : ''}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    {ok ? (
+                      <Text style={styles.trendDetail}>
+                        Latest {trend!.latest?.toFixed(2)} · average {trend!.average?.toFixed(2)} across{' '}
+                        {trend!.data_points} recordings
+                      </Text>
+                    ) : (
+                      <Text style={styles.trendDetail}>
+                        {trend?.message ?? 'Not enough recordings yet.'}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
 
-        {activeTab === 'exercises' && (
-          <>
-            <Text style={styles.sectionTitle}>Voice Therapeutic Exercises</Text>
-            {exercises.map((ex, i) => (
-              <View key={i} style={styles.exerciseCard}>
-                <View style={styles.exerciseHeader}>
-                  <Text style={styles.exerciseName}>{ex.name}</Text>
-                  <Text style={styles.exerciseDuration}>{ex.duration}</Text>
-                </View>
-                <Text style={styles.exerciseBenefit}>{ex.benefit}</Text>
-                <TouchableOpacity style={styles.startBtn}>
-                  <Text style={styles.startBtnText}>Start</Text>
-                </TouchableOpacity>
+              <View style={styles.noteCard}>
+                <Ionicons name="information-circle-outline" size={18} color="#3B82F6" />
+                <Text style={styles.noteText}>
+                  This app does not screen for Parkinson's, depression or any other condition
+                  from your voice. Research links some vocal changes to some conditions, but
+                  nothing here implements a validated instrument, so nothing here claims to.
+                </Text>
               </View>
-            ))}
-          </>
-        )}
+            </>
+          )}
 
-        {activeTab === 'trends' && (
-          <>
-            <Text style={styles.sectionTitle}>Your Voice Health Trends</Text>
-            <View style={styles.trendCard}>
-              <Text style={styles.trendTitle}>Depression Screening</Text>
-              <View style={styles.trendBar}>
-                <View style={[styles.trendFill, { width: '25%', backgroundColor: '#10B981' }]} />
-              </View>
-              <Text style={styles.trendStatus}>Low risk - stable over 4 sessions</Text>
-            </View>
-            <View style={styles.trendCard}>
-              <Text style={styles.trendTitle}>Cognitive Health</Text>
-              <View style={styles.trendBar}>
-                <View style={[styles.trendFill, { width: '15%', backgroundColor: '#10B981' }]} />
-              </View>
-              <Text style={styles.trendStatus}>Excellent - improving trend</Text>
-            </View>
-            <View style={styles.trendCard}>
-              <Text style={styles.trendTitle}>Respiratory Health</Text>
-              <View style={styles.trendBar}>
-                <View style={[styles.trendFill, { width: '35%', backgroundColor: '#F59E0B' }]} />
-              </View>
-              <Text style={styles.trendStatus}>Moderate - practice more exercises</Text>
-            </View>
-          </>
-        )}
-      </ScrollView>
+          <View style={{ height: 80 }} />
+        </ScrollView>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F172A' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { paddingTop: 50, paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#1E293B' },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#F8FAFC' },
   headerSubtitle: { fontSize: 14, color: '#94A3B8', marginTop: 4 },
@@ -183,40 +236,27 @@ const styles = StyleSheet.create({
   activeTabText: { color: '#FFFFFF' },
   content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 12 },
-  diseaseCard: {
-    backgroundColor: '#1E293B', borderRadius: 12, padding: 16, marginBottom: 10,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-  },
-  diseaseLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  diseaseIcon: { marginRight: 12 },
-  diseaseInfo: { flex: 1 },
-  diseaseName: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC' },
-  diseaseDesc: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-  scanBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
-  scanBadgeText: { fontSize: 12, fontWeight: 'bold' },
-  resultCard: {
-    backgroundColor: '#1E293B', borderRadius: 16, padding: 20, marginTop: 16,
-    borderWidth: 1, borderColor: '#10B981',
-  },
-  resultTitle: { fontSize: 18, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 16 },
-  resultScore: { alignItems: 'center', marginBottom: 16 },
-  scoreValue: { fontSize: 48, fontWeight: 'bold', color: '#10B981' },
-  scoreLabel: { fontSize: 14, color: '#94A3B8', marginTop: 4 },
-  resultConfidence: { fontSize: 14, color: '#94A3B8', marginBottom: 4 },
-  resultRisk: { fontSize: 14, color: '#94A3B8', marginBottom: 4 },
-  resultBiomarkers: { fontSize: 13, color: '#64748B', marginTop: 8 },
-  exerciseCard: {
-    backgroundColor: '#1E293B', borderRadius: 12, padding: 16, marginBottom: 10,
-  },
-  exerciseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  exerciseName: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC' },
-  exerciseDuration: { fontSize: 13, color: '#3B82F6', fontWeight: '600' },
-  exerciseBenefit: { fontSize: 13, color: '#94A3B8', marginTop: 6 },
-  startBtn: { backgroundColor: '#3B82F6', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16, marginTop: 10, alignSelf: 'flex-start' },
-  startBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+  emptyText: { fontSize: 13, color: '#94A3B8', lineHeight: 19, marginBottom: 16 },
+
+  targetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  targetChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: '#1E293B' },
+  targetText: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
+  targetTextOn: { color: '#FFF' },
+
+  exerciseCard: { backgroundColor: '#1E293B', borderRadius: 12, padding: 16, marginBottom: 10 },
+  exerciseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  exerciseName: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC', flex: 1 },
+  exerciseDuration: { fontSize: 12, color: '#3B82F6', fontWeight: '600' },
+  exerciseDesc: { fontSize: 13, color: '#94A3B8', lineHeight: 18 },
+  exerciseBenefit: { fontSize: 12, color: '#64748B', marginTop: 6 },
+
   trendCard: { backgroundColor: '#1E293B', borderRadius: 12, padding: 16, marginBottom: 10 },
-  trendTitle: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 8 },
-  trendBar: { height: 8, backgroundColor: '#334155', borderRadius: 4, marginBottom: 8 },
-  trendFill: { height: '100%', borderRadius: 4 },
-  trendStatus: { fontSize: 13, color: '#94A3B8' },
+  trendHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  trendName: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC' },
+  trendDirection: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  trendChange: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
+  trendDetail: { fontSize: 12, color: '#94A3B8', marginTop: 6, lineHeight: 17 },
+
+  noteCard: { flexDirection: 'row', gap: 10, backgroundColor: '#1E293B', borderRadius: 12, padding: 16, marginTop: 8 },
+  noteText: { flex: 1, fontSize: 12, color: '#94A3B8', lineHeight: 18 },
 });

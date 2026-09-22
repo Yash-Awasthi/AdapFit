@@ -50,6 +50,12 @@ async def kick_counter(req: KickCountRequest):
     return {"success": True, "data": result}
 
 
+@router.get("/kick-history/{user_id}")
+async def get_kick_history(user_id: str, limit: int = 10):
+    result = pregnancy_tracker_service.get_kick_history(user_id, limit)
+    return {"success": True, "data": result}
+
+
 @router.post("/contractions")
 async def contraction_timer(req: ContractionRequest):
     result = pregnancy_tracker_service.contraction_timer(req.data)
