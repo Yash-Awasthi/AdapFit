@@ -7,7 +7,8 @@ import { VoiceLoggerModal } from '../src/components/VoiceLoggerModal';
 import { speak } from '../src/services/tts';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../src/services/theme';
-import { useWorkoutStore } from '../src/stores';
+import { useWorkoutStore, useUserStore } from '../src/stores';
+import { patchJson } from '../src/services/http';
 
 const FALLBACK_IMAGE =
   'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/0.jpg';
@@ -17,10 +18,32 @@ function defaultReps(targetReps?: string): number {
   return match ? parseInt(match[0], 10) : 10;
 }
 
+/** Every set of one exercise, in the shape the completion endpoint takes. */
+function groupByExercise(sets: { exercise_id: string; name: string; set_number: number; weight_kg: number; reps_completed: number; rpe: number }[]) {
+  const byExercise = new Map<string, { exercise_id: string; name: string; sets: any[] }>();
+  for (const set of sets) {
+    const entry = byExercise.get(set.exercise_id) ?? {
+      exercise_id: set.exercise_id,
+      name: set.name,
+      sets: [],
+    };
+    entry.sets.push({
+      set_number: set.set_number,
+      weight_kg: set.weight_kg,
+      reps_completed: set.reps_completed,
+      rpe: set.rpe,
+    });
+    byExercise.set(set.exercise_id, entry);
+  }
+  return [...byExercise.values()];
+}
+
 export default function WorkoutActive() {
   const { theme } = useTheme();
   const router = useRouter();
   const { activeWorkout, loggedSets, logSet } = useWorkoutStore();
+  const userId = useUserStore((state) => state.userId);
+  const [finishing, setFinishing] = useState(false);
 
   const exercises = activeWorkout?.exercises ?? [];
   const totalSets = exercises.reduce((sum, ex) => sum + (ex.sets || 1), 0);
@@ -100,8 +123,40 @@ export default function WorkoutActive() {
       setSetNum(1);
       setRest(90);
     } else {
-      router.push('/workout-complete');
+      finishWorkout();
     }
+  };
+
+  /**
+   * Send the session, then move on.
+   *
+   * The sets were only ever kept in the local store, so the server never saw
+   * the work: training load, the acute:chronic ratio and therefore tomorrow's
+   * decision were all computed from an empty history. The average RPE across
+   * the logged sets is the session RPE, which is what load is calculated from.
+   */
+  const finishWorkout = async () => {
+    if (finishing) return;
+    setFinishing(true);
+
+    const sets = loggedSets.length ? loggedSets : [];
+    const averageRpe = sets.length
+      ? Math.round(sets.reduce((sum, set) => sum + (set.rpe || 0), 0) / sets.length)
+      : 0;
+
+    if (sets.length && activeWorkout?.workout_id) {
+      await patchJson(`/workouts/${activeWorkout.workout_id}`, {
+        user_id: userId,
+        actual_duration_minutes: Math.max(1, Math.round(elapsed / 60)),
+        // The endpoint requires 1-10; a session with no RPE recorded still has
+        // a duration worth keeping, so it lands at the middle rather than failing.
+        session_rpe: Math.min(10, Math.max(1, averageRpe || 5)),
+        logged_exercises: groupByExercise(sets),
+      });
+    }
+
+    setFinishing(false);
+    router.push('/workout-complete');
   };
 
   const handleVoiceSetLogged = (setDetails: {
@@ -222,8 +277,8 @@ export default function WorkoutActive() {
       <SmartMusicPlayer compact currentSet={completedSets + 1} totalSets={totalSets} />
 
       {/* Finish Workout early */}
-      <TouchableOpacity style={s.finishButton} onPress={() => router.push('/workout-complete')}>
-        <Text style={s.finishText}>Finish Workout</Text>
+      <TouchableOpacity style={s.finishButton} onPress={finishWorkout} disabled={finishing}>
+        <Text style={s.finishText}>{finishing ? 'Saving…' : 'Finish Workout'}</Text>
         <ArrowRight size={16} color={theme.textSecondary} />
       </TouchableOpacity>
 

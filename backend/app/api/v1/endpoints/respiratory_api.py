@@ -1,7 +1,8 @@
 """Respiratory Training API — Breathing exercises, COPD, asthma"""
-from fastapi import APIRouter
-from pydantic import BaseModel
 from typing import Optional
+
+from fastapi import APIRouter, Query
+from pydantic import BaseModel
 from app.services.respiratory_training import respiratory_training_service
 
 router = APIRouter()
@@ -41,8 +42,25 @@ async def log_breath_hold(hold_time: float = 30):
 
 
 @router.get("/lung-capacity")
-async def estimate_lung_capacity(height: float = 175, age: int = 30, gender: str = "male"):
-    return respiratory_training_service.estimate_lung_capacity(height, age, gender)
+async def estimate_lung_capacity(
+    height: Optional[float] = Query(None, ge=100, le=250),
+    age: Optional[int] = Query(None, ge=13, le=100),
+    gender: Optional[str] = None,
+):
+    """
+    Predicted vital capacity from height, age and sex.
+
+    All three are required: they defaulted to a 175 cm thirty-year-old man, so
+    the app returned a lung capacity for someone whose height it did not know.
+    """
+    if height is None or age is None or not gender:
+        return {
+            "status": "insufficient_data",
+            "needs": ["height", "age", "gender"],
+            "message": "Add your height, age and sex to your profile to see a predicted capacity.",
+        }
+    result = respiratory_training_service.estimate_lung_capacity(height, age, gender)
+    return {"status": "ok", **result}
 
 
 @router.get("/copd-program")

@@ -1,5 +1,8 @@
 import uuid
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, Field
 from app.models.schemas import UserProfileCreate, UserProfileResponse, UserProfileUpdate
 from app.core.storage import storage
 from app.services import personal_baseline
@@ -38,6 +41,29 @@ async def update_user(user_id: str, updates: UserProfileUpdate):
         return UserProfileResponse(**user)
     user = await storage.update_user(user_id, update_data)
     return UserProfileResponse(**user)
+
+class BaselineUpdate(BaseModel):
+    """
+    The parts of a baseline the user sets rather than the app measures.
+
+    The measured ones — HRV mean and deviation, resting heart rate — come from
+    their own readings and are recalibrated, not typed in.
+    """
+    sleep_target_hours: Optional[float] = Field(None, ge=4, le=12)
+    chronic_load_28d: Optional[float] = Field(None, ge=0, le=5000)
+
+
+@router.post("/{user_id}/baselines")
+async def set_baselines(user_id: str, update: BaselineUpdate):
+    """Set the preference parts of a baseline, leaving the measured ones alone."""
+    changes = update.model_dump(exclude_none=True)
+    if not changes:
+        raise HTTPException(status_code=400, detail="No baseline values supplied")
+    current = await storage.get_baseline(user_id) or dict(personal_baseline.DEFAULTS)
+    merged = {**{k: v for k, v in current.items() if k in personal_baseline.DEFAULTS}, **changes}
+    await storage.set_baseline(user_id, merged)
+    return {"user_id": user_id, "baselines": merged}
+
 
 @router.get("/{user_id}/baselines")
 async def get_baselines(user_id: str):

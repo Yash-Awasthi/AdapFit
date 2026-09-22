@@ -6,12 +6,14 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Animated, Dimensions, TextInput, StatusBar, Platform,
+  Animated, Dimensions, TextInput, StatusBar, Platform, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { colors, spacing, radius, typography } from '../src/theme';
+import { useUserStore } from '../src/stores';
+import { postJson } from '../src/services/http';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -329,8 +331,37 @@ function PreferencesStep({ activityLevel, setActivityLevel, sleepGoal, setSleepG
 // ═══════════════════════════════════════════════════════════════
 // ─── MAIN ONBOARDING ─────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════
+// The goals offered here are wellness-shaped; the backend's primary_goal is a
+// training objective. This is the mapping between them.
+const PRIMARY_GOAL: Record<string, string> = {
+  weight_loss: 'fat_loss',
+  muscle_gain: 'hypertrophy',
+  improve_fitness: 'general_fitness',
+  better_sleep: 'general_fitness',
+  reduce_stress: 'general_fitness',
+  mental_wellness: 'general_fitness',
+  chronic_condition: 'general_fitness',
+  general_wellness: 'general_fitness',
+};
+
+const FITNESS_LEVEL: Record<string, string> = {
+  sedentary: 'beginner',
+  light: 'beginner',
+  moderate: 'intermediate',
+  very: 'advanced',
+};
+
+const TRAINING_DAYS: Record<string, number> = {
+  sedentary: 2,
+  light: 3,
+  moderate: 4,
+  very: 6,
+};
+
 export default function OnboardingScreen() {
   const router = useRouter();
+  const userId = useUserStore((state) => state.userId);
+  const updateProfile = useUserStore((state) => state.updateProfile);
   const [step, setStep] = useState(0);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [gender, setGender] = useState('');
@@ -345,9 +376,45 @@ export default function OnboardingScreen() {
     setSelectedGoals(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
   };
 
+  const [saving, setSaving] = useState(false);
+
+  const finish = async () => {
+    // Everything collected here was discarded on the last step, so the app
+    // personalised against nothing. Saving it is what makes the first
+    // recovery score, workout plan and schedule specific to this person.
+    setSaving(true);
+    const profile: Record<string, any> = {
+      primary_goal: PRIMARY_GOAL[selectedGoals[0]] ?? 'general_fitness',
+      fitness_level: FITNESS_LEVEL[activityLevel] ?? 'intermediate',
+      preferred_days_per_week: TRAINING_DAYS[activityLevel] ?? 4,
+    };
+    if (gender && gender !== 'prefer_not') profile.gender = gender;
+    const parsedAge = Number(age);
+    if (Number.isFinite(parsedAge) && parsedAge >= 13 && parsedAge <= 100) profile.age = Math.round(parsedAge);
+    const parsedHeight = Number(height);
+    if (Number.isFinite(parsedHeight) && parsedHeight >= 100 && parsedHeight <= 250) profile.height_cm = parsedHeight;
+    if (device && device !== 'none') profile.health_connect_enabled = true;
+
+    try {
+      await updateProfile(profile);
+      // The sleep target is a baseline input, not a profile field: it is what
+      // the sleep score is measured against.
+      await postJson(`/users/${userId}/baselines`, { sleep_target_hours: sleepGoal });
+    } catch {
+      // A failed save must not trap someone in onboarding; the profile screen
+      // can set the same fields later.
+      Alert.alert(
+        'Saved on this device only',
+        'Your profile could not reach the server. You can set it again from Settings.'
+      );
+    }
+    setSaving(false);
+    router.replace('/(tabs)');
+  };
+
   const goNext = () => {
     if (step < 4) setStep(step + 1);
-    else router.replace('/(tabs)');
+    else finish();
   };
   const goBack = () => { if (step > 0) setStep(step - 1); };
 
