@@ -46,7 +46,6 @@ def test_the_same_lesion_always_scores_the_same(service):
     second = service.analyze_skin_lesion(FULL)
     assert first["abcde_score"] == second["abcde_score"]
     assert first["risk_level"] == second["risk_level"]
-    assert first["differential_diagnosis"] == second["differential_diagnosis"]
 
 
 def test_a_benign_looking_lesion_scores_low(service):
@@ -68,11 +67,10 @@ def test_a_lesion_meeting_every_criterion_scores_critical(service):
     assert result["criteria_assessed"] == 5
 
 
-def test_no_probability_is_ever_attached_to_a_condition(service):
+def test_no_condition_is_named(service):
     result = service.analyze_skin_lesion({**FULL, "asymmetry_score": 0.9, "border_irregularity": 0.9})
-    for entry in result["differential_diagnosis"]:
-        assert "probability" not in entry
-        assert entry["condition"] and entry["urgency"]
+    assert "differential_diagnosis" not in result
+    assert "melanoma" not in result["recommendation"].lower()
 
 
 def test_no_confidence_figure_is_invented(service):

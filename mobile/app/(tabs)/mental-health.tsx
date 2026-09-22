@@ -45,9 +45,9 @@ const JOURNAL_ENTRIES = [
 ];
 
 const CRISIS_RESOURCES = [
-  { name: '988 Suicide & Crisis Lifeline', phone: '988', icon: 'call', color: '#EF4444' },
-  { name: 'Crisis Text Line', phone: 'Text HOME to 741741', icon: 'chatbubble', color: '#6366F1' },
-  { name: 'SAMHSA Helpline', phone: '1-800-662-4357', icon: 'medical', color: '#22C55E' },
+  { name: 'Tele-MANAS (free, 24/7)', phone: '14416', icon: 'call', color: '#EF4444' },
+  { name: 'iCall (TISS)', phone: '9152987821', icon: 'chatbubble', color: '#6366F1' },
+  { name: 'Emergency', phone: '112', icon: 'medical', color: '#22C55E' },
 ];
 
 export default function MentalHealthScreen() {

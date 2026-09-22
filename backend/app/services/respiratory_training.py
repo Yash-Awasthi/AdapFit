@@ -121,7 +121,7 @@ class RespiratoryTrainingService:
             "program_name": "Asthma Management Program",
             "daily_exercises": ["Buteyko breathing: 15 minutes", "Relaxed breathing: 10 minutes", "Pursed lip breathing during activity"],
             "trigger_avoidance": ["Dust mites", "Pollen", "Cold air", "Exercise (use pre-exercise inhaler)", "Smoke"],
-            "action_plan_levels": {"green": "Well controlled — continue medication", "yellow": "Worsening — increase medication, call doctor", "red": "Emergency — use rescue inhaler, call 911"},
+            "action_plan_levels": {"green": "Well controlled — continue medication", "yellow": "Worsening — increase medication, call doctor", "red": "Emergency — use rescue inhaler, call 112"},
         }
 
     def get_breathing_rate_data(self, days: int = 7) -> list[dict]:

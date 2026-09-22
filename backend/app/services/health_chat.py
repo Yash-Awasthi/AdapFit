@@ -78,12 +78,12 @@ def get_health_chat_response(ctx: ChatContext) -> ChatResponse:
     if any(w in message_lower for w in emergency_words):
         safety_flag = True
         return ChatResponse(
-            reply="This sounds like it could be a medical emergency. Please call emergency services (911/112/999) immediately or go to the nearest emergency room. I cannot provide emergency medical advice.",
+            reply="This sounds like it could be a medical emergency. Please call emergency services (112, ambulance 108) immediately or go to the nearest emergency room. I cannot provide emergency medical advice.",
             intent="emergency",
             sources=[],
             has_web_results=False,
             safety_flag=True,
-            follow_up_suggestions=["Call 911", "Go to emergency room"],
+            follow_up_suggestions=["Call 112", "Go to emergency room"],
         )
 
     # Check built-in knowledge first

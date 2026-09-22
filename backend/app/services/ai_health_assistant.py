@@ -15,7 +15,7 @@ class AIHealthAssistant:
         "ask_nutrition": {"keywords": ["eat", "food", "diet", "nutrition", "calorie", "weight", "meal"], "response_type": "nutrition_advice"},
         "ask_sleep": {"keywords": ["sleep", "insomnia", "rest", "tired", "fatigue", "nap"], "response_type": "sleep_advice"},
         "ask_mental": {"keywords": ["anxiety", "depressed", "stress", "mood", "mental", "overwhelm"], "response_type": "mental_health_guidance"},
-        "ask_emergency": {"keywords": ["emergency", "help", "urgent", "ambulance", "hospital", "911"], "response_type": "emergency_response"},
+        "ask_emergency": {"keywords": ["emergency", "help", "urgent", "ambulance", "hospital", "112", "108"], "response_type": "emergency_response"},
         "ask_general": {"keywords": ["health", "wellness", "wellbeing", "healthy"], "response_type": "general_health"},
     }
 
@@ -91,7 +91,7 @@ class AIHealthAssistant:
         return {"response": f"Based on your symptoms, here's what I found:\n\nPossible causes: {', '.join(symptom_info['possible_causes'][:3])}\n\nSelf-care: {', '.join(symptom_info['self_care'])}\n\n⚠️ Please seek immediate medical attention if you experience: {', '.join(symptom_info['urgent_signs'])}", "type": "symptom_guidance", "symptoms_detected": detected_symptoms}
 
     def _handle_emergency(self) -> dict:
-        return {"response": "🚨 EMERGENCY RESPONSE 🚨\n\nIf this is a medical emergency, please:\n1. Call 911 (or your local emergency number) immediately\n2. If possible, have someone stay with you\n3. Unlock your door for emergency responders\n4. Do not drive yourself to the hospital\n\nI'm sending an alert to your emergency contacts now.", "type": "emergency", "emergency_contacts_alerted": True}
+        return {"response": "🚨 EMERGENCY RESPONSE 🚨\n\nIf this is a medical emergency, please:\n1. Call 112 (or your local emergency number) immediately\n2. If possible, have someone stay with you\n3. Unlock your door for emergency responders\n4. Do not drive yourself to the hospital\n\nI'm sending an alert to your emergency contacts now.", "type": "emergency", "emergency_contacts_alerted": True}
 
     def _handle_medication_query(self, message: str) -> dict:
         return {"response": "For medication questions, I recommend:\n\n1. Check the medication label for dosage instructions\n2. Never skip doses without consulting your doctor\n3. Report any side effects to your healthcare provider\n4. Keep an updated medication list\n\nWould you like me to check for drug interactions or set up a medication reminder?", "type": "medication_info"}
@@ -110,7 +110,7 @@ class AIHealthAssistant:
         return {"response": advice, "type": "sleep_advice"}
 
     def _handle_mental_health(self, message: str) -> dict:
-        return {"response": "I'm here to support you. Mental health matters.\n\nIf you're feeling overwhelmed, try:\n• Deep breathing exercises (I can guide you)\n• Journaling your thoughts\n• Talking to someone you trust\n• Taking a short walk\n\nIf you're in crisis, please contact the 988 Suicide & Crisis Lifeline by calling or texting 988.", "type": "mental_health_guidance", "crisis_resources": ["988 Suicide & Crisis Lifeline: Call or text 988", "Crisis Text Line: Text HOME to 741741"]}
+        return {"response": "I'm here to support you. Mental health matters.\n\nIf you're feeling overwhelmed, try:\n• Deep breathing exercises (I can guide you)\n• Journaling your thoughts\n• Talking to someone you trust\n• Taking a short walk\n\nIf you're in crisis, please call Tele-MANAS on 14416 (free, 24/7), or 112 in an emergency.", "type": "mental_health_guidance", "crisis_resources": ["988 Suicide & Crisis Lifeline: Call or text 988", "Crisis Text Line: Text HOME to 741741"]}
 
     def _handle_general_health(self) -> dict:
         tip = self.QUICK_HEALTH_TIPS[datetime.now().hour % len(self.QUICK_HEALTH_TIPS)]

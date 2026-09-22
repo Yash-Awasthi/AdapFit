@@ -35,7 +35,7 @@ TRIAGE_LEVELS = {
     1: {"level": "self_care", "color": "#10B981", "message": "This can likely be managed at home. Monitor symptoms and rest.", "action": "Rest, hydrate, and monitor. See a doctor if symptoms worsen or persist beyond 7 days."},
     2: {"level": "doctor", "color": "#F97316", "message": "Schedule a visit with your primary care doctor.", "action": "Book an appointment within the next few days. Bring a list of your symptoms and their timeline."},
     3: {"level": "urgent_care", "color": "#EF4444", "message": "Consider visiting urgent care or calling your doctor today.", "action": "Go to urgent care or call your doctor for advice. Don't wait more than 24 hours."},
-    4: {"level": "emergency", "color": "#DC2626", "message": "This may require immediate medical attention.", "action": "Call emergency services (911) or go to the nearest emergency room immediately."},
+    4: {"level": "emergency", "color": "#DC2626", "message": "This may require immediate medical attention.", "action": "Call emergency services (112) or go to the nearest emergency room immediately."},
 }
 
 

@@ -1,112 +1,216 @@
 /**
- * Remote Monitoring — Premium IoT Device Dashboard
- * Vital trends, connected devices, alert management
+ * Remote Monitoring — connected-device dashboard from real readings.
+ *
+ * Vital trend and status come only from readings this patient actually
+ * submitted; the dashboard used to hand back a fixed 122/78 and "Dr. Smith"
+ * appointment regardless of whether any device had reported anything.
  */
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Dimensions,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
+  StatusBar, ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radius } from '../../src/theme';
-import { ScreenWrapper } from '../../src/components/ScreenWrapper';
-import { GlassCard, SectionHeaderPremium, ScoreRing, ProgressBarPremium } from '../../src/components/PremiumComponents';
-import { MetricCardWithChart } from '../../src/components/InteractiveCharts';
-import { StaggeredList } from '../../src/components/AnimationSystem';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, spacing, typography } from '../../src/theme';
+import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { useApis } from '../../src/hooks/useApi';
+import { postJson } from '../../src/services/http';
+import { useUserStore } from '../../src/stores';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const DEVICE_METRICS: Record<string, string[]> = {
+  blood_pressure_monitor: ['systolic', 'diastolic', 'pulse'],
+  glucose_meter: ['blood_glucose'],
+  pulse_oximeter: ['oxygen_saturation', 'pulse_rate'],
+  smart_scale: ['weight', 'body_fat', 'bmi'],
+  wearable_tracker: ['steps', 'heart_rate', 'sleep', 'activity_minutes'],
+  ecg_monitor: ['heart_rate', 'hrv'],
+};
 
-const DEVICES = [
-  { id: 1, name: 'Blood Pressure Monitor', type: 'bp', icon: 'pulse', color: '#EF4444', status: 'connected', lastReading: '122/78', time: '2h ago' },
-  { id: 2, name: 'Glucose Meter', type: 'glucose', icon: 'water', color: '#22C55E', status: 'connected', lastReading: '105 mg/dL', time: '4h ago' },
-  { id: 3, name: 'Pulse Oximeter', type: 'spo2', icon: 'heart', color: '#3B82F6', status: 'disconnected', lastReading: '97%', time: '1d ago' },
-  { id: 4, name: 'Smart Scale', type: 'weight', icon: 'scale', color: '#8B5CF6', status: 'connected', lastReading: '74.5 kg', time: '8h ago' },
-];
-
-const VITALS = [
-  { title: 'Blood Pressure', value: '122/78', change: '-3%', changeType: 'down' as const, data: [128, 125, 124, 122, 123, 121, 122], color: '#EF4444', icon: 'pulse' },
-  { title: 'Heart Rate', value: '72 bpm', change: '-2%', changeType: 'down' as const, data: [74, 73, 72, 71, 72, 73, 72], color: '#22C55E', icon: 'heart' },
-  { title: 'Blood Glucose', value: '105 mg/dL', change: '-5%', changeType: 'down' as const, data: [115, 112, 110, 108, 106, 105, 105], color: '#F59E0B', icon: 'water' },
-  { title: 'SpO2', value: '97%', change: '0%', changeType: 'flat' as const, data: [97, 96, 97, 98, 97, 97, 97], color: '#3B82F6', icon: 'fitness' },
-];
+interface VitalSummaryEntry { latest: string; trend: string }
+interface Dashboard {
+  connected_devices: number;
+  active_alerts: number;
+  measurements_today: number;
+  vital_summary: Record<string, VitalSummaryEntry>;
+  recent_alerts: { message: string; severity: string }[];
+  last_sync: string | null;
+}
 
 export default function RemoteMonitoringScreen() {
+  const userId = useUserStore((s) => s.userId);
+  const [busy, setBusy] = useState(false);
+  const [deviceType, setDeviceType] = useState('blood_pressure_monitor');
+  const [readingDevice, setReadingDevice] = useState('blood_pressure_monitor');
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  const { data, loading, refresh, refreshing, reload } = useApis<{ dashboard: { data: Dashboard } }>({
+    dashboard: `/remote-monitoring/dashboard/${userId}`,
+  });
+
+  const dashboard = data.dashboard?.data;
+  const hasDevices = (dashboard?.connected_devices ?? 0) > 0;
+
+  const registerDevice = useCallback(async () => {
+    setBusy(true);
+    const result = await postJson('/remote-monitoring/register-device', {
+      patient_id: userId, device_type: deviceType, device_info: {},
+    });
+    setBusy(false);
+    if (!result) {
+      Alert.alert('Not registered', 'The device could not be registered.');
+      return;
+    }
+    await reload();
+  }, [deviceType, userId, reload]);
+
+  const submitReading = useCallback(async () => {
+    const readings: Record<string, number> = {};
+    for (const m of DEVICE_METRICS[readingDevice] ?? []) {
+      const v = values[m];
+      if (v && v.trim()) readings[m] = Number(v);
+    }
+    if (Object.keys(readings).length === 0) {
+      Alert.alert('No values entered', 'Enter at least one reading.');
+      return;
+    }
+    setBusy(true);
+    const result = await postJson<{ alerts?: { message: string }[] }>('/remote-monitoring/process-reading', {
+      patient_id: userId, device_type: readingDevice, readings,
+    });
+    setBusy(false);
+    if (!result) {
+      Alert.alert('Not recorded', 'The reading could not be saved.');
+      return;
+    }
+    if (result.alerts?.length) {
+      Alert.alert('Worth checking', result.alerts.map((a) => a.message).join('\n'));
+    }
+    setValues({});
+    await reload();
+  }, [readingDevice, values, userId, reload]);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#06B6D4" />
+      </View>
+    );
+  }
+
   return (
-    <ScreenWrapper
-      title="Remote Monitoring"
-      subtitle="Connected health devices"
-      gradient={['#06B6D4', '#3B82F6']}
-      rightAction={{ icon: 'add', onPress: () => {} }}
-    >
-      {/* Health Score */}
-      <View style={styles.scoreSection}>
-        <ScoreRing score={88} size={120} strokeWidth={8} color="#06B6D4" label="MONITORING" sublabel="Good" />
-      </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#06B6D4" />}
+      >
+        <LinearGradient colors={['#06B6D4', '#3B82F6', '#0F1629']} style={styles.hero}>
+          <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)' }]}>Remote Monitoring</Text>
+          <Text style={[typography.heading.h1, { color: '#fff', marginTop: 4 }]}>
+            {dashboard?.connected_devices ?? 0} device{dashboard?.connected_devices === 1 ? '' : 's'} connected
+          </Text>
+          <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)', marginTop: 4 }]}>
+            {dashboard?.active_alerts ?? 0} active alert{dashboard?.active_alerts === 1 ? '' : 's'} · {dashboard?.measurements_today ?? 0} readings today
+          </Text>
+        </LinearGradient>
 
-      {/* Connected Devices */}
-      <SectionHeaderPremium icon="watch" iconColor="#06B6D4" title="Connected Devices" action={{ label: 'Add Device', onPress: () => {} }} />
-      <StaggeredList staggerDelay={80} animationType="slideIn">
-        {DEVICES.map(device => (
-          <GlassCard key={device.id} variant="light" style={styles.deviceCard}>
-            <View style={styles.deviceRow}>
-              <View style={[styles.deviceIcon, { backgroundColor: device.color + '15' }]}>
-                <Ionicons name={device.icon as any} size={20} color={device.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.deviceName}>{device.name}</Text>
-                <Text style={styles.deviceReading}>{device.lastReading} • {device.time}</Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: device.status === 'connected' ? '#22C55E15' : '#F59E0B15' }]}>
-                <View style={[styles.statusDot, { backgroundColor: device.status === 'connected' ? '#22C55E' : '#F59E0B' }]} />
-                <Text style={[styles.statusText, { color: device.status === 'connected' ? '#22C55E' : '#F59E0B' }]}>{device.status}</Text>
-              </View>
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Register a Device" icon="watch" iconColor="#06B6D4" />
+          <GlassCard>
+            <View style={styles.chipRow}>
+              {Object.keys(DEVICE_METRICS).map((t) => (
+                <TouchableOpacity key={t} style={[styles.chip, deviceType === t && styles.chipActive]} onPress={() => setDeviceType(t)}>
+                  <Text style={[styles.chipText, deviceType === t && styles.chipTextActive]}>{t.replace(/_/g, ' ')}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
+            <TouchableOpacity style={styles.primaryBtn} onPress={registerDevice} disabled={busy}>
+              <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Register device'}</Text>
+            </TouchableOpacity>
           </GlassCard>
-        ))}
-      </StaggeredList>
-
-      {/* Vital Trends */}
-      <SectionHeaderPremium icon="trending-up" iconColor="#22C55E" title="Vital Trends" />
-      <View style={{ paddingHorizontal: spacing.screenPadding }}>
-        {VITALS.map((vital, i) => (
-          <MetricCardWithChart key={i} {...vital} />
-        ))}
-      </View>
-
-      {/* Alerts */}
-      <SectionHeaderPremium icon="alert" iconColor="#EF4444" title="Recent Alerts" />
-      <GlassCard variant="light" style={styles.sectionCard}>
-        <View style={styles.alertRow}>
-          <View style={[styles.alertIcon, { backgroundColor: '#22C55E15' }]}>
-            <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.alertTitle}>All vitals within normal range</Text>
-            <Text style={styles.alertTime}>Last checked: 2 hours ago</Text>
-          </View>
         </View>
-      </GlassCard>
-    </ScreenWrapper>
+
+        {hasDevices && (
+          <>
+            <View style={styles.section}>
+              <SectionHeaderPremium title="Submit a Reading" icon="pulse" iconColor="#EF4444" />
+              <GlassCard>
+                <View style={styles.chipRow}>
+                  {Object.keys(DEVICE_METRICS).map((t) => (
+                    <TouchableOpacity key={t} style={[styles.chip, readingDevice === t && styles.chipActive]} onPress={() => setReadingDevice(t)}>
+                      <Text style={[styles.chipText, readingDevice === t && styles.chipTextActive]}>{t.replace(/_/g, ' ')}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {DEVICE_METRICS[readingDevice].map((m) => (
+                  <TextInput
+                    key={m}
+                    style={styles.input}
+                    placeholder={m.replace(/_/g, ' ')}
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="numeric"
+                    value={values[m] ?? ''}
+                    onChangeText={(v) => setValues((prev) => ({ ...prev, [m]: v }))}
+                  />
+                ))}
+                <TouchableOpacity style={styles.primaryBtn} onPress={submitReading} disabled={busy}>
+                  <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Submit reading'}</Text>
+                </TouchableOpacity>
+              </GlassCard>
+            </View>
+
+            <View style={styles.section}>
+              <SectionHeaderPremium title="Vital Trends" icon="trending-up" iconColor="#22C55E" />
+              {!dashboard || Object.keys(dashboard.vital_summary).length === 0 ? (
+                <Text style={styles.emptyText}>No readings submitted yet.</Text>
+              ) : (
+                Object.entries(dashboard.vital_summary).map(([metric, v]) => (
+                  <View key={metric} style={styles.vitalRow}>
+                    <Ionicons name="pulse" size={16} color="#06B6D4" />
+                    <Text style={[typography.body.md, { color: colors.text.primary, flex: 1, marginLeft: 10, textTransform: 'capitalize' }]}>{metric.replace(/_/g, ' ')}</Text>
+                    <Text style={[typography.body.md, { color: colors.text.muted }]}>{v.latest} · {v.trend}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {dashboard && dashboard.recent_alerts.length > 0 && (
+              <View style={styles.section}>
+                <SectionHeaderPremium title="Recent Alerts" icon="warning" iconColor={colors.health.warning} />
+                {dashboard.recent_alerts.map((a, i) => (
+                  <Text key={i} style={[typography.body.sm, { color: colors.health.warning, marginBottom: 6 }]}>{a.message}</Text>
+                ))}
+              </View>
+            )}
+          </>
+        )}
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scoreSection: { alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.lg },
-  sectionCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.md },
-
-  // Devices
-  deviceCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm },
-  deviceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  deviceIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  deviceName: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
-  deviceReading: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 11, fontWeight: '600' },
-
-  // Alerts
-  alertRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  alertIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  alertTitle: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
-  alertTime: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
+  container: { flex: 1, backgroundColor: colors.bg.deep },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 100 },
+  hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
+  emptyText: { color: colors.text.muted, fontSize: 13 },
+  vitalRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: colors.surface.divider },
+  input: {
+    backgroundColor: colors.bg.card, borderRadius: 12, padding: 12, color: colors.text.primary,
+    borderWidth: 1, borderColor: colors.surface.border, marginBottom: 10,
+  },
+  primaryBtn: { backgroundColor: '#06B6D4', borderRadius: 12, padding: 14, alignItems: 'center' },
+  primaryBtnText: { color: '#fff', fontWeight: '700' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border },
+  chipActive: { backgroundColor: '#06B6D420', borderColor: '#06B6D4' },
+  chipText: { color: colors.text.muted, fontSize: 12, textTransform: 'capitalize' },
+  chipTextActive: { color: '#06B6D4', fontWeight: '700' },
 });

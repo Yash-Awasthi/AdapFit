@@ -23,7 +23,7 @@ class ChatModeration:
         "uk": {"name": "Samaritans", "number": "116 123"},
         "canada": {"name": "Crisis Services Canada", "number": "1-833-456-4566"},
         "australia": {"name": "Lifeline Australia", "number": "13 11 14"},
-        "india": {"name": "iCall", "number": "9152987821"},
+        "india": {"name": "Tele-MANAS", "number": "14416", "alt": "iCall 9152987821"},
         "global": {"name": "Befrienders Worldwide", "url": "https://www.befrienders.org"},
     }
 
@@ -62,8 +62,8 @@ class ChatModeration:
     def get_flagged_content(self, limit: int = 50) -> List[dict]:
         return self.moderation_logs[-limit:]
 
-    def get_helplines(self, country: str = "us") -> dict:
-        return self.HELPLINE_NUMBERS.get(country, self.HELPLINE_NUMBERS["us"])
+    def get_helplines(self, country: str = "india") -> dict:
+        return self.HELPLINE_NUMBERS.get(country, self.HELPLINE_NUMBERS["india"])
 
 
 chat_moderation = ChatModeration()

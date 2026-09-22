@@ -10,6 +10,8 @@ from app.core.dependencies import authenticate_websocket
 from app.core.gemini import DEFAULT_MODEL, extract_text, gemini_endpoint
 from app.services.rag_knowledge import rag_retriever
 from app.services.chat_actions import maybe_execute_action
+from app.services.coach_prompts import coach_prompts
+from app.services.safety_policy import triage
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -45,7 +47,7 @@ async def _stream_gemini(prompt: str, history: list[dict], system: str = "") -> 
 
 async def _stream_groq(prompt: str, history: list[dict]) -> str:
     """Call Groq Llama-3.3-70B as fallback."""
-    messages = [{"role": "system", "content": "You are AdapFit, an expert AI fitness coach. Be concise, evidence-based, and motivating."}]
+    messages = [{"role": "system", "content": coach_prompts.BASE_SYSTEM}]
     for msg in history[-8:]:
         messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
     messages.append({"role": "user", "content": prompt})
@@ -108,6 +110,16 @@ async def chat_websocket(websocket: WebSocket, user_id: str):
 
             history.append({"role": "user", "content": message})
 
+            flagged = triage(message)
+            if flagged:
+                history.append({"role": "assistant", "content": flagged["reply"]})
+                await websocket.send_json({"type": "chunk", "content": flagged["reply"]})
+                await websocket.send_json({
+                    "type": "done", "model": "safety", "full_response": flagged["reply"],
+                    "safety": {"category": flagged["category"], "resources": flagged["resources"]},
+                })
+                continue
+
             # Send typing indicator
             await websocket.send_json({"type": "status", "status": "thinking"})
 
@@ -133,7 +145,7 @@ async def chat_websocket(websocket: WebSocket, user_id: str):
             model_used = ""
             if settings.GOOGLE_AI_API_KEY:
                 try:
-                    response = await _stream_gemini(grounded_prompt, history)
+                    response = await _stream_gemini(grounded_prompt, history, system=coach_prompts.BASE_SYSTEM)
                     model_used = DEFAULT_MODEL
                 except Exception:
                     pass

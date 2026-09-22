@@ -153,32 +153,9 @@ class MedicalImagingService:
                 "An ABCDE screening score from the supplied measurements. It does not "
                 "diagnose or rule out skin cancer; only a clinician can."
             ),
-            "differential_diagnosis": self._get_differential(abcde_score, asymmetry, border, color_var),
             "follow_up_schedule": self._get_follow_up(risk),
             "self_monitoring": self._get_self_monitoring_tips(),
         }
-
-    def _get_differential(self, score: int, asym: float, border: float, color: float) -> List[Dict]:
-        """
-        What a clinician would want to rule out at this score.
-
-        No probabilities. These were random percentages, so a lesion could be
-        told it was "Melanoma, 47.3%" — a number with nothing behind it, on the
-        one subject where a number carries the most weight.
-        """
-        if score >= 3:
-            return [
-                {"condition": "Melanoma", "urgency": "urgent", "note": "Needs to be ruled out at this score."},
-                {"condition": "Atypical nevus", "urgency": "moderate", "note": "Common cause of an irregular appearance."},
-            ]
-        if score >= 1:
-            return [
-                {"condition": "Benign nevus", "urgency": "routine", "note": "Ordinary moles can meet one criterion."},
-                {"condition": "Seborrhoeic keratosis", "urgency": "routine", "note": "Benign, and often irregular in colour."},
-            ]
-        return [
-            {"condition": "Benign lesion", "urgency": "routine", "note": "No criterion met. Keep watching for change."},
-        ]
 
     def _get_follow_up(self, risk: str) -> Dict:
         """Get follow-up schedule based on risk"""

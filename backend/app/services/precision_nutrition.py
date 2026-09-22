@@ -67,6 +67,12 @@ class PrecisionNutritionService:
         self.profiles[user_id] = profile
         return profile
 
+    def get_nutrition_profile(self, user_id: str) -> dict:
+        profile = self.profiles.get(user_id)
+        if not profile:
+            return {"status": "no_data", "message": "No nutrition profile set up yet."}
+        return {"status": "ok", **profile}
+
     def generate_meal_plan(self, user_id: str, days: int = 7) -> dict:
         profile = self.profiles.get(user_id, {})
         mb = profile.get("microbiome", self.MICROBIOME_PROFILES["balanced"])
