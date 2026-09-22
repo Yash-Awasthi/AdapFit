@@ -24,6 +24,12 @@ async def log_daily(req: DailyLogRequest):
     result = cardiac_rehab_service.log_daily(req.user_id, req.data)
     return {"success": True, "data": result}
 
+@router.get("/program/{user_id}")
+async def get_program(user_id: str):
+    """The full program: phase, precautions and the target heart-rate zone."""
+    return cardiac_rehab_service.get_program(user_id)
+
+
 @router.get("/exercise/{user_id}")
 async def get_exercise(user_id: str):
     result = cardiac_rehab_service.get_exercise_program(user_id)

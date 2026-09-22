@@ -29,6 +29,12 @@ async def log_pain(req: PainLogRequest):
     return {"success": True, "data": result}
 
 
+@router.get("/history/{user_id}")
+async def get_pain_history(user_id: str, limit: int = 30):
+    """The pain diary. Without it the diary tab has nothing to show."""
+    return {"success": True, "data": chronic_pain_service.get_pain_history(user_id, limit)}
+
+
 @router.get("/triggers/{user_id}")
 async def analyze_triggers(user_id: str):
     result = chronic_pain_service.analyze_triggers(user_id)

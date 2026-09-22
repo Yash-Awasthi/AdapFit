@@ -1,6 +1,6 @@
 """Skin Health & Mole Tracking API"""
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from app.services.skin_health import skin_health_service
 
@@ -50,9 +50,24 @@ async def get_mole(mole_id: str):
     return {"mole": mole}
 
 
-@router.post("/mole/{mole_id}/analyze")
-async def analyze_mole(mole_id: str):
-    return skin_health_service.analyze_mole_photo(mole_id)
+class MoleMeasurement(BaseModel):
+    """A fresh measurement of a mole already being tracked."""
+    size_mm: float = Field(gt=0, le=100)
+    color: str = ""
+    notes: str = ""
+
+
+@router.post("/mole/{mole_id}/measure")
+async def measure_mole(mole_id: str, measurement: MoleMeasurement):
+    """Record a new measurement and report what changed since the last one."""
+    return skin_health_service.record_measurement(
+        mole_id, measurement.size_mm, measurement.color, measurement.notes
+    )
+
+
+@router.get("/mole/{mole_id}/history")
+async def get_mole_history(mole_id: str):
+    return {"history": skin_health_service.get_mole_history(mole_id)}
 
 
 @router.post("/uv")

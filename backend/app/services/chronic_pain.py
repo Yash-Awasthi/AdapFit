@@ -126,6 +126,10 @@ class ChronicPainService:
         self.pain_logs[user_id].append(entry)
         return entry
 
+    def get_pain_history(self, user_id: str, limit: int = 30) -> List[Dict[str, Any]]:
+        """This user's diary entries, oldest first."""
+        return self.pain_logs.get(user_id, [])[-limit:]
+
     def analyze_triggers(self, user_id: str) -> Dict[str, Any]:
         """Analyze pain triggers and correlations."""
         logs = self.pain_logs.get(user_id, [])
