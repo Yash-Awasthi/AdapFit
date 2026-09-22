@@ -76,8 +76,22 @@ class CardiacRehabService:
         }
 
     def setup_program(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Set up cardiac rehabilitation program."""
-        age = data.get("age", 65)
+        """
+        Set up a cardiac rehabilitation program.
+
+        Age is required: the target heart-rate zone is derived from it, and it
+        used to default to 65. A patient of 45 given a 65-year-old's zone
+        trains to the wrong ceiling, which is the one number on this screen
+        that has to be right.
+        """
+        age = data.get("age")
+        if not isinstance(age, (int, float)) or not 18 <= age <= 100:
+            return {
+                "status": "insufficient_data",
+                "needs": ["age"],
+                "message": "Your age is needed to set a target heart-rate zone.",
+            }
+        age = int(age)
         max_hr = 220 - age
 
         self.profiles[user_id] = {
@@ -89,14 +103,15 @@ class CardiacRehabService:
             "max_heart_rate": max_hr,
             "target_hr_min": int(max_hr * 0.6),
             "target_hr_max": int(max_hr * 0.8),
-            "resting_hr": data.get("resting_hr", 72),
+            "resting_hr": data.get("resting_hr"),
             "medications": data.get("medications", []),
-            "weight_kg": data.get("weight", 80),
+            "weight_kg": data.get("weight"),
             "fluid_limit_ml": data.get("fluid_limit_ml", 2000),
             "created_at": time.time(),
         }
 
         return {
+            "status": "ok",
             "program": self.profiles[user_id],
             "current_phase": self.phases[1],
             "heart_rate_zones": {
@@ -115,9 +130,12 @@ class CardiacRehabService:
         entry = {
             "date": data.get("date", time.strftime("%Y-%m-%d")),
             "weight_kg": data.get("weight"),
-            "blood_pressure": data.get("bp", "120/80"),
+            # Not defaulted: "120/80" and a saturation of 97 are reassuring
+            # values, and defaulting to them silenced the alerts below for
+            # exactly the patient who did not record a reading.
+            "blood_pressure": data.get("bp"),
             "resting_hr": data.get("resting_hr"),
-            "spo2": data.get("spo2", 97),
+            "spo2": data.get("spo2"),
             "fluid_intake_ml": data.get("fluid_ml", 0),
             "exercise_min": data.get("exercise_min", 0),
             "exercise_type": data.get("exercise_type", "walking"),
@@ -125,8 +143,8 @@ class CardiacRehabService:
             "max_hr_during_exercise": data.get("max_hr"),
             "medications_taken": data.get("medications_taken", True),
             "symptoms": data.get("symptoms", []),
-            "rpe": data.get("rpe", 5),
-            "mood": data.get("mood", 5),
+            "rpe": data.get("rpe"),
+            "mood": data.get("mood"),
             "logged_at": time.time(),
         }
 
@@ -135,11 +153,17 @@ class CardiacRehabService:
         # Alerts
         alerts = []
         bp = entry["blood_pressure"]
-        if "/" in bp:
-            systolic = int(bp.split("/")[0])
-            if systolic > 140: alerts.append("Blood pressure elevated")
-            if systolic < 90: alerts.append("Blood pressure low")
-        if entry.get("spo2", 100) < 94: alerts.append("Oxygen saturation low")
+        if isinstance(bp, str) and "/" in bp:
+            try:
+                systolic = int(bp.split("/")[0])
+            except ValueError:
+                systolic = None
+            if systolic is not None:
+                if systolic > 140: alerts.append("Blood pressure elevated")
+                if systolic < 90: alerts.append("Blood pressure low")
+        spo2 = entry.get("spo2")
+        if isinstance(spo2, (int, float)) and spo2 < 94:
+            alerts.append("Oxygen saturation low")
         if entry.get("fluid_intake_ml", 0) > self.profiles.get(user_id, {}).get("fluid_limit_ml", 2000):
             alerts.append("Fluid intake over daily limit")
         if entry.get("weight_kg") and self.daily_logs[user_id]:
@@ -150,18 +174,49 @@ class CardiacRehabService:
 
         return {"entry": entry, "alerts": alerts}
 
-    def get_exercise_program(self, user_id: str) -> Dict[str, Any]:
-        """Get current phase exercise program."""
-        profile = self.profiles.get(user_id, {})
-        phase = profile.get("current_phase", 1)
-        program = self.phases.get(phase, self.phases[1])
+    def get_program(self, user_id: str) -> Dict[str, Any]:
+        """
+        This user's program, in the same shape setup_program returns.
 
+        Nothing is invented for a user who has not set one up: the target
+        zone depends on their age, and there is no safe stand-in for it.
+        """
+        profile = self.profiles.get(user_id)
+        if not profile:
+            return {
+                "status": "insufficient_data",
+                "needs": ["age"],
+                "message": "Your age is needed to set a target heart-rate zone.",
+            }
+        phase = self.phases.get(profile["current_phase"], self.phases[1])
         return {
-            "phase": phase,
+            "status": "ok",
+            "program": profile,
+            "current_phase": phase,
+            "heart_rate_zones": {
+                "resting": profile.get("resting_hr"),
+                "target_min": profile["target_hr_min"],
+                "target_max": profile["target_hr_max"],
+                "maximum": profile["max_heart_rate"],
+            },
+        }
+
+    def get_exercise_program(self, user_id: str) -> Dict[str, Any]:
+        """Current phase exercises, with the target zone only if one exists."""
+        profile = self.profiles.get(user_id)
+        if not profile:
+            return {
+                "status": "insufficient_data",
+                "message": "Set up a program to see the exercises and target zone for your phase.",
+            }
+        program = self.phases.get(profile["current_phase"], self.phases[1])
+        return {
+            "status": "ok",
+            "phase": profile["current_phase"],
             "phase_name": program["name"],
             "duration": program["duration_weeks"],
             "exercises": program["exercises"],
-            "target_heart_rate": f"{profile.get('target_hr_min', 90)}-{profile.get('target_hr_max', 120)} bpm",
+            "target_heart_rate": f"{profile['target_hr_min']}-{profile['target_hr_max']} bpm",
             "precautions": program["precautions"],
         }
 
@@ -176,13 +231,16 @@ class CardiacRehabService:
             return {"message": "Start logging to see your progress"}
 
         recent = logs[-7:] if len(logs) > 7 else logs
-        total_exercise = sum(l.get("exercise_min", 0) for l in recent)
-        avg_rpe = sum(l.get("rpe", 5) for l in recent) / len(recent)
+        total_exercise = sum(l.get("exercise_min") or 0 for l in recent)
+        # Averaged over the days that recorded one, rather than treating a
+        # blank as a middling 5.
+        rpes = [l["rpe"] for l in recent if isinstance(l.get("rpe"), (int, float))]
+        avg_rpe = sum(rpes) / len(rpes) if rpes else None
 
         return {
             "total_exercise_minutes": total_exercise,
             "avg_exercise_per_day": round(total_exercise / max(1, len(recent)), 1),
-            "average_rpe": round(avg_rpe, 1),
+            "average_rpe": round(avg_rpe, 1) if avg_rpe is not None else None,
             "days_logged": len(recent),
             "medication_adherence": round(sum(1 for l in recent if l.get("medications_taken")) / max(1, len(recent)) * 100),
             "encouragement": "Great progress! Keep up the exercise routine." if total_exercise > 150 else "Try to increase your daily exercise gradually.",

@@ -27,7 +27,7 @@ const HIDDEN_SCREENS = [
   "achievements", "settings", "personal-info", "dev-tools",
   "sleep-tracker", "mental-health", "medication", "emergency",
   "community", "workouts", "devices", "coach", "voice-health", "longevity",
-  "ambient", "data-export", "diabetes", "chronic-pain", "chronic-pain-v2",
+  "ambient", "data-export", "diabetes", "chronic-pain",
   "accessibility-settings",
   "skin-health", "circadian", "posture", "respiratory",
   "medical-imaging", "remote-monitoring",
@@ -36,7 +36,7 @@ const HIDDEN_SCREENS = [
 ];
 
 /** Only meaningful when the profile records a female gender. */
-const FEMALE_SCREENS = ["cycle", "fertility", "pregnancy", "pregnancy-v2"];
+const FEMALE_SCREENS = ["cycle", "fertility", "pregnancy"];
 
 const screenHeaderStyle = {
   headerShown: true,

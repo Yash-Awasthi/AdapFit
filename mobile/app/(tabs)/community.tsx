@@ -1,62 +1,151 @@
 /**
- * Community — Premium Health Challenges & Social Features
- * Glassmorphism cards, animated elements, leaderboard, challenges
+ * Community — challenges, the leaderboard and the shared feed.
+ *
+ * The leaderboard is the gamification board, which ranks by points actually
+ * earned, so nobody appears on it who has not logged anything. The feed is
+ * what people chose to share; an empty community reads as empty rather than
+ * as five invented members with streaks.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Dimensions, Animated,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Alert, RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radius, glass } from '../../src/theme';
-import {
-  ScoreRing, GlassCard, SectionHeaderPremium, QuickAction, PillChip,
-} from '../../src/components/PremiumComponents';
-import { StaggeredList } from '../../src/components/AnimationSystem';
-import { SCREEN_HEADER_TOP } from '../../src/theme/layout';
+import * as Haptics from 'expo-haptics';
+import { colors, spacing, radius } from '../../src/theme';
+import { GlassCard } from '../../src/components/PremiumComponents';
+import { useApis } from '../../src/hooks/useApi';
+import { postJson, asArray } from '../../src/services/http';
+import { useUserStore } from '../../src/stores';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const CHALLENGES = [
-  { id: 1, title: '10K Steps Daily', icon: 'footsteps', color: colors.health.activity, participants: 234, progress: 72, daysLeft: 5, joined: true },
-  { id: 2, title: '30-Day Meditation', icon: 'meditate', color: colors.health.mental, participants: 189, progress: 45, daysLeft: 18, joined: true },
-  { id: 3, title: 'Hydration Hero', icon: 'water', color: '#3B82F6', participants: 312, progress: 0, daysLeft: 30, joined: false },
-  { id: 4, title: 'No Sugar Week', icon: 'restaurant', color: colors.health.nutrition, participants: 156, progress: 30, daysLeft: 4, joined: false },
-  { id: 5, title: 'Sleep Champion', icon: 'moon', color: colors.health.sleep, participants: 98, progress: 60, daysLeft: 10, joined: true },
-];
+type Tab = 'challenges' | 'leaderboard' | 'feed';
 
-const LEADERBOARD = [
-  { rank: 1, name: 'Sarah M.', score: 9850, avatar: 'woman', streak: 15 },
-  { rank: 2, name: 'You', score: 8720, avatar: 'person', streak: 5, isUser: true },
-  { rank: 3, name: 'Mike R.', score: 8200, avatar: 'man', streak: 8 },
-  { rank: 4, name: 'Emma L.', score: 7800, avatar: 'woman', streak: 12 },
-  { rank: 5, name: 'James K.', score: 7200, avatar: 'person', streak: 3 },
-];
+interface Challenge {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  target_value: number;
+  target_unit: string;
+  duration_days: number;
+  difficulty: string;
+  participant_count: number;
+  is_active: boolean;
+  ends_at: string;
+}
+
+interface LeaderboardEntry {
+  user_id: string;
+  username: string;
+  score: number;
+  rank: number;
+}
+
+interface Share {
+  id: string;
+  user_id: string;
+  user_name: string;
+  title: string;
+  caption: string;
+  exercises_summary: string;
+  duration_minutes: number;
+  likes: number;
+  comments_count: number;
+  shared_at: string;
+}
+
+const CATEGORY_STYLE: Record<string, { icon: string; color: string }> = {
+  steps: { icon: 'footsteps', color: colors.health.activity },
+  cardio: { icon: 'heart', color: colors.health.heart },
+  strength: { icon: 'barbell', color: colors.health.energy },
+  mindfulness: { icon: 'leaf', color: colors.health.mental },
+  hydration: { icon: 'water', color: '#3B82F6' },
+  sleep: { icon: 'moon', color: colors.health.sleep },
+  nutrition: { icon: 'restaurant', color: colors.health.nutrition },
+};
+
+function styleFor(category: string) {
+  return CATEGORY_STYLE[category?.toLowerCase()] ?? { icon: 'trophy', color: colors.primary };
+}
+
+function daysLeft(endsAt: string): number | null {
+  const end = new Date(endsAt).getTime();
+  if (Number.isNaN(end)) return null;
+  return Math.max(0, Math.ceil((end - Date.now()) / 86400_000));
+}
+
+function timeAgo(iso: string): string {
+  const when = new Date(iso).getTime();
+  if (Number.isNaN(when)) return '';
+  const hours = Math.floor((Date.now() - when) / 3600_000);
+  if (hours < 1) return 'just now';
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
 
 export default function CommunityScreen() {
-  const [activeTab, setActiveTab] = useState<'challenges' | 'leaderboard' | 'feed'>('challenges');
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const userId = useUserStore((s) => s.userId);
+  const [activeTab, setActiveTab] = useState<Tab>('challenges');
+  const [joining, setJoining] = useState<string | null>(null);
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, []);
+  const { data, loading, refreshing, refresh, reload } = useApis<{
+    challenges: Challenge[];
+    leaderboard: { leaderboard: LeaderboardEntry[] };
+    feed: Share[];
+  }>({
+    challenges: '/challenges',
+    leaderboard: '/gamification/leaderboard?limit=20',
+    feed: '/community/feed',
+  });
+
+  const challenges = asArray<Challenge>(data.challenges);
+  const leaderboard = asArray<LeaderboardEntry>(data.leaderboard?.leaderboard);
+  const feed = asArray<Share>(data.feed);
+
+  const join = useCallback(async (challenge: Challenge) => {
+    setJoining(challenge.id);
+    const result = await postJson(`/challenges/join/${challenge.id}`, {});
+    setJoining(null);
+    if (!result) {
+      Alert.alert('Could not join', 'The challenge could not be joined. Try again when you are online.');
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await reload();
+  }, [reload]);
+
+  const like = useCallback(async (share: Share) => {
+    Haptics.selectionAsync();
+    await postJson(`/community/${share.id}/like`, {});
+    await reload();
+  }, [reload]);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
-      {/* Header */}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />
+      }
+    >
       <LinearGradient colors={['#EC4899', '#F472B6']} style={styles.header}>
-        <Text style={styles.headerTitle}>Community</Text>
+        <Text style={styles.headerTitle} accessibilityRole="header">Community</Text>
         <Text style={styles.headerSubtitle}>Connect, compete, and grow together</Text>
       </LinearGradient>
 
-      {/* Tab Selector */}
       <View style={styles.tabRow}>
-        {(['challenges', 'leaderboard', 'feed'] as const).map(tab => (
+        {(['challenges', 'leaderboard', 'feed'] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
             onPress={() => setActiveTab(tab)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === tab }}
           >
             <Text style={[styles.tabPillText, activeTab === tab && styles.tabPillTextActive]}>
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -65,98 +154,155 @@ export default function CommunityScreen() {
         ))}
       </View>
 
-      {activeTab === 'challenges' && (
-        <StaggeredList staggerDelay={100} animationType="slideIn">
-          {CHALLENGES.map(challenge => (
-            <GlassCard key={challenge.id} variant="light" style={styles.challengeCard}>
-              <View style={styles.challengeHeader}>
-                <View style={[styles.challengeIcon, { backgroundColor: challenge.color + '15' }]}>
-                  <Ionicons name={challenge.icon as any} size={24} color={challenge.color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.challengeTitle}>{challenge.title}</Text>
-                  <Text style={styles.challengeMeta}>{challenge.participants} participants • {challenge.daysLeft} days left</Text>
-                </View>
-                {challenge.joined && (
-                  <View style={[styles.joinedBadge, { backgroundColor: challenge.color + '15' }]}>
-                    <Text style={[styles.joinedText, { color: challenge.color }]}>Joined</Text>
-                  </View>
-                )}
-              </View>
-              {challenge.joined && (
-                <View style={styles.challengeProgress}>
-                  <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${challenge.progress}%`, backgroundColor: challenge.color }]} />
-                  </View>
-                  <Text style={[styles.progressText, { color: challenge.color }]}>{challenge.progress}%</Text>
-                </View>
-              )}
-              {!challenge.joined && (
-                <TouchableOpacity style={[styles.joinBtn, { backgroundColor: challenge.color }]}>
-                  <Text style={styles.joinBtnText}>Join Challenge</Text>
-                </TouchableOpacity>
-              )}
-            </GlassCard>
-          ))}
-        </StaggeredList>
-      )}
+      {loading && <Text style={styles.emptyText}>Loading…</Text>}
 
-      {activeTab === 'leaderboard' && (
-        <View style={styles.leaderboardContainer}>
-          {LEADERBOARD.map((entry, i) => (
-            <GlassCard key={i} variant="light" style={[styles.leaderboardCard, entry.isUser && styles.leaderboardCardUser]}>
-              <View style={styles.leaderboardRank}>
-                {entry.rank <= 3 ? (
-                  <View style={[styles.rankBadge, { backgroundColor: entry.rank === 1 ? '#F59E0B' : entry.rank === 2 ? '#94A3B8' : '#CD7F32' }]}>
-                    <Text style={styles.rankBadgeText}>{entry.rank}</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.rankNumber}>#{entry.rank}</Text>
-                )}
-              </View>
-              <Ionicons name={entry.avatar as any} size={28} color={colors.text.secondary} style={styles.leaderboardAvatar} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.leaderboardName, entry.isUser && { color: colors.primary }]}>{entry.name}</Text>
-                <View style={styles.leaderboardStreakRow}>
-                  <Ionicons name="flame" size={12} color="#F97316" />
-                  <Text style={styles.leaderboardStreak}>{entry.streak} day streak</Text>
-                </View>
-              </View>
-              <Text style={[styles.leaderboardScore, { color: colors.primary }]}>{entry.score.toLocaleString()}</Text>
-            </GlassCard>
-          ))}
-        </View>
-      )}
-
-      {activeTab === 'feed' && (
-        <View style={styles.feedContainer}>
-          <GlassCard variant="light" style={styles.feedCard}>
-            <View style={styles.feedHeader}>
-              <Text style={styles.feedAvatar}></Text>
-              <View>
-                <Text style={styles.feedName}>Sarah M.</Text>
-                <Text style={styles.feedTime}>2 hours ago</Text>
-              </View>
-            </View>
-            <Text style={styles.feedText}>Just completed my 10K steps challenge! <Ionicons name="trophy" size={14} color="#F59E0B" /> 15-day streak! Who's joining me tomorrow?</Text>
-            <View style={styles.feedActions}>
-              <TouchableOpacity style={styles.feedAction}>
-                <Ionicons name="heart-outline" size={18} color={colors.text.muted} />
-                <Text style={styles.feedActionText}>24</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.feedAction}>
-                <Ionicons name="chatbubble-outline" size={18} color={colors.text.muted} />
-                <Text style={styles.feedActionText}>8</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.feedAction}>
-                <Ionicons name="share-outline" size={18} color={colors.text.muted} />
-              </TouchableOpacity>
-            </View>
+      {!loading && activeTab === 'challenges' && (
+        challenges.length === 0 ? (
+          <GlassCard variant="light" style={styles.challengeCard}>
+            <Text style={styles.emptyTitle}>No challenges running</Text>
+            <Text style={styles.emptyText}>
+              When a challenge is created it appears here with how many people have joined.
+            </Text>
           </GlassCard>
+        ) : (
+          challenges.map((challenge) => {
+            const style = styleFor(challenge.category);
+            const remaining = daysLeft(challenge.ends_at);
+            return (
+              <GlassCard key={challenge.id} variant="light" style={styles.challengeCard}>
+                <View style={styles.challengeHeader}>
+                  <View style={[styles.challengeIcon, { backgroundColor: style.color + '15' }]}>
+                    <Ionicons name={style.icon as any} size={24} color={style.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.challengeTitle}>{challenge.name}</Text>
+                    <Text style={styles.challengeMeta}>
+                      {challenge.participant_count} participant{challenge.participant_count === 1 ? '' : 's'}
+                      {remaining !== null ? ` • ${remaining} day${remaining === 1 ? '' : 's'} left` : ''}
+                    </Text>
+                  </View>
+                  <View style={[styles.joinedBadge, { backgroundColor: style.color + '15' }]}>
+                    <Text style={[styles.joinedText, { color: style.color }]}>{challenge.difficulty}</Text>
+                  </View>
+                </View>
+                <Text style={styles.challengeDesc}>{challenge.description}</Text>
+                <Text style={styles.challengeTarget}>
+                  Target: {challenge.target_value} {challenge.target_unit} over {challenge.duration_days} days
+                </Text>
+                <TouchableOpacity
+                  style={[styles.joinBtn, { backgroundColor: style.color }]}
+                  onPress={() => join(challenge)}
+                  disabled={joining === challenge.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Join ${challenge.name}`}
+                >
+                  <Text style={styles.joinBtnText}>
+                    {joining === challenge.id ? 'Joining…' : 'Join Challenge'}
+                  </Text>
+                </TouchableOpacity>
+              </GlassCard>
+            );
+          })
+        )
+      )}
+
+      {!loading && activeTab === 'leaderboard' && (
+        <View style={styles.leaderboardContainer}>
+          {leaderboard.length === 0 ? (
+            <GlassCard variant="light" style={styles.leaderboardCard}>
+              <Text style={styles.emptyTitle}>Nobody on the board yet</Text>
+              <Text style={styles.emptyText}>
+                Points come from logged sessions and earned badges. The board fills in as
+                people train.
+              </Text>
+            </GlassCard>
+          ) : (
+            leaderboard.map((entry) => {
+              const isUser = entry.user_id === userId;
+              return (
+                <GlassCard
+                  key={entry.user_id}
+                  variant="light"
+                  style={[styles.leaderboardCard, isUser && styles.leaderboardCardUser]}
+                >
+                  <View style={styles.leaderboardRank}>
+                    {entry.rank <= 3 ? (
+                      <View style={[styles.rankBadge, {
+                        backgroundColor: entry.rank === 1 ? '#F59E0B' : entry.rank === 2 ? '#94A3B8' : '#CD7F32',
+                      }]}>
+                        <Text style={styles.rankBadgeText}>{entry.rank}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.rankNumber}>#{entry.rank}</Text>
+                    )}
+                  </View>
+                  <Ionicons name="person" size={28} color={colors.text.secondary} style={styles.leaderboardAvatar} />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[styles.leaderboardName, isUser && { color: colors.primary }]}
+                      numberOfLines={1}
+                    >
+                      {isUser ? 'You' : entry.username}
+                    </Text>
+                  </View>
+                  <Text style={[styles.leaderboardScore, { color: colors.primary }]}>
+                    {Math.round(entry.score).toLocaleString()}
+                  </Text>
+                </GlassCard>
+              );
+            })
+          )}
         </View>
       )}
 
-      <View style={{ height: 100 }} />
+      {!loading && activeTab === 'feed' && (
+        <View style={styles.feedContainer}>
+          {feed.length === 0 ? (
+            <GlassCard variant="light" style={styles.feedCard}>
+              <Text style={styles.emptyTitle}>Nothing shared yet</Text>
+              <Text style={styles.emptyText}>
+                Finish a workout and share it, and it appears here for everyone else.
+              </Text>
+            </GlassCard>
+          ) : (
+            feed.map((share) => (
+              <GlassCard key={share.id} variant="light" style={styles.feedCard}>
+                <View style={styles.feedHeader}>
+                  <Ionicons name="person-circle" size={36} color={colors.text.secondary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.feedName}>
+                      {share.user_id === userId ? 'You' : share.user_name}
+                    </Text>
+                    <Text style={styles.feedTime}>{timeAgo(share.shared_at)}</Text>
+                  </View>
+                </View>
+                <Text style={styles.feedTitle}>{share.title}</Text>
+                {share.caption ? <Text style={styles.feedCaption}>{share.caption}</Text> : null}
+                <Text style={styles.feedSummary}>
+                  {share.exercises_summary} · {share.duration_minutes} min
+                </Text>
+                <View style={styles.feedActions}>
+                  <TouchableOpacity
+                    style={styles.feedAction}
+                    onPress={() => like(share)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Like ${share.title}`}
+                  >
+                    <Ionicons name="heart-outline" size={18} color={colors.health.heart} />
+                    <Text style={styles.feedActionText}>{share.likes}</Text>
+                  </TouchableOpacity>
+                  <View style={styles.feedAction}>
+                    <Ionicons name="chatbubble-outline" size={16} color={colors.text.muted} />
+                    <Text style={styles.feedActionText}>{share.comments_count}</Text>
+                  </View>
+                </View>
+              </GlassCard>
+            ))
+          )}
+        </View>
+      )}
+
+      <View style={{ height: 80 }} />
     </ScrollView>
   );
 }
@@ -164,55 +310,51 @@ export default function CommunityScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
   contentContainer: { paddingBottom: 100 },
-  header: { paddingTop: SCREEN_HEADER_TOP, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
+  header: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: '#FFF' },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
 
-  // Tabs
-  tabRow: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.lg, paddingHorizontal: spacing.screenPadding },
-  tabPill: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border },
+  tabRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg, marginBottom: spacing.md },
+  tabPill: { flex: 1, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border, alignItems: 'center' },
   tabPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   tabPillText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
   tabPillTextActive: { color: '#FFF' },
 
-  // Challenges
-  challengeCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.md },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
+  emptyText: { fontSize: 13, color: colors.text.muted, marginTop: 6, lineHeight: 19, paddingHorizontal: spacing.screenPadding },
+
+  challengeCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm },
   challengeHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   challengeIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  challengeTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary },
+  challengeTitle: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
   challengeMeta: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
-  joinedBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  joinedText: { fontSize: 11, fontWeight: '700' },
-  challengeProgress: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
-  progressBar: { flex: 1, height: 6, backgroundColor: colors.surface.divider, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
-  progressText: { fontSize: 12, fontWeight: '700' },
-  joinBtn: { marginTop: spacing.md, paddingVertical: spacing.md, borderRadius: radius.button, alignItems: 'center' },
+  challengeDesc: { fontSize: 13, color: colors.text.secondary, marginTop: spacing.md, lineHeight: 18 },
+  challengeTarget: { fontSize: 12, color: colors.text.muted, marginTop: spacing.xs },
+  joinedBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  joinedText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  joinBtn: { paddingVertical: spacing.md, borderRadius: radius.button, alignItems: 'center', marginTop: spacing.md },
   joinBtnText: { fontSize: 14, fontWeight: '700', color: '#FFF' },
 
-  // Leaderboard
-  leaderboardContainer: { paddingHorizontal: spacing.screenPadding },
-  leaderboardCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm },
-  leaderboardCardUser: { borderColor: colors.primary + '40', borderWidth: 2 },
-  leaderboardRank: { width: 32 },
+  leaderboardContainer: { paddingHorizontal: 0 },
+  leaderboardCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center' },
+  leaderboardCardUser: { borderColor: colors.primary, borderWidth: 1 },
+  leaderboardRank: { width: 44, alignItems: 'center' },
   rankBadge: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  rankBadgeText: { fontSize: 12, fontWeight: '800', color: '#FFF' },
-  rankNumber: { fontSize: 14, fontWeight: '700', color: colors.text.muted, textAlign: 'center' },
-  leaderboardAvatar: {},
-  leaderboardName: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
-  leaderboardStreakRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  leaderboardStreak: { fontSize: 11, color: colors.text.muted },
+  rankBadgeText: { fontSize: 13, fontWeight: '800', color: '#FFF' },
+  rankNumber: { fontSize: 14, fontWeight: '700', color: colors.text.muted },
+  leaderboardAvatar: { marginRight: spacing.md },
+  leaderboardName: { fontSize: 15, fontWeight: '600', color: colors.text.primary },
   leaderboardScore: { fontSize: 16, fontWeight: '800' },
 
-  // Feed
-  feedContainer: { paddingHorizontal: spacing.screenPadding },
-  feedCard: {},
-  feedHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
-  feedAvatar: { fontSize: 32 },
-  feedName: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
-  feedTime: { fontSize: 12, color: colors.text.muted },
-  feedText: { fontSize: 14, color: colors.text.secondary, lineHeight: 20, marginBottom: spacing.md },
-  feedActions: { flexDirection: 'row', gap: spacing.xl },
+  feedContainer: {},
+  feedCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm },
+  feedHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  feedName: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
+  feedTime: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  feedTitle: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
+  feedCaption: { fontSize: 13, color: colors.text.secondary, marginTop: 4, lineHeight: 18 },
+  feedSummary: { fontSize: 12, color: colors.text.muted, marginTop: spacing.xs },
+  feedActions: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.md },
   feedAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  feedActionText: { fontSize: 13, color: colors.text.muted },
+  feedActionText: { fontSize: 12, color: colors.text.muted, fontWeight: '600' },
 });

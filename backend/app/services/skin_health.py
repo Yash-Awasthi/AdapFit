@@ -73,23 +73,75 @@ class SkinHealthService:
         total = a + b + c + d + e
         return {"asymmetry": a, "border": b, "color_irregularity": c, "diameter": d, "evolution": e, "total": total, "risk_level": "low" if total <= 1 else "moderate" if total <= 3 else "high"}
 
-    def analyze_mole_photo(self, mole_id: str, photo_description: str = "") -> dict:
+    # A mole growing by more than this between checks is the change that
+    # matters most — the "E" in ABCDE — and is worth acting on by itself.
+    NOTABLE_GROWTH_MM = 2.0
+
+    def record_measurement(
+        self, mole_id: str, size_mm: float, color: str = "", notes: str = ""
+    ) -> dict:
+        """
+        Record a fresh measurement of a mole and compare it with the last.
+
+        This replaced an "analysis" that returned symmetry 85, border 80 and
+        "overall risk: low" for every mole, whatever it looked like — a fixed
+        reassuring result about skin cancer, for a photo nothing examined.
+        What a phone can genuinely do is track change over time, which is what
+        this does.
+        """
         mole = self._moles.get(mole_id)
         if not mole:
             return {"error": "Mole not found"}
-        analysis = {
-            "symmetry_score": 85,
-            "border_regularity": 80,
-            "color_uniformity": 75,
-            "estimated_size": mole["size_mm"],
-            "overall_risk": "low",
-            "abcde_assessment": mole["abcde_score"],
-            "recommendation": "Continue monitoring. Schedule dermatologist visit if you notice any changes.",
-            "disclaimer": "This AI analysis is for informational purposes only. Always consult a dermatologist for medical evaluation.",
-        }
+        if not isinstance(size_mm, (int, float)) or size_mm <= 0:
+            return {"error": "A measured size in millimetres is required."}
+
+        previous_size = mole["size_mm"]
+        previous_color = mole.get("color", "")
+        growth = round(size_mm - previous_size, 1)
+
+        mole["size_mm"] = float(size_mm)
+        if color:
+            mole["color"] = color
+        mole["abcde_score"] = self._calculate_abcde(mole["size_mm"], mole.get("color", ""))
         mole["last_checked"] = time.time()
-        self._photos.append({"mole_id": mole_id, "analysis": analysis, "timestamp": time.time()})
-        return analysis
+
+        changes = []
+        if growth >= self.NOTABLE_GROWTH_MM:
+            changes.append(f"Grew {growth} mm since the last measurement")
+        if color and previous_color and color.lower() != previous_color.lower():
+            changes.append(f"Colour changed from {previous_color} to {color}")
+
+        entry = {
+            "mole_id": mole_id,
+            "size_mm": mole["size_mm"],
+            "color": mole.get("color", ""),
+            "growth_mm": growth,
+            "changes": changes,
+            "notes": notes,
+            "timestamp": time.time(),
+        }
+        self._photos.append(entry)
+
+        return {
+            "recorded": True,
+            "size_mm": mole["size_mm"],
+            "growth_mm": growth,
+            "changes": changes,
+            "abcde_assessment": mole["abcde_score"],
+            "recommendation": (
+                "This mole has changed. Have a clinician look at it."
+                if changes else
+                "No change recorded since the last measurement. Keep checking."
+            ),
+            "disclaimer": (
+                "ABCDE is a prompt to get a mole looked at, from the size and colour you "
+                "recorded. It does not diagnose or rule out skin cancer."
+            ),
+        }
+
+    def get_mole_history(self, mole_id: str) -> list[dict]:
+        """Every measurement recorded for one mole, oldest first."""
+        return [entry for entry in self._photos if entry.get("mole_id") == mole_id]
 
     def log_uv_exposure(self, uv_index: int, duration_minutes: int, protection_used: str = "none") -> dict:
         entry = {"uv_index": uv_index, "duration_minutes": duration_minutes, "protection": protection_used, "timestamp": time.time()}
