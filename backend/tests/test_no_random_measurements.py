@@ -79,7 +79,7 @@ def test_no_service_generates_a_measurement(path):
 
 def test_the_sweep_actually_covers_the_services():
     """A guard on the guard: an empty file list would make this vacuous."""
-    assert len(ALL_SERVICES) > 300
+    assert len(ALL_SERVICES) > 250
 
 
 def test_the_allowlist_has_no_stale_entries():

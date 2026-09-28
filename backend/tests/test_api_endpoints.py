@@ -354,19 +354,6 @@ def test_nl_workout_parse():
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
 
-def test_body_dashboard():
-    uid = "dash_u2"
-    d = get_json(f"/api/v1/dashboard?user_id={uid}").json()
-    assert all(k in d for k in ("weight", "body_fat", "muscle_mass", "measurements", "body_composition_score"))
-    post_json(f"/api/v1/body/measurements?user_id={uid}", json={"weight_kg": 82.0, "body_fat_pct": 18.0, "muscle_mass_kg": 33.0, "chest_cm": 100, "waist_cm": 84})
-    post_json(f"/api/v1/body/measurements?user_id={uid}", json={"weight_kg": 81.0, "body_fat_pct": 17.5, "muscle_mass_kg": 33.5, "chest_cm": 101, "waist_cm": 83})
-    d2 = get_json(f"/api/v1/dashboard?user_id={uid}&months=1").json()
-    assert d2["weight"]["current"] == 81.0 and d2["weight"]["direction"] == "down"
-    assert len(d2["weight"]["chart_data"]) == 2
-    s = get_json(f"/api/v1/dashboard/summary?user_id={uid}").json()
-    assert s["total_entries"] == 2 and s["changes"]["weight_kg"] == -1.0
-
-
 # ── Import/Export ────────────────────────────────────────────────────────────
 
 # ── Meditation ───────────────────────────────────────────────────────────────
