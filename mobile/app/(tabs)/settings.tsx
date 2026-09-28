@@ -11,20 +11,15 @@ import {
   TouchableOpacity,
   Switch,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import {
   Bell, Download, Shield, Moon, Sun, Globe, Heart,
   ChevronRight, Palette,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { API_BASE_URL } from '../../src/services/config';
-import { useUserStore } from '../../src/stores';
+import { useRouter } from 'expo-router';
 import { useTheme, AccentName } from '../../src/services/theme';
 import { NotificationSetup } from '../../src/components/NotificationSetup';
-import { authedFetch } from '../../src/services/authToken';
-
-const API = API_BASE_URL;
 
 interface SettingsState {
   workoutReminders: boolean;
@@ -33,7 +28,7 @@ interface SettingsState {
 }
 
 export default function SettingsScreen() {
-  const userId = useUserStore((s) => s.userId);
+  const router = useRouter();
   const { theme, isDark, toggle, accent, setAccent, accents } = useTheme();
   const [settings, setSettings] = useState<SettingsState>({
     workoutReminders: true,
@@ -54,18 +49,6 @@ export default function SettingsScreen() {
   function pickAccent(name: AccentName) {
     Haptics.selectionAsync();
     setAccent(name);
-  }
-
-  async function exportData(format: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      const res = await authedFetch(`${API}/api/v1/export/all?user_id=${userId}&format=${format}`);
-      if (res.ok) {
-        Alert.alert('Export Ready', `Your data has been exported as ${format.toUpperCase()}.`);
-      }
-    } catch {
-      Alert.alert('Export Failed', 'Please try again later.');
-    }
   }
 
   const s = makeStyles(theme);
@@ -159,17 +142,17 @@ export default function SettingsScreen() {
         <NotificationSetup />
       </View>
 
-      {/* Data Export */}
+      {/* Privacy and data */}
       <View style={s.section}>
-        <Text style={s.sectionTitle}>Data Export</Text>
-        <TouchableOpacity style={s.exportBtn} onPress={() => exportData('json')}>
-          <Download size={18} color={theme.success} />
-          <Text style={s.exportText}>Export as JSON</Text>
+        <Text style={s.sectionTitle}>Privacy & Data</Text>
+        <TouchableOpacity style={s.exportBtn} onPress={() => router.push('/privacy' as any)}>
+          <Shield size={18} color={theme.success} />
+          <Text style={s.exportText}>Consent, sign out, delete account</Text>
           <ChevronRight size={16} color={theme.textMuted} />
         </TouchableOpacity>
-        <TouchableOpacity style={s.exportBtn} onPress={() => exportData('csv')}>
+        <TouchableOpacity style={s.exportBtn} onPress={() => router.push('/(tabs)/data-export' as any)}>
           <Download size={18} color={theme.primary} />
-          <Text style={s.exportText}>Export as CSV</Text>
+          <Text style={s.exportText}>Export my data</Text>
           <ChevronRight size={16} color={theme.textMuted} />
         </TouchableOpacity>
       </View>
@@ -182,13 +165,6 @@ export default function SettingsScreen() {
           <View style={s.cardContent}>
             <Text style={s.cardTitle}>AdapFit v2.0.0</Text>
             <Text style={s.cardDesc}>AI-Powered Adaptive Fitness Engine</Text>
-          </View>
-        </View>
-        <View style={s.card}>
-          <Shield size={20} color={theme.success} />
-          <View style={s.cardContent}>
-            <Text style={s.cardTitle}>Privacy</Text>
-            <Text style={s.cardDesc}>Your data stays on your device</Text>
           </View>
         </View>
       </View>

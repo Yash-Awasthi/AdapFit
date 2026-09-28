@@ -13,6 +13,13 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=128)
     display_name: str = ""
+    birth_date: str = Field(default="", description="YYYY-MM-DD")
+    consent: dict[str, bool] = Field(default_factory=dict, description="Purpose id to choice; see /privacy/consent/purposes")
+    guardian_email: str = Field(default="", max_length=255, description="Required under 18")
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str
 
 
 class LoginRequest(BaseModel):
@@ -57,7 +64,8 @@ async def _extract_user(authorization: Optional[str] = None) -> Optional[dict]:
 @router.post("/register")
 async def register(request: RegisterRequest):
     """Register a new user account."""
-    result = await user_manager.register(request.email, request.username, request.password, request.display_name)
+    result = await user_manager.register(request.email, request.username, request.password, request.display_name,
+                                         request.birth_date, request.consent, request.guardian_email)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -120,6 +128,28 @@ async def change_password(request: PasswordChangeRequest, authorization: Optiona
         detail = result.get("details") or result["error"]
         raise HTTPException(status_code=400, detail=detail)
     return result
+
+
+@router.post("/delete-account")
+async def delete_account(request: DeleteAccountRequest, authorization: Optional[str] = Header(None)):
+    """Schedule erasure of the account and everything held for it, after a short grace period."""
+    user = await _extract_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    result = await user_manager.request_deletion(user["id"], request.password)
+    if "error" in result:
+        raise HTTPException(status_code=403, detail=result["error"])
+    return result
+
+
+@router.post("/delete-account/cancel")
+async def cancel_delete_account(authorization: Optional[str] = Header(None)):
+    from app.core import privacy
+
+    user = await _extract_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return {"cancelled": privacy.cancel_deletion(user["id"])}
 
 
 @router.post("/forgot-password")

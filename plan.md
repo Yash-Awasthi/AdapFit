@@ -1484,3 +1484,126 @@ Defects found while wiring, beyond what earlier parts recorded:
   under one "default" user.
 - Broken: rehab progress crashed on every call; two routes were shadowed by
   catch-alls; in-app family invites could never be accepted.
+
+## Part 13 — Clinical modules built for real (todo.md Phase 2b)
+
+Measured at the start: telemedicine still listed eight invented doctors with
+ratings and bookable slots; genomics reported disease risk from an additive
+model (0.1 plus fixed increments) and a "genetic health score"; mole ABCDE
+derived asymmetry and border from the size typed in; ME/CFS pacing assumed age
+35; cardiac rehab set training zones from 220 minus age. 999 backend tests
+passed; the mobile typecheck failed on `e2e/`, which has no test runner
+installed and is now excluded.
+
+Decided with the user: telemedicine links out and checks registrations, image
+measurement runs on the backend, genomics shows published odds ratios, and
+Indian brands come from a large open dataset.
+
+- Telemedicine: eSanjeevani, Tele-MANAS and three private platforms as
+  outbound links, a "which doctor, how soon" guide, and a live check against
+  the NMC Indian Medical Register (its public JSON search). Only registration
+  fields are returned, not the address or birth date the register exposes.
+  Saved doctors record what the register said, not what the client claimed.
+- Genomics: parses 23andMe and AncestryDNA raw files (text or zip) and keeps
+  only a fixed panel; the file is discarded. Associations carry the published
+  per-copy odds ratio and its source (TCF7L2, FTO, 9p21). APOE is hidden until
+  the user asks, with a counselling note. CPIC phenotypes for CYP2C19, CYP2C9,
+  SLCO1B1 and VKORC1; CYP2D6 is reported as not callable from a chip. The old
+  advice to take methylfolate for MTHFR is gone.
+- Skin: `lesion_measure.py` segments the spot with OpenCV and measures
+  asymmetry, border compactness, colour spread in CIELAB, and diameter from a
+  coin of known size; blurry or empty photos are refused by edge width. The
+  0-1 cutoffs are unvalidated screening choices; the dependable signal is
+  change between photos of the same mole, which now counts as evolution.
+- Medication: 246,068 marketed products from the MIT-licensed Indian Medicine
+  Dataset, loaded lazily (~40 MB). Brands resolve to their ingredients; a brand
+  whose products differ (Dolo, Telma) is treated as every ingredient, since a
+  missed interaction is worse than an extra one. Interaction checks now see
+  Indian brands and spellings.
+- First aid and the red-flag replies ship inside the app and are used when the
+  network is down; a test fails if the bundled copy drifts. Snakebite and
+  poisoning (AIIMS poison centre) were added.
+- ME/CFS pacing: ceiling is measured resting heart rate plus 15 (Workwell),
+  or none; boom-bust detection; a section on the Conditions screen.
+
+Unsafe or wrong, found and fixed:
+
+- A dosage calculator (reduce by 25% over 65, defaults age 40 and 70 kg),
+  a timing optimiser and Beers "alternatives" were live endpoints.
+- A petechial rash with fever was "see a doctor within 24 hours"; it is now
+  an emergency, as are lip swelling and breathing trouble. Rash output named
+  meningococcaemia and herpes as causes.
+- Reduced fetal movement said "try again after a snack"; it now says contact
+  the maternity team today, judged against the baby's own pattern.
+- Cardiac zones use the rehab team's prescription, else resting plus 20, with
+  RPE 11-14 always shown; age-predicted zones fail on beta blockers.
+- The Fitzpatrick skin type never reached the skin-check plan (string key
+  looked up in an int-keyed table). First aid used 911, inches and °F.
+- Defaults removed: wound size 2 x 2 cm and pain 3, a 2,000 ml fluid limit,
+  30 s voice duration, pregnancy log fields.
+
+Left for later phases: stroke rehab, chronic disease, hospital at home and
+wound care stay API-only until a clinician designs them; the CDSCO banned
+fixed-dose-combination list; the coach marketplace.
+
+## Part 14 — Privacy, consent and user rights (todo.md Phase 3)
+
+Measured at the start: account deletion existed only as an admin route; there
+was no consent capture anywhere (the login footer claimed agreement to
+documents that did not exist); `/export/all` and erasure skipped the 24 shared
+services that keep every user's records in one object (fertility, pregnancy,
+habits, medical passport, substance use...), and module stores keyed by record
+id (a goal's logs, a post's comments) kept a deleted user's data. Settings said
+"your data stays on your device", which was false, and its export buttons
+showed "Export ready" without saving anything. 1,040 backend tests passed.
+
+Decided with the user: deletion after a 30-minute grace period with password
+confirmation; one required consent plus three optional ones; a guardian consent
+flow for under-18s rather than an age gate; legal documents drafted with
+placeholders for the company details.
+
+- Consent (`app/core/privacy.py`): per purpose (`health_data` required; `ai`,
+  `sharing`, `analytics` optional), tied to a policy version, appended to a log
+  with time and source. `IdentityMiddleware` returns 403 with a reason while an
+  account lacks current consent, awaits a guardian, or is scheduled for
+  deletion; auth, privacy and export stay reachable. Sharing writes need
+  `sharing`. Every LLM call (chat, WebSocket chat, agent phrasing, goal parsing,
+  weekly summary, meal photos) checks `ai` and falls back to rules.
+  WebSockets now set the caller for per-user state and consent, which
+  `authenticate_websocket` never did.
+- Children: signup takes a date of birth; under 18 needs a guardian email. The
+  guardian gets a 72-hour link to a server-rendered page, declares adulthood,
+  and agrees or declines (decline erases the account). The child can withdraw
+  but not grant; analytics is never offered to a child. Mail goes over SMTP
+  (`app/core/mailer.py`). The interim identity check is a declaration;
+  DigiLocker is the upgrade path.
+- Erasure: `POST /auth/delete-account` schedules erasure; a sweep every minute
+  runs it. `durable.erase_user` now walks shared services and module stores
+  and removes anything keyed by the user id, any record with a field equal to
+  it, set membership (likes), and records keyed by the ids of removed records;
+  the in-memory storage fallback is cleared too. Signing out now clears the
+  device cache and local SQLite database; before this there was no sign-out.
+- Retention: a child account with no guardian decision is erased after 7 days;
+  an account unused for 3 years gets an email and is erased 48 hours later
+  unless the user signs in (no email, no erasure).
+- Export: `/export/all` adds the account, shared-service records and the
+  consent log.
+- Documents: privacy policy, terms and health disclaimer in
+  `backend/app/legal/`, served at `/privacy/documents/{id}` and shown in the
+  app; `docs/PRIVACY.md` holds the retention table, store declarations and
+  enforcement map.
+- Mobile: signup asks for date of birth, consent per purpose and a guardian
+  email when needed; a Privacy screen manages consent, guardian status,
+  deletion (with cancel), export and sign-out; the root layout sends a blocked
+  account there.
+
+Also fixed: meal photo logging without an AI key saved a zero-calorie "Photo
+meal"; it now refuses and asks for manual entry.
+
+Left for later phases: the security audit log is still in memory, so the
+1-year log retention in the policy is not yet met (Phase 4); `POST /users` is
+public and creates profile rows without an account, and the mobile store falls
+back to the seeded `default` identity when no user is stored (Phase 4); backup
+retention and re-applying erasures after a restore (Phase 8); filling the
+placeholders, appointing the Grievance Officer, SMTP in production and
+DigiLocker (Phase 10).

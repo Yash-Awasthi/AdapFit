@@ -213,4 +213,13 @@ async def authenticate_websocket(websocket, expected_user_id: Optional[str] = No
             await websocket.close(code=WS_POLICY_VIOLATION, reason="Not the owner of this connection")
             return None
 
+    from app.core import privacy
+    from app.core.per_user import CURRENT_USER
+
+    reason = privacy.blocked(user["id"])
+    if reason:
+        await websocket.close(code=WS_POLICY_VIOLATION, reason=reason)
+        return None
+    # IdentityMiddleware only sees HTTP, so per-user state and consent checks read the caller from here.
+    CURRENT_USER.set(user["id"])
     return user

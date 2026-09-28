@@ -35,6 +35,13 @@ CROSS_USER_PREFIXES = (
 # would hold a file in memory for nothing.
 MAX_REWRITABLE_BODY = 1 << 20  # 1 MiB
 
+# Reachable while an account is blocked (consent missing, guardian pending,
+# deletion scheduled): signing in, giving consent, exporting, cancelling.
+UNGATED_PREFIXES = ("/api/v1/auth/", "/api/v1/privacy/", "/api/v1/export/")
+# Writes that put the user in front of other people need the sharing consent.
+SHARING_PREFIXES = ("/api/v1/community/", "/api/v1/family-network/invite", "/api/v1/peer-support/",
+                    "/api/v1/challenges/")
+
 _PARAM = re.compile(r"\{([^}:]+)(?::[^}]+)?\}")
 
 
@@ -110,6 +117,11 @@ class IdentityMiddleware:
             await self.app(scope, receive, send)
             return
         user_id, role = caller
+        if role not in ("admin", "superadmin"):
+            reason = _gate(scope, path, user_id)
+            if reason:
+                await _refuse(send, reason)
+                return
         # An admin addressing another user is a support action, not an attack.
         if role in ("admin", "superadmin"):
             await self.app(scope, receive, send)
@@ -202,6 +214,26 @@ class IdentityMiddleware:
             return {"type": "http.request", "body": rewritten, "more_body": False}
 
         return wrapped
+
+
+def _gate(scope: Scope, path: str, user_id: str) -> Optional[str]:
+    from app.core import privacy
+
+    if not path.startswith(API_PREFIX) or path.startswith(UNGATED_PREFIXES):
+        return None
+    reason = privacy.blocked(user_id)
+    if reason:
+        return reason
+    if scope.get("method") in ("POST", "PUT", "PATCH") and path.startswith(SHARING_PREFIXES)             and not privacy.allowed("sharing", user_id):
+        return "sharing_consent_required"
+    return None
+
+
+async def _refuse(send: Send, reason: str) -> None:
+    body = json.dumps({"detail": reason}).encode()
+    await send({"type": "http.response.start", "status": 403,
+                "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
+    await send({"type": "http.response.body", "body": body})
 
 
 def _rebind_body(body: bytes, user_id: str) -> bytes:

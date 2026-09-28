@@ -26,4 +26,5 @@ def register_user(email: str, username: str, password: str = "Str0ngPassw0rd!") 
     """Register an account from synchronous test code."""
     from app.core.auth import user_manager
 
-    return asyncio.run(user_manager.register(email, username, password))
+    consent = {"health_data": True, "ai": True, "sharing": True, "analytics": False}
+    return asyncio.run(user_manager.register(email, username, password, birth_date="1990-01-01", consent=consent))

@@ -280,6 +280,16 @@ class StorageEngine:
             await self._save()
             return memory
 
+    async def erase_user(self, user_id: str) -> None:
+        """In-memory records for one user; in Postgres they cascade from the users row."""
+        if _USE_DB:
+            return
+        async with self._lock:
+            for table in (self.users, self.baselines, self.recovery_logs, self.workouts, self.workout_logs,
+                          self.workload_history, self.agent_memory, self.diet_plans):
+                table.pop(user_id, None)
+            await self._save()
+
     # --- Utility ---
     async def clear_all(self):
         async with self._lock:

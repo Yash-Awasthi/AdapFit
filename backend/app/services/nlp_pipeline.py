@@ -29,6 +29,7 @@ def _ensure_hf_pipeline():
 
 from app.core.config import settings
 from app.core.gemini import gemini_endpoint
+from app.core.privacy import allowed
 
 
 class NLPPipeline:
@@ -131,7 +132,7 @@ class NLPPipeline:
     
     async def parse_goals_from_text(self, text: str) -> Dict[str, Any]:
         """Use LLM to parse fitness goals from free-text input."""
-        if not settings.GEMINI_API_KEY:
+        if not settings.GEMINI_API_KEY or not allowed("ai"):
             return self._rule_based_goal_parse(text)
         
         try:
@@ -193,7 +194,7 @@ User input: "{text}"
     
     async def generate_weekly_summary(self, user_data: dict, recovery_logs: list, workout_logs: list) -> str:
         """Generate a natural language weekly progress summary."""
-        if settings.GEMINI_API_KEY:
+        if settings.GEMINI_API_KEY and allowed("ai"):
             return await self._generate_summary_llm(user_data, recovery_logs, workout_logs)
         return self._generate_summary_rule_based(recovery_logs, workout_logs)
     

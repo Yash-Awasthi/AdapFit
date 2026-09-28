@@ -357,7 +357,10 @@ class UserManager:
         self._refresh_tokens.pop(digest, None)
         await session_store.remove(digest)
 
-    async def register(self, email: str, username: str, password: str, display_name: str = "") -> dict:
+    async def register(self, email: str, username: str, password: str, display_name: str = "",
+                       birth_date: str = "", consent: Optional[dict] = None, guardian_email: str = "") -> dict:
+        from app.core import privacy
+
         await self._ensure_loaded()
         if email.lower() in self._email_index:
             return {"error": "Email already registered"}
@@ -366,20 +369,27 @@ class UserManager:
         pw_check = validate_password_strength(password)
         if not pw_check["valid"]:
             return {"error": "Weak password", "details": pw_check["errors"]}
+        try:
+            privacy.validate_signup(birth_date, consent or {}, guardian_email, email)
+        except ValueError as exc:
+            return {"error": str(exc)}
         # A UUID rather than an opaque token, so the account id is also the
         # primary key of the profile row every personalization feature reads.
         user_id = str(uuid.uuid4())
         user = User(
             id=user_id, email=email.lower(), username=username.lower(),
             password_hash=hash_password(password),
-            display_name=display_name or username,
+            display_name=display_name or username, date_of_birth=birth_date,
         )
         self._index(user)
         await self._persist(user)
+        consent_state = privacy.start(user_id, birth_date, consent or {}, guardian_email)
+        if consent_state["guardian_pending"]:
+            consent_state["guardian_email_sent"] = await privacy.send_guardian_link(user_id)
         tokens = create_token_pair(user_id, user.role)
         await self._remember_refresh(user_id, tokens["refresh_token"])
         _log_audit_event("register", user_id=user_id, email=user.email)
-        return {"user": _public(user), "tokens": tokens}
+        return {"user": _public(user), "tokens": tokens, "privacy": consent_state}
 
     async def login(self, email: str, password: str, ip: str = "") -> dict:
         await self._ensure_loaded()
@@ -427,6 +437,8 @@ class UserManager:
 
         user.last_login = time.time()
         await self._persist(user)
+        from app.core import privacy
+        privacy.on_login(user_id)
         tokens = create_token_pair(user_id, user.role)
         await self._remember_refresh(user_id, tokens["refresh_token"])
 
@@ -519,8 +531,23 @@ class UserManager:
         del self._users[user_id]
         await account_store.delete(user_id)
         from app.core import durable
+        from app.core.storage import storage
+        await storage.erase_user(user_id)
         await durable.erase_user(user_id)
+        _log_audit_event("account_erased", user_id=user_id)
         return {"deleted": True}
+
+    async def request_deletion(self, user_id: str, password: str) -> dict:
+        """Erase after a grace period; the password proves it is the owner, not someone holding the phone."""
+        from app.core import privacy
+
+        await self._ensure_loaded()
+        user = self._users.get(user_id)
+        if not user or not verify_password(password, user.password_hash):
+            return {"error": "Invalid credentials"}
+        due = privacy.request_deletion(user_id)
+        _log_audit_event("deletion_requested", user_id=user_id)
+        return {"deletion_due_at": due, "grace_minutes": privacy.DELETION_GRACE_SECONDS // 60}
 
 
 user_manager = UserManager()

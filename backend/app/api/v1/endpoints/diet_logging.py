@@ -9,7 +9,7 @@ Supports: quick-add, text description, barcode-style lookup, and photo-based log
 from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -90,8 +90,13 @@ async def log_meal(req: MealLogRequest, user_id: str = Query("default")):
 
 @router.post("/photo-log")
 async def photo_log_meal(req: PhotoLogRequest, user_id: str = Query("default")):
-    """Analyze a meal photo with Gemini Vision (falls back to a rough estimate
-    without an API key) and log the result as today's meal."""
+    """Analyze a meal photo with Gemini Vision and log the result as today's meal."""
+    from app.core.privacy import allowed
+    # Without analysis the record would be a zero-calorie meal nobody measured.
+    if not allowed("ai"):
+        raise HTTPException(status_code=403, detail="Photo logging sends the photo to an AI service; turn on AI features in Privacy settings, or log the meal by hand")
+    if not settings.GEMINI_API_KEY:
+        raise HTTPException(status_code=503, detail="Photo analysis is not available right now; log the meal by hand")
     analysis = analyze_food_from_gemini_vision(req.image_base64, settings.GEMINI_API_KEY)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     record = {

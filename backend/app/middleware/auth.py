@@ -62,6 +62,9 @@ PUBLIC_PREFIXES = (
     "/static",
     "/admin",
     "/ws/",
+    # Guardian consent is given by someone without an account; documents are read before signing up.
+    "/api/v1/privacy/guardian/",
+    "/api/v1/privacy/documents",
 )
 
 

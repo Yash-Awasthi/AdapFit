@@ -1,12 +1,12 @@
 """
 Data export: each record type as CSV or JSON, or everything held for the user.
 
-`/all` is the portability export: stored records plus every per-user service's
-state, so nothing the app keeps about a person is missing from it.
+`/all` is the portability export: stored records, every per-user service's
+state, the user's records inside shared services, and the consent log.
 """
 from fastapi import APIRouter, HTTPException, Query, Response
 
-from app.core import per_user
+from app.core import durable, per_user, privacy
 from app.core.export import envelope, to_csv
 from app.core.storage import storage
 from app.services.sleep_tracker import sleep_journal
@@ -62,7 +62,15 @@ async def export_all(user_id: str = Query("default")):
     data["baseline"] = await storage.get_baseline(user_id)
     data["coach_memory"] = await storage.get_agent_memory(user_id)
     data["feature_data"] = per_user.export_user(user_id)
+    data["shared_feature_data"] = durable.export_shared(user_id)
+    data["account"] = await _account(user_id)
+    data["privacy"] = {**privacy.state(user_id), "history": (dict.get(privacy._records, user_id) or {}).get("events", [])}
     return envelope(user_id, data)
+
+
+async def _account(uid: str):
+    from app.core.auth import user_manager
+    return await user_manager.get_user(uid)
 
 
 @router.get("/{data_type}")

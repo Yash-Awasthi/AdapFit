@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 import { restoreToken, setToken } from '../services/authToken';
+import { cache } from '../services/cache';
+import { deleteLocalDatabase } from '../db/schema';
 
 export interface UserProfile {
   id: string;
@@ -85,9 +87,17 @@ export const useUserStore = create<UserStore>((set, get) => ({
     set({ profile: { ...(profile || {}), ...updated } as UserProfile });
   },
 
+  // Signing out also removes the health data cached on the device, which may be shared.
   clearUser: async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY);
     await setToken(null);
+    cache.clear();
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      await AsyncStorage.multiRemove(keys.filter((k) => k === STORAGE_KEY || k.startsWith('adapfit:cache:')));
+      await deleteLocalDatabase();
+    } catch {
+      /* nothing stored yet */
+    }
     set({ userId: 'default', profile: null });
   },
 }));

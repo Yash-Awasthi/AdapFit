@@ -118,7 +118,12 @@ export default function LoginScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={ns.footer}>By signing in, you agree to our Terms of Service and Privacy Policy</Text>
+      <Text style={ns.footer}>
+        By signing in, you agree to our{' '}
+        <Text style={ns.footerLink} onPress={() => router.push({ pathname: '/legal', params: { doc: 'terms' } } as any)}>Terms of Service</Text>
+        {' '}and{' '}
+        <Text style={ns.footerLink} onPress={() => router.push({ pathname: '/legal', params: { doc: 'privacy-policy' } } as any)}>Privacy Policy</Text>
+      </Text>
     </KeyboardAvoidingView>
   );
 }
@@ -141,4 +146,5 @@ const ns = StyleSheet.create({
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.surface.border },
   dividerText: { marginHorizontal: spacing.md, color: colors.text.muted, fontSize: 14 },
   footer: { textAlign: 'center', color: colors.text.muted, fontSize: 12, padding: spacing.lg, paddingBottom: 40 },
+  footerLink: { color: colors.primary, fontWeight: '600' },
 });

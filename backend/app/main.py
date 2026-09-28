@@ -4,6 +4,7 @@ AdapFit — AI-Powered Adaptive Fitness & Recovery Engine
 Entry point. Endpoint routers are auto-discovered by app/core/registry.py.
 Add a new endpoint: drop a file in app/api/v1/endpoints/, export `router`.
 """
+import asyncio
 import sys
 from pathlib import Path as _Path
 # Ensure the ZFIT project root is on sys.path so that `src.*` modules
@@ -64,9 +65,23 @@ async def lifespan(app: FastAPI):
         logger.info("Vector store initialized")
     except Exception as e:
         logger.warning(f"Vector store init failed: {e}")
+    sweeper = asyncio.create_task(_erase_due_accounts())
     yield
+    sweeper.cancel()
     await durable.flush()
     logger.info("AdapFit shutting down")
+
+
+async def _erase_due_accounts():
+    """Accounts whose deletion grace period has passed are erased within a minute."""
+    from app.core import durable, privacy
+    while True:
+        try:
+            if await privacy.run_due_deletions():
+                await durable.flush()
+        except Exception:
+            logger.exception("Scheduled account erasure failed")
+        await asyncio.sleep(60)
 
 
 # Rate limiter
