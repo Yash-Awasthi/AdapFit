@@ -118,3 +118,37 @@ def forget_user(user_id: str) -> int:
     for proxy in _registry.values():
         proxy.reset(user_id)
     return len(_registry)
+
+
+def _plain(value: Any) -> Any:
+    import dataclasses
+    from datetime import date, datetime
+    from enum import Enum
+
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {k: _plain(v) for k, v in dataclasses.asdict(value).items()}
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): _plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_plain(v) for v in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def export_user(user_id: str) -> Dict[str, Any]:
+    """Everything each per-user service holds for one user, as plain JSON-able data."""
+    out: Dict[str, Any] = {}
+    for name, proxy in _registry.items():
+        instances = object.__getattribute__(proxy, "_instances")
+        instance = instances.get(user_id)
+        if instance is None:
+            continue
+        state = {k: _plain(v) for k, v in vars(instance).items() if v not in (None, [], {}, "", set())}
+        if state:
+            out[name] = state
+    return out

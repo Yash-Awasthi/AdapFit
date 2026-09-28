@@ -75,10 +75,10 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  // Recovery Engine V2
+  // Today's check-in explained against the personal baseline
   getRecoveryV2: (userId: string) =>
     request<{
-      overall_score: number;
+      overall_score: number | null;
       recovery_level: string;
       domains: {
         name: string;
@@ -100,13 +100,7 @@ export const api = {
       confidence: string;
       data_completeness: number;
       calculated_at: string;
-    }>(`/api/v1/recovery-v2/quick`),
-
-  calculateRecoveryV2: (data: Record<string, any>) =>
-    request<any>('/api/v1/recovery-v2/calculate', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    }>(`/api/v1/recovery-logs/today?user_id=${userId}`),
 
   // Workouts
   getWorkouts: (userId: string, days = 14) =>

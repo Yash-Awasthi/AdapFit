@@ -34,8 +34,13 @@ Measured at start: 229 route modules, 281 services, 93 services unreachable
       `/community` feed; `/social`, `/community-v2`, `/activity-feed` and the
       social screen removed. Dashboard's medication, challenge and feed panels fixed.
 - [ ] Dashboard screen needs a full wiring audit (it had three dead calls).
-- [ ] Recovery: `/recovery-logs`, `/recovery`, `/recovery-v2`, seven services.
-- [ ] Export: `/export`, `-v2`, `/data-export`.
+- [x] Recovery: one engine (personal baseline). The dashboard scored HRV against
+      population cut-offs with a second engine; it now explains the check-in score
+      via `/recovery-logs/today`. Five duplicate recovery engines removed.
+- [ ] `fatigue_prediction` (Three-Process fatigue model) is unwired; belongs with sleep/circadian.
+- [x] Export: one `/export` over the real stores; `/export/all` includes every
+      per-user service's state. `-v2` returned a sample export, `/data-export`
+      was a second copy. Export screen saves real files.
 - [ ] Leftover `-v2` prefixes: injury-risk, recommendations.
 - [ ] Wire the unreachable unique services (smart alarm is done), API and screen.
 - [ ] Mental health screen: hard-coded journal and wellbeing score of 72;

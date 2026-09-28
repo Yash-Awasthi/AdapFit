@@ -103,7 +103,6 @@ ROUTE_MAP = {
     "personalization_api": ("/personalize", ["Personalization"]),
     "chronotype_api": ("/chronotype", ["Chronotype Analysis"]),
     "illness_api": ("/illness", ["Illness Detection"]),
-    "recovery_api": ("/recovery", ["Recovery & Readiness"]),
     "wearable_api": ("/wearable", ["Wearable Import"]),
     "health_predictions_api": ("/predictions", ["Health Predictions"]),
     "blood_pressure_api": ("/blood-pressure", ["Blood Pressure"]),
@@ -114,7 +113,6 @@ ROUTE_MAP = {
     "health_analytics_api": ("/health-analytics", ["Health Analytics"]),
     "medication_api": ("/medication", ["Medication Reminders"]),
     "emergency_api": ("/emergency", ["Emergency SOS"]),
-    "data_export_api": ("/data-export", ["Data Export"]),
     "workout_api": ("/workout-engine", ["Workout Engine"]),
     "device_sync_api": ("/device-sync", ["Device Sync"]),
     "ai_coach_api": ("/ai-coach", ["AI Health Coach"]),
@@ -197,7 +195,6 @@ ROUTE_MAP = {
     "wellness_hub_api": ("/wellness-hub", ["Wellness Hub"]),
     "health_trends_api": ("/health-trends", ["Health Trends"]),
     "rate_limiter_api": ("/rate-limit", ["Rate Limiting"]),
-    "export_v2_api": ("/export-v2", ["Export V2"]),
     "integrations_api": ("/integrations", ["Integrations"]),
     "pose_estimation_api": ("/pose", ["Pose Estimation & Form Check"]),
     "biomarkers_api": ("/biomarkers", ["Biomarker Tracking"]),
@@ -229,7 +226,6 @@ ROUTE_MAP = {
     "family_network_api": ("/family-network", ["Family Network"]),
     "health_news_api": ("/health-news", ["Health News"]),
     "healthcare_providers_api": ("/providers", ["Healthcare Providers"]),
-    "recovery_v2_api": ("/recovery-v2", ["Recovery V2"]),
     "privacy_dashboard_api": ("/privacy", ["Privacy Dashboard"]),
 }
 

@@ -49,8 +49,8 @@ async def create_recovery_log(req: RecoveryCalculationRequest):
         features = ml_engine.extract_features(recovery_logs, workout_logs)
         ml_insights = ml_engine.predict_readiness(features)
 
-        acwr = response.metrics_breakdown.acwr or 1.0
-        injury_risk = ml_engine.compute_injury_risk(acwr, 0.0, 0.0, 0)
+        acwr = response.metrics_breakdown.acwr
+        injury_risk = ml_engine.compute_injury_risk(acwr, 0.0, 0.0, 0) if acwr is not None else None
 
         wd = req.wearable_data
         sc = req.subjective_checkin
@@ -101,3 +101,75 @@ async def list_recovery_logs(user_id: str, days: int = 28):
     """List recovery log history."""
     logs = await storage.get_recovery_logs(user_id, days)
     return {"user_id": user_id, "items": logs, "count": len(logs)}
+
+
+def _domain(name: str, score, insight: str) -> dict:
+    available = score is not None
+    return {"name": name, "score": round(score) if available else 0, "weight": 0, "weighted_score": 0,
+            "status": ("good" if score >= 70 else "moderate" if score >= 40 else "low") if available else "no_data",
+            "insight": insight, "data_available": available}
+
+
+@router.get("/today")
+async def recovery_today(user_id: str):
+    """
+    Today's check-in explained: each domain against the user's own baseline,
+    and the training decision with its reasons. Same score as the check-in.
+    """
+    from app.services.daily_decision import decide, signals_from_logs
+
+    logs = await storage.get_recovery_logs(user_id, 1)
+    if not logs:
+        return {"overall_score": None, "recovery_level": "no_data", "domains": [], "cross_domain_insights": [],
+                "recommendations": [], "training_recommendation": "Complete a morning check-in to get today's recovery.",
+                "confidence": "low", "data_completeness": 0, "calculated_at": None}
+    log = logs[-1]
+    history = await storage.get_recovery_logs(user_id, personal_baseline.WINDOW_DAYS)
+    workload = await storage.get_workload_history(user_id, 28)
+    base = personal_baseline.compute(history, workload)
+    latest_load = workload[-1] if workload else None
+    result = decide(signals_from_logs(log, None, latest_load, await storage.get_workout_logs(user_id, 7)))
+
+    hrv, z = log.get("hrv_rmssd"), log.get("hrv_z_score")
+    rhr, rhr_delta = log.get("resting_heart_rate"), log.get("resting_hr_delta")
+    acwr = latest_load.get("acwr") if latest_load else None
+    domains = [
+        _domain("hrv", None if z is None else max(0, min(100, 60 + z * 20)),
+                f"HRV {hrv:.0f} ms, {z:+.1f} SD from your normal of {base['hrv_mean_rmssd']:.0f} ms."
+                if hrv is not None and z is not None else "No HRV in today's check-in."),
+        _domain("sleep", log.get("sleep_score"),
+                f"{log['sleep_duration_hours']}h against your usual {base['sleep_target_hours']}h."
+                if log.get("sleep_duration_hours") is not None else "No sleep in today's check-in."),
+        _domain("subjective", log.get("subjective_score"),
+                "From your soreness, fatigue and stress ratings." if log.get("subjective_score") is not None
+                else "No soreness, fatigue or stress ratings today."),
+        _domain("heart_rate", None if rhr_delta is None else max(0, min(100, 70 - rhr_delta * 6)),
+                f"Resting HR {rhr:.0f} bpm, {rhr_delta:+.0f} from your normal." if rhr_delta is not None and rhr is not None
+                else "No resting heart rate today."),
+        _domain("training_load", None if acwr is None else max(0, 100 - abs(acwr - 1.05) * 120),
+                f"This week's load is {acwr:.2f}x your 4-week average." if acwr is not None
+                else "No training logged in the last 4 weeks."),
+    ]
+    priority = {"REST": "high", "RECOVER": "high", "REDUCE": "medium", "TRAIN": "low"}[result.decision.value]
+    recommendations = [{"priority": priority, "category": "training", "message": result.headline,
+                        "rationale": "; ".join(result.reasons)}]
+    recommendations += [{"priority": "high", "category": "caution", "message": c, "rationale": ""} for c in result.cautions]
+    if base["confidence"] < 1:
+        recommendations.append({
+            "priority": "low", "category": "baseline",
+            "message": f"Your personal baseline is {round(base['confidence'] * 100)}% built.",
+            "rationale": f"It uses {base['sample_counts']['hrv']} HRV readings so far; 14 make it fully yours.",
+        })
+    score = log.get("recovery_score")
+    return {
+        "overall_score": score,
+        "recovery_level": (log.get("readiness_state") or "").lower(),
+        "domains": domains,
+        "cross_domain_insights": result.reasons + result.cautions,
+        "recommendations": recommendations,
+        "training_recommendation": result.headline,
+        "confidence": result.confidence,
+        "data_completeness": round(sum(d["data_available"] for d in domains) / len(domains) * 100),
+        "calculated_at": log.get("log_date") or log.get("created_at"),
+        "baseline": base,
+    }
