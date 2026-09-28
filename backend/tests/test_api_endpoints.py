@@ -131,9 +131,9 @@ def test_crud_lifecycle(name, base_path, uid, body, id_field, claims):
      [("exercises", lambda v: len(v) > 0)]),
     ("/api/v1/mental-health", {"user_id": "u1", "mood": 8, "energy": 7, "anxiety": 3, "notes": "Good", "tags": ["sleep"]},
      [("mood", 8), ("energy", 7)]),
-    ("/api/v1/social", {"user_id": "u1", "name": "Plank", "description": "Hold planks", "challenge_type": "duration",
+    ("/api/v1/challenges", {"name": "Plank", "description": "Hold planks", "category": "endurance",
      "target_value": 30, "target_unit": "minutes", "duration_days": 30},
-     [("name", "Plank"), ("participant_count", 0)]),
+     [("name", "Plank"), ("participant_count", 1)]),
 ])
 def test_create_and_validate(path, body, claims):
     r = post_json(path, json=body)
@@ -195,25 +195,30 @@ def test_update_user_ignores_forbidden_fields():
     assert r2.json()["id"] == uid and "role" not in r2.json()
 
 
-def test_social_full_lifecycle():
+def test_challenge_full_lifecycle():
     uid = "social_u1"
-    ch = post_json("/api/v1/social?user_id=" + uid, json={
-        "name": "Plank", "description": "Hold planks", "challenge_type": "duration",
+    ch = post_json("/api/v1/challenges?user_id=" + uid, json={
+        "name": "Plank", "description": "Hold planks", "category": "endurance",
         "target_value": 30, "target_unit": "minutes", "duration_days": 30}).json()
     cid = ch["id"]
-    # Join + duplicate
-    assert post_json(f"/api/v1/social/{cid}/join?user_id={uid}").status_code == 200
-    assert post_json(f"/api/v1/social/{cid}/join?user_id={uid}").status_code == 409
-    assert post_json(f"/api/v1/social/{cid}/join?user_id=u2").status_code == 200
-    # Progress
-    assert post_json(f"/api/v1/social/{cid}/progress?user_id={uid}", json={"value": 15}).json()["participant_count"] == 2
-    assert post_json(f"/api/v1/social/{cid}/progress?user_id=u2", json={"value": 10}).status_code == 200
-    # Leaderboard
-    lb = get_json(f"/api/v1/social/{cid}/leaderboard?user_id={uid}").json()
-    assert len(lb) == 2 and lb[0]["score"] == 15
-    # Feed + 404
-    assert len(get_json("/api/v1/social/feed").json()) >= 3
-    assert get_json("/api/v1/social/nonexistent/leaderboard").status_code == 404
+    assert ch["joined"] is True
+    assert post_json(f"/api/v1/challenges/join/{cid}?user_id={uid}").status_code == 409
+    assert post_json(f"/api/v1/challenges/join/{cid}?user_id=u2").status_code == 200
+    r = post_json(f"/api/v1/challenges/{cid}/log?user_id={uid}", json={"value": 15}).json()
+    assert r["progress_pct"] == 50.0
+    assert post_json(f"/api/v1/challenges/{cid}/log?user_id=u2", json={"value": 10}).status_code == 200
+    lb = get_json(f"/api/v1/challenges/{cid}/leaderboard?user_id={uid}").json()
+    assert lb["total_participants"] == 2 and lb["entries"][0]["total_progress"] == 15
+    listed = {c["id"]: c for c in get_json(f"/api/v1/challenges?user_id={uid}").json()}
+    assert listed[cid]["my_progress_pct"] == 50.0
+    assert get_json("/api/v1/challenges/nonexistent/leaderboard").status_code == 404
+
+
+def test_a_joined_builtin_is_listed_once():
+    builtin = get_json("/api/v1/challenges/builtin").json()[-1]["id"]
+    assert post_json(f"/api/v1/challenges/join/{builtin}?user_id=once").status_code == 200
+    ids = [c["id"] for c in get_json("/api/v1/challenges?user_id=once").json()]
+    assert ids.count(builtin) == 1
 
 
 def test_nutrition_daily_summary():

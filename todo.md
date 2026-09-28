@@ -30,7 +30,10 @@ Measured at start: 229 route modules, 281 services, 93 services unreachable
       from home and menu. Fixed two dead home-screen routes.
 - [ ] `ai-coach-v2` (workout plans, form check, demo videos that point at
       missing assets), `health-coaching` (sample coach marketplace), `habits`.
-- [ ] Community: `/community`, `-v2`, and `/challenges`.
+- [x] Community: `/challenges` (now with create and per-user progress) and
+      `/community` feed; `/social`, `/community-v2`, `/activity-feed` and the
+      social screen removed. Dashboard's medication, challenge and feed panels fixed.
+- [ ] Dashboard screen needs a full wiring audit (it had three dead calls).
 - [ ] Recovery: `/recovery-logs`, `/recovery`, `/recovery-v2`, seven services.
 - [ ] Export: `/export`, `-v2`, `/data-export`.
 - [ ] Leftover `-v2` prefixes: injury-risk, recommendations.

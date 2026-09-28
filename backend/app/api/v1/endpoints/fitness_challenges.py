@@ -39,6 +39,18 @@ class FitnessChallengeResponse(BaseModel):
     participant_count: int = 0
     is_active: bool = True
     is_builtin: bool = False
+    joined: bool = False
+    my_progress_pct: Optional[float] = None
+
+
+class CreateChallengeRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    description: str = Field("", max_length=500)
+    category: str = Field("consistency", pattern=r"^(strength|endurance|flexibility|consistency)$")
+    target_value: int = Field(ge=1, le=1_000_000)
+    target_unit: str = Field(min_length=1, max_length=20)
+    duration_days: int = Field(ge=1, le=365)
+    difficulty: str = Field("intermediate", pattern=r"^(beginner|intermediate|advanced)$")
 
 
 class DailyLogRequest(BaseModel):
@@ -141,9 +153,16 @@ async def list_challenges(
     now = datetime.now(timezone.utc)
     results = []
 
+    def mine(cid: str, target: float) -> dict:
+        p = fitness_participants.get(cid, {}).get(user_id)
+        if p is None:
+            return {"joined": False, "my_progress_pct": None}
+        return {"joined": True, "my_progress_pct": round(min(100, p["total_progress"] / target * 100), 1) if target else None}
+
     if include_builtin:
         for t in BUILTIN_CHALLENGES:
-            if category and t.category != category:
+            # A joined builtin is listed once, from its running instance below.
+            if t.id in fitness_challenges or (category and t.category != category):
                 continue
             results.append(FitnessChallengeResponse(
                 id=t.id, template_id=t.id, name=t.name, description=t.description,
@@ -152,7 +171,7 @@ async def list_challenges(
                 created_by="system", created_at="2026-01-01T00:00:00Z",
                 starts_at="2026-01-01T00:00:00Z", ends_at="2026-12-31T23:59:59Z",
                 participant_count=len(fitness_participants.get(t.id, {})),
-                is_active=True, is_builtin=True,
+                is_active=True, is_builtin=True, **mine(t.id, t.target_value),
             ))
 
     for c in fitness_challenges.values():
@@ -170,10 +189,33 @@ async def list_challenges(
             created_at=c["created_at"], starts_at=c["starts_at"],
             ends_at=c["ends_at"],
             participant_count=len(fitness_participants.get(cid, {})),
-            is_active=True, is_builtin=False,
+            is_active=True, is_builtin=c["created_by"] == "system", **mine(cid, c["target_value"]),
         ))
 
     return results
+
+
+@router.post("", response_model=FitnessChallengeResponse, status_code=201)
+async def create_challenge(req: CreateChallengeRequest, user_id: str = Query("default")):
+    """Create a custom challenge; the creator joins it."""
+    now = datetime.now(timezone.utc)
+    cid = uuid.uuid4().hex[:10]
+    fitness_challenges[cid] = {
+        "id": cid, "template_id": None, "name": req.name, "description": req.description,
+        "category": req.category, "target_value": req.target_value, "target_unit": req.target_unit,
+        "duration_days": req.duration_days, "daily_goal": round(req.target_value / req.duration_days, 2),
+        "difficulty": req.difficulty, "created_by": user_id, "created_at": now.isoformat(),
+        "starts_at": now.isoformat(), "ends_at": (now + timedelta(days=req.duration_days)).isoformat(),
+    }
+    fitness_participants.setdefault(cid, {})[user_id] = {
+        "joined_at": now.isoformat(), "total_progress": 0, "daily_logs_count": 0,
+        "current_streak": 0, "best_streak": 0,
+    }
+    fitness_daily_logs.setdefault(cid, {})[user_id] = []
+    return FitnessChallengeResponse(
+        **{k: v for k, v in fitness_challenges[cid].items()},
+        participant_count=1, joined=True, my_progress_pct=0.0,
+    )
 
 
 @router.get("/categories")
