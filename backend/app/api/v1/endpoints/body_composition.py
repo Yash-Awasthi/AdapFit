@@ -33,11 +33,10 @@ class MeasurementResponse(BaseModel):
 
 class CompositionTrend(BaseModel):
     period: str  # "7d", "30d", "90d"
-    weight_change: float
-    body_fat_change: float
-    muscle_change: float
-    waist_change: float
-    trend: str  # "improving", "stable", "declining"
+    weight_change: Optional[float] = None
+    body_fat_change: Optional[float] = None
+    muscle_change: Optional[float] = None
+    waist_change: Optional[float] = None
 
 
 # In-memory storage
@@ -45,34 +44,20 @@ measurements = durable_dict("app.api.v1.endpoints.body_composition.measurements"
 
 
 def _calc_trend(entries: list, days: int) -> CompositionTrend:
-    """Calculate trends over a period."""
-    now = datetime.now(timezone.utc)
-    cutoff = (now - timedelta(days=days)).isoformat()
+    """Change over the period, per measure, between the first and last entries that recorded it."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     recent = [e for e in entries if e["logged_at"] >= cutoff]
 
-    if len(recent) < 2:
-        return CompositionTrend(
-            period=f"{days}d", weight_change=0, body_fat_change=0,
-            muscle_change=0, waist_change=0, trend="stable",
-        )
-
-    first, last = recent[0], recent[-1]
-    weight_chg = (last.get("weight_kg") or 0) - (first.get("weight_kg") or 0)
-    bf_chg = (last.get("body_fat_pct") or 0) - (first.get("body_fat_pct") or 0)
-    muscle_chg = (last.get("muscle_mass_kg") or 0) - (first.get("muscle_mass_kg") or 0)
-    waist_chg = (last.get("measurements", {}).get("waist") or 0) - (first.get("measurements", {}).get("waist") or 0)
-
-    # Improving = losing fat, gaining muscle, waist shrinking
-    improving = bf_chg < -0.3 or muscle_chg > 0.2 or waist_chg < -1
-    declining = bf_chg > 0.5 or muscle_chg < -0.3 or waist_chg > 1.5
+    def change(get) -> Optional[float]:
+        vals = [v for v in (get(e) for e in recent) if v is not None]
+        return round(vals[-1] - vals[0], 1) if len(vals) >= 2 else None
 
     return CompositionTrend(
         period=f"{days}d",
-        weight_change=round(weight_chg, 1),
-        body_fat_change=round(bf_chg, 1),
-        muscle_change=round(muscle_chg, 1),
-        waist_change=round(waist_chg, 1),
-        trend="improving" if improving else ("declining" if declining else "stable"),
+        weight_change=change(lambda e: e.get("weight_kg")),
+        body_fat_change=change(lambda e: e.get("body_fat_pct")),
+        muscle_change=change(lambda e: e.get("muscle_mass_kg")),
+        waist_change=change(lambda e: e.get("measurements", {}).get("waist")),
     )
 
 

@@ -72,16 +72,16 @@ async def log_strain(req: StrainLogRequest):
     return vision_health_service.log_strain(req.user_id, req.symptoms, req.severity, req.duration_hours)
 
 
-@router.get("/exercises/{strain_level}")
-async def get_exercises(strain_level: int):
-    from app.services.vision_health import vision_health_service
-    return vision_health_service.get_exercise_plan(strain_level)
-
-
 @router.get("/exercises/all")
 async def get_all_exercises():
     from app.services.vision_health import vision_health_service
     return vision_health_service.VISION_EXERCISES
+
+
+@router.get("/exercises/{strain_level}")
+async def get_exercises(strain_level: int):
+    from app.services.vision_health import vision_health_service
+    return vision_health_service.get_exercise_plan(strain_level)
 
 
 @router.post("/exercise/log")

@@ -83,13 +83,15 @@ class RehabilitationService:
         self._pain_log.append({"level": pain_level, "timestamp": time.time()})
         return {"logged": True, "pain_level": pain_level, "message": f"Exercise logged. Pain: {pain_level}/10" + (". Consider reducing intensity if pain increases." if pain_level >= 7 else "")}
 
-    def log_progress(self, program_id: str, pain_level: int = 0, rom_degrees: int = 0, strength_score: int = 0, notes: str = "") -> dict:
-        entry = {"program_id": program_id, "pain": pain_level, "rom": rom_points, "strength": strength_score, "notes": notes, "timestamp": time.time()}
+    def log_progress(self, program_id: str, pain_level=None, rom_degrees=None, strength_score=None, notes: str = "") -> dict:
+        entry = {"program_id": program_id, "pain": pain_level, "rom": rom_degrees, "strength": strength_score, "notes": notes, "timestamp": time.time()}
         self._progress.append(entry)
+        if pain_level is not None:
+            self._pain_log.append({"level": pain_level, "timestamp": entry["timestamp"]})
         return {"logged": True}
 
     def get_progress_chart(self, program_id: str) -> list[dict]:
-        return [{"pain": p["pain"], "rom": p.get("rom", 0), "strength": p.get("strength", 0), "date": time.strftime("%Y-%m-%d", time.localtime(p["timestamp"]))} for p in self._progress if p["program_id"] == program_id]
+        return [{"pain": p["pain"], "rom": p.get("rom"), "strength": p.get("strength"), "date": time.strftime("%Y-%m-%d", time.localtime(p["timestamp"]))} for p in self._progress if p["program_id"] == program_id]
 
     def get_milestones(self, injury_type: str) -> list[dict]:
         program = INJURY_PROGRAMS.get(injury_type, {})

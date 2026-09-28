@@ -6,7 +6,7 @@
  * a measured one. ECG needs hardware a phone does not have, so that panel
  * says so instead of drawing a waveform.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput, Alert,
 } from 'react-native';
@@ -16,7 +16,7 @@ import { colors, spacing, radius } from '../../src/theme';
 import { ScreenWrapper } from '../../src/components/ScreenWrapper';
 import { GlassCard, SectionHeaderPremium, ProgressBarPremium } from '../../src/components/PremiumComponents';
 import { useApis } from '../../src/hooks/useApi';
-import { postJson, asArray } from '../../src/services/http';
+import { getJson, postJson, asArray } from '../../src/services/http';
 
 interface Measurement<T> {
   value: T | null;
@@ -100,6 +100,42 @@ const CHECK_FIELDS = [
   { key: 'pulse_rate', label: 'Pulse', hint: 'Beats per minute' },
   { key: 'temperature', label: 'Temperature °C', hint: 'e.g. 37.2' },
 ] as const;
+
+function BloodPressure() {
+  const [sys, setSys] = useState('');
+  const [dia, setDia] = useState('');
+  const [pulse, setPulse] = useState('');
+  const [data, setData] = useState<any>(null);
+  const [last, setLast] = useState<any>(null);
+  const load = useCallback(async () => setData(await getJson('/blood-pressure/log?days=7')), []);
+  useEffect(() => { load(); }, [load]);
+  const save = async () => {
+    const s_ = Number(sys), d_ = Number(dia);
+    if (!(s_ > 0 && d_ > 0)) return Alert.alert('Blood pressure', 'Enter both numbers, e.g. 128 and 84.');
+    const r = await postJson<any>('/blood-pressure/log', { systolic: s_, diastolic: d_, pulse: pulse ? Number(pulse) : undefined });
+    if (!r) return Alert.alert('Not saved', 'Check the values.');
+    setLast(r); setSys(''); setDia(''); setPulse(''); load();
+  };
+  const summ = data?.summary;
+  return (
+    <GlassCard variant="light" style={styles.logCard}>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TextInput style={[styles.input, { flex: 1 }]} placeholder="Top (systolic)" placeholderTextColor={colors.text.muted} keyboardType="number-pad" value={sys} onChangeText={setSys} />
+        <TextInput style={[styles.input, { flex: 1 }]} placeholder="Bottom" placeholderTextColor={colors.text.muted} keyboardType="number-pad" value={dia} onChangeText={setDia} />
+        <TextInput style={[styles.input, { flex: 1 }]} placeholder="Pulse" placeholderTextColor={colors.text.muted} keyboardType="number-pad" value={pulse} onChangeText={setPulse} />
+      </View>
+      <TouchableOpacity style={[styles.logButton, { backgroundColor: '#8B5CF6' }]} onPress={save}><Text style={styles.logButtonText}>Save reading</Text></TouchableOpacity>
+      {last && <Text style={styles.emptyText}>{last.systolic}/{last.diastolic}: {last.label}. {last.next_step}</Text>}
+      {summ?.count > 0 && (
+        <View>
+          <Text style={styles.historyTime}>7-day average {summ.average} · {summ.range}</Text>
+          <Text style={styles.emptyText}>{summ.next_step}{summ.enough_for_doctor ? '' : ` (${summ.count} readings so far; about 12 over a week gives a reliable average.)`}</Text>
+        </View>
+      )}
+      <Text style={styles.historySub}>{data?.how_to}</Text>
+    </GlassCard>
+  );
+}
 
 function SeekCareCheck() {
   const [values, setValues] = useState<Record<string, string>>({});
@@ -215,6 +251,9 @@ export default function VitalSignsScreen() {
         icon="thermometer"
         status={prettify(summary?.temperature?.classification)}
       />
+
+      <SectionHeaderPremium icon="speedometer" iconColor="#8B5CF6" title="Blood Pressure" subtitle="Home readings and your weekly average" />
+      <BloodPressure />
 
       <SectionHeaderPremium icon="medkit" iconColor="#EF4444" title="Should I Get Help?" subtitle="NEWS2 on your home readings" />
       <SeekCareCheck />

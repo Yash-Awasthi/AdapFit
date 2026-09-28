@@ -75,7 +75,7 @@ class ContentItem:
     view_count: int = 0
     like_count: int = 0
     bookmark_count: int = 0
-    rating: float = 4.5
+    rating: float = 0.0  # no rating until users rate it
     source: str = "adapfit"
     author: str = "AdapFit Team"
     created_at: float = field(default_factory=time.time)
@@ -557,8 +557,8 @@ class ContentPlatformService:
                 tags=[subtype, "form", "strength"],
                 muscles_targeted=muscles,
                 equipment_needed=[equip],
-                view_count=1000 + idx * 100,
-                rating=4.5 + (idx % 5) * 0.1,
+                view_count=0,
+                
             ))
             idx += 1
         
@@ -588,8 +588,7 @@ class ContentPlatformService:
                 tags=[subtype, "cardio", "fat_burn"],
                 muscles_targeted=[cat],
                 equipment_needed=equip if equip else ["none"],
-                view_count=800 + idx * 80,
-                rating=4.4,
+                view_count=0,
             ))
             idx += 1
         
@@ -615,8 +614,7 @@ class ContentPlatformService:
                 tags=["stretching", "flexibility", "recovery"],
                 muscles_targeted=[name.split()[0].lower()],
                 equipment_needed=["none"],
-                view_count=600 + idx * 50,
-                rating=4.3,
+                view_count=0,
             ))
             idx += 1
         
@@ -644,8 +642,7 @@ class ContentPlatformService:
                 tags=["meditation", "mental_health", "stress", "sleep"],
                 muscles_targeted=[],
                 equipment_needed=["none"],
-                view_count=500 + idx * 60,
-                rating=4.7,
+                view_count=0,
             ))
             idx += 1
         
@@ -673,8 +670,7 @@ class ContentPlatformService:
                 tags=["nutrition", "diet", "meal_planning"],
                 muscles_targeted=[],
                 equipment_needed=["none"],
-                view_count=400 + idx * 40,
-                rating=4.4,
+                view_count=0,
             ))
             idx += 1
         
@@ -700,8 +696,7 @@ class ContentPlatformService:
                 tags=["sleep", "recovery", "wellness"],
                 muscles_targeted=[],
                 equipment_needed=["none"],
-                view_count=300 + idx * 30,
-                rating=4.6,
+                view_count=0,
             ))
             idx += 1
         
@@ -727,8 +722,7 @@ class ContentPlatformService:
                 tags=["injury_prevention", "form", "safety"],
                 muscles_targeted=["core", "shoulders", "back"],
                 equipment_needed=["none"],
-                view_count=350 + idx * 35,
-                rating=4.5,
+                view_count=0,
             ))
             idx += 1
         

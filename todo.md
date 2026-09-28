@@ -9,13 +9,35 @@ wellness, India first, every feature kept, nothing diagnoses.
 
 ---
 
-## Phase 2c — Screen coverage for API-only features
+## Phase 2c — Screen coverage for API-only features (in progress)
 
-125 of 208 route modules have no screen calling them (measured 2026-09-28 with
-`scratchpad routes.py`; `tests/test_mobile_api_paths.py` guards the reverse).
-Triage each: wire into an existing screen, give it a screen, fold it into a
-sibling, or delete it. Expect many to be sub-APIs of features that already
-have screens.
+Decided with the user 2026-09-28: keep what makes the app unique or helps an
+ordinary user, delete the rest; group features without screens into hubs.
+Measure with `scratchpad coverage.py` (maps every mobile call to its module).
+
+- [x] Deleted 70 modules: gimmicks (blockchain, AR, digital twin), off-market
+      (US OSHA, US insurance, B2B), duplicates (trend engines, a second forum,
+      17 workout modules, body dashboards) and diagnosis-like "detection".
+- [x] Workouts: live set scaling in the active workout, 1RM estimate on Stats.
+- [x] Care & Safety hub: OSM care nearby, symptom triage, first aid, check a
+      forward, IDRS, Indian schemes (rewritten, PM-JAY rules corrected), notes.
+- [x] Emergency screen edits the one medical-info store; `medical_id` removed.
+- [x] Conditions & Recovery hub: Indian NCD check-ups, lab results against the
+      report's own range (one shared tracker had held every user's labs), physio,
+      CDC STEADI falls check, eye care, allergies. Fixed a crash in rehab progress
+      and an unreachable eye route.
+- [ ] Stroke rehab, chronic disease, hospital at home and wound care stay API-only
+      until Phase 2b designs them with clinicians.
+- [x] Everyday Wellbeing hub: live AQI/UV, desk health, a digit-span memory game
+      (real measured score), focus modes, travel health. Fixed an unreachable
+      passport route. Peer support and vaccination records left API-only.
+- [x] Body screen: measurements, goals, on-device progress photos; trends no
+      longer report the whole weight as a change when an entry lacks it.
+- [x] Family screen on `family_network`: invite by email or username, per-category
+      sharing, a member view of only what was shared. In-app invites could never
+      be accepted (a token only the inviter saw); `family_mode` duplicate removed.
+- [ ] Content feed falls back to items with invented view counts and ratings.
+- [ ] Blood pressure logging in vital signs (the BP classifier has no store).
 
 ## Phase 2b — Clinical modules built for real
 

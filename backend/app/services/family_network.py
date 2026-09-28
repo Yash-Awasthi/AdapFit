@@ -186,6 +186,7 @@ class FamilyNetworkService:
         invitee_id: str,
         relationship: str = "custom",
         message: str = "Let's stay connected on our health journeys!",
+        in_app: bool = False,
     ) -> dict:
         """Send a family connection invite."""
         # Check if already connected
@@ -200,7 +201,9 @@ class FamilyNetworkService:
                 return {"error": "Invite already pending"}
 
         invite_id = f"inv_{secrets.token_hex(6)}"
-        token = secrets.token_urlsafe(32)
+        # In-app invites go to an authenticated account, so login is the proof;
+        # a token is only needed when the invite travels as a link.
+        token = "" if in_app else secrets.token_urlsafe(32)
         now = time.time()
         invite = FamilyInvite(
             id=invite_id,

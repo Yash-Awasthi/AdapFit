@@ -1,6 +1,6 @@
 """Physical Therapy & Rehabilitation API"""
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from app.services.rehabilitation import rehabilitation_service
 
@@ -22,9 +22,9 @@ class LogExerciseRequest(BaseModel):
 
 class LogProgressRequest(BaseModel):
     program_id: str
-    pain_level: int = 0
-    rom_degrees: int = 0
-    strength_score: int = 0
+    pain_level: Optional[int] = Field(None, ge=0, le=10)
+    rom_degrees: Optional[int] = Field(None, ge=0, le=360)
+    strength_score: Optional[int] = Field(None, ge=0, le=10)
     notes: str = ""
 
 

@@ -55,7 +55,7 @@ class AllergyTrackerService:
         if user_id not in self.symptom_logs:
             self.symptom_logs[user_id] = []
 
-        severity = data.get("severity", 3)
+        severity = data.get("severity")
         entry = {
             "date": date,
             "symptoms": data.get("symptoms", []),
@@ -75,6 +75,10 @@ class AllergyTrackerService:
             "logged_at": time.time(),
         }
 
+        resp = entry["respiratory"] or {}
+        if resp.get("breathlessness") or resp.get("wheezing") or entry["skin"].get("hives"):
+            entry["next_step"] = ("If breathing is hard, or your lips, tongue or face swell, call 112 now. "
+                                  "Otherwise, see a doctor about these symptoms soon.")
         self.symptom_logs[user_id].append(entry)
         return entry
 
