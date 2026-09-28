@@ -17,7 +17,7 @@ import { colors, spacing, radius } from '../../src/theme';
 import { GlassCard, SectionHeaderPremium, ScoreRing, ProgressBarPremium } from '../../src/components/PremiumComponents';
 import { SCREEN_HEADER_TOP } from '../../src/theme/layout';
 import { useApis } from '../../src/hooks/useApi';
-import { postJson, asArray } from '../../src/services/http';
+import { getJson, postJson, asArray } from '../../src/services/http';
 
 interface ScheduleEntry {
   medication: string;
@@ -132,8 +132,28 @@ function AddMedicationModal({ visible, onClose, onAdded }: {
   );
 }
 
+interface DrugInfo {
+  searched_as: string;
+  matches: { brand_name: string | null; generic_name: string | null; purpose: string[]; warnings: string[] }[];
+  recalls: { reason: string; classification: string; date: string }[];
+  source: string;
+}
+interface Interaction { drug_1: string; drug_2: string; severity: string; effect: string; next_step: string; for_your_doctor: string }
+
 export default function MedicationScreen() {
   const [adding, setAdding] = useState(false);
+  const [openInfo, setOpenInfo] = useState<string | null>(null);
+  const [info, setInfo] = useState<Record<string, DrugInfo | 'loading' | 'error'>>({});
+  const [interactions, setInteractions] = useState<Interaction[] | null>(null);
+
+  const toggleInfo = useCallback(async (name: string) => {
+    if (openInfo === name) return setOpenInfo(null);
+    setOpenInfo(name);
+    if (info[name] && info[name] !== 'error') return;
+    setInfo((m) => ({ ...m, [name]: 'loading' }));
+    const r = await getJson<DrugInfo>(`/medication/drug-info?name=${encodeURIComponent(name.replace(/[^A-Za-z0-9 -]/g, ' ').trim())}`);
+    setInfo((m) => ({ ...m, [name]: r ?? 'error' }));
+  }, [openInfo, info]);
   const { data, loading, refreshing, refresh, reload } = useApis<{
     today: TodaySchedule;
     refills: { alerts: RefillAlert[] };
@@ -143,6 +163,13 @@ export default function MedicationScreen() {
   const schedule = asArray<ScheduleEntry>(today?.schedule);
   const refills = asArray<RefillAlert>(data.refills?.alerts);
   const refillByName = new Map(refills.map((r) => [r.medication, r]));
+
+  const checkInteractions = useCallback(async () => {
+    const names = Array.from(new Set(schedule.map((e) => e.medication)));
+    const r = await postJson<{ data: { interactions: Interaction[] } }>('/drug-interactions/check', { medications: names });
+    if (!r) return Alert.alert('Unavailable', 'The interaction check could not run.');
+    setInteractions(asArray<Interaction>(r.data?.interactions));
+  }, [schedule]);
 
   const markTaken = useCallback(async (entry: ScheduleEntry) => {
     if (entry.status === 'taken') return;
@@ -215,10 +242,11 @@ export default function MedicationScreen() {
               <View style={[styles.medIcon, { backgroundColor: tint + '15' }]}>
                 <Ionicons name="medical" size={20} color={tint} />
               </View>
-              <View style={{ flex: 1 }}>
+              <TouchableOpacity style={{ flex: 1 }} onPress={() => toggleInfo(entry.medication)}
+                accessibilityLabel={`About ${entry.medication}`}>
                 <Text style={styles.medName}>{entry.medication}</Text>
-                <Text style={styles.medDetail}>{entry.dosage} • {entry.time}</Text>
-              </View>
+                <Text style={styles.medDetail}>{entry.dosage} • {entry.time} · tap for info</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.medCheck, entry.status === 'taken' && { backgroundColor: colors.health.calm }]}
                 onPress={() => markTaken(entry)}
@@ -236,6 +264,27 @@ export default function MedicationScreen() {
                 />
               </TouchableOpacity>
             </View>
+            {openInfo === entry.medication && (() => {
+              const d = info[entry.medication];
+              if (d === 'loading' || d === undefined) return <ActivityIndicator style={{ marginTop: 8 }} color={colors.primary} />;
+              if (d === 'error') return <Text style={styles.medDetail}>Could not reach the drug database.</Text>;
+              const m = d.matches[0];
+              return (
+                <View style={{ marginTop: 8 }}>
+                  {m ? (
+                    <>
+                      <Text style={styles.medDetail}>{[m.brand_name, m.generic_name].filter(Boolean).join(' · ')}</Text>
+                      {m.purpose[0] ? <Text style={styles.emptyBody}>{m.purpose[0]}</Text> : null}
+                      {m.warnings[0] ? <Text style={styles.emptyBody} numberOfLines={6}>{m.warnings[0]}</Text> : null}
+                    </>
+                  ) : (
+                    <Text style={styles.emptyBody}>No US FDA label found for "{d.searched_as}". Try the generic name.</Text>
+                  )}
+                  {d.recalls.length > 0 && <Text style={[styles.refillText, { marginTop: 6 }]}>{d.recalls.length} FDA recall record(s) mention this name. Ask your pharmacist whether they apply to your pack.</Text>}
+                  <Text style={[styles.medDetail, { marginTop: 6 }]}>{d.source}</Text>
+                </View>
+              );
+            })()}
             {refill && (
               <View style={styles.refillWarning}>
                 <Ionicons name="warning" size={12} color="#F59E0B" />
@@ -247,6 +296,26 @@ export default function MedicationScreen() {
           </GlassCard>
         );
       })}
+
+      {schedule.length > 1 && (
+        <GlassCard variant="light" style={styles.medCard}>
+          <TouchableOpacity onPress={checkInteractions} accessibilityRole="button">
+            <Text style={styles.medName}>Check interactions between my medicines</Text>
+          </TouchableOpacity>
+          {interactions !== null && (interactions.length === 0 ? (
+            <Text style={styles.emptyBody}>No known interactions between these medicines in our database. Your pharmacist can double-check.</Text>
+          ) : interactions.map((it, i) => (
+            <View key={i} style={{ marginTop: 10 }}>
+              <Text style={[styles.medName, { color: it.severity === 'major' || it.severity === 'contraindicated' ? '#EF4444' : '#F59E0B' }]}>
+                {it.drug_1} + {it.drug_2} ({it.severity})
+              </Text>
+              <Text style={styles.emptyBody}>{it.effect}</Text>
+              <Text style={styles.emptyBody}>{it.next_step}</Text>
+              <Text style={styles.medDetail}>For your doctor: {it.for_your_doctor}</Text>
+            </View>
+          )))}
+        </GlassCard>
+      )}
 
       <TouchableOpacity
         style={styles.addButton}

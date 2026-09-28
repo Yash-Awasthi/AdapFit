@@ -33,18 +33,51 @@ Measured at start: 229 route modules, 281 services, 93 services unreachable
 - [x] Community: `/challenges` (now with create and per-user progress) and
       `/community` feed; `/social`, `/community-v2`, `/activity-feed` and the
       social screen removed. Dashboard's medication, challenge and feed panels fixed.
+- [x] New test `test_mobile_api_paths.py` fails on any mobile call to a path
+      the server lacks. It found: the vital signs screen calling `/vital-signs/*`
+      (server serves `/vitals/*`), health calendar calling `/calendar/cycle/*`,
+      health hub posting fixed inputs to a missing `/stress/assess` and showing
+      50 as the stress level, and a dead api-client module.
 - [ ] Dashboard screen needs a full wiring audit (it had three dead calls).
 - [x] Recovery: one engine (personal baseline). The dashboard scored HRV against
       population cut-offs with a second engine; it now explains the check-in score
       via `/recovery-logs/today`. Five duplicate recovery engines removed.
-- [ ] `fatigue_prediction` (Three-Process fatigue model) is unwired; belongs with sleep/circadian.
 - [x] Export: one `/export` over the real stores; `/export/all` includes every
       per-user service's state. `-v2` returned a sample export, `/data-export`
       was a second copy. Export screen saves real files.
 - [x] Sixteen mobile files called the API without the auth token; one
       `authedFetch` helper now covers them.
 - [x] Leftover duplicates: `/injury-risk-v2`, `/recommendations-v2`, `/recommend`.
-- [ ] Wire the unreachable unique services (smart alarm is done), API and screen.
+- [x] Deleted 52 unreachable services that duplicated wired features, had no
+      possible input (EEG staging, WHOOP frames), or were off-domain (a stock
+      factor engine). Services: 281 at start, 201 now.
+- [ ] Wire the 18 unique ones, API and screen, grouped by where they surface:
+      - [x] Medication: openFDA lookup (brand or generic, Indian names mapped)
+        and an interaction check on the screen; interaction results now give a
+        next step instead of prescriber dose advice. `medication_safety`
+        duplicated the existing Beers check and was removed.
+      - [x] Diabetes: CGM analyzer drives the summary (episodes, CV, GMI,
+        consensus targets) with a bulk import route; insulin and medication
+        advice removed from pattern messages.
+      - Devices/import: `apple_health_parser` (export.xml), `activity_stream_parser`
+        (GPX/TCX/FIT), `garmin_data_analyzer`.
+      - [x] Training analytics: `/training/form` (fitness/fatigue/form from
+        session-RPE load, sessions without RPE excluded), `/training/intensity`,
+        `/training/ride-fueling` (planner had never run: a field-name bug). On Stats.
+      - [ ] `cycling_analysis` (climbs from GPS) waits on activity import; `core_training`.
+      - [x] Circadian: personal alertness curve (two-process model timed by the
+        sleep journal's mid-sleep) on the circadian screen; the old fatigue model
+        used arbitrary constants. Chronotype cards relabelled as general guidance.
+      - [ ] `actigraphy_analysis` needs hourly activity from device sync (Phase 5).
+      - [x] Nutrition: targets from profile and weight (Mifflin-St Jeor + protein
+        recommender) replace a fixed 2500 kcal/150 g for everyone; meal entries
+        whose calories disagree with their macros are flagged.
+      - [x] Insights: personal patterns (sleep vs next-day mood and recovery,
+        10+ paired days, only clear differences) in the briefing. `quantified_self`
+        turned out to be another logger with no correlation code; removed.
+      - [x] Vital signs: NEWS2 home check (`/vitals/check`) with the single-parameter
+        red-score rule it was missing and plain next steps.
+      - Conditions: `chronic_fatigue` (ME/CFS energy envelope and pacing).
 - [x] Mind screen: mood check-ins, journal, WHO-5/PHQ-9/GAD-7 with safe next
       steps (no medication advice), CBT thought records API, tap-to-call crisis
       lines. The old screen was fake and its mood button posted to a missing route.

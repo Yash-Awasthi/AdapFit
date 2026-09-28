@@ -89,24 +89,33 @@ class DiabetesManagerService:
         return [r for r in self._glucose_readings if r["timestamp"] > cutoff]
 
     def get_glucose_summary(self) -> dict:
-        if not self._glucose_readings:
-            return {"message": "No glucose data yet"}
-        values = [r["value"] for r in self._glucose_readings[-50:]]
-        avg = sum(values) / len(values)
-        in_range = sum(1 for v in values if 70 <= v <= 180) / len(values) * 100
-        hypo = sum(1 for v in values if v < 70)
-        hyper = sum(1 for v in values if v > 180)
-        estimated_a1c = round((avg + 46.7) / 28.7, 1)
-        return {
-            "average_glucose": round(avg),
-            "time_in_range": round(in_range, 1),
-            "hypo_episodes": hypo,
-            "hyper_episodes": hyper,
-            "estimated_hba1c": estimated_a1c,
-            "readings_count": len(self._glucose_readings),
-            "target_range": "70-180 mg/dL",
-            "in_range_target": "70%+",
-        }
+        from datetime import datetime
+
+        from app.services.cgm_analyzer import GlucoseReading, generate_glucose_summary
+
+        if len(self._glucose_readings) < 3:
+            return {"message": "Log at least 3 readings for a summary", "readings": len(self._glucose_readings)}
+        readings = [GlucoseReading(datetime.fromtimestamp(r["timestamp"]), float(r["value"]), r.get("source", "meter"))
+                    for r in sorted(self._glucose_readings, key=lambda r: r["timestamp"])]
+        summary = generate_glucose_summary(readings)
+        summary["next_step"] = (
+            "Share this summary with your doctor or diabetes educator at your next review."
+            if all(summary["targets_met"].values()) else
+            "Some targets are not met. Book a review with your doctor or diabetes educator and bring this summary."
+        )
+        return summary
+
+    def import_readings(self, readings: list[dict]) -> dict:
+        """Bulk readings from a CGM or meter export: [{timestamp (epoch s), value_mgdl}]."""
+        known = {r["timestamp"] for r in self._glucose_readings}
+        added = 0
+        for r in readings:
+            if r["timestamp"] in known:
+                continue
+            self._glucose_readings.append({"value": r["value_mgdl"], "context": "cgm", "notes": "",
+                                           "timestamp": r["timestamp"], "source": "cgm"})
+            added += 1
+        return {"imported": added, "skipped_duplicates": len(readings) - added}
 
     def log_insulin(self, insulin_type: str, units: float, site: str = "abdomen", notes: str = "") -> dict:
         entry = {"type": insulin_type, "units": units, "site": site, "notes": notes, "timestamp": time.time()}
@@ -143,12 +152,12 @@ class DiabetesManagerService:
             if fasting:
                 avg_fasting = sum(r["value"] for r in fasting) / len(fasting)
                 if avg_fasting > 130:
-                    patterns.append({"pattern": "Elevated Fasting Glucose", "value": round(avg_fasting), "message": "Fasting glucose consistently above 130 mg/dL. Discuss medication adjustment with your doctor."})
+                    patterns.append({"pattern": "Elevated Fasting Glucose", "value": round(avg_fasting), "message": "Fasting glucose is consistently above 130 mg/dL. Show your log to your doctor at your next visit."})
             post_meal = [r for r in readings if r["context"] == "post_meal"]
             if post_meal:
                 avg_post = sum(r["value"] for r in post_meal) / len(post_meal)
                 if avg_post > 200:
-                    patterns.append({"pattern": "Post-Meal Spikes", "value": round(avg_post), "message": "Post-meal glucose frequently above 200 mg/dL. Consider reducing carb intake or adjusting insulin."})
+                    patterns.append({"pattern": "Post-Meal Spikes", "value": round(avg_post), "message": "Post-meal glucose is often above 200 mg/dL. Note which meals cause it and show your doctor or diabetes educator."})
             all_values = [r["value"] for r in readings]
             if max(all_values) - min(all_values) > 100:
                 patterns.append({"pattern": "High Variability", "message": "Large glucose swings detected. Consider more consistent meal timing and carb counting."})

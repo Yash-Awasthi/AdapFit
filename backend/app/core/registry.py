@@ -73,6 +73,7 @@ ROUTE_MAP = {
     "exercise_library": ("/exercise-library", ["Exercise Library"]),
     "photo_compare": ("/photo-compare", ["Photo Comparison"]),
     "hrv": ("/hrv", ["HRV"]),
+    "training_api": ("/training", ["Training Analytics"]),
     "workout_compare": ("/workout-compare", ["Workout Comparison"]),
     "body_trends": ("/body-trends", ["Body Trends"]),
     "personal_bests": ("/personal-bests", ["Personal Bests"]),

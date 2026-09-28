@@ -147,6 +147,8 @@ def detect_episodes(readings: list[GlucoseReading]) -> list[GlycemicEpisode]:
     in_episode = False
     episode_type = ""
     start_idx = 0
+    # A sentinel in-range reading closes an episode still open at the end.
+    readings = readings + [GlucoseReading(readings[-1].timestamp, (TARGET_LOW + TARGET_HIGH) / 2)]
     for i, reading in enumerate(readings):
         is_hypo = reading.value < TARGET_LOW
         is_hyper = reading.value > TARGET_HIGH
@@ -213,8 +215,8 @@ def calculate_average_glucose(readings: list[GlucoseReading]) -> float:
 
 
 def estimate_hba1c(mean_glucose: float) -> float:
-    """Estimate HbA1c from mean glucose using Nathan formula."""
-    return (mean_glucose + 46.7) / 28.7
+    """Glucose Management Indicator (Bergenstal 2018), the consensus estimate from mean CGM glucose."""
+    return 3.31 + 0.02392 * mean_glucose
 
 
 def calculate_mage(readings: list[GlucoseReading]) -> float:
@@ -276,9 +278,18 @@ def generate_glucose_summary(readings: list[GlucoseReading]) -> dict[str, Any]:
     mean_glucose = calculate_average_glucose(readings)
     hba1c_est = estimate_hba1c(mean_glucose)
     mage = calculate_mage(readings)
+    below_70 = tir.percent_hypo + tir.percent_low
     return {
+        "readings": len(readings),
         "mean_glucose": round(mean_glucose, 1),
-        "estimated_hba1c": round(hba1c_est, 1),
+        "gmi": round(hba1c_est, 1),
+        # International consensus targets (Battelino et al., Diabetes Care 2019).
+        "targets_met": {
+            "time_in_range_over_70pct": tir.percent_target > 70,
+            "below_70_under_4pct": below_70 < 4,
+            "below_54_under_1pct": tir.percent_hypo < 1,
+            "cv_36_or_less": variability.cv <= 36,
+        },
         "time_in_range": {
             "target": round(tir.percent_target, 1),
             "above_target": round(tir.percent_elevated + tir.percent_hyper, 1),

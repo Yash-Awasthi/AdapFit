@@ -15,6 +15,8 @@ import { TrendingUp, Trophy, Dumbbell, Clock, Zap } from 'lucide-react-native';
 import { API_BASE_URL as API } from '../../src/services/config';
 import { useTheme } from '../../src/services/theme';
 import { authHeader } from '../../src/services/authToken';
+import { getJson } from '../../src/services/http';
+import { useUserStore } from '../../src/stores';
 const SCREEN_WIDTH = Dimensions.get('window').width - 40;
 
 interface WorkoutStats {
@@ -42,18 +44,39 @@ const MUSCLE_COLORS: Record<string, string> = {
   unknown: '#64748B',
 };
 
+interface FormResponse {
+  today: { fitness: number; fatigue: number; form: number; zone: string; recommendation: string } | null;
+  series: { date: string; fitness: number; fatigue: number; form: number }[];
+  sessions_used: number;
+  sessions_without_rpe: number;
+}
+interface IntensityResponse {
+  distribution: { easy: number; moderate: number; hard: number } | null;
+  pattern?: string;
+  description?: string;
+}
+
 export default function StatsScreen() {
   const { theme } = useTheme();
   const s = makeStyles(theme);
+  const userId = useUserStore((st) => st.userId);
   const [stats, setStats] = useState<WorkoutStats | null>(null);
+  const [form, setForm] = useState<FormResponse | null>(null);
+  const [tid, setTid] = useState<IntensityResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchStats(); }, []);
 
   async function fetchStats() {
     try {
-      const res = await fetch(`${API}/api/v1/workout-stats/default?days=365`, { headers: authHeader() });
+      const [res, f, t] = await Promise.all([
+        fetch(`${API}/api/v1/workout-stats/${userId}?days=365`, { headers: authHeader() }),
+        getJson<FormResponse>(`/training/form?user_id=${userId}&days=90`),
+        getJson<IntensityResponse>(`/training/intensity?user_id=${userId}&days=28`),
+      ]);
       if (res.ok) setStats(await res.json());
+      setForm(f);
+      setTid(t);
     } catch {}
     setLoading(false);
   }
@@ -154,6 +177,34 @@ export default function StatsScreen() {
               );
             })}
           </View>
+        </View>
+      )}
+
+      {form?.today && (
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Fitness, Fatigue & Form</Text>
+          <View style={s.summaryGrid}>
+            <View style={s.summaryCard}><Text style={s.summaryValue}>{Math.round(form.today.fitness)}</Text><Text style={s.summaryLabel}>Fitness</Text></View>
+            <View style={s.summaryCard}><Text style={s.summaryValue}>{Math.round(form.today.fatigue)}</Text><Text style={s.summaryLabel}>Fatigue</Text></View>
+            <View style={s.summaryCard}><Text style={s.summaryValue}>{form.today.form > 0 ? '+' : ''}{Math.round(form.today.form)}</Text><Text style={s.summaryLabel}>Form</Text></View>
+          </View>
+          <Text style={s.emptySubtext}>{form.today.recommendation}</Text>
+          <Text style={s.emptySubtext}>
+            From {form.sessions_used} sessions with RPE{form.sessions_without_rpe ? `; ${form.sessions_without_rpe} without RPE were left out` : ''}.
+          </Text>
+        </View>
+      )}
+
+      {tid?.distribution && (
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Intensity Mix (last 4 weeks)</Text>
+          {(['easy', 'moderate', 'hard'] as const).map((k) => (
+            <View key={k} style={s.topExRow}>
+              <Text style={s.topExName}>{k}</Text>
+              <Text style={s.topExVol}>{tid.distribution![k]}%</Text>
+            </View>
+          ))}
+          {tid.description ? <Text style={s.emptySubtext}>{tid.description}</Text> : null}
         </View>
       )}
 

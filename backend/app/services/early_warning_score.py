@@ -127,10 +127,12 @@ def calculate_news2(vitals: VitalSigns) -> NEWSScore:
 
     total = rr_score + sat_score + sbp_score + pulse_score + consci_score + temp_score + o2_score
 
+    single_red = max(rr_score, sat_score, sbp_score, pulse_score, consci_score, temp_score) == 3
     if total >= 7:
         alert = AlertLevel.HIGH
         trigger = "high"
-    elif total >= 5:
+    elif total >= 5 or single_red:
+        # RCP NEWS2: a score of 3 in any one parameter warrants urgent review on its own.
         alert = AlertLevel.MODERATE
         trigger = "medium"
     elif total >= 1:
@@ -152,6 +154,17 @@ def calculate_news2(vitals: VitalSigns) -> NEWSScore:
         alert_level=alert,
         trigger=trigger,
     )
+
+
+def home_next_step(score: NEWSScore) -> str:
+    """What someone measuring at home should do, by NEWS2 band."""
+    if score.alert_level == AlertLevel.HIGH:
+        return "Call 112 (or 108 for an ambulance) now. These readings together need emergency care."
+    if score.alert_level == AlertLevel.MODERATE:
+        return "Contact a doctor now, or go to urgent care within the hour. Take these readings with you."
+    if score.alert_level == AlertLevel.LOW:
+        return "Rest and measure again in 4-6 hours. If the numbers or how you feel get worse, contact a doctor."
+    return "Your readings are in the normal range."
 
 
 def news2_recommendation(score: NEWSScore) -> str:

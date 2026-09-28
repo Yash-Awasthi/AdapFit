@@ -48,3 +48,15 @@ def test_the_old_invented_routes_are_gone():
     h = _headers("coach-gone")
     for path in ("/api/v1/ai-coach/health-risks", "/api/v1/ai-coach/daily-insight", "/api/v1/ai-assistant/tips"):
         assert c.get(path, headers=h).status_code == 404
+
+
+def test_personal_pattern_needs_a_real_difference():
+    from app.services.ai_coach import personal_patterns
+
+    nights = [{"date": f"2026-07-{d:02d}", "total_minutes": (480 if d % 2 else 360)} for d in range(1, 15)]
+    moods = [{"mood": (8 if d % 2 else 5), "logged_at": f"2026-07-{d:02d}T20:00:00"} for d in range(1, 15)]
+    found = personal_patterns([], moods, nights)
+    assert found and "mood tracks your sleep" in found[0]["title"].lower()
+
+    flat = [{"mood": 6, "logged_at": f"2026-07-{d:02d}T20:00:00"} for d in range(1, 15)]
+    assert personal_patterns([], flat, nights) == []

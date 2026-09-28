@@ -58,6 +58,15 @@ interface Schedule {
   [block: string]: ScheduleBlock | string;
 }
 
+interface Alertness {
+  status: 'ok' | 'insufficient_data';
+  curve?: { time: string; alertness: number | null }[];
+  peak_window?: string;
+  dip_window?: string;
+  suggestions?: string[];
+  message?: string;
+}
+
 interface RhythmScore {
   status: 'ok' | 'insufficient_data';
   overall_score?: number | null;
@@ -103,12 +112,21 @@ export default function CircadianScreen() {
     energy: { energy_curve: EnergyPoint[] };
     schedule: Schedule;
     rhythm: RhythmScore;
+    alertness: Alertness;
   }>({
     info: `/circadian/chronotype/${chronotype}`,
     energy: `/circadian/energy/${chronotype}`,
     schedule: `/circadian/schedule/${chronotype}`,
     rhythm: '/circadian/rhythm-score',
+    alertness: '/sleep/alertness',
   });
+  const alertness = data.alertness ?? null;
+  const personalBars = useMemo(
+    () => asArray<{ time: string; alertness: number | null }>(alertness?.curve)
+      .filter((p, i) => p.alertness !== null && i % 2 === 0)
+      .map((p) => ({ value: Math.round(p.alertness!), label: p.time.slice(0, 2), color: energyColor(p.alertness!) })),
+    [alertness]
+  );
 
   const info = data.info ?? null;
   const rhythm = data.rhythm ?? null;
@@ -157,7 +175,20 @@ export default function CircadianScreen() {
       refreshing={refreshing}
       onRefresh={refresh}
     >
-      <SectionHeaderPremium icon="compass" iconColor="#8B5CF6" title="Your Chronotype" />
+      <SectionHeaderPremium icon="pulse" iconColor="#8B5CF6" title="Your Alertness Today" subtitle="From your own sleep times" />
+      <GlassCard variant="light" style={styles.sectionCard}>
+        {alertness?.status === 'ok' ? (
+          <>
+            <InteractiveBarChart data={personalBars} height={160} showValues={false} />
+            <Text style={styles.energyInsight}>Peak {alertness.peak_window} · dip {alertness.dip_window}</Text>
+            {asArray<string>(alertness.suggestions).map((t) => <Text key={t} style={styles.infoLine}>{t}</Text>)}
+          </>
+        ) : (
+          <Text style={styles.emptyText}>{alertness?.message ?? 'Log your sleep to see your own curve.'}</Text>
+        )}
+      </GlassCard>
+
+      <SectionHeaderPremium icon="compass" iconColor="#8B5CF6" title="Chronotype Guide" subtitle="General patterns, not measured" />
       <View style={styles.chronotypeGrid}>
         {CHRONOTYPES.map((ct) => {
           const selected = ct.key === chronotype;
@@ -190,7 +221,7 @@ export default function CircadianScreen() {
         </GlassCard>
       )}
 
-      <SectionHeaderPremium icon="trending-up" iconColor="#22C55E" title="Energy Curve" />
+      <SectionHeaderPremium icon="trending-up" iconColor="#22C55E" title="Typical Curve for This Chronotype" />
       <GlassCard variant="light" style={styles.sectionCard}>
         {chartData.length > 0 ? (
           <>

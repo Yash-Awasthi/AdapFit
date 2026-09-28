@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LoadingScreen } from '../../src/components';
 import { api } from '../../src/services/api';
 import { API_BASE_URL } from '../../src/services/config';
+import { asArray } from '../../src/services/http';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
 import { authHeader } from '../../src/services/authToken';
@@ -32,10 +33,10 @@ interface Summary {
   total_carbs: number;
   total_fat: number;
   meal_count: number;
-  calorie_target: number;
-  protein_target: number;
-  remaining_calories: number;
-  remaining_protein: number;
+  calorie_target: number | null;
+  protein_target: number | null;
+  remaining_calories: number | null;
+  remaining_protein: number | null;
 }
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -45,8 +46,6 @@ const QUICK_MEALS = [
   { name: 'Chicken Breast', cal: 200, pro: 35, carb: 0, fat: 4 },
   { name: 'Banana', cal: 105, pro: 1, carb: 27, fat: 0 },
 ];
-const CARBS_TARGET = 300;
-const FAT_TARGET = 70;
 
 export default function NutritionScreen() {
   const { theme } = useTheme();
@@ -55,6 +54,7 @@ export default function NutritionScreen() {
   const profile = useUserStore((s) => s.profile);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [targets, setTargets] = useState<{ status: string; carbs_g?: number; fat_g?: number; missing?: string[] } | null>(null);
   const [generatedPlan, setGeneratedPlan] = useState<any | null>(null);
   const [generating, setGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -73,10 +73,12 @@ export default function NutritionScreen() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [mealsRes, sumRes] = await Promise.all([
+      const [mealsRes, sumRes, tRes] = await Promise.all([
         fetch(`${API}/api/v1/nutrition/meals?user_id=${userId}`, { headers: authHeader() }),
         fetch(`${API}/api/v1/nutrition/daily?user_id=${userId}`, { headers: authHeader() }),
+        fetch(`${API}/api/v1/nutrition/targets?user_id=${userId}`, { headers: authHeader() }),
       ]);
+      if (tRes.ok) setTargets(await tRes.json());
       if (mealsRes.ok) setMeals(await mealsRes.json());
       if (sumRes.ok) setSummary(await sumRes.json());
     } catch {}
@@ -171,8 +173,8 @@ export default function NutritionScreen() {
     setAnalyzingPhoto(false);
   }
 
-  function MacroCard({ label, current, target, color }: { label: string; current: number; target: number; color: string }) {
-    const pct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+  function MacroCard({ label, current, target, color }: { label: string; current: number; target: number | null; color: string }) {
+    const pct = target ? Math.min((current / target) * 100, 100) : 0;
     return (
       <View style={s.macroCard}>
         <Text style={[s.macroCardValue, { color }]}>{Math.round(current)}g</Text>
@@ -180,14 +182,14 @@ export default function NutritionScreen() {
         <View style={s.macroBarBg}>
           <View style={[s.macroBarFill, { width: `${pct}%`, backgroundColor: color }]} />
         </View>
-        <Text style={s.macroCardTarget}>{target}g target</Text>
+        <Text style={s.macroCardTarget}>{target ? `${target}g target` : 'no target yet'}</Text>
       </View>
     );
   }
 
   if (loading) return <LoadingScreen />;
 
-  const caloriePct = summary && summary.calorie_target > 0
+  const caloriePct = summary && summary.calorie_target
     ? Math.min(100, Math.round((summary.total_calories / summary.calorie_target) * 100))
     : 0;
   const visibleMeals = filterType ? meals.filter((m) => m.meal_type === filterType) : meals;
@@ -201,17 +203,21 @@ export default function NutritionScreen() {
         <View style={s.ringContainer}>
           <View style={[s.ring, { borderColor: caloriePct >= 100 ? theme.danger : theme.primary }]}>
             <Text style={s.ringNum}>{summary.total_calories}</Text>
-            <Text style={s.ringLabel}>of {summary.calorie_target} kcal</Text>
+            <Text style={s.ringLabel}>{summary.calorie_target ? `of ${summary.calorie_target} kcal` : 'kcal today'}</Text>
           </View>
-          <Text style={s.remaining}>{summary.remaining_calories} kcal remaining</Text>
+          {summary.remaining_calories != null ? (
+            <Text style={s.remaining}>{summary.remaining_calories} kcal remaining</Text>
+          ) : (
+            <Text style={s.remaining}>Add {asArray<string>(targets?.missing).join(', ').replace(/_/g, ' ') || 'your profile'} to get your own targets</Text>
+          )}
         </View>
       )}
 
       {summary && (
         <View style={s.macroRow}>
           <MacroCard label="Protein" current={summary.total_protein} target={summary.protein_target} color={theme.success} />
-          <MacroCard label="Carbs" current={summary.total_carbs} target={CARBS_TARGET} color={theme.primaryLight} />
-          <MacroCard label="Fat" current={summary.total_fat} target={FAT_TARGET} color={theme.warning} />
+          <MacroCard label="Carbs" current={summary.total_carbs} target={targets?.carbs_g ?? null} color={theme.primaryLight} />
+          <MacroCard label="Fat" current={summary.total_fat} target={targets?.fat_g ?? null} color={theme.warning} />
         </View>
       )}
 

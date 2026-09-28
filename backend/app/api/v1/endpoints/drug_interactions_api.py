@@ -20,9 +20,22 @@ class DosageRequest(BaseModel):
 class TimingRequest(BaseModel):
     medications: List[str]
 
+NEXT_STEP = {
+    "contraindicated": "Contact your doctor or pharmacist today, before your next dose.",
+    "major": "Contact your doctor or pharmacist today, before your next dose.",
+    "moderate": "Mention this to your doctor or pharmacist at your next visit or refill.",
+    "minor": "Worth mentioning at your next visit.",
+}
+DO_NOT_CHANGE = "Do not stop or change any medicine on your own."
+
+
 @router.post("/check")
 async def check_interactions(req: InteractionCheckRequest):
     result = drug_interaction_service.check_interactions(req.medications)
+    # The source's "action" is written for prescribers; users get a next step instead.
+    for item in result.get("interactions", []):
+        item["for_your_doctor"] = item.pop("action", "")
+        item["next_step"] = f"{NEXT_STEP.get(item.get('severity'), NEXT_STEP['moderate'])} {DO_NOT_CHANGE}"
     return {"success": True, "data": result}
 
 @router.post("/beers-criteria")
