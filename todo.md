@@ -22,7 +22,8 @@ Measured at start: 229 route modules, 281 services, 93 services unreachable
       unused `app/api/v1/domains/` routers and the fake `/tasks` jobs.
 - [x] HRV: one `/hrv` API over one analyzer with Lipponen artifact correction and
       biofeedback; HRV screen reads a Bluetooth chest strap (standard 0x180D).
-- [ ] Achievements: `/achievements`, `-v2`, `-v3`.
+- [x] Achievements: one `/achievements` derived from logged activity; the
+      self-grant XP/badge routes and the `eval()` goal parser are gone.
 - [ ] Coach: `/ai-coach`, `-v2`, plus `health-coaching`, `habits`.
 - [ ] Community: `/community`, `-v2`, and `/challenges`.
 - [ ] Recovery: `/recovery-logs`, `/recovery`, `/recovery-v2`, seven services.

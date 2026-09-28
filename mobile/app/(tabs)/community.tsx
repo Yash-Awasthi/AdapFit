@@ -1,8 +1,8 @@
 /**
  * Community — challenges, the leaderboard and the shared feed.
  *
- * The leaderboard is the gamification board, which ranks by points actually
- * earned, so nobody appears on it who has not logged anything. The feed is
+ * The leaderboard ranks by achievement points, which only logged activity
+ * earns. Other members appear by rank alone. The feed is
  * what people chose to share; an empty community reads as empty rather than
  * as five invented members with streaks.
  */
@@ -38,10 +38,10 @@ interface Challenge {
 }
 
 interface LeaderboardEntry {
-  user_id: string;
-  username: string;
-  score: number;
   rank: number;
+  name: string;
+  points: number;
+  is_you: boolean;
 }
 
 interface Share {
@@ -98,7 +98,7 @@ export default function CommunityScreen() {
     feed: Share[];
   }>({
     challenges: '/challenges',
-    leaderboard: '/gamification/leaderboard?limit=20',
+    leaderboard: '/achievements/leaderboard?limit=20',
     feed: '/community/feed',
   });
 
@@ -218,10 +218,10 @@ export default function CommunityScreen() {
             </GlassCard>
           ) : (
             leaderboard.map((entry) => {
-              const isUser = entry.user_id === userId;
+              const isUser = entry.is_you;
               return (
                 <GlassCard
-                  key={entry.user_id}
+                  key={entry.rank}
                   variant="light"
                   style={[styles.leaderboardCard, isUser && styles.leaderboardCardUser]}
                 >
@@ -242,11 +242,11 @@ export default function CommunityScreen() {
                       style={[styles.leaderboardName, isUser && { color: colors.primary }]}
                       numberOfLines={1}
                     >
-                      {isUser ? 'You' : entry.username}
+                      {entry.name}
                     </Text>
                   </View>
                   <Text style={[styles.leaderboardScore, { color: colors.primary }]}>
-                    {Math.round(entry.score).toLocaleString()}
+                    {entry.points.toLocaleString()}
                   </Text>
                 </GlassCard>
               );

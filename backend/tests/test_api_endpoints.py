@@ -464,19 +464,6 @@ def test_meditation_sessions():
     assert get_json("/api/v1/meditation/nonexistent").json()["error"]
 
 
-# ── Achievements v2 ──────────────────────────────────────────────────────────
-
-def test_achievements_v2():
-    badges = get_json("/api/v1/achievements-v2").json()["badges"]
-    assert len(badges) >= 20
-    tiers = {b["tier"] for b in badges}
-    assert {"bronze", "silver", "gold", "platinum"} <= tiers
-    cats = {b["category"] for b in badges}
-    assert len(cats) >= 4
-    up = get_json("/api/v1/achievements-v2/achieve-u2").json()
-    assert "badges" in up and "total_xp" in up and up["total_badges"] >= 20
-
-
 # ── Metrics ──────────────────────────────────────────────────────────────────
 
 def test_metrics_endpoint():

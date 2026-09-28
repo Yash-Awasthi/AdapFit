@@ -59,7 +59,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
       items: [
         { icon: Search, label: 'Exercises', sub: 'Movement library', route: '/exercises', color: theme.primary },
         { icon: Calendar, label: 'Periodization', sub: 'Long-term plan', route: '/periodization', color: '#06B6D4' },
-        { icon: Award, label: 'Achievements', sub: '25 badges to earn', route: '/achievements', color: '#EAB308' },
+        { icon: Award, label: 'Achievements', sub: 'Badges, level & streaks', route: '/achievements', color: '#EAB308' },
         { icon: HeartPulse, label: 'Recovery', sub: 'Readiness breakdown', route: '/recovery-dashboard', color: '#EF4444' },
       ],
     },

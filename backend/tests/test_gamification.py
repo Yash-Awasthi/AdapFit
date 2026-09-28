@@ -7,7 +7,7 @@ from app.services.gamification import (
     calculate_level_progress, calculate_points, calculate_leaderboard_ranks,
     calculate_weekly_leaderboard, update_streak, calculate_streak_multiplier,
     calculate_total_points, calculate_user_level, generate_achievement_summary,
-    evaluate_goal_expression, RARITY_MULTIPLIER,
+    RARITY_MULTIPLIER,
 )
 
 
@@ -21,19 +21,6 @@ def make_achievement(key="test", rarity=AchievementRarity.COMMON, points=100, ma
 
 def make_progress(key="test", value=0.0, level=0):
     return AchievementProgress(achievement_key=key, user_id="u1", current_level=level, current_value=value)
-
-
-class TestGoalExpression:
-    def test_basic(self):
-        assert evaluate_goal_expression("value >= target", 10, 5) is True
-        assert evaluate_goal_expression("value >= target", 3, 5) is False
-
-    def test_math(self):
-        assert evaluate_goal_expression("value * 2 >= target", 3, 5) is True
-        assert evaluate_goal_expression("value * 2 >= target", 2, 5) is False
-
-    def test_invalid(self):
-        assert evaluate_goal_expression("import os", 10, 5) is False
 
 
 class TestLevelProgress:

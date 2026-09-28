@@ -28,9 +28,9 @@ class ServiceHealthMiddleware(BaseHTTPMiddleware):
         for prefix in ["/api/v1/pose", "/api/v1/biomarkers", "/api/v1/biometrics",
                        "/api/v1/anomaly", "/api/v1/planner", "/api/v1/tracker",
                        "/api/v1/chat", "/api/v1/rppg", "/api/v1/sensors",
-                       "/api/v1/sleep-analysis", "/api/v1/breathing",
+                       "/api/v1/sleep", "/api/v1/breathing",
                        "/api/v1/injury-risk-v2", "/api/v1/medication-tracker",
-                       "/api/v1/achievements-v3"]:
+                       "/api/v1/achievements"]:
             if path.startswith(prefix):
                 service_name = prefix.split("/")[-1]
                 self._service_counts[service_name] = self._service_counts.get(service_name, 0) + 1
