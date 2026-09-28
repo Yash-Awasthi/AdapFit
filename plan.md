@@ -1451,3 +1451,36 @@ Decided with the user: write-through with one worker on Railway for now;
 per-request loading by user is the upgrade path. `tests/test_durable_state.py`
 simulates a restart. Postgres itself was not exercised: the local password in
 `backend/.env` was rejected.
+
+## Part 12 — Screen coverage (todo.md Phase 2c)
+
+Before: 206 route modules, 71 called by any screen. After: 133 modules, 95 in
+use; the remaining 38 are infrastructure, device sync, WebSockets, or clinical
+modules deferred to Phase 2b. Services went from 191 to about 130.
+
+Decided with the user: keep what is unique or helps an ordinary user, delete
+the rest, and group features into hubs rather than one screen each. Deleted:
+gimmicks (blockchain records, AR, digital twin), off-market modules (US OSHA,
+US insurance, B2B corporate), and duplicates (ten trend engines, a second forum
+and chat, 17 workout modules, second body, ECG, medication and breathing
+modules), plus "detection" modules that diagnosed.
+
+New screens: Care & Safety, Conditions & Recovery, Everyday Wellbeing, Body,
+Family (rewritten), and BP in vital signs. Built on real sources: OpenStreetMap
+for care nearby, Open-Meteo for AQI and UV, validated instruments (IDRS for
+diabetes risk, CDC STEADI for falls, digit span for working memory), and the
+Government of India's NCD screening and schemes.
+
+Defects found while wiring, beyond what earlier parts recorded:
+
+- Fabricated or wrong: a Boston hospital list, bookable invented doctors and
+  coaches, PM-JAY eligibility by income (it is SECC lists and age 70+), a
+  demo family with invented members, fixed fitness and vision scores, content
+  ratings and view counts, disease risk reductions per kilogram lost.
+- Unsafe: symptom severity clamped so a 10/10 headache stopped being an
+  emergency; BP labelled "stage 2 hypertension, medication typically required";
+  a keyword myth-checker that answered every vaccine question with autism.
+- Privacy: every user's lab results in one shared tracker; symptom history kept
+  under one "default" user.
+- Broken: rehab progress crashed on every call; two routes were shadowed by
+  catch-alls; in-app family invites could never be accepted.

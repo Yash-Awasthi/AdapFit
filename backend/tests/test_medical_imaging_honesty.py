@@ -79,3 +79,20 @@ def test_no_confidence_figure_is_invented(service):
 
 def test_every_score_says_what_it_is_not(service):
     assert "does not diagnose" in service.analyze_skin_lesion(FULL)["disclaimer"]
+
+
+def test_rash_red_flags_go_straight_to_emergency(service):
+    assert service.detect_rash({"pattern": "petechial", "symptoms": ["fever"]})["urgency"] == "emergency"
+    assert service.detect_rash({"pattern": "urticarial", "symptoms": ["lip_or_tongue_swelling"]})["urgency"] == "emergency"
+    assert service.detect_rash({"pattern": "maculopapular", "symptoms": ["fever"]})["urgency"] == "high"
+
+
+def test_rash_names_no_condition(service):
+    out = service.detect_rash({"pattern": "vesicular"})
+    assert "possible_causes" not in out and "herpes" not in str(out).lower()
+
+
+def test_diameter_and_evolution_may_be_unmeasured(service):
+    out = service.analyze_skin_lesion({k: FULL[k] for k in service.REQUIRED_FEATURES})
+    assert out["status"] == "scored" and out["criteria_assessed"] == 3
+    assert out["abcde_details"]["diameter"]["score"] == "not_measured"

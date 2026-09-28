@@ -1,44 +1,43 @@
-"""Genomics Insights API endpoints."""
-from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import Dict, Any, List
-from app.services.genomics_insights import genomics_insights_service
+"""Genomics: raw DNA file upload, panel report and medicine check."""
+from typing import List
+
+from fastapi import APIRouter, File, UploadFile
+from pydantic import BaseModel, Field
+
+from app.services.genomics_insights import MAX_UPLOAD_BYTES, genomics_insights_service
 
 router = APIRouter(prefix="/genomics", tags=["Genomics & Pharmacogenomics"])
 
 
-class GeneticAnalysisRequest(BaseModel):
-    user_id: str
-    genetic_data: Dict[str, Any]
+class DrugCheckRequest(BaseModel):
+    medications: List[str] = Field(max_length=50)
 
 
-class DrugSafetyRequest(BaseModel):
-    user_id: str
-    medications: List[str]
+class ApoeRequest(BaseModel):
+    show: bool
 
 
-@router.post("/analyze")
-async def analyze_genetics(req: GeneticAnalysisRequest):
-    result = genomics_insights_service.analyze_genetic_data(req.user_id, req.genetic_data)
-    return {"success": True, "data": result}
+@router.post("/upload")
+async def upload(file: UploadFile = File(...)):
+    return genomics_insights_service.upload(await file.read(MAX_UPLOAD_BYTES + 1))
 
 
-@router.get("/profile/{user_id}")
-async def get_latest_profile(user_id: str):
-    result = genomics_insights_service.get_latest_profile(user_id)
-    return {"success": True, "data": result}
+@router.get("/report")
+async def report():
+    return genomics_insights_service.report()
 
 
-@router.post("/drug-safety")
-async def check_drug_safety(req: DrugSafetyRequest):
-    result = genomics_insights_service.check_drug_safety(req.user_id, req.medications)
-    return {"success": True, "data": result}
+@router.post("/apoe")
+async def show_apoe(request: ApoeRequest):
+    return genomics_insights_service.set_show_apoe(request.show)
 
 
-@router.get("/genes")
-async def list_genetic_risks():
-    risks = [
-        {"disease": k, "genes": v["genes"], "risk_variants": list(v["risk_variants"].keys())}
-        for k, v in genomics_insights_service.genetic_risks.items()
-    ]
-    return {"success": True, "data": risks}
+@router.post("/drug-check")
+async def drug_check(request: DrugCheckRequest):
+    return genomics_insights_service.check_drugs(request.medications)
+
+
+@router.delete("/report")
+async def delete_report():
+    genomics_insights_service.forget()
+    return {"deleted": True}

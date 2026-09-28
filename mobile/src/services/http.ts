@@ -29,6 +29,17 @@ export async function deleteJson<T>(path: string): Promise<T | null> {
   return sendJson<T>(path, 'DELETE');
 }
 
+/** Multipart upload; `fetch` sets the boundary when Content-Type is left out. */
+export async function postForm<T>(path: string, form: FormData): Promise<T | null> {
+  try {
+    const res = await fetch(`${API_V1}${path}`, { method: 'POST', headers: { ...authHeader() }, body: form });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 async function sendJson<T>(path: string, method: string, body?: unknown): Promise<T | null> {
   try {
     const res = await fetch(path.startsWith('http') ? path : `${API_V1}${path}`, {

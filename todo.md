@@ -9,36 +9,6 @@ wellness, India first, every feature kept, nothing diagnoses.
 
 ---
 
-## Phase 2c — Screen coverage for API-only features (in progress)
-
-Decided with the user 2026-09-28: keep what makes the app unique or helps an
-ordinary user, delete the rest; group features without screens into hubs.
-Measure with `scratchpad coverage.py` (maps every mobile call to its module).
-
-- [x] Deleted 70 modules: gimmicks (blockchain, AR, digital twin), off-market
-      (US OSHA, US insurance, B2B), duplicates (trend engines, a second forum,
-      17 workout modules, body dashboards) and diagnosis-like "detection".
-- [x] Workouts: live set scaling in the active workout, 1RM estimate on Stats.
-- [x] Care & Safety hub: OSM care nearby, symptom triage, first aid, check a
-      forward, IDRS, Indian schemes (rewritten, PM-JAY rules corrected), notes.
-- [x] Emergency screen edits the one medical-info store; `medical_id` removed.
-- [x] Conditions & Recovery hub: Indian NCD check-ups, lab results against the
-      report's own range (one shared tracker had held every user's labs), physio,
-      CDC STEADI falls check, eye care, allergies. Fixed a crash in rehab progress
-      and an unreachable eye route.
-- [ ] Stroke rehab, chronic disease, hospital at home and wound care stay API-only
-      until Phase 2b designs them with clinicians.
-- [x] Everyday Wellbeing hub: live AQI/UV, desk health, a digit-span memory game
-      (real measured score), focus modes, travel health. Fixed an unreachable
-      passport route. Peer support and vaccination records left API-only.
-- [x] Body screen: measurements, goals, on-device progress photos; trends no
-      longer report the whole weight as a change when an entry lacks it.
-- [x] Family screen on `family_network`: invite by email or username, per-category
-      sharing, a member view of only what was shared. In-app invites could never
-      be accepted (a token only the inviter saw); `family_mode` duplicate removed.
-- [ ] Content feed falls back to items with invented view counts and ratings.
-- [ ] Blood pressure logging in vital signs (the BP classifier has no store).
-
 ## Phase 2b — Clinical modules built for real
 
 Cardiac rehab, skin health, medical imaging, genomics, telemedicine, diabetes,
@@ -53,6 +23,8 @@ implementation that screens and refers without diagnosing.
 - Telemedicine: a real registered-practitioner provider, per the 2020 guidelines.
 - Medication: Indian brand names and the CDSCO drug list alongside OpenFDA.
 - Offline copies of the red-flag and first-aid content.
+- Stroke rehab, chronic disease management, hospital at home and wound
+  assessment are API-only; design each with a clinician before giving it a screen.
 - ME/CFS pacing (`chronic_fatigue`): wire with a screen; it defaults age to 35,
   which sets the heart-rate ceiling, and uses `random`.
 - Coach marketplace: removed because every coach was invented; rebuild only with
@@ -95,6 +67,8 @@ Target the DPDP Act 2023 and DPDP Rules 2025 first.
 - Health Connect and HealthKit sync actually wired and installed.
 - Wearable and BLE integrations worth keeping for launch.
 - `actigraphy_analysis` (rest-activity rhythm) once hourly activity syncs.
+- Live GPS run recording (`gps_tracking`) and night sleep-audio (`sleep_audio`)
+  have APIs but need on-device capture.
 - `realtime_pipeline` is only exercised by tests; decide with live streaming.
 - Health Connect sync can supply blood glucose to the CGM summary
   (`/diabetes/glucose/import` already takes bulk readings).
@@ -137,6 +111,13 @@ Target the DPDP Act 2023 and DPDP Rules 2025 first.
 - Load test the core loop.
 
 ## Phase 9 — User experience and quality
+
+- API-only features still without a screen: peer support, vaccination records
+  (health passport), accessible workout alternatives, the accessibility API.
+- `test_mobile_api_paths.py` misses calls whose generic type contains nested
+  `<...>` (for example `getJson<{ data: Record<string, any> }>(...)`); widen it.
+- 12 new hub and feature screens this phase have only been typechecked, never
+  run on a device.
 
 - Onboarding flow and first-run experience.
 - Navigation and information architecture for the reduced feature set.

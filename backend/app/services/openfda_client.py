@@ -57,6 +57,7 @@ US_NAMES = {
     "noradrenaline": "norepinephrine", "glibenclamide": "glyburide", "frusemide": "furosemide",
     "lignocaine": "lidocaine", "pethidine": "meperidine", "orciprenaline": "metaproterenol",
     "thyroxine": "levothyroxine", "rifampicin": "rifampin", "cyclosporin": "cyclosporine",
+    "amoxycillin": "amoxicillin",
 }
 
 

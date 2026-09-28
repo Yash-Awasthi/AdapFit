@@ -1,303 +1,294 @@
-"""Genomics & Pharmacogenomics Insights Service.
-
-Based on 2025-2026 precision medicine research:
-- Genetic disease risk scoring from uploaded data
-- Pharmacogenomic drug interaction analysis
-- Nutrigenomics dietary recommendations
-- Genetic trait reporting
-- Personalized medicine insights
 """
+Genomics: reads a consumer DNA raw-data file (23andMe or AncestryDNA) and
+reports a fixed panel of well-studied variants.
 
+Nothing here is a personal risk. Associations are shown as the published
+per-copy odds ratio with its source, which describes study populations and not
+the user. Pharmacogenomic phenotypes follow CPIC allele definitions and end in
+"tell your prescriber", never a dose. Only the panel genotypes are kept; the
+raw file is discarded after parsing.
+"""
+import io
 import time
-import random
-from typing import Dict, List, Optional, Any
+import zipfile
+from typing import Iterable, Optional
+
+MAX_UPLOAD_BYTES = 60 * 1024 * 1024
+
+CHIP_CAVEAT = (
+    "Consumer DNA chips misread some variants, rare ones most of all. Confirm any result with a "
+    "clinical-grade test before a doctor acts on it."
+)
+ANCESTRY_CAVEAT = (
+    "Most of these studies were done in people of European ancestry; the effect in Indian "
+    "populations may be larger, smaller or unmeasured."
+)
+
+# rsid -> (effect allele on the + strand, as the chip reports it)
+ASSOCIATIONS = [
+    {
+        "id": "tcf7l2", "gene": "TCF7L2", "rsid": "rs7903146", "effect_allele": "T",
+        "condition": "Type 2 diabetes", "odds_ratio_per_copy": 1.4,
+        "source": "Tong et al., BMC Medical Genetics 2009 (meta-analysis, including South Asian cohorts)",
+        "what_helps": "Regular activity, weight in a healthy range and periodic fasting glucose or HbA1c checks lower type 2 diabetes risk for every genotype.",
+    },
+    {
+        "id": "fto", "gene": "FTO", "rsid": "rs9939609", "effect_allele": "A",
+        "condition": "Obesity", "odds_ratio_per_copy": 1.31,
+        "source": "Frayling et al., Science 2007",
+        "what_helps": "Studies find physical activity reduces this variant's effect on weight by roughly a third or more.",
+    },
+    {
+        "id": "9p21", "gene": "9p21 (CDKN2B-AS1)", "rsid": "rs10757278", "effect_allele": "G",
+        "condition": "Coronary artery disease", "odds_ratio_per_copy": 1.29,
+        "source": "Helgadottir et al., Science 2007",
+        "what_helps": "Blood pressure, cholesterol, not smoking and activity matter far more than this variant; a doctor can check the first two.",
+    },
+    {
+        "id": "9p21b", "gene": "9p21 (CDKN2B-AS1)", "rsid": "rs1333049", "effect_allele": "C",
+        "condition": "Coronary artery disease", "odds_ratio_per_copy": 1.36,
+        "source": "Samani et al., NEJM 2007",
+        "what_helps": "Blood pressure, cholesterol, not smoking and activity matter far more than this variant; a doctor can check the first two.",
+    },
+]
+
+# Shown only after the user asks to see them: no prevention changes the
+# result, and guidelines advise counselling before disclosure.
+APOE = {
+    "id": "apoe", "gene": "APOE", "rsids": ("rs429358", "rs7412"),
+    "condition": "Alzheimer's disease",
+    "odds_ratios": {"e2/e4": 2.6, "e3/e4": 3.2, "e4/e4": 14.9},
+    "source": "Farrer et al., JAMA 1997 (white clinical and population samples)",
+    "counselling": "Talk to a genetic counsellor before or after viewing this. Many people with e4 never develop Alzheimer's, and many without it do.",
+}
+
+TRAITS = [
+    {"id": "lct", "gene": "LCT/MCM6", "rsid": "rs4988235", "effect_allele": "A", "trait": "Lactase persistence",
+     "copies_meaning": {0: "Likely lactose intolerant as an adult", 1: "Likely digests lactose", 2: "Likely digests lactose"}},
+    {"id": "actn3", "gene": "ACTN3", "rsid": "rs1815739", "effect_allele": "T", "trait": "Fast-twitch muscle protein (R577X)",
+     "copies_meaning": {0: "RR: both copies make alpha-actinin-3, common in sprint athletes",
+                        1: "RX: one working copy", 2: "XX: no alpha-actinin-3; slightly more common in endurance athletes"}},
+    {"id": "aldh2", "gene": "ALDH2", "rsid": "rs671", "effect_allele": "A", "trait": "Alcohol flush",
+     "copies_meaning": {0: "Typical alcohol breakdown", 1: "Flushing after alcohol likely; the acetaldehyde build-up is harmful",
+                        2: "Strong flushing likely; alcohol is best avoided"}},
+    {"id": "mthfr", "gene": "MTHFR", "rsid": "rs1801133", "effect_allele": "A", "trait": "MTHFR C677T",
+     "copies_meaning": {0: "No C677T copies", 1: "One C677T copy, very common",
+                        2: "Two C677T copies; about 10% of people. Guidelines advise no special supplement for this result alone"}},
+]
+
+# CPIC allele-defining SNPs on the + strand.
+CYP2C19 = {"no_function": {"rs4244285": "A", "rs4986893": "A"}, "increased": {"rs12248560": "T"}}
+CYP2C9 = {"rs1799853": ("T", 0.5), "rs1057910": ("C", 0.0)}
+SLCO1B1 = ("rs4149056", "C")
+VKORC1 = ("rs9923231", "T")
+
+PGX_DRUGS = {
+    "CYP2C19": ["clopidogrel", "omeprazole", "pantoprazole", "esomeprazole", "lansoprazole", "citalopram",
+                "escitalopram", "sertraline", "voriconazole", "amitriptyline"],
+    "CYP2C9": ["warfarin", "phenytoin", "celecoxib", "ibuprofen", "meloxicam", "piroxicam"],
+    "SLCO1B1": ["simvastatin", "atorvastatin", "rosuvastatin"],
+    "VKORC1": ["warfarin", "acenocoumarol"],
+}
+PGX_NOTES = {
+    "CYP2C19": "Can change how well clopidogrel, some acid reducers and some antidepressants work.",
+    "CYP2C9": "Can change how quickly warfarin, phenytoin and some painkillers are cleared.",
+    "SLCO1B1": "Can raise the chance of muscle side effects on some statins, simvastatin most.",
+    "VKORC1": "Can change the warfarin dose a doctor starts with.",
+}
+NOT_CALLABLE = {
+    "CYP2D6": "Needs copy-number testing that DNA chips cannot do; ask for a clinical test if a prescriber needs it.",
+}
+
+PANEL_RSIDS = (
+    {a["rsid"] for a in ASSOCIATIONS} | set(APOE["rsids"]) | {t["rsid"] for t in TRAITS}
+    | set(CYP2C19["no_function"]) | set(CYP2C19["increased"]) | set(CYP2C9) | {SLCO1B1[0], VKORC1[0]}
+)
+
+
+def _text_lines(data: bytes) -> Iterable[str]:
+    if data[:2] == b"PK":
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            name = next((n for n in zf.namelist() if n.lower().endswith(".txt")), None)
+            if name is None:
+                return []
+            data = zf.read(name)
+    return data.decode("utf-8", errors="replace").splitlines()
+
+
+def parse_raw_file(data: bytes) -> dict[str, str]:
+    """rsid -> two-letter genotype for panel SNPs; handles 23andMe and AncestryDNA layouts."""
+    out: dict[str, str] = {}
+    for line in _text_lines(data):
+        if not line or line[0] == "#" or not line.startswith("rs"):
+            continue
+        cols = line.replace(",", "\t").split()
+        if cols[0] not in PANEL_RSIDS:
+            continue
+        geno = "".join(cols[3:5]) if len(cols) >= 5 else (cols[3] if len(cols) == 4 else "")
+        geno = geno.upper()
+        if len(geno) == 2 and set(geno) <= set("ACGT"):
+            out[cols[0]] = geno
+        elif len(geno) == 1 and geno in "ACGT":
+            out[cols[0]] = geno * 2
+    return out
+
+
+def _copies(genotypes: dict, rsid: str, allele: str) -> Optional[int]:
+    g = genotypes.get(rsid)
+    return None if g is None else g.count(allele)
+
+
+def _apoe(genotypes: dict) -> Optional[str]:
+    a, b = genotypes.get("rs429358"), genotypes.get("rs7412")
+    if not a or not b:
+        return None
+    c4, t2 = a.count("C"), b.count("T")
+    if c4 + t2 > 2:
+        return None
+    alleles = ["e4"] * c4 + ["e2"] * t2
+    alleles += ["e3"] * (2 - len(alleles))
+    return "/".join(sorted(alleles))
+
+
+def _cyp2c19(g: dict) -> Optional[dict]:
+    tested = [r for r in (*CYP2C19["no_function"], *CYP2C19["increased"]) if r in g]
+    if "rs4244285" not in g:
+        return None
+    nf = sum(_copies(g, r, a) or 0 for r, a in CYP2C19["no_function"].items())
+    inc = _copies(g, "rs12248560", "T") or 0
+    if nf >= 2:
+        pheno = "Poor metabolizer"
+    elif nf == 1:
+        pheno = "Intermediate metabolizer"
+    elif inc == 2:
+        pheno = "Ultrarapid metabolizer"
+    elif inc == 1:
+        pheno = "Rapid metabolizer"
+    else:
+        pheno = "Normal metabolizer"
+    return {"phenotype": pheno, "snps_read": tested}
+
+
+def _cyp2c9(g: dict) -> Optional[dict]:
+    if not all(r in g for r in CYP2C9):
+        return None
+    score = 2.0
+    for rsid, (allele, value) in CYP2C9.items():
+        score -= (_copies(g, rsid, allele) or 0) * (1 - value)
+    score = max(score, 0.0)
+    pheno = "Normal metabolizer" if score >= 2 else "Intermediate metabolizer" if score >= 1 else "Poor metabolizer"
+    return {"phenotype": pheno, "activity_score": score, "snps_read": list(CYP2C9)}
+
+
+def _single(g: dict, rsid: str, allele: str, labels: tuple[str, str, str]) -> Optional[dict]:
+    n = _copies(g, rsid, allele)
+    return None if n is None else {"phenotype": labels[n], "snps_read": [rsid]}
 
 
 class GenomicsInsightsService:
-    """Genetic health insights and pharmacogenomics."""
+    """Per-user panel result; the raw file is never stored."""
 
     def __init__(self):
-        self.profiles: Dict[str, Dict] = {}
-        self._init_disease_risks()
+        self.genotypes: dict[str, str] = {}
+        self.uploaded_at: Optional[float] = None
+        self.source_snps = 0
+        self.show_apoe = False
 
-    def _init_disease_risks(self):
-        self.genetic_risks = {
-            "cardiovascular": {
-                "genes": ["APOE", "LPA", "PCSK9", "LDLR"],
-                "risk_variants": {"APOE_e4": 0.3, "LPA_risk": 0.25, "PCSK9_gain": 0.2},
-                "modifiers": {"exercise": -0.15, "diet": -0.1, "smoking": 0.2},
-            },
-            "type2_diabetes": {
-                "genes": ["TCF7L2", "PPARG", "KCNJ11", "FTO"],
-                "risk_variants": {"TCF7L2_risk": 0.25, "FTO_risk": 0.15},
-                "modifiers": {"exercise": -0.2, "diet": -0.15, "obesity": 0.3},
-            },
-            "alzheimers": {
-                "genes": ["APOE", "BIN1", "CLU", "PICALM"],
-                "risk_variants": {"APOE_e4_homo": 0.5, "APOE_e4_hetero": 0.25},
-                "modifiers": {"exercise": -0.1, "cognitive_activity": -0.1, "social_engagement": -0.05},
-            },
-            "breast_cancer": {
-                "genes": ["BRCA1", "BRCA2", "PALB2", "CHEK2"],
-                "risk_variants": {"BRCA1": 0.4, "BRCA2": 0.3, "PALB2": 0.15},
-                "modifiers": {"regular_screening": -0.1},
-            },
-            "depression": {
-                "genes": ["5-HTTLPR", "BDNF", "FKBP5", "COMT"],
-                "risk_variants": {"5HTTLPR_ss": 0.15, "BDNF_val66met": 0.1},
-                "modifiers": {"exercise": -0.15, "therapy": -0.2, "social_support": -0.1},
-            },
+    def upload(self, data: bytes) -> dict:
+        if len(data) > MAX_UPLOAD_BYTES:
+            return {"status": "too_large", "message": "That file is larger than any raw DNA export."}
+        try:
+            genotypes = parse_raw_file(data)
+        except zipfile.BadZipFile:
+            return {"status": "unreadable", "message": "The zip file could not be opened."}
+        if not genotypes:
+            return {"status": "unreadable",
+                    "message": "No panel variants found. Upload the raw data file from 23andMe or AncestryDNA."}
+        self.genotypes, self.uploaded_at, self.source_snps = genotypes, time.time(), len(genotypes)
+        return self.report()
+
+    def set_show_apoe(self, show: bool) -> dict:
+        self.show_apoe = bool(show)
+        return self.report()
+
+    def forget(self) -> None:
+        self.__init__()
+
+    def report(self) -> dict:
+        if not self.genotypes:
+            return {"status": "no_data", "message": "No DNA file uploaded yet."}
+        g = self.genotypes
+        associations = []
+        for a in ASSOCIATIONS:
+            n = _copies(g, a["rsid"], a["effect_allele"])
+            if n is None or any(x["gene"] == a["gene"] for x in associations):
+                continue
+            associations.append({**a, "genotype": g[a["rsid"]], "copies": n,
+                                 "meaning": (f"You carry {n} cop{'y' if n == 1 else 'ies'} of the variant studied. "
+                                             f"In studies, each copy was linked to about {a['odds_ratio_per_copy']}x "
+                                             f"the odds of {a['condition'].lower()}, compared with people without it."
+                                             if n else "You do not carry the variant studied.")})
+        apoe_type = _apoe(g)
+        apoe = None
+        if apoe_type:
+            apoe = {"available": True, "shown": self.show_apoe, "counselling": APOE["counselling"]}
+            if self.show_apoe:
+                apoe.update(genotype=apoe_type, condition=APOE["condition"], source=APOE["source"],
+                            odds_ratio=APOE["odds_ratios"].get(apoe_type))
+
+        traits = []
+        for t in TRAITS:
+            n = _copies(g, t["rsid"], t["effect_allele"])
+            if n is not None:
+                traits.append({"id": t["id"], "gene": t["gene"], "trait": t["trait"], "genotype": g[t["rsid"]],
+                               "meaning": t["copies_meaning"][n]})
+
+        pgx = {
+            "CYP2C19": _cyp2c19(g),
+            "CYP2C9": _cyp2c9(g),
+            "SLCO1B1": _single(g, *SLCO1B1, ("Normal function", "Decreased function", "Poor function")),
+            "VKORC1": _single(g, *VKORC1, ("Typical warfarin sensitivity", "Increased warfarin sensitivity",
+                                            "High warfarin sensitivity")),
         }
-
-        self.drug_metabolism = {
-            "CYP2D6": {
-                "drugs": ["codeine", "tramadol", "tamoxifen", "metoprolol", "dextromethorphan"],
-                "metabolizer_types": {
-                    "poor": {"action": "Reduce dose or avoid", "risk": "Toxicity"},
-                    "intermediate": {"action": "Standard dose with monitoring", "risk": "Mild effects"},
-                    "normal": {"action": "Standard dosing", "risk": "Normal"},
-                    "ultra_rapid": {"action": "May need higher dose", "risk": "Inefficacy"},
-                },
-            },
-            "CYP2C19": {
-                "drugs": ["clopidogrel", "omeprazole", "escitalopram", "diazepam"],
-                "metabolizer_types": {
-                    "poor": {"action": "Avoid clopidogrel, use alternatives", "risk": "Treatment failure"},
-                    "intermediate": {"action": "Consider dose adjustment", "risk": "Reduced efficacy"},
-                    "normal": {"action": "Standard dosing", "risk": "Normal"},
-                    "ultra_rapid": {"action": "May need higher dose of prodrugs", "risk": "Increased activation"},
-                },
-            },
-            "CYP3A4": {
-                "drugs": ["atorvastatin", "simvastatin", "amlodipine", "midazolam"],
-                "metabolizer_types": {
-                    "poor": {"action": "Reduce dose 50%", "risk": "Drug accumulation"},
-                    "normal": {"action": "Standard dosing", "risk": "Normal"},
-                },
-            },
-        }
-
-        self.nutrigenomics = {
-            "MTHFR": {
-                "variant": "C677T",
-                "impact": "Reduced folate metabolism",
-                "recommendation": "Take methylfolate (L-MTHF) instead of folic acid",
-                "foods": ["leafy greens", "liver", "legumes"],
-            },
-            "FTO": {
-                "variant": "rs9939609",
-                "impact": "Increased appetite, obesity risk",
-                "recommendation": "Higher protein diet, mindful eating",
-                "foods": ["lean proteins", "fiber-rich foods"],
-            },
-            "APOA5": {
-                "variant": "rs662799",
-                "impact": "Higher triglyceride response to fat",
-                "recommendation": "Limit saturated fat, increase omega-3",
-                "foods": ["fatty fish", "walnuts", "flaxseed"],
-            },
-            "LCT": {
-                "variant": "MCM6",
-                "impact": "Lactose tolerance/intolerance",
-                "recommendation": "If intolerant, avoid or use lactase",
-                "foods": ["lactose-free dairy", "calcium-fortified alternatives"],
-            },
-        }
-
-    def analyze_genetic_data(self, user_id: str, genetic_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze uploaded genetic data for health insights."""
-        profile_id = f"gen_{user_id}_{int(time.time())}"
-
-        # Extract variants from data
-        variants = genetic_data.get("variants", {})
-        ancestry = genetic_data.get("ancestry", "unknown")
-
-        # Calculate disease risks
-        disease_risks = {}
-        for disease, info in self.genetic_risks.items():
-            risk_score = 0.1  # baseline
-            detected_variants = []
-
-            for gene in info["genes"]:
-                if gene in variants:
-                    variant_val = variants[gene]
-                    if variant_val in info.get("risk_variants", {}):
-                        risk_score += info["risk_variants"][variant_val]
-                        detected_variants.append(f"{gene}:{variant_val}")
-
-            risk_score = min(1.0, risk_score)
-            disease_risks[disease] = {
-                "risk_score": round(risk_score, 3),
-                "risk_level": "high" if risk_score > 0.5 else "moderate" if risk_score > 0.25 else "low",
-                "genes_analyzed": info["genes"],
-                "risk_variants_found": detected_variants,
-                "modifiable_factors": list(info.get("modifiers", {}).keys()),
-                "recommendations": self._get_disease_recommendations(disease, risk_score),
-            }
-
-        # Pharmacogenomics
-        pgx_results = self._analyze_pharmacogenomics(variants)
-
-        # Nutrigenomics
-        nutrition_results = self._analyze_nutrigenomics(variants)
-
-        # Genetic traits
-        traits = self._analyze_traits(variants)
-
-        profile = {
-            "profile_id": profile_id,
-            "user_id": user_id,
-            "timestamp": time.time(),
-            "ancestry": ancestry,
-            "total_variants_analyzed": len(variants),
-            "disease_risks": disease_risks,
-            "pharmacogenomics": pgx_results,
-            "nutrigenomics": nutrition_results,
-            "genetic_traits": traits,
-            "actionable_insights": self._generate_actionable_insights(disease_risks, pgx_results, nutrition_results),
-            "genetic_health_score": self._calculate_genetic_health_score(disease_risks),
-        }
-
-        self.profiles[profile_id] = profile
-        return profile
-
-    def get_latest_profile(self, user_id: str) -> Dict[str, Any]:
-        """Most recent genetic analysis on file for this user, or a clear no-data marker."""
-        user_profiles = [p for p in self.profiles.values() if p["user_id"] == user_id]
-        if not user_profiles:
-            return {"status": "no_data", "message": "No genetic data uploaded yet."}
-        return {"status": "ok", **max(user_profiles, key=lambda p: p["timestamp"])}
-
-    def check_drug_safety(self, user_id: str, medications: List[str]) -> Dict[str, Any]:
-        """Check genetic compatibility with medications."""
-        user_profiles = [p for p in self.profiles.values() if p["user_id"] == user_id]
-        if not user_profiles:
-            return {"error": "No genetic profile found. Upload genetic data first."}
-
-        variants = {}
-        for p in user_profiles:
-            for k, v in p.get("pharmacogenomics", {}).items():
-                variants[k] = v
-
-        results = []
-        for drug in medications:
-            drug_info = None
-            gene = None
-            for g, info in self.drug_metabolism.items():
-                if drug.lower() in [d.lower() for d in info["drugs"]]:
-                    drug_info = info
-                    gene = g
-                    break
-
-            if drug_info:
-                metabolizer = variants.get(gene, {}).get("type", "normal")
-                metabolism_info = drug_info["metabolizer_types"].get(metabolizer, {"action": "Consult pharmacist", "risk": "Unknown"})
-                results.append({
-                    "drug": drug,
-                    "gene": gene,
-                    "metabolizer_status": metabolizer,
-                    "recommended_action": metabolism_info["action"],
-                    "risk_level": metabolism_info["risk"],
-                })
+        pharmacogenomics = []
+        for gene, res in pgx.items():
+            entry = {"gene": gene, "drugs": PGX_DRUGS[gene], "note": PGX_NOTES[gene]}
+            if res is None:
+                entry.update(phenotype=None, status="not_in_file")
             else:
-                results.append({
-                    "drug": drug,
-                    "gene": "Not pharmacogenomically tested",
-                    "metabolizer_status": "N/A",
-                    "recommended_action": "No genetic interaction known",
-                    "risk_level": "Unknown",
-                })
+                entry.update(res, status="read",
+                             action=("Tell your prescriber and pharmacist about this result before starting any of "
+                                     "these medicines. Do not change a medicine you already take."))
+            pharmacogenomics.append(entry)
+        for gene, why in NOT_CALLABLE.items():
+            pharmacogenomics.append({"gene": gene, "status": "not_callable", "phenotype": None, "note": why})
 
         return {
-            "user_id": user_id,
-            "medications_checked": len(results),
-            "results": results,
-            "warnings": [r for r in results if r["risk_level"] not in ("Normal", "Unknown")],
+            "status": "ok", "uploaded_at": self.uploaded_at, "variants_read": self.source_snps,
+            "associations": associations, "apoe": apoe, "traits": traits, "pharmacogenomics": pharmacogenomics,
+            "caveats": [CHIP_CAVEAT, ANCESTRY_CAVEAT,
+                        "An odds ratio describes groups in a study, not your chance of getting a condition."],
+            "next_step": "Discuss any result you plan to act on with a doctor or genetic counsellor.",
         }
 
-    def _analyze_pharmacogenomics(self, variants: Dict) -> Dict[str, Any]:
-        """Only reports a metabolizer type for a gene the upload actually covered."""
-        results = {}
-        for gene, info in self.drug_metabolism.items():
-            if gene not in variants:
-                results[gene] = {
-                    "type": "not_tested",
-                    "affected_drugs": info["drugs"],
-                    "action": "Not in the uploaded data — consult a specialist before relying on standard dosing.",
-                }
+    def check_drugs(self, medications: list[str]) -> dict:
+        report = self.report()
+        if report["status"] != "ok":
+            return {"status": "no_data", "results": []}
+        wanted = {m.strip().lower() for m in medications if m.strip()}
+        results = []
+        for entry in report["pharmacogenomics"]:
+            if entry["status"] != "read":
                 continue
-            gene_variant = variants[gene]
-            results[gene] = {
-                "type": gene_variant,
-                "affected_drugs": info["drugs"],
-                "action": info["metabolizer_types"].get(gene_variant, {}).get("action", "Consult specialist"),
-            }
-        return results
-
-    def _analyze_nutrigenomics(self, variants: Dict) -> Dict[str, Any]:
-        results = {}
-        for gene, info in self.nutrigenomics.items():
-            has_variant = gene in variants
-            results[gene] = {
-                "variant_present": has_variant,
-                "impact": info["impact"] if has_variant else "Normal",
-                "recommendation": info["recommendation"] if has_variant else "No dietary modification needed",
-                "recommended_foods": info["foods"] if has_variant else [],
-            }
-        return results
-
-    def _analyze_traits(self, variants: Dict) -> List[Dict]:
-        """Only reports a trait for a gene that was actually in the uploaded data."""
-        gene_confidence = {
-            "LCT": ("Lactose Tolerance", 0.95),
-            "CYP1A2": ("Caffeine Metabolism", 0.9),
-            "ALDH2": ("Alcohol Flush", 0.92),
-            "VDR": ("Vitamin D Synthesis", 0.85),
-        }
-        return [
-            {"trait": trait, "status": variants[gene], "confidence": confidence}
-            for gene, (trait, confidence) in gene_confidence.items()
-            if gene in variants
-        ]
-
-    def _get_disease_recommendations(self, disease: str, risk: float) -> List[str]:
-        if risk < 0.2:
-            return ["Continue healthy lifestyle", "Routine screening per age guidelines"]
-        elif risk < 0.5:
-            return ["Consider genetic counseling", "Increase preventive screenings", "Lifestyle optimization recommended"]
-        else:
-            return ["Genetic counseling strongly recommended", "Enhanced screening protocol", "Discuss preventive options with physician", "Consider genetic testing for family members"]
-
-    def _generate_actionable_insights(self, risks: Dict, pgx: Dict, nutrition: Dict) -> List[Dict]:
-        insights = []
-        for disease, data in risks.items():
-            if data["risk_level"] in ("moderate", "high"):
-                insights.append({
-                    "type": "disease_risk",
-                    "priority": "high" if data["risk_level"] == "high" else "medium",
-                    "message": f"Elevated {disease.replace('_', ' ')} risk - consider preventive measures",
-                })
-        for gene, data in pgx.items():
-            if data["type"] != "normal":
-                insights.append({
-                    "type": "pharmacogenomics",
-                    "priority": "high",
-                    "message": f"{gene}: {data['type']} metabolizer - affects {len(data['affected_drugs'])} medications",
-                })
-        for gene, data in nutrition.items():
-            if data["variant_present"]:
-                insights.append({
-                    "type": "nutrition",
-                    "priority": "medium",
-                    "message": f"{gene} variant: {data['recommendation']}",
-                })
-        return sorted(insights, key=lambda x: 0 if x["priority"] == "high" else 1)
-
-    def _calculate_genetic_health_score(self, risks: Dict) -> int:
-        avg_risk = sum(d["risk_score"] for d in risks.values()) / max(1, len(risks))
-        return max(20, min(100, int(100 - avg_risk * 100)))
+            for drug in wanted & set(entry["drugs"]):
+                if entry["phenotype"] not in ("Normal metabolizer", "Normal function", "Typical warfarin sensitivity"):
+                    results.append({"drug": drug, "gene": entry["gene"], "phenotype": entry["phenotype"],
+                                    "message": f"{entry['note']} Tell your prescriber you are a {entry['phenotype'].lower()} for {entry['gene']}.",
+                                    "action": entry["action"]})
+        return {"status": "ok", "results": results,
+                "note": "No result means none of your listed medicines is affected by the genes read from your file."}
 
 
-from app.core.durable import shared  # noqa: E402
+from app.core.per_user import per_user, register  # noqa: E402
 
-genomics_insights_service = shared("app.services.genomics_insights.genomics_insights_service", GenomicsInsightsService())
+genomics_insights_service = register("genomics.genomics_insights_service", per_user(GenomicsInsightsService))
