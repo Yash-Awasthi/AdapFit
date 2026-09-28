@@ -88,7 +88,7 @@ ROUTE_MAP = {
     "vital_signs_api": ("/vitals", ["Vital Signs"]),
     "family_api": ("/family", ["Family"]),
     "calendar_api": ("/health-calendar", ["Health Calendar"]),
-    "health_risk_api": ("/risk", ["Health Risk"]),
+    "health_risk_api": ("/health-risk", ["Health Risk"]),
     "recipe_api": ("/recipes", ["AI Recipes"]),
     "habit_coach_api": ("/habits", ["AI Habit Coach"]),
     "symptom_checker_api": ("/symptoms", ["Symptom Checker"]),
@@ -112,7 +112,6 @@ ROUTE_MAP = {
     "senior_health_api": ("/senior-health", ["Senior Health"]),
     "digital_detox_api": ("/digital-detox", ["Digital Detox"]),
     "sleep_audio_api": ("/sleep-audio", ["Sleep Audio"]),
-    "medical_id_api": ("/medical-id", ["Medical ID"]),
     "environmental_api": ("/environmental", ["Environmental Health"]),
     "ergonomics_api": ("/ergonomics", ["Workplace Ergonomics"]),
     "cardiac_rehab_api": ("/cardiac-rehab", ["Cardiac Rehab"]),
@@ -150,7 +149,6 @@ ROUTE_MAP = {
     "government_schemes_api": ("/government-schemes", ["Government Schemes"]),
     "health_data_api": ("/health-data", ["Health Data"]),
     "family_network_api": ("/family-network", ["Family Network"]),
-    "healthcare_providers_api": ("/providers", ["Healthcare Providers"]),
     "privacy_dashboard_api": ("/privacy", ["Privacy Dashboard"]),
 }
 

@@ -28,8 +28,6 @@ API_PREFIX = "/api/v1/"
 # ensure_owner call), so rebinding their user_id would break the feature.
 CROSS_USER_PREFIXES = (
     "/api/v1/admin/",
-    "/api/v1/medical-id/",
-    "/api/v1/forums/reputation/",
 )
 
 # Bodies larger than this are streamed through untouched. A user_id never

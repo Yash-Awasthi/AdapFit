@@ -38,14 +38,14 @@ def test_meals_sleep_and_medical_id_survive_a_restart():
     assert c.post("/api/v1/nutrition/meals", headers=h, json={
         "name": "Poha", "calories": 300, "protein_g": 6, "carbs_g": 55, "fat_g": 7, "meal_type": "breakfast"}).status_code == 201
     assert c.post("/api/v1/sleep/logs", headers=h, json={"bedtime": "23:00", "wake_time": "06:30"}).status_code == 201
-    assert c.post("/api/v1/medical-id/create", headers=h, json={
-        "user_id": uid, "data": {"blood_type": "B+", "allergies": ["penicillin"]}}).status_code == 200
+    assert c.post("/api/v1/emergency/medical-info", headers=h, json={
+        "blood_type": "B+", "allergies": ["penicillin"]}).status_code == 200
 
     _simulate_restart()
 
     assert [m["name"] for m in c.get("/api/v1/nutrition/meals", headers=h).json()] == ["Poha"]
     assert len(c.get("/api/v1/sleep/logs", headers=h).json()) == 1
-    assert "penicillin" in str(c.get(f"/api/v1/medical-id/emergency/{uid}", headers=h).json())
+    assert "penicillin" in str(c.get("/api/v1/emergency/medical-info", headers=h).json())
 
 
 def test_a_row_that_would_run_code_is_refused():

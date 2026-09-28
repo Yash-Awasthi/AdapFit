@@ -114,7 +114,47 @@ function AddContactModal({ visible, onClose, onAdded }: {
   );
 }
 
+const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'unknown'];
+
+function MedicalInfoEditor({ initial, onSaved }: { initial: MedicalInfo | null; onSaved: () => void }) {
+  const [blood, setBlood] = useState(initial?.blood_type ?? 'unknown');
+  const [allergies, setAllergies] = useState((initial?.allergies ?? []).join(', '));
+  const [conditions, setConditions] = useState((initial?.conditions ?? []).join(', '));
+  const [medications, setMedications] = useState((initial?.medications ?? []).join(', '));
+  const [note, setNote] = useState(initial?.emergency_note ?? '');
+  const list = (t: string) => t.split(',').map((x) => x.trim()).filter(Boolean);
+  const save = async () => {
+    const r = await postJson('/emergency/medical-info', {
+      blood_type: blood, allergies: list(allergies), conditions: list(conditions), medications: list(medications), emergency_note: note,
+    });
+    if (!r) return Alert.alert('Not saved', 'Your medical info could not be saved.');
+    onSaved();
+  };
+  return (
+    <View>
+      <Text style={styles.medicalLabel}>Blood type</Text>
+      <View style={styles.tagRow}>
+        {BLOOD_TYPES.map((b) => (
+          <TouchableOpacity key={b} onPress={() => setBlood(b)}
+            style={[styles.medicalTag, { backgroundColor: blood === b ? '#EF444430' : colors.bg.card }]}>
+            <Text style={[styles.medicalTagText, { color: blood === b ? '#EF4444' : colors.text.muted }]}>{b}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {[['Allergies (comma separated)', allergies, setAllergies], ['Conditions', conditions, setConditions],
+        ['Medications and doses', medications, setMedications], ['Note for responders', note, setNote]].map(([label, v, set]: any) => (
+        <View key={label} style={{ marginTop: 10 }}>
+          <Text style={styles.medicalLabel}>{label}</Text>
+          <TextInput style={styles.editInput} value={v} onChangeText={set} multiline placeholderTextColor={colors.text.muted} />
+        </View>
+      ))}
+      <TouchableOpacity style={styles.saveBtn} onPress={save}><Text style={styles.saveBtnText}>Save medical info</Text></TouchableOpacity>
+    </View>
+  );
+}
+
 export default function EmergencyScreen() {
+  const [editing, setEditing] = useState(false);
   const [alert_, setAlert] = useState<ActiveAlert | null>(null);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -274,12 +314,15 @@ export default function EmergencyScreen() {
         })
       )}
 
-      <SectionHeaderPremium icon="medical" iconColor="#3B82F6" title="Medical Info" />
+      <SectionHeaderPremium icon="medical" iconColor="#3B82F6" title="Medical Info"
+        action={{ label: editing ? 'Cancel' : 'Edit', onPress: () => setEditing(!editing) }} />
       <GlassCard variant="light" style={styles.medicalCard}>
-        {!hasMedical ? (
+        {editing ? (
+          <MedicalInfoEditor initial={medical} onSaved={() => { setEditing(false); reload(); }} />
+        ) : !hasMedical ? (
           <Text style={styles.emptyText}>
             Nothing recorded. Blood type, allergies and current medications are what a
-            responder needs first — add them in your medical ID.
+            responder needs first. Tap Edit to add them.
           </Text>
         ) : (
           <>
@@ -322,6 +365,9 @@ export default function EmergencyScreen() {
 }
 
 const styles = StyleSheet.create({
+  editInput: { backgroundColor: colors.bg.card, borderRadius: 10, padding: 10, color: colors.text.primary, marginTop: 4 },
+  saveBtn: { backgroundColor: '#3B82F6', borderRadius: 12, padding: 13, alignItems: 'center', marginTop: 14 },
+  saveBtnText: { color: '#fff', fontWeight: '700' },
   sosSection: { alignItems: 'center', paddingVertical: spacing.xl, paddingHorizontal: spacing.screenPadding },
   sosContainer: { marginBottom: spacing.md },
   sosButton: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center' },

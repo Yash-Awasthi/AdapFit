@@ -104,7 +104,7 @@ def test_admin_may_still_address_another_user(caller, victim):
 
 def test_cross_user_prefixes_still_enforce_their_own_check(caller, victim):
     """Routes exempt from rebinding must refuse a stranger themselves."""
-    r = c.get(f"/api/v1/medical-id/emergency/{victim}", headers=_headers(caller))
+    r = c.get(f"/api/v1/admin/users/{victim}", headers=_headers(caller))
     assert r.status_code == 403
 
 

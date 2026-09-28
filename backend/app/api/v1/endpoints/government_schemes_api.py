@@ -18,13 +18,12 @@ router = APIRouter()
 
 class EligibilityCheckRequest(BaseModel):
     country: str = "IN"
-    income_annual: Optional[float] = Field(None, ge=0, description="Annual income in local currency")
-    is_bpl: Optional[bool] = Field(None, description="Below Poverty Line card holder")
     age: Optional[int] = Field(None, ge=0, le=120)
-    has_insurance: Optional[bool] = None
     is_pregnant: Optional[bool] = None
-    is_employee: Optional[bool] = None
-    has_children_under_5: Optional[bool] = None
+    formal_employee: Optional[bool] = Field(None, description="Salaried with an employer")
+    monthly_wage: Optional[float] = Field(None, ge=0)
+    central_govt: Optional[bool] = Field(None, description="Central government employee or pensioner")
+    in_secc_list: Optional[bool] = Field(None, description="Family named on the PM-JAY (SECC 2011) list")
 
 
 @router.get("/list")
@@ -58,25 +57,5 @@ async def search_schemes(query: str = "", country: str = "IN"):
 
 @router.post("/eligibility")
 async def check_eligibility(request: EligibilityCheckRequest, user: dict = Depends(require_user)):
-    """
-    Check which schemes the user might be eligible for.
-    
-    Provide any combination of the eligibility parameters — more data means
-    better eligibility matching. Always shows "verify with official source".
-    """
-    results = government_schemes_service.check_eligibility(
-        country=request.country,
-        income_annual=request.income_annual,
-        is_bpl=request.is_bpl,
-        age=request.age,
-        has_insurance=request.has_insurance,
-        is_pregnant=request.is_pregnant,
-        is_employee=request.is_employee,
-        has_children_under_5=request.has_children_under_5,
-    )
-    return {
-        "user_id": user["id"],
-        "eligible_schemes": results,
-        "count": len(results),
-        "disclaimer": "All eligibility determinations are estimates. Please verify with the official scheme portal or helpline before applying.",
-    }
+    """Schemes the answers point to, with reasons. Always 'confirm on the official portal'."""
+    return {"schemes": government_schemes_service.check_eligibility(**request.model_dump())}
