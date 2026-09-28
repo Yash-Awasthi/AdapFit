@@ -22,13 +22,6 @@ class FitnessTestRequest(BaseModel):
     result: float = Field(ge=0, examples=[35])
 
 
-class FitnessAssessment(BaseModel):
-    one_rm: Optional[OneRepMaxEstimate] = None
-    fitness_tests: List[FitnessTest] = []
-    overall_score: float  # 0-100
-    recommendations: List[str]
-
-
 @router.post("/one-rm", response_model=OneRepMaxEstimate)
 async def calculate_one_rm(request: OneRMRequest):
     """Estimate 1RM from a set of weight x reps."""
@@ -50,16 +43,3 @@ async def run_fitness_test(request: FitnessTestRequest):
 async def list_tests():
     """List available fitness tests."""
     return available_tests()
-
-
-@router.get("/summary", response_model=FitnessAssessment)
-async def get_assessment_summary(user_id: str = Query("default")):
-    """Get a fitness assessment summary (placeholder — would aggregate from user data)."""
-    return FitnessAssessment(
-        overall_score=65,
-        recommendations=[
-            "Add push-up test to track upper body endurance",
-            "Log a plank test to track core strength",
-            "Try a squat test to benchmark lower body",
-        ],
-    )

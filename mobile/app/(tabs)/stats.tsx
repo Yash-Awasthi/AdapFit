@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { TextInput } from 'react-native';
 import {
   View,
   Text,
@@ -15,7 +16,7 @@ import { TrendingUp, Trophy, Dumbbell, Clock, Zap } from 'lucide-react-native';
 import { API_BASE_URL as API } from '../../src/services/config';
 import { useTheme } from '../../src/services/theme';
 import { authHeader } from '../../src/services/authToken';
-import { getJson } from '../../src/services/http';
+import { getJson, postJson } from '../../src/services/http';
 import { useUserStore } from '../../src/stores';
 const SCREEN_WIDTH = Dimensions.get('window').width - 40;
 
@@ -54,6 +55,33 @@ interface IntensityResponse {
   distribution: { easy: number; moderate: number; hard: number } | null;
   pattern?: string;
   description?: string;
+}
+
+function OneRepMax({ s }: { s: any }) {
+  const [lift, setLift] = useState('bench press');
+  const [weight, setWeight] = useState('');
+  const [reps, setReps] = useState('');
+  const [body, setBody] = useState('');
+  const [out, setOut] = useState<{ estimated_1rm: number; level?: string | null; relative_strength?: number | null } | null>(null);
+  const run = async () => {
+    const w = Number(weight), r = Number(reps), b = Number(body);
+    if (!(w > 0 && r > 0 && r <= 12)) return;
+    setOut(await postJson('/fitness/one-rm', { exercise: lift, weight_kg: w, reps: r, bodyweight_kg: b > 0 ? b : undefined }));
+  };
+  return (
+    <View style={s.section}>
+      <Text style={s.sectionTitle}>Estimated 1-Rep Max</Text>
+      {[['Lift', lift, setLift, 'default'], ['Weight lifted (kg)', weight, setWeight, 'decimal-pad'], ['Reps (1-12)', reps, setReps, 'number-pad'], ['Your bodyweight (kg, optional)', body, setBody, 'decimal-pad']].map(([ph, v, set, kb]: any) => (
+        <TextInput key={ph} style={s.oneRmInput} placeholder={ph} placeholderTextColor="#888" value={v} onChangeText={set} keyboardType={kb} />
+      ))}
+      <Text style={s.oneRmBtn} onPress={run} accessibilityRole="button">Estimate</Text>
+      {out && (
+        <Text style={s.emptySubtext}>
+          About {Math.round(out.estimated_1rm)} kg for one rep (Epley){out.level ? ` · ${out.level} for your bodyweight` : ''}. Test a true max only with a spotter.
+        </Text>
+      )}
+    </View>
+  );
 }
 
 export default function StatsScreen() {
@@ -208,6 +236,8 @@ export default function StatsScreen() {
         </View>
       )}
 
+      <OneRepMax s={s} />
+
       {/* Top Exercises */}
       {stats.top_exercises.length > 0 && (
         <View style={s.section}>
@@ -228,6 +258,8 @@ export default function StatsScreen() {
 function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, padding: 20 },
+    oneRmInput: { backgroundColor: theme.surface, color: theme.text, borderRadius: 10, padding: 10, marginBottom: 8 },
+    oneRmBtn: { backgroundColor: theme.primary, color: '#fff', textAlign: 'center', padding: 12, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
     title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 48, marginBottom: 16 },
     loadingText: { color: theme.textMuted, textAlign: 'center', marginTop: 100 },
 

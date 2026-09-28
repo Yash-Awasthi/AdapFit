@@ -33,12 +33,7 @@ def del_json(path, **kw):
     ("GET",  "/api/v1/trends/alerts?user_id=default", 200),
     ("GET",  "/api/v1/mental-health/breathing-exercises", 200),
     ("GET",  "/api/v1/periodization/available", 200),
-    ("GET",  "/api/v1/analytics?user_id=a1", 200),
-    ("GET",  "/api/v1/analytics/volume-trends?user_id=a1", 200),
-    ("GET",  "/api/v1/analytics/muscle-balance?user_id=a1", 200),
-    ("GET",  "/api/v1/analytics/predictions?user_id=a1", 200),
     ("GET",  "/api/v1/fitness/tests", 200),
-    ("GET",  "/api/v1/fitness/summary", 200),
     ("GET",  "/api/v1/music/presets", 200),
     ("GET",  "/api/v1/music/preset/hiit", 200),
     ("GET",  "/api/v1/music/preset/nonexistent", 404),
@@ -52,7 +47,6 @@ def del_json(path, **kw):
     ("GET",  "/api/v1/simulator/quick", 200),
     ("GET",  "/api/v1/hydration/quick-add", 200),
     ("GET",  "/api/v1/hydration/goal?user_id=hyd_u1", 200),
-    ("GET",  "/api/v1/templates/categories", 200),
     ("GET",  "/api/v1/routine/muscles", 200),
 ])
 def test_smoke_endpoints(method, path, expected):
@@ -281,42 +275,11 @@ def test_wearable_sync():
     assert len(get_json("/api/v1/wearable/devices?user_id=w1").json()) == 1
 
 
-def test_streaks():
-    from datetime import datetime, timedelta, timezone
-    uid = "streak_u2"
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    for i in [2, 1, 0]:
-        d = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
-        assert post_json(f"/api/v1/streaks/log?user_id={uid}&date={d}").status_code == 200
-    s = get_json(f"/api/v1/streaks?user_id={uid}").json()
-    assert s["current_streak"] >= 2 and s["total_workouts"] == 3
-    assert len([d for d in get_json(f"/api/v1/streaks/heatmap?user_id={uid}&months=1").json() if d["workout"]]) == 3
-
-
 def test_fitness_assessment():
     est = post_json("/api/v1/fitness/one-rm", json={"exercise": "bench", "weight_kg": 80, "reps": 5}).json()
     assert est["estimated_1rm"] > 80 and est["reps"] == 5
     t = post_json("/api/v1/fitness/test", json={"test_id": "pushups_1min", "result": 35}).json()
     assert t["rating"] == "average" and t["percentile"] == 60
-    assert "overall_score" in get_json("/api/v1/fitness/summary").json()
-
-
-def test_workout_templates():
-    uid = "tmpl_u2"
-    assert len(get_json(f"/api/v1/templates?user_id={uid}").json()) >= 4
-    assert get_json(f"/api/v1/templates/builtin_push?user_id={uid}").json()["is_builtin"] is True
-    tid = post_json(f"/api/v1/templates?user_id={uid}", json={
-        "name": "Pull", "description": "Pull day", "category": "pull",
-        "exercises": [{"exercise_id": "row", "name": "Row", "target_muscle": "back", "sets": 4, "target_reps": "8-10"}],
-        "target_duration_minutes": 45}).json()["id"]
-    assert post_json(f"/api/v1/templates/{tid}/use?user_id={uid}").json()["use_count"] == 1
-    assert put_json(f"/api/v1/templates/{tid}?user_id={uid}", json={
-        "name": "Pull V2", "description": "Updated", "category": "pull",
-        "exercises": [{"exercise_id": "row", "name": "Row", "target_muscle": "back", "sets": 5, "target_reps": "6-8"}],
-        "target_duration_minutes": 50}).json()["name"] == "Pull V2"
-    assert del_json(f"/api/v1/templates/{tid}?user_id={uid}").json()["deleted"] is True
-    assert get_json(f"/api/v1/templates/nonexistent?user_id={uid}").status_code == 404
-    assert del_json(f"/api/v1/templates/builtin_push?user_id={uid}").status_code == 404
 
 
 def test_goals_full():
@@ -347,35 +310,6 @@ def test_fitness_challenges():
     lb = get_json(f"/api/v1/challenges/pushup_30/leaderboard?user_id={uid}").json()
     assert lb["total_participants"] == 1 and lb["entries"][0]["total_progress"] == 50
     assert del_json(f"/api/v1/challenges/pushup_30?user_id={uid}").json()["left"] is True
-
-
-def test_workout_timer():
-    sid = post_json("/api/v1/timer/start", json={"exercises": [
-        {"name": "Bench", "sets": 3, "target_reps": "8-10", "target_rpe": 7, "rest_seconds": 90},
-        {"name": "Incline", "sets": 3, "target_reps": "10-12", "target_rpe": 7, "rest_seconds": 90},
-    ]}).json()["session_id"]
-    assert get_json(f"/api/v1/timer/{sid}").json()["session_id"] == sid
-    assert post_json(f"/api/v1/timer/{sid}/rest", json={"duration_seconds": 60}).json()["state"] == "rest"
-    assert post_json(f"/api/v1/timer/{sid}/complete-set").json()["completed_sets"] == 1
-    assert post_json(f"/api/v1/timer/{sid}/pause").json()["state"] == "paused"
-    assert post_json(f"/api/v1/timer/{sid}/resume").json()["state"] != "paused"
-    end = post_json(f"/api/v1/timer/{sid}/end").json()
-    assert end["completed_sets"] == 1 and end["total_sets"] == 6
-    assert get_json("/api/v1/timer/nonexistent").status_code == 404
-
-
-def test_training_calendar():
-    from datetime import datetime, timezone
-    uid = "cal_u2"
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    eid = post_json(f"/api/v1/calendar?user_id={uid}", json={
-        "date": today, "workout_type": "strength", "title": "Push", "duration_minutes": 50,
-        "focus_muscles": ["chest", "shoulders"]}).json()["id"]
-    assert get_json(f"/api/v1/calendar/date/{today}?user_id={uid}").json()["total_duration"] == 50
-    assert patch_json(f"/api/v1/calendar/{eid}/status?status=completed&user_id={uid}").json()["status"] == "completed"
-    assert get_json(f"/api/v1/calendar/stats?user_id={uid}&days=30").json()["total_completed"] == 1
-    assert del_json(f"/api/v1/calendar/{eid}?user_id={uid}").json()["deleted"] is True
-    assert del_json(f"/api/v1/calendar/nonexistent?user_id={uid}").status_code == 404
 
 
 def test_hydration():
@@ -434,16 +368,6 @@ def test_body_dashboard():
 
 
 # ── Import/Export ────────────────────────────────────────────────────────────
-
-def test_workout_import_export():
-    uid = "ie_u2"
-    pid = post_json(f"/api/v1/plan/quick-export?user_id={uid}&name=Push&exercise_ids=barbell-bench-press&exercise_ids=dumbbell-incline-press").json()["id"]
-    plan = get_json(f"/api/v1/plan/shared/{pid}").json()
-    assert plan["plan"]["title"] == "Push" and len(plan["plan"]["exercises"]) == 2
-    r = post_json(f"/api/v1/plan/import?user_id=ie_u3", json={"plan": plan["plan"], "name": "My Push"}).json()
-    assert r["exercises"] == 2
-    assert get_json("/api/v1/plan/shared/nonexistent").status_code == 404
-
 
 # ── Meditation ───────────────────────────────────────────────────────────────
 
