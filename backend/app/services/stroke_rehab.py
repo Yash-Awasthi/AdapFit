@@ -4,7 +4,6 @@ Neuroplasticity-based exercises, motor recovery, cognitive rehab, speech therapy
 """
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
-import random
 
 
 class StrokeRehabService:

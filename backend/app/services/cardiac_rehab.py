@@ -12,8 +12,20 @@ Based on 2025 AHA/ACC cardiac rehab guidelines:
 """
 
 import time
-import random
 from typing import Dict, List, Any
+
+
+EFFORT_GUIDE = ("Aim for RPE 11-14 on the 6-20 scale: you can talk but not sing. Stop and rest for chest pain, "
+                "dizziness or unusual breathlessness; call 108 if chest pain lasts more than a few minutes of rest.")
+
+
+def _zone_text(profile: dict) -> str:
+    lo, hi = profile.get("target_hr_min"), profile.get("target_hr_max")
+    if lo and hi:
+        return f"{lo}-{hi} bpm (from your rehab team)"
+    if hi:
+        return f"Stay under {hi} bpm (resting + 20) unless your rehab team gave you a zone"
+    return "Go by effort; ask your rehab team for a heart-rate zone from your exercise test"
 
 
 class CardiacRehabService:
@@ -30,48 +42,48 @@ class CardiacRehabService:
                 "name": "Inpatient/Immediate Post-Op",
                 "duration_weeks": "0-2",
                 "exercises": ["Deep breathing exercises", "Gentle walking (hallway)", "Bed exercises", "Arm raises"],
-                "heart_rate_zone": "50-60% max HR",
+                "heart_rate_zone": "RPE 11-12 (fairly light)",
                 "precautions": ["Monitor vitals every 4 hours", "Report chest pain immediately", "No lifting >2kg"],
             },
             2: {
                 "name": "Early Outpatient",
                 "duration_weeks": "2-6",
                 "exercises": ["Walking 10-20 min", "Light stationary cycling", "Gentle stretching", "Light resistance bands"],
-                "heart_rate_zone": "60-70% max HR",
+                "heart_rate_zone": "RPE 11-13",
                 "precautions": ["Warm up 5-10 min", "Cool down 5-10 min", "Stop if dizzy or short of breath"],
             },
             3: {
                 "name": "Progressive Training",
                 "duration_weeks": "6-12",
                 "exercises": ["Walking 30 min", "Swimming", "Moderate cycling", "Light weight training"],
-                "heart_rate_zone": "70-80% max HR",
+                "heart_rate_zone": "RPE 12-14 (somewhat hard)",
                 "precautions": ["Gradual progression", "Self-monitor RPE (Rate of Perceived Exertion)"],
             },
             4: {
                 "name": "Maintenance",
                 "duration_weeks": "12+",
                 "exercises": ["Regular aerobic exercise 150 min/week", "Resistance training 2x/week", "Flexibility work", "Recreational activities"],
-                "heart_rate_zone": "70-85% max HR",
+                "heart_rate_zone": "RPE 12-14, or the zone from your exercise test",
                 "precautions": ["Lifelong heart-healthy habits", "Annual cardiac checkup"],
             },
         }
 
         self.heart_healthy_diet = {
             "recommended": [
-                {"food": "Fatty fish (salmon, mackerel)", "benefit": "Omega-3 reduces inflammation", "frequency": "2-3x/week"},
-                {"food": "Leafy greens (spinach, kale)", "benefit": "Nitrates lower blood pressure", "frequency": "Daily"},
-                {"food": "Berries", "benefit": "Antioxidants protect blood vessels", "frequency": "Daily"},
-                {"food": "Oats and whole grains", "benefit": "Fiber lowers cholesterol", "frequency": "Daily"},
-                {"food": "Nuts (almonds, walnuts)", "benefit": "Healthy fats for heart", "frequency": "Handful daily"},
-                {"food": "Olive oil", "benefit": "Monounsaturated fats", "frequency": "Daily"},
+                {"food": "Fish such as mackerel (bangda), sardines or rohu", "benefit": "Omega-3 fats", "frequency": "2-3x/week"},
+                {"food": "Dal, chana, rajma and other pulses", "benefit": "Fibre and protein without saturated fat", "frequency": "Daily"},
+                {"food": "Leafy greens (palak, methi, amaranth)", "benefit": "Potassium and fibre", "frequency": "Daily"},
+                {"food": "Whole grains (atta, millets like ragi and jowar, oats)", "benefit": "Fibre lowers cholesterol", "frequency": "Daily"},
+                {"food": "Fruit such as guava, amla, oranges", "benefit": "Fibre and potassium", "frequency": "Daily"},
+                {"food": "A handful of nuts (almonds, walnuts, groundnuts)", "benefit": "Unsaturated fats", "frequency": "Daily"},
             ],
             "avoid": [
-                "Processed meats (bacon, sausage)",
-                "Excessive salt (>2300mg/day)",
-                "Trans fats and fried foods",
-                "Sugary beverages",
-                "Refined carbohydrates",
-                "Excessive alcohol",
+                "Salt above 5 g a day (about one teaspoon), including pickles, papad and namkeen",
+                "Vanaspati and reused frying oil (trans fats)",
+                "Deep-fried snacks and sweets",
+                "Sugary drinks",
+                "Processed meats",
+                "Alcohol and all tobacco, including chewed",
             ],
         }
 
@@ -79,34 +91,35 @@ class CardiacRehabService:
         """
         Set up a cardiac rehabilitation program.
 
-        Age is required: the target heart-rate zone is derived from it, and it
-        used to default to 65. A patient of 45 given a 65-year-old's zone
-        trains to the wrong ceiling, which is the one number on this screen
-        that has to be right.
+        Age-predicted zones (220 minus age) do not hold for heart patients,
+        especially on beta blockers, so the zone is the one the rehab team
+        prescribed, else a cap of resting heart rate plus 20 bpm, and always
+        an effort of RPE 11-14 on the 6-20 Borg scale.
         """
-        age = data.get("age")
-        if not isinstance(age, (int, float)) or not 18 <= age <= 100:
-            return {
-                "status": "insufficient_data",
-                "needs": ["age"],
-                "message": "Your age is needed to set a target heart-rate zone.",
-            }
-        age = int(age)
-        max_hr = 220 - age
+        def bpm(key):
+            v = data.get(key)
+            return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and 30 <= v <= 220 else None
+
+        rx_min, rx_max, resting = bpm("prescribed_hr_min"), bpm("prescribed_hr_max"), bpm("resting_hr")
+        if rx_min and rx_max and rx_min < rx_max:
+            zone = {"target_min": rx_min, "target_max": rx_max, "source": "prescribed"}
+        elif resting:
+            zone = {"target_min": None, "target_max": resting + 20, "source": "resting_plus_20"}
+        else:
+            zone = {"target_min": None, "target_max": None, "source": "effort_only"}
 
         self.profiles[user_id] = {
             "user_id": user_id,
-            "condition": data.get("condition", "post_mi"),
+            "condition": data.get("condition"),
             "surgery_date": data.get("surgery_date"),
-            "current_phase": data.get("current_phase", 1),
-            "age": age,
-            "max_heart_rate": max_hr,
-            "target_hr_min": int(max_hr * 0.6),
-            "target_hr_max": int(max_hr * 0.8),
-            "resting_hr": data.get("resting_hr"),
+            "current_phase": data.get("current_phase") if data.get("current_phase") in self.phases else 2,
+            "resting_hr": resting,
+            "target_hr_min": zone["target_min"],
+            "target_hr_max": zone["target_max"],
+            "zone_source": zone["source"],
             "medications": data.get("medications", []),
             "weight_kg": data.get("weight"),
-            "fluid_limit_ml": data.get("fluid_limit_ml", 2000),
+            "fluid_limit_ml": data.get("fluid_limit_ml"),
             "created_at": time.time(),
         }
 
@@ -118,7 +131,8 @@ class CardiacRehabService:
                 "resting": self.profiles[user_id]["resting_hr"],
                 "target_min": self.profiles[user_id]["target_hr_min"],
                 "target_max": self.profiles[user_id]["target_hr_max"],
-                "maximum": max_hr,
+                "effort": EFFORT_GUIDE,
+                "source": self.profiles[user_id]["zone_source"],
             },
         }
 
@@ -164,7 +178,8 @@ class CardiacRehabService:
         spo2 = entry.get("spo2")
         if isinstance(spo2, (int, float)) and spo2 < 94:
             alerts.append("Oxygen saturation low")
-        if entry.get("fluid_intake_ml", 0) > self.profiles.get(user_id, {}).get("fluid_limit_ml", 2000):
+        limit = self.profiles.get(user_id, {}).get("fluid_limit_ml")
+        if limit and entry.get("fluid_intake_ml", 0) > limit:
             alerts.append("Fluid intake over daily limit")
         if entry.get("weight_kg") and self.daily_logs[user_id]:
             prev = self.daily_logs[user_id][-2] if len(self.daily_logs[user_id]) > 1 else None
@@ -178,16 +193,11 @@ class CardiacRehabService:
         """
         This user's program, in the same shape setup_program returns.
 
-        Nothing is invented for a user who has not set one up: the target
-        zone depends on their age, and there is no safe stand-in for it.
+        Nothing is invented for a user who has not set one up.
         """
         profile = self.profiles.get(user_id)
         if not profile:
-            return {
-                "status": "insufficient_data",
-                "needs": ["age"],
-                "message": "Your age is needed to set a target heart-rate zone.",
-            }
+            return {"status": "insufficient_data", "message": "Set up your rehab program first."}
         phase = self.phases.get(profile["current_phase"], self.phases[1])
         return {
             "status": "ok",
@@ -197,7 +207,8 @@ class CardiacRehabService:
                 "resting": profile.get("resting_hr"),
                 "target_min": profile["target_hr_min"],
                 "target_max": profile["target_hr_max"],
-                "maximum": profile["max_heart_rate"],
+                "effort": EFFORT_GUIDE,
+                "source": profile.get("zone_source"),
             },
         }
 
@@ -216,7 +227,8 @@ class CardiacRehabService:
             "phase_name": program["name"],
             "duration": program["duration_weeks"],
             "exercises": program["exercises"],
-            "target_heart_rate": f"{profile['target_hr_min']}-{profile['target_hr_max']} bpm",
+            "target_heart_rate": _zone_text(profile),
+            "effort": EFFORT_GUIDE,
             "precautions": program["precautions"],
         }
 

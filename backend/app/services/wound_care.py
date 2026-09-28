@@ -83,15 +83,17 @@ class WoundCareService:
             "type": wound_type,
             "type_name": type_info["name"],
             "location": wound_data.get("location", "unknown"),
-            "stage": wound_data.get("stage", 1),
-            "length_cm": wound_data.get("length_cm", 2),
-            "width_cm": wound_data.get("width_cm", 2),
-            "depth_cm": wound_data.get("depth_cm", 0.3),
-            "surface_area_cm2": wound_data.get("length_cm", 2) * wound_data.get("width_cm", 2),
-            "wound_bed": wound_data.get("wound_bed", "granulating"),
-            "exudate": wound_data.get("exudate", "moderate"),
-            "odor": wound_data.get("odor", "none"),
-            "pain_level": wound_data.get("pain_level", 3),
+            "stage": wound_data.get("stage"),
+            "length_cm": wound_data.get("length_cm"),
+            "width_cm": wound_data.get("width_cm"),
+            "depth_cm": wound_data.get("depth_cm"),
+            "surface_area_cm2": (wound_data["length_cm"] * wound_data["width_cm"]
+                                 if isinstance(wound_data.get("length_cm"), (int, float))
+                                 and isinstance(wound_data.get("width_cm"), (int, float)) else None),
+            "wound_bed": wound_data.get("wound_bed"),
+            "exudate": wound_data.get("exudate"),
+            "odor": wound_data.get("odor"),
+            "pain_level": wound_data.get("pain_level"),
             "risk_factors": wound_data.get("risk_factors", []),
             "created_at": time.time(),
             "status": "active",
@@ -289,7 +291,7 @@ class WoundCareService:
         risk_score = 0
         risk_factors = []
 
-        if wound.get("stage", 1) >= 3:
+        if (wound.get("stage") or 0) >= 3:
             risk_score += 30
             risk_factors.append("Advanced stage")
         if data.get("pain_level", 0) > 7:
@@ -332,7 +334,7 @@ class WoundCareService:
         if healing["status"] == "stalled":
             recs.append("Consider wound care specialist consultation")
             recs.append("Review and optimize nutrition (protein, vitamins)")
-        if wound.get("stage", 1) >= 2:
+        if (wound.get("stage") or 0) >= 2:
             recs.append("Ensure proper offloading/pressure relief")
         recs.append("Continue regular wound assessment (every 2-3 days)")
         recs.append("Maintain wound moisture balance with appropriate dressing")

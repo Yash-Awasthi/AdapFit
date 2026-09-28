@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../src/theme';
 import { GlassCard } from '../../src/components/PremiumComponents';
-import { asArray, getJson, postJson } from '../../src/services/http';
+import { asArray, getJson, postJson, putJson } from '../../src/services/http';
 import { useUserStore } from '../../src/stores';
 
 const TINT = '#0EA5E9';
@@ -234,6 +234,59 @@ function Allergies() {
   );
 }
 
+function Pacing() {
+  const [d, setD] = useState<any>(null);
+  const [rhr, setRhr] = useState('');
+  const [energy, setEnergy] = useState<string | null>(null);
+  const [minutes, setMinutes] = useState('');
+  const [peak, setPeak] = useState('');
+  const load = () => getJson('/fatigue-pacing/summary').then(setD);
+  useEffect(() => { load(); }, []);
+  const plan = d?.plan;
+  const saveRhr = async () => { if (Number(rhr) >= 30 && await putJson('/fatigue-pacing/resting-hr', { bpm: Number(rhr) })) load(); };
+  const logDay = async () => {
+    if (energy === null || minutes === '') return Alert.alert('Log today', 'Pick an energy level and enter active minutes.');
+    const r = await postJson<{ advice: string[] }>('/fatigue-pacing/day', {
+      date: today(), energy: Number(energy), activity_minutes: Number(minutes), peak_hr: peak ? Number(peak) : null,
+    });
+    if (r?.advice?.length) Alert.alert('Pacing', r.advice.join('\n\n'));
+    setMinutes(''); setPeak(''); load();
+  };
+  const crash = async (severity: string) => {
+    const r = await postJson<{ guidance: string[] }>('/fatigue-pacing/crash', { date: today(), severity });
+    if (r) Alert.alert('Crash logged', r.guidance.join('\n\n'));
+    load();
+  };
+  return (
+    <>
+      <Text style={styles.sub}>For people whose doctor has assessed their fatigue. Keeps activity under a heart-rate ceiling and shows crashes after busy days.</Text>
+      {plan?.heart_rate_ceiling
+        ? <Text style={styles.body}>Your ceiling: {plan.heart_rate_ceiling} bpm (resting {plan.resting_hr} + 15)</Text>
+        : <>
+            <Text style={styles.body}>{plan?.ceiling_note ?? 'Enter your resting heart rate.'}</Text>
+            <Input value={rhr} onChangeText={setRhr} keyboardType="number-pad" placeholder="Resting heart rate (bpm)" />
+            <Btn label="Set ceiling" onPress={saveRhr} />
+          </>}
+      <Text style={styles.label}>Energy today (0-10)</Text>
+      <Chips options={['0', '2', '4', '6', '8', '10'].map((v) => ({ id: v, label: v }))} value={energy} onChange={setEnergy} />
+      <Input value={minutes} onChangeText={setMinutes} keyboardType="number-pad" placeholder="Active minutes today" />
+      <Input value={peak} onChangeText={setPeak} keyboardType="number-pad" placeholder="Highest heart rate (optional)" />
+      <Btn label="Log today" onPress={logDay} />
+      <Text style={styles.label}>Having a crash?</Text>
+      <Chips options={[{ id: 'mild', label: 'Mild' }, { id: 'moderate', label: 'Moderate' }, { id: 'severe', label: 'Severe' }]} value={null} onChange={crash} />
+      {d?.status === 'ok' && (
+        <Text style={styles.body}>
+          Last {d.days_logged} days: energy {d.average_energy}/10, {d.average_activity_minutes} active min a day,
+          {' '}{d.crashes.length} crash(es){d.days_with_heart_rate ? `, ${d.days_over_ceiling} day(s) over ceiling` : ''}.
+          {d.boom_bust_days.length ? ` A crash followed a busy day on ${d.boom_bust_days.join(', ')}.` : ''}
+        </Text>
+      )}
+      {asArray<string>(plan?.rules).map((r) => <Text key={r} style={styles.sub}>• {r}</Text>)}
+      {plan?.see_a_doctor && <Text style={styles.sub}>{plan.see_a_doctor}</Text>}
+    </>
+  );
+}
+
 export default function ConditionsScreen() {
   return (
     <View style={styles.container}>
@@ -248,6 +301,7 @@ export default function ConditionsScreen() {
           <Section icon="walk" title="Physio programmes" sub="Knee, shoulder, back and more"><Physio /></Section>
           <Section icon="accessibility" title="Falls" sub="CDC STEADI check and home safety"><Falls /></Section>
           <Section icon="eye" title="Eye care" sub="Screen strain relief"><Eyes /></Section>
+          <Section icon="battery-half" title="Energy pacing" sub="ME/CFS and long-lasting fatigue"><Pacing /></Section>
           <Section icon="flower" title="Allergies" sub="Log symptoms and triggers"><Allergies /></Section>
         </View>
       </ScrollView>

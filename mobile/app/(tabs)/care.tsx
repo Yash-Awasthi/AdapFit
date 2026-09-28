@@ -15,6 +15,7 @@ import { colors, spacing } from '../../src/theme';
 import { GlassCard } from '../../src/components/PremiumComponents';
 import { asArray, getJson, postJson } from '../../src/services/http';
 import { useUserStore } from '../../src/stores';
+import { offlineProtocols } from '../../src/services/offlineSafety';
 
 const TINT = '#EF4444';
 const LEVEL_COLOR: Record<string, string> = { emergency: '#DC2626', urgent: '#F97316', doctor: '#F59E0B', self_care: '#10B981' };
@@ -134,9 +135,9 @@ function SymptomCheck() {
 }
 
 function FirstAid() {
-  const [protocols, setProtocols] = useState<Record<string, any>>({});
+  const [protocols, setProtocols] = useState<Record<string, any>>(offlineProtocols);
   const [open, setOpen] = useState<string | null>(null);
-  useEffect(() => { getJson<{ data: Record<string, any> }>('/first-aid/protocols').then((r) => setProtocols(r?.data ?? {})); }, []);
+  useEffect(() => { getJson<{ data: Record<string, any> }>('/first-aid/protocols').then((r) => r?.data && setProtocols(r.data)); }, []);
   return (
     <>
       <Text style={styles.sub}>Call 112 first for anything life-threatening, then follow the steps.</Text>
