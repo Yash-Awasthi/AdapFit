@@ -1,125 +1,128 @@
 """
-Government Health Schemes Knowledge Base — Core schemes only.
+Indian public health schemes and helplines, with a conservative eligibility check.
+
+Eligibility here is only ever "likely, confirm at the official portal". PM-JAY
+in particular is decided by the SECC 2011 deprivation lists (and, since
+October 2024, age 70+), not by income, so no income test is applied to it.
 """
-import time
+from dataclasses import asdict, dataclass, field
 from typing import Optional
-from dataclasses import dataclass, field
+
+VERIFY = "Confirm on the official portal or helpline before relying on this."
 
 
 @dataclass
 class HealthScheme:
     id: str
     name: str
-    country: str
     category: str
     description: str
-    eligibility: dict = field(default_factory=dict)
-    benefits: dict = field(default_factory=dict)
-    application_process: list = field(default_factory=list)
-    required_documents: list = field(default_factory=list)
-    official_portal: str = ""
+    who: str
+    official_portal: str
     helpline: str = ""
-    disclaimer: str = "Possible eligibility — verify with official source"
+    how_to_apply: list[str] = field(default_factory=list)
+
+
+SCHEMES = [
+    HealthScheme(
+        "pmjay", "Ayushman Bharat PM-JAY", "insurance",
+        "Cashless hospital treatment up to ₹5 lakh per family per year at empanelled public and private hospitals.",
+        "Families listed under the SECC 2011 deprivation criteria, and since October 2024 every person aged 70 "
+        "or over regardless of income (Ayushman Vay Vandana card).",
+        "https://beneficiary.nha.gov.in", "14555",
+        ["Check your name at the beneficiary portal or any empanelled hospital's Ayushman Mitra desk",
+         "Carry Aadhaar; create your Ayushman card on the portal or app"]),
+    HealthScheme(
+        "esic", "Employees' State Insurance (ESIC)", "insurance",
+        "Medical care for you and your family at ESI dispensaries and hospitals, plus cash benefits during sickness and maternity.",
+        "Employees of covered establishments earning up to ₹21,000 a month (₹25,000 for persons with disability).",
+        "https://www.esic.gov.in", "1800-11-2526",
+        ["Your employer registers you; ask HR for your ESIC (IP) number and e-Pehchan card"]),
+    HealthScheme(
+        "cghs", "Central Government Health Scheme (CGHS)", "insurance",
+        "Outpatient and inpatient care for central government employees, pensioners and their dependants in CGHS cities.",
+        "Central government employees, pensioners and eligible dependants.",
+        "https://cghs.mohfw.gov.in", "1800-208-8900",
+        ["Apply through your department or, for pensioners, the CGHS portal"]),
+    HealthScheme(
+        "jsy", "Janani Suraksha Yojana (JSY)", "maternity",
+        "Cash assistance for giving birth in a government or accredited private facility.",
+        "Pregnant women; the amount and conditions vary by state and area.",
+        "https://nhm.gov.in", "104",
+        ["Register your pregnancy with the ASHA worker or at the nearest government health centre"]),
+    HealthScheme(
+        "pmsma", "Pradhan Mantri Surakshit Matritva Abhiyan (PMSMA)", "maternity",
+        "A free antenatal check-up by a doctor on the 9th of every month at government facilities.",
+        "Pregnant women in the second and third trimester.",
+        "https://pmsma.mohfw.gov.in", "104",
+        ["Go to the nearest government health facility on the 9th of the month"]),
+    HealthScheme(
+        "esanjeevani", "eSanjeevani", "telemedicine",
+        "Free video consultations with government doctors from your phone.",
+        "Everyone in India.",
+        "https://esanjeevani.mohfw.gov.in", "",
+        ["Register with your mobile number in the eSanjeevani app or website"]),
+    HealthScheme(
+        "telemanas", "Tele-MANAS", "mental_health",
+        "Free 24/7 mental health counselling by phone in Indian languages.",
+        "Everyone in India.",
+        "https://telemanas.mohfw.gov.in", "14416",
+        ["Call 14416 or 1-800-891-4416"]),
+    HealthScheme(
+        "abha", "ABHA (Ayushman Bharat Health Account)", "records",
+        "A free health ID that lets you link and share your health records across hospitals and apps.",
+        "Everyone in India.",
+        "https://abha.abdm.gov.in", "1800-11-4477",
+        ["Create it with Aadhaar or a driving licence on the ABHA portal"]),
+    HealthScheme(
+        "helplines", "104 health helpline and 108 ambulance", "emergency",
+        "104 gives medical advice and information; 108 sends a free ambulance in most states. 112 is the national emergency number.",
+        "Everyone in India.",
+        "https://nhm.gov.in", "108",
+        ["Call 108 for an ambulance, 104 for health advice, 112 for any emergency"]),
+]
+
+EVERYONE = {"esanjeevani", "telemanas", "abha", "helplines"}
 
 
 class GovernmentSchemesService:
-    def __init__(self):
-        self._schemes: dict[str, HealthScheme] = {}
-        self._load_schemes()
-
-    def _load_schemes(self):
-        schemes = [
-            HealthScheme(
-                id="pmjay",
-                name="Ayushman Bharat — PM-JAY",
-                country="IN",
-                category="insurance",
-                description="Health insurance covering hospitalization up to ₹5 lakh/year for economically vulnerable families.",
-                eligibility={"income_limit_annual": 500000, "family_coverage": True},
-                benefits={"coverage_amount": 500000, "cashless_treatment": True, "pre_existing_diseases": "From day 1"},
-                application_process=["Visit empanelled hospital or CSC", "Carry Aadhaar + ration card", "Check eligibility at pmjay.gov.in"],
-                required_documents=["Aadhaar card", "Ration card"],
-                official_portal="https://pmjay.gov.in",
-                helpline="14555",
-            ),
-            HealthScheme(
-                id="esic",
-                name="Employees' State Insurance (ESIC)",
-                country="IN",
-                category="insurance",
-                description="Social security for employees earning up to ₹21,000/month — medical, sickness, maternity benefits.",
-                eligibility={"monthly_wage_limit": 21000, "employee_contribution": "0.75%"},
-                benefits={"medical_benefit": "Self and family", "maternity_benefit": "26 weeks paid leave"},
-                application_process=["Employer registers with ESIC", "Employee receives e-Pehchan card"],
-                required_documents=["Aadhaar card", "PAN card"],
-                official_portal="https://www.esic.gov.in",
-                helpline="1800-11-2526",
-            ),
-            HealthScheme(
-                id="nhm",
-                name="National Health Mission (NHM)",
-                country="IN",
-                category="preventive",
-                description="Public health program covering immunization, maternal health, child health, and disease control.",
-                eligibility={"target_population": "All citizens", "focus": ["pregnant_women", "children_under_5"]},
-                benefits={"immunization": "Free vaccination", "maternal_health": "Free institutional delivery"},
-                application_process=["Visit nearest PHC or CHC", "No registration needed for basic services"],
-                required_documents=["Aadhaar (preferred, not mandatory)"],
-                official_portal="https://nhm.gov.in",
-                helpline="104",
-            ),
-        ]
-        for s in schemes:
-            self._schemes[s.id] = s
-
     def get_all_schemes(self, country: str = "IN") -> list[dict]:
-        return [self._to_dict(s) for s in self._schemes.values() if s.country == country]
+        return [asdict(s) for s in SCHEMES] if country == "IN" else []
 
     def get_scheme(self, scheme_id: str) -> Optional[dict]:
-        s = self._schemes.get(scheme_id)
-        return self._to_dict(s) if s else None
+        return next((asdict(s) for s in SCHEMES if s.id == scheme_id), None)
 
     def search_schemes(self, query: str, country: str = "IN") -> list[dict]:
         q = query.lower()
-        return [self._to_dict(s) for s in self._schemes.values()
-                if s.country == country and q in (s.name + s.description + s.category).lower()]
-
-    def check_eligibility(self, country: str = "IN", income_annual: Optional[float] = None,
-                          is_bpl: Optional[bool] = None, **kwargs) -> list[dict]:
-        results = []
-        for s in self._schemes.values():
-            if s.country != country:
-                continue
-            score = 0
-            reasons = []
-            if income_annual and s.eligibility.get("income_limit_annual"):
-                if income_annual <= s.eligibility["income_limit_annual"]:
-                    score += 2
-                    reasons.append(f"Income below ₹{s.eligibility['income_limit_annual']:,} limit")
-            if is_bpl:
-                score += 1
-                reasons.append("BPL families are eligible")
-            if score:
-                d = self._to_dict(s)
-                d["eligibility_score"] = score
-                d["eligibility_reasons"] = reasons
-                results.append(d)
-        results.sort(key=lambda x: x.get("eligibility_score", 0), reverse=True)
-        return results
+        return [d for d in self.get_all_schemes(country) if q in (d["name"] + d["description"] + d["category"]).lower()]
 
     def get_categories(self) -> list[dict]:
-        cats = {}
-        for s in self._schemes.values():
+        cats: dict[str, int] = {}
+        for s in SCHEMES:
             cats[s.category] = cats.get(s.category, 0) + 1
         return [{"id": k, "name": k.replace("_", " ").title(), "count": v} for k, v in cats.items()]
 
-    def _to_dict(self, s: HealthScheme) -> dict:
-        return {
-            "id": s.id, "name": s.name, "country": s.country, "category": s.category,
-            "description": s.description, "eligibility": s.eligibility, "benefits": s.benefits,
-            "application_process": s.application_process, "required_documents": s.required_documents,
-            "official_portal": s.official_portal, "helpline": s.helpline, "disclaimer": s.disclaimer,
-        }
+    def check_eligibility(self, country: str = "IN", age: Optional[int] = None, is_pregnant: Optional[bool] = None,
+                          monthly_wage: Optional[float] = None, formal_employee: Optional[bool] = None,
+                          central_govt: Optional[bool] = None, in_secc_list: Optional[bool] = None, **_) -> list[dict]:
+        """Schemes the answers point to, each with the reason. Never a guarantee."""
+        if country != "IN":
+            return []
+        reasons: dict[str, str] = {}
+        if age is not None and age >= 70:
+            reasons["pmjay"] = "Everyone aged 70 or over is covered under Ayushman Vay Vandana."
+        elif in_secc_list:
+            reasons["pmjay"] = "Your family may be on the PM-JAY list; check the beneficiary portal."
+        if formal_employee and monthly_wage is not None and monthly_wage <= 21000:
+            reasons["esic"] = "Your wage is within the ESIC limit if your employer is covered."
+        if central_govt:
+            reasons["cghs"] = "Central government employees and pensioners are covered."
+        if is_pregnant:
+            reasons["jsy"] = "Cash support for a hospital delivery."
+            reasons["pmsma"] = "A free check-up on the 9th of each month."
+        for sid in EVERYONE:
+            reasons.setdefault(sid, "Open to everyone in India.")
+        return [{**self.get_scheme(sid), "reason": why, "note": VERIFY} for sid, why in reasons.items()]
 
 
 government_schemes_service = GovernmentSchemesService()

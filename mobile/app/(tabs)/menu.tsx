@@ -9,7 +9,7 @@ import {
   ChevronRight, Sun, Moon as MoonIcon, Search, Calendar, BarChart3, Award,
   Brain, Moon, Shield, Utensils, Users, Settings as SettingsIcon,
   Download, Bell, Info, Pencil, Ruler, Droplet, Wrench,
-  LayoutDashboard, CheckSquare, Activity, TrendingUp, HeartPulse, Baby, MessagesSquare,
+  LayoutDashboard, CheckSquare, Stethoscope, Activity, TrendingUp, HeartPulse, Baby, MessagesSquare,
   ChefHat, Droplets, Smile, Pill, Watch, CalendarDays, Siren, Accessibility,
 } from 'lucide-react-native';
 import { useTheme, AccentName, CARD_SHADOW } from '../../src/services/theme';
@@ -109,6 +109,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
       items: [
         { icon: CalendarDays, label: 'Calendar', sub: 'Plan and history', route: '/health-calendar', color: '#06B6D4' },
         { icon: Siren, label: 'Emergency', sub: 'Contacts & medical ID', route: '/emergency', color: '#DC2626' },
+        { icon: Stethoscope, label: 'Care & Safety', sub: 'Care nearby, symptoms, first aid, schemes', route: '/care', color: '#EF4444' },
         { icon: Accessibility, label: 'Accessibility', sub: 'Text size & motion', route: '/accessibility-settings', color: '#0EA5E9' },
         { icon: Download, label: 'Export Data', sub: 'Download your records', route: '/data-export', color: '#22C55E' },
       ],

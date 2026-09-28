@@ -1,33 +1,18 @@
-"""Hospital Finder API endpoints."""
-from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import List
-from app.services.hospital_finder import hospital_finder_service
+"""Nearby hospitals, clinics and pharmacies from OpenStreetMap."""
+from typing import Literal
 
-router = APIRouter(prefix="/hospitals", tags=["Hospital & ER Finder"])
+from fastapi import APIRouter, Query
 
-class TriageRequest(BaseModel):
-    symptoms: List[str]
+from app.services import hospital_finder
+
+router = APIRouter()
+
 
 @router.get("/nearby")
-async def find_nearby(location: str = "Boston", type: str = "all", max_wait: int = 0):
-    result = hospital_finder_service.find_nearby(location, type, max_wait)
-    return {"success": True, "data": result}
-
-@router.get("/er-wait-times")
-async def get_er_times():
-    return {"success": True, "data": hospital_finder_service.get_er_wait_times()}
-
-@router.get("/urgent-care")
-async def get_urgent_care():
-    return {"success": True, "data": hospital_finder_service.get_urgent_care()}
-
-@router.get("/details/{facility_id}")
-async def get_details(facility_id: str):
-    result = hospital_finder_service.get_hospital_details(facility_id)
-    return {"success": True, "data": result}
-
-@router.post("/triage")
-async def triage(req: TriageRequest):
-    result = hospital_finder_service.should_go_er_or_urgent_care(req.symptoms)
-    return {"success": True, "data": result}
+async def find_nearby(
+    lat: float = Query(ge=-90, le=90),
+    lon: float = Query(ge=-180, le=180),
+    kind: Literal["all", "hospital", "clinic", "pharmacy"] = "all",
+    radius_km: float = Query(5.0, ge=0.5, le=25),
+):
+    return await hospital_finder.find_nearby(lat, lon, kind, radius_km)

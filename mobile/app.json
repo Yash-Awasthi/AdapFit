@@ -54,7 +54,10 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
+          "modes": [
+            "peripheral",
+            "central"
+          ],
           "bluetoothAlwaysPermission": "AdapFit connects to Bluetooth heart-rate straps during workouts."
         }
       ],
@@ -66,6 +69,12 @@
             "compileSdkVersion": 36,
             "targetSdkVersion": 35
           }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "AdapFit uses your location only to show hospitals, clinics and pharmacies near you."
         }
       ]
     ],

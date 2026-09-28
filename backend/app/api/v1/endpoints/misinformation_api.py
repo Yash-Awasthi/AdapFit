@@ -1,60 +1,66 @@
 """
-Health Misinformation Detection API
+Check a forward: paste a health message (often a WhatsApp forward) and get a
+plain-language verdict with who to trust. The model may only point to named
+public-health bodies; with no model available the answer is "unverified".
 """
+import json
+import re
+from typing import Literal, Optional
+
 from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import List, Optional
+from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/misinformation", tags=["Health Misinformation"])
+from app.services.safety_policy import SAFETY_RULES, triage
 
+router = APIRouter()
 
-class VerifyClaimRequest(BaseModel):
-    claim: str
-    source: Optional[str] = None
-    context: str = ""
+TRUSTED = ["WHO", "ICMR", "Ministry of Health and Family Welfare (MoHFW)", "FSSAI", "AIIMS", "PIB Fact Check", "NHS", "CDC"]
+PROMPT = f"""You check health claims that circulate in India, often as WhatsApp forwards.
+Reply with JSON only: {{"verdict": "supported|misleading|false|unproven", "explanation": "2-3 plain sentences",
+"what_to_do": "one safe, practical sentence", "sources": ["organisation names"]}}.
+Use only these organisations as sources: {", ".join(TRUSTED)}. Never invent a study, statistic or link.
+If the evidence is unclear, say "unproven". Never tell anyone to stop, start or change a medicine.
+{SAFETY_RULES}"""
 
-
-class RateSourceRequest(BaseModel):
-    source_name: str
-    source_url: Optional[str] = None
-
-
-class CheckArticleRequest(BaseModel):
-    url: Optional[str] = None
-    text: str
-
-
-@router.post("/verify")
-async def verify_claim(req: VerifyClaimRequest):
-    from app.services.health_misinformation import health_misinformation_service
-    return health_misinformation_service.verify_claim(req.claim, req.source, req.context)
+UNVERIFIED = {
+    "verdict": "unverified",
+    "explanation": "This could not be checked automatically right now.",
+    "what_to_do": "Search the claim on factcheck.pib.gov.in or ask a doctor before acting on it or forwarding it.",
+    "sources": ["PIB Fact Check"],
+}
 
 
-@router.post("/rate-source")
-async def rate_source(req: RateSourceRequest):
-    from app.services.health_misinformation import health_misinformation_service
-    return health_misinformation_service.rate_source(req.source_name, req.source_url)
+class ForwardCheck(BaseModel):
+    text: str = Field(min_length=10, max_length=4000)
 
 
-@router.post("/check-article")
-async def check_article(req: CheckArticleRequest):
-    from app.services.health_misinformation import health_misinformation_service
-    return health_misinformation_service.check_article(req.text, req.url)
+class Verdict(BaseModel):
+    verdict: Literal["supported", "misleading", "false", "unproven", "unverified"]
+    explanation: str
+    what_to_do: str
+    sources: list[str]
+    safety: Optional[dict] = None
 
 
-@router.get("/misinformation-categories")
-async def get_categories():
-    from app.services.health_misinformation import health_misinformation_service
-    return health_misinformation_service.MISINFO_CATEGORIES
+def _parse(reply: str) -> Optional[dict]:
+    m = re.search(r"\{.*\}", reply or "", re.S)
+    if not m:
+        return None
+    try:
+        data = json.loads(m.group(0))
+        data["sources"] = [s for s in data.get("sources", []) if any(t.split(" (")[0] in s for t in TRUSTED)]
+        return Verdict(**data).model_dump()
+    except (ValueError, TypeError):
+        return None
 
 
-@router.get("/red-flags")
-async def get_red_flags():
-    from app.services.health_misinformation import health_misinformation_service
-    return health_misinformation_service.RED_FLAGS
+@router.post("/check", response_model=Verdict)
+async def check_forward(req: ForwardCheck):
+    flagged = triage(req.text)
+    if flagged:
+        return {**UNVERIFIED, "explanation": flagged["reply"], "safety": flagged}
+    from app.api.v1.endpoints.chat import _call_gemini, _call_groq
 
-
-@router.get("/trusted-sources")
-async def get_trusted_sources():
-    from app.services.health_misinformation import health_misinformation_service
-    return health_misinformation_service.TRUSTED_SOURCES
+    prompt = f"Claim to check:\n\"\"\"{req.text}\"\"\""
+    reply = await _call_gemini(prompt, [], system=PROMPT) or await _call_groq(prompt, system=PROMPT)
+    return _parse(reply) or UNVERIFIED
