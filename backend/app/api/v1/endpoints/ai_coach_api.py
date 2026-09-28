@@ -1,41 +1,29 @@
-"""AI Health Coach API"""
+"""Coach briefing and weekly report. Questions go to /chat, which has the safety layer."""
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.services.ai_coach import ai_coach_service
+from app.core.per_user import current_user_id
+from app.services import ai_coach
 
 router = APIRouter()
 
-class QuestionRequest(BaseModel):
-    question: str
 
 class FeedbackRequest(BaseModel):
-    insight_id: str; helpful: bool; comment: str = ""
+    category: str = Field(min_length=1, max_length=40)
+    helpful: bool
+    comment: str = Field("", max_length=500)
 
-@router.get("/daily-insight")
-async def get_daily_insight():
-    return ai_coach_service.get_daily_insight()
+
+@router.get("/briefing")
+async def get_briefing():
+    return await ai_coach.briefing(current_user_id())
+
 
 @router.get("/weekly-report")
 async def get_weekly_report():
-    return ai_coach_service.get_weekly_report()
+    return await ai_coach.weekly_report(current_user_id())
 
-@router.post("/ask")
-async def ask_question(request: QuestionRequest):
-    return ai_coach_service.ask_question(request.question)
-
-@router.get("/recommendations")
-async def get_recommendations():
-    return {"recommendations": ai_coach_service.get_recommendations()}
-
-@router.get("/health-risks")
-async def get_health_risks():
-    return {"risks": ai_coach_service.get_health_risks()}
-
-@router.get("/motivation")
-async def get_motivation():
-    return ai_coach_service.get_motivation()
 
 @router.post("/feedback")
-async def log_feedback(request: FeedbackRequest):
-    return ai_coach_service.log_feedback(request.insight_id, request.helpful, request.comment)
+async def log_feedback(req: FeedbackRequest):
+    return ai_coach.log_feedback(current_user_id(), req.category, req.helpful, req.comment)

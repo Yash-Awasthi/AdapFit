@@ -48,6 +48,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
     {
       title: 'Overview',
       items: [
+        { icon: Sun, label: 'Daily Briefing', sub: "Today's call from your data", route: '/coach', color: '#6366F1' },
         { icon: LayoutDashboard, label: 'Dashboard', sub: 'Everything at a glance', route: '/dashboard', color: theme.primary },
         { icon: Activity, label: 'Health Hub', sub: 'Vitals & body systems', route: '/health-hub', color: '#22C55E' },
         { icon: TrendingUp, label: 'Trends', sub: 'HRV, load, readiness', route: '/trends', color: '#06B6D4' },

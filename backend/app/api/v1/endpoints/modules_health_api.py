@@ -12,7 +12,7 @@ router = APIRouter()
 async def modules_health() -> dict[str, str]:
     modules = [
         "src.anomaly.detector", "src.biomarkers.tracker",
-        "src.biometrics.signals", "src.breathing.analyzer", "src.chat.fitness_rag",
+        "src.biometrics.signals", "src.breathing.analyzer",
         "src.injury.risk_detector", "src.medication.tracker", "src.planner.fitness_planner",
         "src.pose.form_checker", "src.rppg.processor", "src.sensors.ble_monitor",
         "src.sleep.classifier", "src.tracker.workout_tracker",

@@ -24,7 +24,12 @@ Measured at start: 229 route modules, 281 services, 93 services unreachable
       biofeedback; HRV screen reads a Bluetooth chest strap (standard 0x180D).
 - [x] Achievements: one `/achievements` derived from logged activity; the
       self-grant XP/badge routes and the `eval()` goal parser are gone.
-- [ ] Coach: `/ai-coach`, `-v2`, plus `health-coaching`, `habits`.
+- [x] Coach: `/ai-coach` briefing and weekly report built from the user's records
+      (the old one picked canned "personal" insights at random); four duplicate
+      chat surfaces removed, `/chat` is the one assistant. Briefing screen linked
+      from home and menu. Fixed two dead home-screen routes.
+- [ ] `ai-coach-v2` (workout plans, form check, demo videos that point at
+      missing assets), `health-coaching` (sample coach marketplace), `habits`.
 - [ ] Community: `/community`, `-v2`, and `/challenges`.
 - [ ] Recovery: `/recovery-logs`, `/recovery`, `/recovery-v2`, seven services.
 - [ ] Export: `/export`, `-v2`, `/data-export`.

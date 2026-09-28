@@ -1,138 +1,244 @@
 """
-AI Health Coach Service — Personalized AI-Powered Health Recommendations
+Coach briefing and weekly report, built from the user's own records.
 
-Features:
-- Cross-service data analysis (all 15 services)
-- Daily personalized insights
-- Weekly health reports with natural language
-- Health Q&A with contextual answers
-- Goal adjustment suggestions
-- Habit formation coaching
-- Risk alerts based on trends
-- Motivational messages
+Every insight cites the numbers it came from. When a source has too little
+data the briefing says what to log instead of filling the gap with a typical
+user's week.
 """
-import time
 import random
+from datetime import datetime, timedelta, timezone
+from statistics import mean
 from typing import Optional
 
+from app.core.storage import storage
+from app.services.sleep_tracker import sleep_journal
 
-class AICoachService:
-    """AI-powered health coaching that synthesizes data from all services."""
+MOTIVATIONAL = [
+    "Every workout counts. Even 10 minutes is better than none.",
+    "Progress isn't linear. Consistency beats intensity.",
+    "Your body adapts to what you do often. Keep showing up.",
+    "Small daily improvements add up to big results.",
+    "Rest days are part of training, not a break from it.",
+    "The hardest part of any session is starting. You already know how to do that.",
+]
 
-    INSIGHTS = [
-        {"category": "sleep", "icon": "🌙", "title": "Sleep Quality Dip", "message": "Your deep sleep has decreased 15% this week. Try exercising earlier in the day and avoiding screens 1 hour before bed.", "priority": "high", "action": "Try tonight's breathing exercise before sleep"},
-        {"category": "stress", "icon": "🧘", "title": "Stress Pattern Detected", "message": "Your stress levels spike between 2-4 PM daily. Consider scheduling a 5-minute breathing break during that window.", "priority": "medium", "action": "Set a 2 PM reminder for breathing exercise"},
-        {"category": "activity", "icon": "🏃", "title": "Activity Milestone!", "message": "You've hit your step goal 5 days in a row! Your cardiovascular fitness is improving. Try increasing your daily target by 10%.", "priority": "low", "action": "Increase daily step goal to 11,000"},
-        {"category": "nutrition", "icon": "🥗", "title": "Protein Intake Alert", "message": "You've been averaging 95g protein daily, below your 135g target. Add a protein shake or extra chicken breast to your meals.", "priority": "medium", "action": "Log a high-protein snack today"},
-        {"category": "recovery", "icon": "💪", "title": "Great Recovery Score", "message": "Your HRV has been above baseline for 3 days. You're in an optimal training window — consider a challenging workout today.", "priority": "low", "action": "Try a high-intensity workout today"},
-        {"category": "mental", "icon": "🧠", "title": "Mood-Exercise Connection", "message": "Your mood scores are 23% higher on days you exercise. Keep it up! Even a 15-minute walk makes a difference.", "priority": "low", "action": "Schedule your next workout"},
-        {"category": "digital", "icon": "📱", "title": "Screen Time Improvement", "message": "Your screen time dropped 45 minutes this week! This likely contributed to your improved sleep quality.", "priority": "low", "action": "Maintain your current digital habits"},
-        {"category": "heart", "icon": "❤️", "title": "Resting HR Trend", "message": "Your resting heart rate has decreased 3 BPM over the past month — a sign of improving cardiovascular fitness.", "priority": "low", "action": "Continue your current training program"},
-    ]
 
-    WEEKLY_REPORTS = [
-        "This was a solid week! You completed {workouts} workouts, averaging {steps} steps daily. Your sleep score improved to {sleep_score}, and stress levels dropped {stress_change}. Key areas to focus on: increase protein intake and maintain your new screen time habits.",
-        "Great progress this week! Your consistency with daily habits is paying off — {habits_completed} of 7 habits completed daily. Your recovery score of {recovery_score} suggests you can handle increased training volume next week.",
-        "Mixed results this week. While your activity was strong ({total_active} active minutes), sleep quality dipped to {sleep_score}. Try the sleep hygiene tips in the content hub. Your nutrition adherence was {nutrition_pct}% — meal prep could help improve consistency.",
-    ]
+def _date(record: dict, *keys: str) -> Optional[datetime]:
+    for key in keys:
+        raw = record.get(key)
+        if raw:
+            try:
+                parsed = datetime.fromisoformat(str(raw)[:19])
+                return parsed.replace(tzinfo=None)
+            except ValueError:
+                continue
+    return None
 
-    MOTIVATIONAL = [
-        "Every workout counts. Even 10 minutes is better than none. You've got this! 💪",
-        "Progress isn't always linear. Trust the process and stay consistent. 🌟",
-        "Your body adapts to what you consistently do. Keep showing up! 🔥",
-        "Small daily improvements lead to stunning results. Keep stacking those wins! ⭐",
-        "The hardest part of any workout is starting. You've already proven you can do that. 🏆",
-        "Your future self will thank you for the work you're putting in today. 🚀",
-    ]
 
-    HEALTH_QA = {
-        "how to improve sleep": "Focus on three pillars: consistency (same bedtime/wake time), environment (cool, dark, quiet), and wind-down routine (no screens 1hr before bed, try 4-7-8 breathing). Track with our sleep tracker!",
-        "how to reduce stress": "Combine daily practices: morning meditation (5 min), regular exercise, nature walks, breathing exercises (box breathing), and social connection. Use our Stress Manager feature daily.",
-        "what should i eat": "Base meals around protein (palm-sized), complex carbs (fist-sized), healthy fats (thumb-sized), and vegetables (two fists). Track with Nutrition Log and use AI Meal Planner.",
-        "how to build muscle": "Progressive overload (increase weight/reps weekly), adequate protein (1.6-2.2g/kg bodyweight), 7-9 hours sleep, and 48hr rest between training the same muscle group.",
-        "how to lose weight": "Create a sustainable 300-500 calorie deficit through diet and exercise combined. Prioritize protein to preserve muscle. Track with our Nutrition Log and Walk Tracker.",
-        "benefits of exercise": "Exercise reduces all-cause mortality by 30%, improves mood (endorphins), builds bone density, improves sleep quality, boosts immune function, and enhances cognitive performance.",
+def _within(records: list[dict], start: datetime, end: datetime, *keys: str) -> list[dict]:
+    out = []
+    for r in records:
+        d = _date(r, *keys)
+        if d is not None and start <= d < end:
+            out.append(r)
+    return out
+
+
+def _values(records: list[dict], key: str) -> list[float]:
+    return [float(r[key]) for r in records if isinstance(r.get(key), (int, float))]
+
+
+async def _sources(user_id: str) -> dict:
+    return {
+        "recovery": await storage.get_recovery_logs(user_id, 60),
+        "workouts": await storage.get_workout_logs(user_id, 60),
+        "workload": await storage.get_workload_history(user_id, 28),
+        "moods": (await storage.get_agent_memory(user_id)).get("mood_logs", []),
+        "sleep": sleep_journal.instance_for(user_id),
     }
 
-    def __init__(self):
-        self._feedback_log: list[dict] = []
 
-    def get_daily_insight(self) -> dict:
-        """Get a personalized daily insight based on current health state."""
-        insight = random.choice(self.INSIGHTS)
-        return {
-            **insight,
-            "timestamp": time.strftime("%Y-%m-%d %H:%M"),
-            "personalized": True,
+def _insight(category: str, title: str, message: str, action: str, priority: str, evidence: dict) -> dict:
+    return {"category": category, "title": title, "message": message, "action": action,
+            "priority": priority, "evidence": evidence}
+
+
+async def briefing(user_id: str) -> dict:
+    """Today's readiness call plus whatever the data supports saying."""
+    src = await _sources(user_id)
+    insights: list[dict] = []
+    missing: list[str] = []
+    now = datetime.now()
+
+    recovery = src["recovery"]
+    today_call = None
+    if recovery:
+        last = recovery[-1]
+        state, score = last.get("readiness_state"), last.get("recovery_score")
+        plans = {
+            "OPTIMAL": ("Train hard today", "You are recovered. A heavy or high-intensity session fits today.", "high"),
+            "MODERATE": ("Train normally", "Recovery is fine. Keep today's planned session at normal intensity.", "medium"),
+            "REDUCED": ("Go lighter today", "Recovery is below your normal. Cut volume by a third or swap to technique work.", "medium"),
+            "DEPLETED": ("Rest or walk today", "Recovery is well below your normal. Rest, walk, or do mobility only.", "high"),
         }
+        if state in plans:
+            title, message, priority = plans[state]
+            today_call = _insight("recovery", title, f"{message} Score {score}/100.", title, priority,
+                                  {"recovery_score": score, "readiness_state": state, "date": last.get("log_date")})
+        if last.get("pain_flagged") or last.get("illness_flagged"):
+            insights.append(_insight(
+                "safety", "You flagged pain or illness",
+                "Skip hard training until it settles. If it lasts more than a few days or gets worse, see a doctor or physiotherapist.",
+                "Log how it feels tomorrow", "high",
+                {"pain_flagged": bool(last.get("pain_flagged")), "illness_flagged": bool(last.get("illness_flagged"))}))
 
-    def get_weekly_report(self, week: Optional[dict] = None) -> dict:
-        """
-        Phrase the week's figures.
+        hrv = _values(recovery, "hrv_rmssd")
+        if len(hrv) >= 10:
+            recent, prior = mean(hrv[-7:]), mean(hrv[:-7])
+            change = (recent - prior) / prior * 100 if prior else 0
+            if abs(change) >= 8:
+                up = change > 0
+                insights.append(_insight(
+                    "hrv", "HRV trending up" if up else "HRV trending down",
+                    f"Your 7-day HRV average is {recent:.0f} ms against {prior:.0f} ms before, {change:+.0f}%. "
+                    + ("Your body is handling the load well." if up else "Sleep, stress, illness or hard training can each do this."),
+                    "Keep the current plan" if up else "Add an easy day this week and protect sleep",
+                    "low" if up else "medium", {"hrv_7d_ms": round(recent, 1), "hrv_prior_ms": round(prior, 1)}))
+        else:
+            missing.append(f"HRV on {10 - len(hrv)} more check-ins to see your HRV trend")
+    else:
+        missing.append("a daily check-in to get today's readiness")
 
-        Every number in this report — workouts, steps, sleep, recovery — used
-        to be generated, so it read as a summary of a week the user never had.
-        The figures are supplied by the caller, which has the logs.
-        """
-        required = (
-            "workouts", "steps", "sleep_score", "stress_change",
-            "habits_completed", "recovery_score", "total_active", "nutrition_pct",
-        )
-        week = week or {}
-        missing = [key for key in required if key not in week]
-        if missing:
-            return {
-                "status": "insufficient_data",
-                "missing": missing,
-                "message": "A weekly report needs the week's figures; none were supplied.",
-            }
+    journal = src["sleep"]
+    debt = journal.debt()
+    if debt["nights_counted"] >= 3 and debt["debt_hours"] and debt["debt_hours"] >= 2:
+        insights.append(_insight(
+            "sleep", "Sleep debt building",
+            f"You are {debt['debt_hours']}h short of {debt['target_hours']}h a night over your last {debt['nights_counted']} logged nights.",
+            debt.get("recovery_plan", "Go to bed 30 minutes earlier"), "high" if debt["debt_hours"] > 5 else "medium",
+            {"debt_hours": debt["debt_hours"], "nights": debt["nights_counted"]}))
+    elif debt["nights_counted"] < 3:
+        missing.append("3 nights of sleep to track sleep debt")
 
-        return {
-            "status": "ok",
-            "period": f"Week of {time.strftime('%b %d, %Y')}",
-            "report": random.choice(self.WEEKLY_REPORTS).format(**{k: week[k] for k in required}),
-            "figures": {k: week[k] for k in required},
-        }
+    workload = src["workload"]
+    acwr_values = _values(workload, "acwr")
+    if acwr_values:
+        acwr = acwr_values[-1]
+        if acwr > 1.5:
+            insights.append(_insight(
+                "load", "Training load jumped",
+                f"This week's load is {acwr:.2f} times your 4-week average. Jumps above 1.5 are when overuse injuries cluster.",
+                "Hold load steady for the next week", "high", {"acwr": round(acwr, 2)}))
+        elif acwr < 0.8 and len(workload) >= 7:
+            insights.append(_insight(
+                "load", "Load has dropped",
+                f"This week's load is {acwr:.2f} times your 4-week average. Fitness fades if this lasts.",
+                "Add one session this week", "low", {"acwr": round(acwr, 2)}))
 
-    def ask_question(self, question: str) -> dict:
-        """Answer a health-related question with contextual advice."""
-        q_lower = question.lower()
-        best_match = None
-        best_score = 0
-        for key, answer in self.HEALTH_QA.items():
-            score = sum(1 for word in key.split() if word in q_lower)
-            if score > best_score:
-                best_score = score
-                best_match = answer
-        if best_match and best_score > 0:
-            return {"answer": best_match, "confidence": min(0.95, best_score * 0.2 + 0.5), "source": "health_knowledge"}
-        return {"answer": "That's a great question! For personalized advice, I recommend checking our Content Hub for relevant articles, or consulting with a healthcare professional for medical concerns.", "confidence": 0.3, "source": "general"}
+    workouts = src["workouts"]
+    this_week = _within(workouts, now - timedelta(days=7), now + timedelta(days=1), "completed_at", "created_at")
+    last_week = _within(workouts, now - timedelta(days=14), now - timedelta(days=7), "completed_at", "created_at")
+    if this_week or last_week:
+        insights.append(_insight(
+            "consistency", "Training this week",
+            f"{len(this_week)} workout{'s' if len(this_week) != 1 else ''} in the last 7 days, {len(last_week)} the week before.",
+            "Plan your next session now" if len(this_week) < len(last_week) else "Keep the rhythm going",
+            "low", {"this_week": len(this_week), "last_week": len(last_week)}))
+    else:
+        missing.append("a workout to start tracking consistency")
 
-    def get_recommendations(self) -> list[dict]:
-        """Get personalized daily recommendations."""
-        return [
-            {"category": "workout", "icon": "💪", "title": "Today's Workout", "message": "Based on your recovery score (82), you're ready for a strength session. Try the Squat + Bench Press combo.", "priority": "high"},
-            {"category": "nutrition", "icon": "🥗", "title": "Meal Suggestion", "message": "You're 35g short on protein today. A Greek yogurt + protein shake would close the gap.", "priority": "medium"},
-            {"category": "sleep", "icon": "🌙", "title": "Sleep Optimization", "message": "Set your bedtime alarm for 10:30 PM to get a full 8 hours before your 6:30 wake-up.", "priority": "medium"},
-            {"category": "mental", "icon": "🧠", "title": "Mindfulness", "message": "Your stress has been elevated this week. Try a 5-minute guided meditation after lunch.", "priority": "medium"},
-            {"category": "hydration", "icon": "💧", "title": "Hydration Check", "message": "You've had 1.2L today. Aim for 800ml more before dinner to hit your 2.5L target.", "priority": "low"},
-        ]
+    moods = src["moods"]
+    mood_vals = [m["mood"] for m in moods if isinstance(m.get("mood"), (int, float))]
+    if len(mood_vals) >= 6:
+        recent, prior = mean(mood_vals[-3:]), mean(mood_vals[:-3])
+        if recent <= prior - 1.5:
+            insights.append(_insight(
+                "mind", "Mood lower lately",
+                f"Your last three mood logs average {recent:.1f}/10 against {prior:.1f} before. "
+                "If low mood lasts two weeks or more, talking to someone helps. Tele-MANAS is free on 14416.",
+                "Try a 10-minute walk outside and a short breathing session", "medium",
+                {"mood_recent": round(recent, 1), "mood_prior": round(prior, 1)}))
 
-    def get_health_risks(self) -> list[dict]:
-        """Identify potential health risks from trend data."""
-        risks = []
-        risks.append({"risk": "Chronic stress", "likelihood": "moderate", "evidence": "Elevated stress scores 4 of the past 7 days", "recommendation": "Practice daily breathing exercises. Consider reducing screen time."})
-        risks.append({"risk": "Sleep debt accumulation", "likelihood": "low", "evidence": "Average sleep 7.1 hours, slightly below optimal", "recommendation": "Aim for 7.5+ hours. Use sleep tracker to monitor."})
-        return risks
-
-    def get_motivation(self) -> dict:
-        return {"message": random.choice(self.MOTIVATIONAL), "timestamp": time.strftime("%H:%M")}
-
-    def log_feedback(self, insight_id: str, helpful: bool, comment: str = "") -> dict:
-        self._feedback_log.append({"insight_id": insight_id, "helpful": helpful, "comment": comment, "time": time.time()})
-        return {"thanked": True, "message": "Thanks for your feedback! This helps me provide better insights."}
+    priority_rank = {"high": 0, "medium": 1, "low": 2}
+    insights.sort(key=lambda i: priority_rank[i["priority"]])
+    return {
+        "date": now.strftime("%Y-%m-%d"),
+        "today": today_call,
+        "insights": insights,
+        "to_unlock": missing,
+        "motivation": random.choice(MOTIVATIONAL),
+    }
 
 
-from app.core.per_user import per_user, register
+async def weekly_report(user_id: str) -> dict:
+    """The last 7 days against the 7 before, in figures and plain sentences."""
+    src = await _sources(user_id)
+    now = datetime.now()
+    week = (now - timedelta(days=7), now + timedelta(days=1))
+    prev = (now - timedelta(days=14), now - timedelta(days=7))
 
-ai_coach_service = register("ai_coach.ai_coach_service", per_user(AICoachService))
+    def window(records: list[dict], span, *keys):
+        return _within(records, span[0], span[1], *keys)
+
+    rec_now = window(src["recovery"], week, "log_date", "created_at")
+    rec_prev = window(src["recovery"], prev, "log_date", "created_at")
+    wk_now = window(src["workouts"], week, "completed_at", "created_at")
+    wk_prev = window(src["workouts"], prev, "completed_at", "created_at")
+    nights = src["sleep"].nights(7)
+
+    def avg(vals: list[float]) -> Optional[float]:
+        return round(mean(vals), 1) if vals else None
+
+    figures = {
+        "workouts": len(wk_now),
+        "workouts_prev": len(wk_prev),
+        "checkins": len(rec_now),
+        "avg_recovery": avg(_values(rec_now, "recovery_score")),
+        "avg_recovery_prev": avg(_values(rec_prev, "recovery_score")),
+        "avg_hrv_ms": avg(_values(rec_now, "hrv_rmssd")),
+        "avg_sleep_hours": avg([n["total_minutes"] / 60 for n in nights]) or avg(_values(rec_now, "sleep_duration_hours")),
+        "nights_logged": len(nights),
+    }
+    if not (figures["workouts"] or figures["checkins"] or figures["nights_logged"]):
+        return {"status": "insufficient_data", "figures": figures,
+                "message": "Nothing logged in the last 7 days yet. Check in, log sleep or finish a workout to get a report."}
+
+    lines = [f"{figures['workouts']} workout{'s' if figures['workouts'] != 1 else ''} this week"
+             + (f" ({figures['workouts_prev']} the week before)." if figures["workouts_prev"] else ".")]
+    if figures["avg_recovery"] is not None:
+        line = f"Average recovery {figures['avg_recovery']}/100"
+        if figures["avg_recovery_prev"] is not None:
+            delta = figures["avg_recovery"] - figures["avg_recovery_prev"]
+            line += f", {'up' if delta >= 0 else 'down'} {abs(delta):.1f} on last week"
+        lines.append(line + ".")
+    if figures["avg_sleep_hours"] is not None:
+        lines.append(f"You slept {figures['avg_sleep_hours']}h a night on average.")
+    if figures["avg_hrv_ms"] is not None:
+        lines.append(f"HRV averaged {figures['avg_hrv_ms']} ms.")
+
+    focus = "Keep the same routine next week."
+    if figures["avg_sleep_hours"] is not None and figures["avg_sleep_hours"] < 7:
+        focus = "Next week, protect sleep first: aim for 7+ hours before adding training."
+    elif figures["workouts"] < figures["workouts_prev"]:
+        focus = "Next week, book your sessions in the calendar to get back to last week's count."
+    elif figures["avg_recovery"] is not None and figures["avg_recovery"] >= 75 and figures["workouts"] >= 3:
+        focus = "Recovery is holding up; next week can take a small increase in load."
+
+    return {
+        "status": "ok",
+        "period": f"{(now - timedelta(days=6)).strftime('%d %b')} – {now.strftime('%d %b %Y')}",
+        "summary": " ".join(lines),
+        "focus": focus,
+        "figures": figures,
+    }
+
+
+_feedback: dict[str, list[dict]] = {}
+
+
+def log_feedback(user_id: str, insight_category: str, helpful: bool, comment: str = "") -> dict:
+    _feedback.setdefault(user_id, []).append({
+        "category": insight_category, "helpful": helpful, "comment": comment,
+        "at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"recorded": True}
