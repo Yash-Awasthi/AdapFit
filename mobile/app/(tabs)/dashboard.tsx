@@ -352,7 +352,7 @@ export default function DashboardScreen() {
           <SectionHeaderPremium title="Quick Actions" icon="flash" iconColor={colors.health.energy} />
           <View style={styles.quickActionsGrid}>
             {[
-              { id: 'water', icon: 'water', label: 'Log Water', color: colors.health.activity, screen: 'nutrition-log' },
+              { id: 'water', icon: 'water', label: 'Log Water', color: colors.health.activity, screen: 'nutrition' },
               { id: 'mood', icon: 'happy', label: 'Log Mood', color: colors.health.mental, screen: 'mental-health' },
               { id: 'weight', icon: 'scale', label: 'Log Weight', color: colors.health.nutrition, screen: 'health' },
               { id: 'meditate', icon: 'leaf', label: 'Meditate', color: colors.health.calm, screen: 'wellness' },

@@ -1,187 +1,155 @@
 /**
- * AI Health Coach — Daily insights, Q&A, weekly report, recommendations
+ * Daily Briefing — today's readiness call, insights that cite the user's own
+ * numbers, and the weekly report. Questions go to the Coach chat.
  */
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator, RefreshControl,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, radius, presets, getScoreColor } from '../../src/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { colors, spacing } from '../../src/theme';
+import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { useApis } from '../../src/hooks/useApi';
+import { asArray, postJson } from '../../src/services/http';
 
-import { API_V1 as API } from '../../src/services/config';
-const api = async (p: string, o?: RequestInit) => { try { const r = await fetch(`${API}${p}`, { headers: { 'Content-Type': 'application/json' }, ...o }); return r.ok ? await r.json() : null; } catch { return null; } };
+const TINT = '#6366F1';
+const PRIORITY_COLORS: Record<string, string> = { high: '#EF4444', medium: '#F59E0B', low: '#10B981' };
+const CATEGORY_ICONS: Record<string, string> = {
+  recovery: 'battery-charging', safety: 'medkit', hrv: 'pulse', sleep: 'moon', load: 'barbell',
+  consistency: 'calendar', mind: 'happy',
+};
 
-const PRIORITY_COLORS: Record<string, string> = { high: colors.health.danger, medium: colors.health.energy, low: colors.health.calm };
+interface Insight { category: string; title: string; message: string; action: string; priority: string }
+interface Briefing { date: string; today: Insight | null; insights: Insight[]; to_unlock: string[]; motivation: string }
+interface Report { status: string; period?: string; summary?: string; focus?: string; message?: string }
 
-export default function CoachScreen() {
-  const [insight, setInsight] = useState<any>(null);
-  const [report, setReport] = useState<any>(null);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [motivation, setMotivation] = useState('');
-  const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<{role: string; text: string}[]>([]);
-  const [chatLoading, setChatLoading] = useState(false);
-  const [activeView, setActiveView] = useState<'insights' | 'chat' | 'report'>('insights');
+export default function BriefingScreen() {
+  const router = useRouter();
+  const [rated, setRated] = useState<Record<string, boolean>>({});
+  const { data, loading, refresh, refreshing } = useApis<{ briefing: Briefing; report: Report }>({
+    briefing: '/ai-coach/briefing',
+    report: '/ai-coach/weekly-report',
+  });
+  const briefing = data.briefing;
+  const report = data.report;
 
-  const load = useCallback(async () => {
-    const [i, r, rec, m] = await Promise.allSettled([
-      api('/ai-coach/daily-insight'), api('/ai-coach/weekly-report'),
-      api('/ai-coach/recommendations'), api('/ai-coach/motivation'),
-    ]);
-    if (i.status === 'fulfilled') setInsight(i.value);
-    if (r.status === 'fulfilled') setReport(r.value);
-    if (rec.status === 'fulfilled') setRecommendations(rec.value?.recommendations || []);
-    if (m.status === 'fulfilled') setMotivation(m.value?.message || '');
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const askQuestion = async () => {
-    if (!chatInput.trim()) return;
-    const q = chatInput.trim();
-    setChatInput('');
-    setChatMessages(prev => [...prev, { role: 'user', text: q }]);
-    setChatLoading(true);
-    const r = await api('/ai-coach/ask', { method: 'POST', body: JSON.stringify({ question: q }) });
-    setChatLoading(false);
-    if (r?.answer) setChatMessages(prev => [...prev, { role: 'coach', text: r.answer }]);
+  const rate = async (category: string, helpful: boolean) => {
+    setRated((r) => ({ ...r, [category]: helpful }));
+    await postJson('/ai-coach/feedback', { category, helpful });
   };
 
+  if (loading) {
+    return <View style={[styles.container, styles.center]}><ActivityIndicator size="large" color={TINT} /></View>;
+  }
+
+  const today = briefing?.today;
+
   return (
-    <ScrollView style={co.container}>
-      <View style={co.header}>
-        <Text style={typography.heading.h1}>AI Coach</Text>
-        <Text style={typography.body.sm}>Your personalized health advisor</Text>
-      </View>
-
-      {/* View Tabs */}
-      <View style={co.tabRow}>
-        {(['insights', 'chat', 'report'] as const).map(v => (
-          <TouchableOpacity key={v} style={[co.tab, activeView === v && co.tabActive]} onPress={() => setActiveView(v)}>
-            <Text style={[co.tabText, activeView === v && co.tabTextActive]}>{v.charAt(0).toUpperCase() + v.slice(1)}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Insights View */}
-      {activeView === 'insights' && (
-        <>
-          {/* Daily Insight */}
-          {insight && (
-            <View style={[presets.card, { marginHorizontal: spacing.lg, borderLeftWidth: 3, borderLeftColor: PRIORITY_COLORS[insight.priority || 'medium'] }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
-                <Text style={{ fontSize: 24 }}>{insight.icon}</Text>
-                <View style={{ flex: 1 }}><Text style={typography.heading.h4}>{insight.title}</Text><Text style={typography.body.xs}>{insight.category}</Text></View>
-              </View>
-              <Text style={[typography.body.md, { marginBottom: spacing.md }]}>{insight.message}</Text>
-              <View style={[co.actionBadge, { backgroundColor: PRIORITY_COLORS[insight.priority || 'medium'] + '20' }]}>
-                <Ionicons name="arrow-forward" size={14} color={PRIORITY_COLORS[insight.priority || 'medium']} />
-                <Text style={[typography.body.sm, { color: PRIORITY_COLORS[insight.priority || 'medium'] }]}>{insight.action}</Text>
-              </View>
-            </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <ScrollView contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={TINT} />}>
+        <LinearGradient colors={[TINT, '#4338CA', colors.bg.deep]} style={styles.hero}>
+          <Text style={styles.heroMuted}>Daily Briefing</Text>
+          {today ? (
+            <>
+              <Text style={styles.heroTitle}>{today.title}</Text>
+              <Text style={styles.heroBody}>{today.message}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.heroTitle}>Check in to get today's call</Text>
+              <Text style={styles.heroBody}>Your readiness comes from your own HRV, sleep and how you feel.</Text>
+            </>
           )}
+          {briefing?.motivation ? <Text style={[styles.heroMuted, { marginTop: 12, fontStyle: 'italic' }]}>{briefing.motivation}</Text> : null}
+        </LinearGradient>
 
-          {/* Motivation */}
-          {motivation && (
-            <View style={[presets.card, { marginHorizontal: spacing.lg, backgroundColor: colors.primaryMuted }]}>
-              <Text style={[typography.body.md, { fontStyle: 'italic', textAlign: 'center', color: colors.primaryLight }]}>{motivation}</Text>
-            </View>
-          )}
-
-          {/* Recommendations */}
-          <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
-            <Text style={[typography.heading.h4, { marginBottom: spacing.md }]}>Today's Recommendations</Text>
-            {recommendations.map((rec, i) => (
-              <View key={i} style={co.recCard}>
-                <Text style={{ fontSize: 20 }}>{rec.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={typography.label.lg}>{rec.title}</Text>
-                  <Text style={typography.body.sm}>{rec.message}</Text>
+        {asArray<Insight>(briefing?.insights).length > 0 && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="What Your Data Says" icon="analytics" iconColor={TINT} />
+            {asArray<Insight>(briefing?.insights).map((i) => (
+              <GlassCard key={i.title} style={[styles.card, { borderLeftColor: PRIORITY_COLORS[i.priority] ?? TINT }]}>
+                <View style={styles.cardHead}>
+                  <Ionicons name={(CATEGORY_ICONS[i.category] ?? 'bulb') as any} size={20} color={PRIORITY_COLORS[i.priority] ?? TINT} />
+                  <Text style={styles.cardTitle}>{i.title}</Text>
                 </View>
-                <View style={[co.priorityDot, { backgroundColor: PRIORITY_COLORS[rec.priority || 'low'] }]} />
-              </View>
+                <Text style={styles.body}>{i.message}</Text>
+                <Text style={styles.action}>→ {i.action}</Text>
+                <View style={styles.rateRow}>
+                  {rated[i.category] === undefined ? (
+                    <>
+                      <Text style={styles.muted}>Useful?</Text>
+                      <TouchableOpacity onPress={() => rate(i.category, true)} accessibilityLabel="Useful">
+                        <Ionicons name="thumbs-up-outline" size={18} color={colors.text.muted} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => rate(i.category, false)} accessibilityLabel="Not useful">
+                        <Ionicons name="thumbs-down-outline" size={18} color={colors.text.muted} />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <Text style={styles.muted}>Thanks, noted.</Text>
+                  )}
+                </View>
+              </GlassCard>
             ))}
           </View>
-        </>
-      )}
+        )}
 
-      {/* Chat View */}
-      {activeView === 'chat' && (
-        <>
-          <View style={[presets.card, { marginHorizontal: spacing.lg, minHeight: 300 }]}>
-            {chatMessages.length === 0 && (
-              <View style={{ alignItems: 'center', paddingVertical: spacing['3xl'] }}>
-                <Text style={{ fontSize: 48 }}></Text>
-                <Text style={[typography.body.md, { marginTop: spacing.md, textAlign: 'center' }]}>Ask me anything about health, fitness, nutrition, or recovery!</Text>
-              </View>
+        {asArray<string>(briefing?.to_unlock).length > 0 && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="Unlock More Insights" icon="lock-open" iconColor={TINT} />
+            <GlassCard>
+              {asArray<string>(briefing?.to_unlock).map((m) => (
+                <Text key={m} style={styles.body}>• Log {m}</Text>
+              ))}
+            </GlassCard>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <SectionHeaderPremium title="This Week" subtitle={report?.period} icon="document-text" iconColor={TINT} />
+          <GlassCard>
+            {report?.status === 'ok' ? (
+              <>
+                <Text style={styles.body}>{report.summary}</Text>
+                <Text style={styles.action}>{report.focus}</Text>
+              </>
+            ) : (
+              <Text style={styles.muted}>{report?.message ?? 'The weekly report could not be loaded.'}</Text>
             )}
-            {chatMessages.map((msg, i) => (
-              <View key={i} style={[co.chatBubble, msg.role === 'user' ? co.chatUser : co.chatCoach]}>
-                <Text style={[typography.body.md, { color: msg.role === 'user' ? '#FFF' : colors.text.primary }]}>{msg.text}</Text>
-              </View>
-            ))}
-            {chatLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />}
-          </View>
-          <View style={co.chatInputRow}>
-            <TextInput style={co.chatInput} value={chatInput} onChangeText={setChatInput} placeholder="Ask about health, fitness..." placeholderTextColor={colors.text.muted} onSubmitEditing={askQuestion} />
-            <TouchableOpacity style={co.sendBtn} onPress={askQuestion}><Ionicons name="send" size={18} color="#FFF" /></TouchableOpacity>
-          </View>
-        </>
-      )}
-
-      {/* Report View */}
-      {activeView === 'report' && report && (
-        <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
-          <Text style={[typography.heading.h4, { marginBottom: spacing.xs }]}>Weekly Report</Text>
-          <Text style={[typography.body.xs, { color: colors.text.muted, marginBottom: spacing.md }]}>{report.period}</Text>
-          <View style={[co.scoreCircle, { borderColor: getScoreColor(report.health_score) + '30' }]}>
-            <Text style={[typography.metric.large, { color: getScoreColor(report.health_score) }]}>{report.health_score}</Text>
-            <Text style={typography.body.xs}>Health Score</Text>
-          </View>
-          <Text style={[typography.body.md, { marginTop: spacing.lg, lineHeight: 22 }]}>{report.report}</Text>
-          {report.highlights && (
-            <>
-              <Text style={[typography.heading.h4, { marginTop: spacing.lg, marginBottom: spacing.sm }]}>Highlights</Text>
-              {report.highlights.map((h: string, i: number) => (
-                <View key={i} style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs }}>
-                  <Ionicons name="checkmark-circle" size={14} color={colors.health.calm} />
-                  <Text style={typography.body.sm}>{h}</Text>
-                </View>
-              ))}
-            </>
-          )}
-          {report.focus_next_week && (
-            <>
-              <Text style={[typography.heading.h4, { marginTop: spacing.lg, marginBottom: spacing.sm }]}>Focus Next Week</Text>
-              {report.focus_next_week.map((f: string, i: number) => (
-                <View key={i} style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs }}>
-                  <Ionicons name="arrow-forward" size={14} color={colors.primary} />
-                  <Text style={typography.body.sm}>{f}</Text>
-                </View>
-              ))}
-            </>
-          )}
+          </GlassCard>
         </View>
-      )}
-      <View style={{ height: 40 }} />
-    </ScrollView>
+
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/chat' as any)}>
+            <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
+            <Text style={styles.primaryBtnText}>Ask your coach</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const co = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
-  header: { padding: spacing.screenPadding, paddingTop: 50, paddingBottom: spacing.lg },
-  tabRow: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.lg, backgroundColor: colors.bg.card, borderRadius: radius.md, padding: spacing.xs, borderWidth: 1, borderColor: colors.surface.border },
-  tab: { flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderRadius: radius.sm - 2 },
-  tabActive: { backgroundColor: colors.primary },
-  tabText: { fontSize: typography.fontSize.sm, color: colors.text.muted },
-  tabTextActive: { color: '#FFF' },
-  actionBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md },
-  recCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, backgroundColor: colors.bg.input, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.surface.border },
-  priorityDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
-  chatBubble: { padding: spacing.md, borderRadius: radius.lg, marginBottom: spacing.sm, maxWidth: '85%' },
-  chatUser: { backgroundColor: colors.primary, alignSelf: 'flex-end', borderBottomRightRadius: radius.xs },
-  chatCoach: { backgroundColor: colors.bg.elevated, alignSelf: 'flex-start', borderBottomLeftRadius: radius.xs, borderWidth: 1, borderColor: colors.surface.border },
-  chatInputRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
-  chatInput: { flex: 1, backgroundColor: colors.bg.card, borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm + 2, color: colors.text.primary, borderWidth: 1, borderColor: colors.surface.border, fontSize: typography.fontSize.base },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-  scoreCircle: { width: 100, height: 100, borderRadius: 50, borderWidth: 4, alignSelf: 'center', justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.input },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg.deep },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  scrollContent: { paddingBottom: 100 },
+  hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
+  heroBody: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 6, lineHeight: 20 },
+  section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
+  card: { marginBottom: 10, borderLeftWidth: 3 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardTitle: { color: colors.text.primary, fontSize: 15, fontWeight: '700', flex: 1 },
+  body: { color: colors.text.secondary, fontSize: 14, marginTop: 6, lineHeight: 20 },
+  action: { color: TINT, fontSize: 13, fontWeight: '600', marginTop: 8 },
+  muted: { color: colors.text.muted, fontSize: 12 },
+  rateRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 10 },
+  primaryBtn: { flexDirection: 'row', gap: 8, backgroundColor: TINT, borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center' },
+  primaryBtnText: { color: '#fff', fontWeight: '700' },
 });

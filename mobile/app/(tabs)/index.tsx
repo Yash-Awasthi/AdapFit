@@ -104,12 +104,12 @@ export default function HomeScreen() {
   const onRefresh = refresh;
 
   const quickActions = [
-    { icon: 'heart', label: 'Heart Rate', color: colors.health.heart, route: '/health-hub' },
+    { icon: 'sunny', label: 'Briefing', color: '#6366F1', route: '/coach' },
     { icon: 'moon', label: 'Sleep', color: colors.health.sleep, route: '/sleep' },
     { icon: 'fitness', label: 'Workout', color: colors.health.activity, route: '/workout' },
-    { icon: 'restaurant', label: 'Nutrition', color: colors.health.nutrition, route: '/nutrition-log' },
-    { icon: 'brain', label: 'Mental', color: colors.health.mental, route: '/mental-health' },
-    { icon: 'meditate', label: 'Meditate', color: colors.health.calm, route: '/meditation' },
+    { icon: 'restaurant', label: 'Nutrition', color: colors.health.nutrition, route: '/nutrition' },
+    { icon: 'happy', label: 'Mental', color: colors.health.mental, route: '/mental-health' },
+    { icon: 'leaf', label: 'Breathe', color: colors.health.calm, route: '/hrv' },
   ];
 
   // "--" wherever nothing was recorded. A zero would read as a measurement.
