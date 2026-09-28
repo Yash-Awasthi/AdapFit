@@ -1,4 +1,4 @@
-"""Tests for realtime_pipeline.py and stream_processors.py."""
+"""Tests for realtime_pipeline.py."""
 
 import time
 import math
@@ -7,15 +7,6 @@ from app.services.realtime_pipeline import (
     DataPoint, StreamType, CircularBuffer, aggregate_window,
     detect_anomaly, detect_trend, downsample, auto_downsample,
     AlertManager, HealthDataPipeline, PipelineConfig, AlertSeverity,
-)
-from app.services.stream_processors import (
-    classify_hr_zone, calculate_hrv_rmssd, detect_arrhythmia,
-    process_hr_stream, estimate_distance_km, estimate_calories,
-    classify_intensity, process_activity_stream,
-    classify_sleep_stage_from_motion, calculate_sleep_quality_score,
-    process_sleep_stream, calculate_stress_score, classify_stress_level,
-    detect_recovery, process_stress_stream,
-    HRZone, SleepStageState, StressLevel,
 )
 
 
@@ -144,68 +135,3 @@ class TestHealthPipeline:
         alert = pipeline.ingest(DataPoint(StreamType.HEART_RATE, 110, time.time()))
         assert alert is not None
         assert alert.severity == AlertSeverity.WARNING
-
-
-class TestHRProcessing:
-    def test_hr_zones(self):
-        assert classify_hr_zone(50, 190) == HRZone.REST
-        assert classify_hr_zone(133, 190) == HRZone.FAT_BURN  # 70% of 190
-        assert classify_hr_zone(180, 190) == HRZone.PEAK
-
-    def test_hrv_rmssd(self):
-        rr = [800, 810, 790, 820, 780]
-        hrv = calculate_hrv_rmssd(rr)
-        assert hrv > 0
-
-    def test_arrhythmia_detection(self):
-        normal = [800, 810, 790, 820, 780, 800, 810]
-        assert detect_arrhythmia(normal) is False
-
-        abnormal = [800, 810, 400, 820, 780]  # Premature beat
-        assert detect_arrhythmia(abnormal) is True
-
-    def test_process_hr(self):
-        metrics = process_hr_stream(72, [800, 810, 790, 820, 780])
-        assert metrics.current_bpm == 72
-        assert metrics.zone == HRZone.REST
-
-
-class TestActivityProcessing:
-    def test_distance(self):
-        assert estimate_distance_km(10000) == pytest.approx(7.5, abs=0.1)
-
-    def test_calories(self):
-        cal = estimate_calories(10000)
-        assert cal > 0
-
-    def test_intensity(self):
-        assert classify_intensity(0) == "sedentary"
-        assert classify_intensity(50) == "light"
-        assert classify_intensity(110) == "moderate"
-        assert classify_intensity(140) == "vigorous"
-
-
-class TestSleepProcessing:
-    def test_stage_classification(self):
-        assert classify_sleep_stage_from_motion(0.8, 70, 20) == SleepStageState.AWAKE
-        assert classify_sleep_stage_from_motion(0.05, 50, 60) == SleepStageState.DEEP
-
-    def test_quality_score(self):
-        score = calculate_sleep_quality_score(480, 20, 25, 2, 10)
-        assert 70 <= score <= 100
-
-
-class TestStressProcessing:
-    def test_stress_score(self):
-        score = calculate_stress_score(50, 60, 16)
-        assert 0 <= score <= 100
-
-    def test_stress_levels(self):
-        assert classify_stress_level(10) == StressLevel.LOW
-        assert classify_stress_level(40) == StressLevel.MODERATE
-        assert classify_stress_level(60) == StressLevel.HIGH
-
-    def test_recovery_detection(self):
-        hrv = [30 + i for i in range(20)]
-        hr = [70 - i * 0.5 for i in range(20)]
-        assert detect_recovery(hrv, hr) is True

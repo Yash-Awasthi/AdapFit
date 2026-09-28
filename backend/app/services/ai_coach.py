@@ -159,6 +159,8 @@ async def briefing(user_id: str) -> dict:
                 "Try a 10-minute walk outside and a short breathing session", "medium",
                 {"mood_recent": round(recent, 1), "mood_prior": round(prior, 1)}))
 
+    insights.extend(personal_patterns(recovery, moods, journal.nights(60)))
+
     priority_rank = {"high": 0, "medium": 1, "low": 2}
     insights.sort(key=lambda i: priority_rank[i["priority"]])
     return {
@@ -168,6 +170,49 @@ async def briefing(user_id: str) -> dict:
         "to_unlock": missing,
         "motivation": random.choice(MOTIVATIONAL),
     }
+
+
+def _split_means(pairs: list[tuple[float, float]], threshold: float) -> Optional[tuple[float, float, int, int]]:
+    hi = [y for x, y in pairs if x >= threshold]
+    lo = [y for x, y in pairs if x < threshold]
+    if len(hi) < 4 or len(lo) < 4:
+        return None
+    return mean(hi), mean(lo), len(hi), len(lo)
+
+
+def personal_patterns(recovery: list[dict], moods: list[dict], nights: list[dict]) -> list[dict]:
+    """Differences in the user's own data large enough to act on. Needs 10+ paired days."""
+    out = []
+    sleep_by_day = {n["date"]: n["total_minutes"] / 60 for n in nights}
+    for r in recovery:
+        d, h = str(r.get("log_date") or "")[:10], r.get("sleep_duration_hours")
+        if d and isinstance(h, (int, float)):
+            sleep_by_day.setdefault(d, float(h))
+    mood_by_day: dict[str, list[float]] = {}
+    for m in moods:
+        if isinstance(m.get("mood"), (int, float)):
+            mood_by_day.setdefault(str(m.get("logged_at", ""))[:10], []).append(m["mood"])
+
+    pairs = [(sleep_by_day[d], mean(v)) for d, v in mood_by_day.items() if d in sleep_by_day]
+    split = _split_means(pairs, 7.0) if len(pairs) >= 10 else None
+    if split and split[0] - split[1] >= 1.0:
+        out.append(_insight(
+            "sleep", "Your mood tracks your sleep",
+            f"On days after 7h+ of sleep your mood averages {split[0]:.1f}/10, against {split[1]:.1f} after shorter nights "
+            f"({split[2]} and {split[3]} days).",
+            "Protect 7 hours on the nights before days that matter", "medium",
+            {"mood_after_7h": round(split[0], 1), "mood_after_less": round(split[1], 1)}))
+
+    rec_pairs = [(sleep_by_day[str(r.get("log_date"))[:10]], float(r["recovery_score"])) for r in recovery
+                 if isinstance(r.get("recovery_score"), (int, float)) and str(r.get("log_date"))[:10] in sleep_by_day]
+    split = _split_means(rec_pairs, 7.0) if len(rec_pairs) >= 10 else None
+    if split and split[0] - split[1] >= 8:
+        out.append(_insight(
+            "recovery", "Sleep drives your recovery",
+            f"Your recovery averages {split[0]:.0f} after 7h+ of sleep and {split[1]:.0f} after less.",
+            "Treat sleep as part of training", "low",
+            {"recovery_after_7h": round(split[0]), "recovery_after_less": round(split[1])}))
+    return out
 
 
 async def weekly_report(user_id: str) -> dict:

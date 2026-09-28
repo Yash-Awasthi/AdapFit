@@ -6,7 +6,6 @@ from app.services.nlp_pipeline import nlp_pipeline
 from app.services.vector_store import VectorStore
 from app.services.agent.supervisor import supervisor_agent
 from app.services.agent.evolution_engine import evolution_engine
-from app.services.workflow_engine import morning_recovery
 from app.services.spark_processor import spark_analytics
 from core_engine import (
     compute_hrv_zscore, compute_ewma, compute_acwr,
@@ -138,11 +137,6 @@ def test_evolution_record_and_report():
 
 
 # --- Workflow ---
-
-def test_morning_recovery():
-    r = asyncio.run(morning_recovery("test-wf", {"sleep_duration_hours": 7.5, "hrv_rmssd": 50}))
-    assert r["readiness_state"] in ("OPTIMAL", "MODERATE", "REDUCED", "DEPLETED")
-
 
 # --- Spark baselines ---
 

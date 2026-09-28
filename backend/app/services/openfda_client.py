@@ -51,6 +51,20 @@ class DrugRecall:
     date: str
 
 
+# Indian (INN/BAN) names that differ from the US names openFDA indexes.
+US_NAMES = {
+    "paracetamol": "acetaminophen", "salbutamol": "albuterol", "adrenaline": "epinephrine",
+    "noradrenaline": "norepinephrine", "glibenclamide": "glyburide", "frusemide": "furosemide",
+    "lignocaine": "lidocaine", "pethidine": "meperidine", "orciprenaline": "metaproterenol",
+    "thyroxine": "levothyroxine", "rifampicin": "rifampin", "cyclosporin": "cyclosporine",
+}
+
+
+def us_name(drug_name: str) -> str:
+    key = drug_name.strip().lower()
+    return US_NAMES.get(key, key)
+
+
 def _fda_request(endpoint: str, params: dict, api_key: str | None = None) -> dict:
     """Make an OpenFDA API request."""
     url = f"{OPENFDA_BASE}/{endpoint}.json?{urllib.parse.urlencode(params)}"
@@ -72,9 +86,10 @@ def search_drug_label(drug_name: str, api_key: str | None = None) -> list[DrugIn
 
     https://api.fda.gov/drug/label.json?search=openfda.brand_name:"aspirin"
     """
+    name = us_name(drug_name)
     params = {
-        "search": f'openfda.brand_name:"{drug_name}"',
-        "limit": "10",
+        "search": f'openfda.brand_name:"{name}"+openfda.generic_name:"{name}"',
+        "limit": "5",
     }
     data = _fda_request("drug/label", params, api_key)
     results = []

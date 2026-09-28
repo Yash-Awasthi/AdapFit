@@ -16,10 +16,10 @@ export default function HealthCalendarScreen() {
   const [tab, setTab] = useState<'cycle' | 'appointments' | 'medications'>('cycle');
 
   useEffect(() => {
-    authedFetch(`${API}/calendar/cycle/predictions`).then(r => r.ok ? r.json() : null).then(setPredictions).catch(() => {});
-    authedFetch(`${API}/calendar/cycle/summary`).then(r => r.ok ? r.json() : null).then(setSummary).catch(() => {});
-    authedFetch(`${API}/calendar/appointments/upcoming`).then(r => r.ok ? r.json() : null).then(d => setAppointments(d?.appointments || [])).catch(() => {});
-    authedFetch(`${API}/calendar/medications`).then(r => r.ok ? r.json() : null).then(d => setMedications(d?.medications || [])).catch(() => {});
+    authedFetch(`${API}/health-calendar/cycle/predictions`).then(r => r.ok ? r.json() : null).then(setPredictions).catch(() => {});
+    authedFetch(`${API}/health-calendar/cycle/summary`).then(r => r.ok ? r.json() : null).then(setSummary).catch(() => {});
+    authedFetch(`${API}/health-calendar/appointments/upcoming`).then(r => r.ok ? r.json() : null).then(d => setAppointments(d?.appointments || [])).catch(() => {});
+    authedFetch(`${API}/health-calendar/medications`).then(r => r.ok ? r.json() : null).then(d => setMedications(d?.medications || [])).catch(() => {});
   }, []);
 
   return (

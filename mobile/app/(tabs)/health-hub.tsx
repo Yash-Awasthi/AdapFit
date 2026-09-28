@@ -2,6 +2,7 @@
  * Health Hub — Premium Health Monitoring Dashboard
  * Glassmorphism cards, animated score rings, real-time BPM, stress management
  */
+import { useRouter } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -57,12 +58,8 @@ const BPMSection: React.FC = () => {
    * with a face-detection confidence of 0.88, which meant the heart rate that
    * came back was computed from noise and displayed as the user\'s pulse.
    */
-  const start = () => {
-    Alert.alert(
-      'Not available in this build',
-      'Reading a pulse from the camera needs frame-by-frame pixel access, which this build does not have. Your resting heart rate still comes from a paired watch or band, and you can enter it in the morning check-in.'
-    );
-  };
+  const router = useRouter();
+  const start = () => router.push('/camera-heart-rate' as any);
 
   const bpmColor = bpm ? (bpm < 60 ? '#3B82F6' : bpm < 100 ? colors.score.excellent : colors.score.fair) : colors.primary;
 
@@ -105,11 +102,11 @@ const BPMSection: React.FC = () => {
               <Ionicons name="camera" size={28} color={colors.primary} />
             </View>
             <Text style={[typography.body.md, { marginTop: spacing.md, textAlign: 'center', color: colors.text.secondary }]}>
-              Camera heart rate is not available in this build
+              Measure your pulse with the phone camera and flash
             </Text>
             <TouchableOpacity style={styles.primaryBtn} onPress={start}>
-              <Ionicons name="information-circle" size={18} color="#FFF" />
-              <Text style={styles.primaryBtnText}>Why not?</Text>
+              <Ionicons name="camera" size={18} color="#FFF" />
+              <Text style={styles.primaryBtnText}>Measure now</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -120,15 +117,19 @@ const BPMSection: React.FC = () => {
 
 // ===== Stress Manager =====
 const StressSection: React.FC = () => {
-  const [level, setLevel] = useState(50);
+  const [level, setLevel] = useState<number | null>(null);
   const [breathing, setBreathing] = useState<any>(null);
   const [activeBreath, setActiveBreath] = useState(false);
   const [breathPhase, setBreathPhase] = useState('Inhale');
   const breathAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    api('/stress/assess', { method: 'POST', body: JSON.stringify({ mood_score: 6, energy_level: 5, sleep_quality: 70 }) }).then(d => d && setLevel(d.overall_score || 50));
-    api(`/stress/breathing-exercises?stress_level=50&time_of_day=${new Date().getHours()}`).then(d => d && setBreathing(d));
+    api('/stress/trends?days=7').then((d) => {
+      const today = d?.daily_averages?.day_0;
+      const latest = typeof today === 'number' ? today : d?.total_assessments ? d.overall_average : null;
+      setLevel(latest);
+      api(`/stress/breathing-exercises?stress_level=${latest ?? 50}&time_of_day=${new Date().getHours()}`).then(b => b && setBreathing(b));
+    });
   }, []);
 
   const startBreathing = () => {
@@ -141,13 +142,17 @@ const StressSection: React.FC = () => {
     ).start();
   };
 
-  const stressColor = getScoreColor(100 - level);
+  const stressColor = level === null ? colors.text.muted : getScoreColor(100 - level);
 
   return (
     <GlassCard variant="light" style={styles.sectionCard}>
       <SectionHeaderPremium icon="leaf" iconColor={colors.health.calm} title="Stress Level" />
       <View style={styles.stressBarContainer}>
-        <ProgressBarPremium value={level} max={100} color={stressColor} height={8} showLabel label={`${getScoreLabel(100 - level)} Stress`} />
+        {level === null ? (
+          <Text style={[typography.body.sm, { color: colors.text.muted }]}>No stress logged this week. Log how you feel on the Mind screen.</Text>
+        ) : (
+          <ProgressBarPremium value={level} max={100} color={stressColor} height={8} showLabel label={`${getScoreLabel(100 - level)} Stress`} />
+        )}
       </View>
       {breathing && !activeBreath && (
         <TouchableOpacity style={styles.breathCard} onPress={startBreathing}>

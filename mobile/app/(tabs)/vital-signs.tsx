@@ -93,6 +93,52 @@ function VitalGauge({ value, max, label, unit, color, icon, status }: {
   );
 }
 
+const CHECK_FIELDS = [
+  { key: 'respiratory_rate', label: 'Breaths per minute', hint: 'Count for 30 s, double it' },
+  { key: 'oxygen_saturation', label: 'SpO2 %', hint: 'Pulse oximeter' },
+  { key: 'systolic_bp', label: 'Systolic BP', hint: 'Top number, mmHg' },
+  { key: 'pulse_rate', label: 'Pulse', hint: 'Beats per minute' },
+  { key: 'temperature', label: 'Temperature °C', hint: 'e.g. 37.2' },
+] as const;
+
+function SeekCareCheck() {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [confused, setConfused] = useState(false);
+  const [result, setResult] = useState<{ score: number; band: string; next_step: string } | null>(null);
+  const run = async () => {
+    const body: Record<string, number | boolean> = { new_confusion: confused };
+    for (const f of CHECK_FIELDS) {
+      const n = Number(values[f.key]);
+      if (!values[f.key] || !Number.isFinite(n)) return Alert.alert('Missing reading', `Enter ${f.label.toLowerCase()}.`);
+      body[f.key] = f.key === 'temperature' ? n : Math.round(n);
+    }
+    const r = await postJson<{ score: number; band: string; next_step: string }>('/vitals/check', body);
+    if (!r) return Alert.alert('Check failed', 'One of the readings looks out of range.');
+    setResult(r);
+  };
+  const color = result?.band === 'high' ? '#EF4444' : result?.band === 'medium' ? '#F59E0B' : '#22C55E';
+  return (
+    <GlassCard variant="light" style={styles.logCard}>
+      {CHECK_FIELDS.map((f) => (
+        <TextInput key={f.key} style={styles.input} placeholder={`${f.label} (${f.hint})`} placeholderTextColor={colors.text.muted}
+          keyboardType="decimal-pad" value={values[f.key] ?? ''} onChangeText={(t) => setValues((v) => ({ ...v, [f.key]: t }))} />
+      ))}
+      <TouchableOpacity onPress={() => setConfused(!confused)} accessibilityRole="checkbox" accessibilityState={{ checked: confused }}>
+        <Text style={styles.historyTime}>{confused ? '☑' : '☐'} New confusion or unusual drowsiness</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.logButton, { backgroundColor: '#EF4444' }]} onPress={run}>
+        <Text style={styles.logButtonText}>Check my readings</Text>
+      </TouchableOpacity>
+      {result && (
+        <View>
+          <Text style={[styles.historyValue, { color }]}>NEWS2 score {result.score}</Text>
+          <Text style={styles.emptyText}>{result.next_step}</Text>
+        </View>
+      )}
+    </GlassCard>
+  );
+}
+
 export default function VitalSignsScreen() {
   const [tempInput, setTempInput] = useState('');
   const [saving, setSaving] = useState(false);
@@ -102,9 +148,9 @@ export default function VitalSignsScreen() {
     temperature: { readings: TemperatureReading[] };
     ecg: { readings: ECGReading[] };
   }>({
-    summary: '/vital-signs/summary',
-    temperature: '/vital-signs/temperature/history?limit=10',
-    ecg: '/vital-signs/ecg/history?limit=10',
+    summary: '/vitals/summary',
+    temperature: '/vitals/temperature/history?limit=10',
+    ecg: '/vitals/ecg/history?limit=10',
   });
 
   const summary = data.summary ?? null;
@@ -118,7 +164,7 @@ export default function VitalSignsScreen() {
       return;
     }
     setSaving(true);
-    const result = await postJson<{ error?: string }>('/vital-signs/temperature', {
+    const result = await postJson<{ error?: string }>('/vitals/temperature', {
       temperature_celsius: value,
       measurement_site: 'oral',
     });
@@ -169,6 +215,9 @@ export default function VitalSignsScreen() {
         icon="thermometer"
         status={prettify(summary?.temperature?.classification)}
       />
+
+      <SectionHeaderPremium icon="medkit" iconColor="#EF4444" title="Should I Get Help?" subtitle="NEWS2 on your home readings" />
+      <SeekCareCheck />
 
       <SectionHeaderPremium icon="thermometer" iconColor="#F59E0B" title="Log a Temperature" />
       <GlassCard variant="light" style={styles.logCard}>

@@ -180,7 +180,7 @@ def _suggest_pre_ride_meal(ride_type: RideType, duration_hours: float) -> str:
 def _build_timeline(ride_type: RideType, duration_hours: float, target: FuelingTarget) -> list[dict]:
     timeline = []
     timeline.append({"time": "Pre-ride", "action": _suggest_pre_ride_meal(ride_type, duration_hours)})
-    if target.grams_per_hour > 0:
+    if target.max_grams_per_hour > 0:
         interval = max(20, min(45, int(60 / (target.max_grams_per_hour / GEL_CARBS))))
         t = interval
         while t < duration_hours * 60:
@@ -195,7 +195,7 @@ def _build_timeline(ride_type: RideType, duration_hours: float, target: FuelingT
     return timeline
 
 
-def calculate_weekly_fueling负荷(plans: list[FuelingPlan]) -> dict:
+def calculate_weekly_fueling_load(plans: list[FuelingPlan]) -> dict:
     """Calculate weekly fueling totals."""
     total_carbs = sum(p.total_carbs_grams for p in plans)
     total_gels = sum(p.gel_count for p in plans)

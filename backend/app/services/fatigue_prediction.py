@@ -1,8 +1,11 @@
-"""Fatigue impairment prediction — bio-mathematical models of fatigue.
+"""
+Alertness across the day from the two-process model of sleep regulation
+(Borbely 1982; Daan, Beersma & Borbely 1984).
 
-Extracted from inspiration/ZFIT/fips.
-Pattern: sleep/actigraphy → FIPS data frame → bio-mathematical model → fatigue score.
-Implements simplified versions of the Unified Model and Three-Process Model.
+Process S (sleep pressure) rises while awake and falls while asleep with the
+published time constants; Process C (the body clock) is a 24-hour sinusoid
+whose timing comes from the user's own mid-sleep, so a late sleeper's curve
+peaks later. Alertness is C minus S, scaled 0-100 for display.
 """
 from __future__ import annotations
 
@@ -10,141 +13,78 @@ import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+TAU_RISE_H = 18.2
+TAU_DECAY_H = 4.2
+# Body-clock alertness peaks roughly 14 hours after mid-sleep in entrained adults.
+PEAK_AFTER_MIDSLEEP_H = 14.0
+C_AMPLITUDE = 0.12
+STEP_MIN = 15
+
 
 @dataclass(frozen=True)
 class SleepPeriod:
-    """A sleep period from actigraphy or self-report."""
     start: datetime
     end: datetime
-    quality: float = 1.0  # 0.0-1.0
 
 
-@dataclass
-class FIPSDataFrame:
-    """FIPS-format sleep/wake data for BMM simulation."""
-    timestamps: list[datetime]
-    sleep_state: list[int]  # 0=awake, 1=sleep
-    hour_of_day: list[float]  # 0-24
+def mid_sleep_hour(periods: list[SleepPeriod]) -> float:
+    """Average clock hour of mid-sleep, averaged on the circle so 23:00 and 01:00 give 00:00."""
+    angles = []
+    for p in periods:
+        mid = p.start + (p.end - p.start) / 2
+        angles.append(2 * math.pi * (mid.hour + mid.minute / 60) / 24)
+    x = sum(math.cos(a) for a in angles) / len(angles)
+    y = sum(math.sin(a) for a in angles) / len(angles)
+    return (math.atan2(y, x) * 24 / (2 * math.pi)) % 24
 
 
-def sleep_periods_to_fips(periods: list[SleepPeriod], start: datetime, end: datetime, interval_min: int = 30) -> FIPSDataFrame:
-    """Convert sleep periods to FIPS-format time series."""
-    timestamps = []
-    sleep_state = []
-    hour_of_day = []
-
-    current = start
-    while current < end:
-        is_sleeping = False
-        for p in periods:
-            if p.start <= current < p.end:
-                is_sleeping = True
-                break
-        timestamps.append(current)
-        sleep_state.append(1 if is_sleeping else 0)
-        hour_of_day.append(current.hour + current.minute / 60)
-        current += timedelta(minutes=interval_min)
-
-    return FIPSDataFrame(timestamps, sleep_state, hour_of_day)
-
-
-def circadian_phase(hour: float, chronotype_offset: float = 0) -> float:
-    """Circadian phase using a sinusoidal model.
-
-    Peak drive for wakefulness ~2 hours after habitual wake time.
-    Trough (sleep drive) ~2 hours before habitual bedtime.
-    """
-    # Phase relative to midnight
-    phase = 2 * math.pi * (hour - 6 - chronotype_offset) / 24
-    # Higher = more alertness, lower = more sleep pressure
-    return math.sin(phase)
-
-
-def sleep_homeostat(sleep_state: list[int], decay_rate: float = 0.1, buildup_rate: float = 0.05) -> list[float]:
-    """Process S (sleep homeostat) — sleep pressure builds during wake, decays during sleep."""
-    pressure = 0.0
-    pressures = []
-    for state in sleep_state:
-        if state == 0:  # awake
-            pressure += buildup_rate
-        else:  # sleeping
-            pressure *= (1 - decay_rate)
-        pressure = max(0, min(1, pressure))
-        pressures.append(pressure)
-    return pressures
-
-
-def unified_model(fips: FIPSDataFrame, chronotype_offset: float = 0) -> list[float]:
-    """Simplified Unified Model of fatigue.
-
-    Fatigue = SleepHomeostat - CircadianAlertness
-    Higher = more fatigued
-    """
-    homeostat = sleep_homeostat(fips.sleep_state)
-    fatigue = []
-    for i in range(len(fips.timestamps)):
-        circadian = circadian_phase(fips.hour_of_day[i], chronotype_offset)
-        # Fatigue = homeostatic pressure - circadian alertness
-        f = homeostat[i] - (circadian + 1) / 2 * 0.5
-        fatigue.append(max(0, min(1, f)))
-    return fatigue
-
-
-def three_process_model(fips: FIPSDataFrame, chronotype_offset: float = 0) -> list[float]:
-    """Simplified Three-Process Model.
-
-    Process S: homeostatic sleep pressure
-    Process C: circadian rhythm
-    Process W: sleep inertia (decays after waking)
-    """
-    homeostat = sleep_homeostat(fips.sleep_state)
-    sleep_inertia = 0.0
-    fatigue = []
-
-    for i in range(len(fips.timestamps)):
-        # Sleep inertia: spike on waking, decays over ~30 min
-        if i > 0 and fips.sleep_state[i] == 0 and fips.sleep_state[i-1] == 1:
-            sleep_inertia = 0.3  # wake inertia spike
-        sleep_inertia *= 0.95  # decay
-
-        circadian = circadian_phase(fips.hour_of_day[i], chronotype_offset)
-
-        # Total fatigue = S + inertia - C
-        f = homeostat[i] + sleep_inertia - (circadian + 1) / 2 * 0.4
-        fatigue.append(max(0, min(1, f)))
-
-    return fatigue
-
-
-@dataclass(frozen=True)
-class FatigueAssessment:
-    timestamp: datetime
-    fatigue_score: float  # 0-1
-    risk_level: str  # "low", "moderate", "high", "severe"
-    recommendation: str
-
-
-def assess_fatigue(fatigue_scores: list[float], timestamps: list[datetime]) -> list[FatigueAssessment]:
-    """Convert fatigue scores to risk assessments."""
-    assessments = []
-    for i, score in enumerate(fatigue_scores):
-        if score < 0.3:
-            risk = "low"
-            rec = "Well rested. Normal activity."
-        elif score < 0.5:
-            risk = "moderate"
-            rec = "Some fatigue. Consider lighter tasks."
-        elif score < 0.7:
-            risk = "high"
-            rec = "Significant fatigue. Avoid high-risk activities."
+def alertness_curve(periods: list[SleepPeriod], day: datetime) -> list[tuple[datetime, float]]:
+    """Alertness 0-100 every 15 minutes across `day`, simulated from the first sleep period."""
+    periods = sorted(periods, key=lambda p: p.start)
+    peak = (mid_sleep_hour(periods) + PEAK_AFTER_MIDSLEEP_H) % 24
+    t = periods[0].start
+    end = day.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    s = 0.3
+    step_h = STEP_MIN / 60
+    out = []
+    while t < end:
+        asleep = any(p.start <= t < p.end for p in periods)
+        if asleep:
+            s *= math.exp(-step_h / TAU_DECAY_H)
         else:
-            risk = "severe"
-            rec = "Severe fatigue. Rest required. Do not operate machinery."
+            s = 1 - (1 - s) * math.exp(-step_h / TAU_RISE_H)
+        if t.date() == day.date():
+            hour = t.hour + t.minute / 60
+            c = C_AMPLITUDE * math.cos(2 * math.pi * (hour - peak) / 24)
+            out.append((t, None if asleep else round(max(0.0, min(100.0, (c - s + 0.9) * 100)), 1)))
+        t += timedelta(minutes=STEP_MIN)
+    return out
 
-        assessments.append(FatigueAssessment(
-            timestamp=timestamps[i],
-            fatigue_score=round(score, 2),
-            risk_level=risk,
-            recommendation=rec,
-        ))
-    return assessments
+
+def summarise(curve: list[tuple[datetime, float | None]]) -> dict:
+    awake = [(t, v) for t, v in curve if v is not None]
+    if not awake:
+        return {}
+
+    def best_window(points, hours, pick):
+        n = int(hours * 60 / STEP_MIN)
+        best = None
+        for i in range(len(points) - n + 1):
+            avg = sum(v for _, v in points[i:i + n]) / n
+            if best is None or pick(avg, best[1]):
+                best = (points[i][0], avg)
+        return best
+
+    peak = best_window(awake, 2, lambda a, b: a > b)
+    # The post-lunch dip is searched only in the middle of the waking day.
+    third = len(awake) // 3
+    dip = best_window(awake[third:2 * third] or awake, 1, lambda a, b: a < b)
+    fmt = lambda t: t.strftime("%H:%M")  # noqa: E731
+    return {
+        "peak_window": f"{fmt(peak[0])}-{fmt(peak[0] + timedelta(hours=2))}",
+        "dip_window": f"{fmt(dip[0])}-{fmt(dip[0] + timedelta(hours=1))}",
+        "suggestions": [
+            f"Hard training or demanding work fits best around {fmt(peak[0])}.",
+            f"Expect a dip around {fmt(dip[0])}; a short walk or daylight helps more than caffeine late in the day.",
+        ],
+    }

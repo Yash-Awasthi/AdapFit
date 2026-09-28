@@ -206,3 +206,28 @@ async def stage_from_sensors(req: StagingRequest):
         "sleep_onset_min": arch.sleep_onset_latency_min,
         "recommendations": result.recommendations,
     }
+
+
+@router.get("/alertness")
+async def alertness_today():
+    """Today's alertness curve from the two-process model, timed by your own logged nights."""
+    from datetime import datetime as dt, timedelta as td
+
+    from app.services.fatigue_prediction import SleepPeriod, alertness_curve, summarise
+
+    nights = sleep_journal.nights(14)
+    if len(nights) < 3:
+        return {"status": "insufficient_data", "nights_needed": 3 - len(nights),
+                "message": "Log at least 3 nights to see your personal alertness curve."}
+    periods = []
+    for n in nights:
+        wake = dt.strptime(f"{n['date']} {n['wake_time']}", "%Y-%m-%d %H:%M")
+        periods.append(SleepPeriod(wake - td(minutes=n["total_minutes"]), wake))
+    today = dt.now()
+    curve = alertness_curve(periods, today)
+    return {
+        "status": "ok",
+        "curve": [{"time": t.strftime("%H:%M"), "alertness": v} for t, v in curve[::4]],
+        **summarise(curve),
+        "model": "Two-process model (Borbely), body-clock timing from your last nights",
+    }

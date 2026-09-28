@@ -1,7 +1,7 @@
 """Diabetes Management API — Glucose tracking, insulin, carb counting"""
 from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import List, Optional
 from app.services.diabetes_manager import diabetes_manager_service
 
 router = APIRouter()
@@ -34,6 +34,21 @@ async def log_glucose(request: GlucoseRequest):
 @router.get("/glucose/readings")
 async def get_readings(hours: int = 24):
     return {"readings": diabetes_manager_service.get_glucose_readings(hours)}
+
+
+class GlucosePoint(BaseModel):
+    timestamp: float = Field(gt=946684800, description="Epoch seconds")
+    value_mgdl: float = Field(ge=20, le=600)
+
+
+class GlucoseImport(BaseModel):
+    readings: List[GlucosePoint] = Field(min_length=1, max_length=20000)
+
+
+@router.post("/glucose/import")
+async def import_glucose(request: GlucoseImport):
+    """Bulk readings from a CGM or meter export."""
+    return diabetes_manager_service.import_readings([r.model_dump() for r in request.readings])
 
 
 @router.get("/glucose/summary")

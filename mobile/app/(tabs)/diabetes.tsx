@@ -28,14 +28,14 @@ interface GlucoseReading {
 
 interface GlucoseSummary {
   message?: string;
-  average_glucose?: number;
-  time_in_range?: number;
-  hypo_episodes?: number;
-  hyper_episodes?: number;
-  estimated_hba1c?: number;
-  readings_count?: number;
-  target_range?: string;
-  in_range_target?: string;
+  readings?: number;
+  mean_glucose?: number;
+  gmi?: number;
+  time_in_range?: { target: number; above_target: number; below_target: number };
+  variability?: { cv: number };
+  episodes?: { hypo_count: number; hyper_count: number };
+  targets_met?: Record<string, boolean>;
+  next_step?: string;
 }
 
 interface InsulinEntry {
@@ -165,9 +165,10 @@ export default function DiabetesScreen() {
 
   const carbsEaten = asNumber(carbs.total_carbs);
   const carbPct = Math.min(100, Math.round((carbsEaten / DAILY_CARB_GOAL) * 100));
-  const timeInRange = asNumber(summary.time_in_range);
-  const average = asNumber(summary.average_glucose);
-  const hba1c = asNumber(summary.estimated_hba1c);
+  const timeInRange = asNumber(summary.time_in_range?.target);
+  const timeBelow = asNumber(summary.time_in_range?.below_target);
+  const average = asNumber(summary.mean_glucose);
+  const hba1c = asNumber(summary.gmi);
 
   return (
     <View style={styles.container}>
@@ -351,7 +352,7 @@ export default function DiabetesScreen() {
                     }]} />
                   </View>
                   <Text style={styles.trendStatus}>
-                    Target range {summary.target_range ?? '70-180 mg/dL'}
+                    Target range 70-180 mg/dL · {asNumber(summary.episodes?.hypo_count)} low and {asNumber(summary.episodes?.hyper_count)} high episodes
                   </Text>
                 </View>
                 <View style={styles.trendCard}>
@@ -362,10 +363,10 @@ export default function DiabetesScreen() {
                       backgroundColor: timeInRange >= 70 ? '#10B981' : '#F59E0B',
                     }]} />
                   </View>
-                  <Text style={styles.trendStatus}>Goal: {summary.in_range_target ?? '70%+'} time in range</Text>
+                  <Text style={styles.trendStatus}>Goal: over 70% in range, under 4% below ({timeBelow}% below) · variability {asNumber(summary.variability?.cv)}% (goal 36% or less)</Text>
                 </View>
                 <View style={styles.trendCard}>
-                  <Text style={styles.trendTitle}>A1C Estimate: {hba1c}%</Text>
+                  <Text style={styles.trendTitle}>GMI (estimated A1C): {hba1c}%</Text>
                   <View style={styles.trendBar}>
                     <View style={[styles.trendFill, {
                       width: `${Math.min(100, Math.round((hba1c / 10) * 100))}%`,
@@ -373,7 +374,7 @@ export default function DiabetesScreen() {
                     }]} />
                   </View>
                   <Text style={styles.trendStatus}>
-                    From {asNumber(summary.readings_count)} readings. Estimated, not a lab result.
+                    From {asNumber(summary.readings)} readings. Estimated, not a lab result. {summary.next_step ?? ''}
                   </Text>
                 </View>
               </>

@@ -28,6 +28,7 @@ class MealResponse(BaseModel):
     meal_type: str
     notes: Optional[str] = None
     logged_at: str
+    energy_check: Optional[str] = None
 
 
 class DailySummary(BaseModel):
@@ -37,10 +38,10 @@ class DailySummary(BaseModel):
     total_carbs: float
     total_fat: float
     meal_count: int
-    calorie_target: int
-    protein_target: float
-    remaining_calories: int
-    remaining_protein: float
+    calorie_target: Optional[int] = None
+    protein_target: Optional[float] = None
+    remaining_calories: Optional[int] = None
+    remaining_protein: Optional[float] = None
 
 
 # --- In-memory storage ---
@@ -51,10 +52,15 @@ meal_logs: dict = {}  # user_id -> list of meals
 async def get_daily_summary(
     user_id: str = Query("default"),
     date: Optional[str] = Query(None),
-    calorie_target: int = Query(2500, ge=500, le=10000),
-    protein_target: float = Query(150, ge=20, le=500),
+    calorie_target: Optional[int] = Query(None, ge=500, le=10000),
+    protein_target: Optional[float] = Query(None, ge=20, le=500),
 ):
-    """Get daily nutrition summary."""
+    """Daily totals against the user's own targets, or none when the profile cannot produce them."""
+    if calorie_target is None or protein_target is None:
+        targets = await get_targets(user_id)
+        if targets.get("status") == "ok":
+            calorie_target = calorie_target or targets["calories"]
+            protein_target = protein_target or targets["protein_g"]
     target_date = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     user_meals = [
         m for m in meal_logs.get(user_id, [])
@@ -74,8 +80,8 @@ async def get_daily_summary(
         meal_count=len(user_meals),
         calorie_target=calorie_target,
         protein_target=protein_target,
-        remaining_calories=max(0, calorie_target - total_cal),
-        remaining_protein=max(0, protein_target - total_protein),
+        remaining_calories=max(0, calorie_target - total_cal) if calorie_target else None,
+        remaining_protein=max(0, protein_target - total_protein) if protein_target else None,
     )
 
 
@@ -103,6 +109,10 @@ async def log_meal(meal: MealLog, user_id: str = Query("default")):
         "logged_at": datetime.now(timezone.utc).isoformat(),
     }
     meal_logs.setdefault(user_id, []).append(entry)
+    from_macros = 4 * meal.protein_g + 4 * meal.carbs_g + 9 * meal.fat_g
+    if from_macros > 0 and abs(meal.calories - from_macros) > max(50, 0.2 * from_macros):
+        entry = {**entry, "energy_check": (
+            f"The macros add up to about {round(from_macros)} kcal, not {meal.calories}. Worth a second look.")}
     return MealResponse(**entry)
 
 
@@ -117,15 +127,46 @@ async def delete_meal(meal_id: str, user_id: str = Query("default")):
     raise HTTPException(status_code=404, detail="Meal not found")
 
 
+# Goal -> (activity key, goal key) for the protein recommender.
+_PROTEIN_PROFILE = {
+    "hypertrophy": ("resistance/strength training", "muscle_gain"),
+    "strength": ("resistance/strength training", "muscle_gain"),
+    "fat_loss": ("resistance/strength training", "fat_loss"),
+    "endurance": ("endurance training", "endurance"),
+    "general_fitness": ("moderate", "maintenance"),
+}
+_ENERGY_GOAL = {"fat_loss": 0.85, "hypertrophy": 1.10, "strength": 1.05}
+
+
 @router.get("/targets", response_model=dict)
 async def get_targets(user_id: str = Query("default")):
-    """Get recommended nutrition targets based on fitness goals."""
-    # Simple rule-based targets
+    """Daily targets from the user's own profile and latest weight (Mifflin-St Jeor)."""
+    from app.api.v1.endpoints.body_composition import measurements
+    from app.core.storage import storage
+    from app.services.protein_recommender import adjust_for_goal, calculate_protein_needs
+
+    profile = await storage.get_user(user_id) or {}
+    weights = [m["weight_kg"] for m in measurements.get(user_id, []) if m.get("weight_kg")]
+    need = {"weight_kg": weights[-1] if weights else None, "height_cm": profile.get("height_cm"),
+            "age": profile.get("age"), "gender": profile.get("gender")}
+    missing = [k for k, v in need.items() if v in (None, "")]
+    if missing:
+        return {"status": "insufficient_data", "missing": missing,
+                "message": "Add these to your profile or log your weight to get targets made for you."}
+    sex_term = 5 if str(need["gender"]).lower() in ("male", "m", "man") else -161
+    bmr = 10 * need["weight_kg"] + 6.25 * need["height_cm"] - 5 * need["age"] + sex_term
+    days = profile.get("preferred_days_per_week") or 3
+    activity = 1.375 if days <= 2 else 1.55 if days <= 4 else 1.725 if days <= 6 else 1.9
+    goal = str(profile.get("primary_goal") or "general_fitness")
+    calories = bmr * activity * _ENERGY_GOAL.get(goal, 1.0)
+    act_key, goal_key = _PROTEIN_PROFILE.get(goal, _PROTEIN_PROFILE["general_fitness"])
+    protein = adjust_for_goal(calculate_protein_needs(need["weight_kg"], act_key), goal_key).daily_grams
+    fat = calories * 0.28 / 9
+    carbs = max(0.0, (calories - protein * 4 - fat * 9) / 4)
     return {
-        "calories": 2500,
-        "protein_g": 150,
-        "carbs_g": 300,
-        "fat_g": 70,
-        "water_ml": 3500,
-        "notes": "Adjust based on your weight and activity level",
+        "status": "ok",
+        "calories": round(calories), "protein_g": round(protein), "carbs_g": round(carbs), "fat_g": round(fat),
+        "water_ml": round(need["weight_kg"] * 35),
+        "basis": {"bmr": round(bmr), "activity_factor": activity, "goal": goal, "weight_kg": need["weight_kg"]},
+        "notes": "Estimates for a healthy adult. Pregnancy, kidney disease or diabetes change these; ask your doctor or a dietitian.",
     }

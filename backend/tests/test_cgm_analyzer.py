@@ -129,7 +129,7 @@ class TestSummary:
         readings = make_readings([100, 110, 120, 100, 90, 80, 100, 110, 120, 130])
         summary = generate_glucose_summary(readings)
         assert "mean_glucose" in summary
-        assert "estimated_hba1c" in summary
+        assert "gmi" in summary and "targets_met" in summary
         assert "time_in_range" in summary
 
     def test_empty(self):
