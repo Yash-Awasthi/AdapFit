@@ -9,24 +9,6 @@ wellness, India first, every feature kept, nothing diagnoses.
 
 ---
 
-## Phase 4 — Security hardening
-
-- Token storage on device, session lifetime, refresh rotation review.
-- Encryption at rest and field-level encryption for the most sensitive records.
-- Access audit trail for health records.
-- Rate limiting and abuse protection on auth and expensive routes.
-- Secrets management and credential rotation.
-- Public surfaces (`/metrics`, docs, admin pages, WebSockets).
-- `health_security` keeps encryption keys in process memory, and the auth audit
-  log is an in-memory list; both are lost on restart and neither belongs in the
-  feature store.
-- Dependency and container scanning; third-party penetration test before launch.
-- The privacy policy promises 1-year retention of security logs; the auth
-  audit log is in memory, so move it to durable storage with that retention.
-- `POST /api/v1/users` is public and creates profile rows with no account or
-  consent; the mobile user store falls back to the seeded `default` identity
-  when nothing is stored.
-
 ## Phase 5 — Platform coverage and device data
 
 - Photo measurement of skin spots (`lesion_measure.py`) is tested on synthetic
@@ -78,6 +60,12 @@ wellness, India first, every feature kept, nothing diagnoses.
 - Error tracking and crash reporting on backend and mobile.
 - Metrics, logs, uptime alerts, on-call basics.
 - CI that blocks on types, lint and mobile checks; release pipeline for EAS.
+- Container image scanning and `pip-audit`/`npm audit` in CI; upgrade protobuf
+  with mediapipe and Expo past 55 for the two accepted advisories (`docs/SECURITY.md`).
+- First deploy with `DATA_ENCRYPTION_KEYS`: call `POST /encryption/key/rotate`
+  once so rows written before encryption are sealed.
+- Before a second worker, persist the used-refresh-token memory and the
+  "sessions ended at" cut-off, which live in process memory today.
 - Load test the core loop.
 
 ## Phase 9 — User experience and quality
@@ -95,6 +83,7 @@ wellness, India first, every feature kept, nothing diagnoses.
 - 12 new hub and feature screens this phase have only been typechecked, never
   run on a device.
 
+- Change-password screen (the API returns a fresh token pair; reset by email works).
 - Onboarding flow and first-run experience.
 - Navigation and information architecture for the reduced feature set.
 - Empty, loading and error states.
@@ -109,6 +98,7 @@ wellness, India first, every feature kept, nothing diagnoses.
   scraped retail listings) and use of the NMC register search.
 - Add the CDSCO list of banned fixed-dose combinations to the medicine check.
 
+- Third-party penetration test.
 - Store listings, screenshots, descriptions, age ratings, review notes.
 - Health data declarations for Google Play and Apple.
 - Closed beta, feedback loop, analytics with consent.

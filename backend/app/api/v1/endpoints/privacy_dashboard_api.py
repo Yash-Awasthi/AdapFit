@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import Optional
-from app.core import privacy
+from app.core import audit, privacy
 from app.core.dependencies import require_user
 from app.services.family_network import family_network_service
 
@@ -38,7 +38,9 @@ async def get_consent(user: dict = Depends(require_user)):
 @router.put("/consent")
 async def put_consent(body: ConsentUpdate, user: dict = Depends(require_user)):
     try:
-        return privacy.update(user["id"], body.choices)
+        result = privacy.update(user["id"], body.choices)
+        await audit.record("consent_changed", user_id=user["id"], choices=body.choices)
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except PermissionError as exc:
@@ -109,8 +111,10 @@ async def guardian_submit(
         if decision == "decline":
             await privacy.guardian_decline(token)
             return _page("Declined", "<p>The account and everything in it have been deleted.</p>")
+        link = privacy.guardian_link(token)
         privacy.guardian_confirm(token, name, relationship, declared_adult == "1",
                                  {"health_data": health_data == "1", "ai": ai == "1", "sharing": sharing == "1"})
+        await audit.record("guardian_consented", user_id=link["user_id"])
     except LookupError as exc:
         return _page("Link expired", f"<p>{html.escape(str(exc))}</p>")
     except ValueError as exc:

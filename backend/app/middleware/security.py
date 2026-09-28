@@ -157,14 +157,6 @@ def validate_username(username: str) -> dict:
     return {"valid": len(errors) == 0, "errors": errors}
 
 
-# === API Key Authentication ===
-
-def validate_api_key(api_key: str) -> dict:
-    """Validate API key from header."""
-    from app.core.auth import api_key_manager
-    return api_key_manager.validate_key(api_key)
-
-
 def block_ip(ip: str) -> None:
     """Block an IP address."""
     blocked_ips.add(ip)

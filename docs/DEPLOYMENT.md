@@ -70,6 +70,11 @@ az acr build --registry adapfit --image adapfit:v1 .
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
 | `REDIS_URL` | Redis connection string | Yes |
 | `JWT_SECRET_KEY` | Secret for JWT signing | Yes |
+| `JWT_SECRET_KEY_PREVIOUS` | Old signing key, verify-only, during a rotation | No |
+| `DATA_ENCRYPTION_KEYS` | At-rest keyring, `id:base64key,...`; first one encrypts | Yes |
+| `PUBLIC_BASE_URL` | https URL used in reset and guardian links | Yes |
+| `METRICS_TOKEN` | Bearer token for Prometheus; without it `/metrics` is 404 in production | No |
+| `ALLOWED_ORIGINS` | Browser origins allowed by CORS, comma separated | No |
 | `GEMINI_API_KEY` | Google AI API key | No |
 | `ENVIRONMENT` | development/staging/production | Yes |
 | `LOG_LEVEL` | debug/info/warning/error | No |

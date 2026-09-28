@@ -9,7 +9,7 @@ Provides route-level dependencies for protecting endpoints:
 """
 from typing import Optional
 from fastapi import Depends, Header, HTTPException, status
-from app.core.auth import decode_token, user_manager
+from app.core.auth import decode_access_token, user_manager
 from app.core.config import settings
 from app.middleware.auth import auth_bypass_active
 
@@ -27,8 +27,9 @@ async def _decode_user_from_token(token: Optional[str]) -> Optional[dict]:
     """Decode and validate JWT, return user dict or None."""
     if not token:
         return None
-    payload = decode_token(token)
-    if not payload or payload.get("type") != "access":
+    await user_manager._ensure_loaded()
+    payload = decode_access_token(token)
+    if not payload:
         return None
     return await user_manager.get_user(payload["sub"])
 

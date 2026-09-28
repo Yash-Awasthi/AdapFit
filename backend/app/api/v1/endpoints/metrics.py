@@ -1,9 +1,22 @@
 """TRACK: Prometheus-compatible /metrics endpoint."""
 
-from fastapi import APIRouter, Response
+import hmac
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from app.core.config import settings
 from app.core.metrics import metrics
 
-router = APIRouter()
+
+def _scraper(authorization: str = Header("")) -> None:
+    """Request counts and error rates help an attacker; only the configured scraper reads them in production."""
+    if settings.METRICS_TOKEN:
+        if not hmac.compare_digest(authorization.encode(), f"Bearer {settings.METRICS_TOKEN}".encode()):
+            raise HTTPException(status_code=401, detail="Metrics token required")
+    elif settings.ENVIRONMENT.lower() == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+
+
+router = APIRouter(dependencies=[Depends(_scraper)])
 
 
 @router.get("")

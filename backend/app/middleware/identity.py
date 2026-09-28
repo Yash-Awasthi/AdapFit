@@ -18,7 +18,7 @@ from urllib.parse import parse_qsl, urlencode
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.core.auth import decode_token
+from app.core.auth import decode_access_token
 from app.core.per_user import CURRENT_USER
 
 API_PREFIX = "/api/v1/"
@@ -40,7 +40,7 @@ MAX_REWRITABLE_BODY = 1 << 20  # 1 MiB
 UNGATED_PREFIXES = ("/api/v1/auth/", "/api/v1/privacy/", "/api/v1/export/")
 # Writes that put the user in front of other people need the sharing consent.
 SHARING_PREFIXES = ("/api/v1/community/", "/api/v1/family-network/invite", "/api/v1/peer-support/",
-                    "/api/v1/challenges/")
+                    "/api/v1/challenges/", "/api/v1/encryption/share")
 
 _PARAM = re.compile(r"\{([^}:]+)(?::[^}]+)?\}")
 
@@ -67,8 +67,8 @@ def _caller(scope: Scope) -> Optional[tuple[str, str]]:
             if raw.startswith("Bearer "):
                 token = raw[7:]
             break
-    payload = decode_token(token) if token else None
-    if payload and payload.get("type") == "access" and payload.get("sub"):
+    payload = decode_access_token(token) if token else None
+    if payload:
         return str(payload["sub"]), str(payload.get("role") or "user")
     # Without a token there is no identity to bind to. AuthMiddleware has
     # already rejected the request unless the dev bypass is on, and under the
@@ -109,6 +109,12 @@ class IdentityMiddleware:
         CURRENT_USER.set(caller[0] if caller else None)
 
         path = scope.get("path", "")
+        if caller and caller[1] in ("admin", "superadmin") and path.startswith(API_PREFIX):
+            target = self._named_user(scope, path)
+            if target and target != caller[0]:
+                from app.core import audit
+                await audit.record("admin_access", user_id=target, actor_id=caller[0],
+                                   method=scope.get("method", ""), path=path)
         if path.startswith(CROSS_USER_PREFIXES):
             await self.app(scope, receive, send)
             return
@@ -135,6 +141,17 @@ class IdentityMiddleware:
         receive = self._rebinding_receive(scope, receive, user_id)
 
         await self.app(scope, receive, send)
+
+    def _named_user(self, scope: Scope, path: str) -> Optional[str]:
+        """The user id a request addresses in its path or query, if any."""
+        for matcher in self._path_matchers():
+            found = matcher.match(path)
+            if found:
+                return found.group("user_id")
+        for key, value in parse_qsl(scope.get("query_string", b"").decode("latin-1")):
+            if key == "user_id":
+                return value
+        return None
 
     def _rebind_path(self, scope: Scope, path: str, user_id: str) -> None:
         for matcher in self._path_matchers():

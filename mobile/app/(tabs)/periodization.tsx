@@ -6,7 +6,7 @@ import { LoadingScreen } from '../../src/components';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
-import { authHeader } from '../../src/services/authToken';
+import { authedFetch } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -61,7 +61,7 @@ export default function PeriodizationScreen() {
   async function fetchPlan() {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/v1/periodization?user_id=${userId}`, { headers: authHeader() });
+      const res = await authedFetch(`${API}/api/v1/periodization?user_id=${userId}`);
       if (res.ok) setPlan(await res.json());
     } catch {}
     setLoading(false);
@@ -71,9 +71,9 @@ export default function PeriodizationScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSelectedGoal(goal);
     try {
-      const res = await fetch(`${API}/api/v1/periodization?user_id=${userId}`, {
+      const res = await authedFetch(`${API}/api/v1/periodization?user_id=${userId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ goal, current_readiness: 'MODERATE' }),
       });
       if (res.ok) {

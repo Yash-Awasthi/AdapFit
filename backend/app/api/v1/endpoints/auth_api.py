@@ -1,9 +1,13 @@
 """User Authentication API — Register, Login, Profile, Token Management"""
-from fastapi import APIRouter, Header, HTTPException, Request, Depends
-from pydantic import BaseModel, Field, EmailStr
+import html
+
+from fastapi import APIRouter, Form, Header, HTTPException, Request, Depends
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
 from typing import Optional
-from app.core.auth import user_manager, decode_token, validate_password_strength, create_token_pair, get_audit_log
-from app.core.dependencies import require_admin
+from app.core import audit
+from app.core.auth import user_manager, decode_access_token
+from app.core.dependencies import require_admin, require_user
 
 router = APIRouter()
 
@@ -54,18 +58,22 @@ async def _extract_user(authorization: Optional[str] = None) -> Optional[dict]:
     """Extract user from Authorization header."""
     if not authorization:
         return None
-    token = authorization.replace("Bearer ", "")
-    payload = decode_token(token)
-    if not payload or payload.get("type") != "access":
+    await user_manager._ensure_loaded()
+    payload = decode_access_token(authorization.replace("Bearer ", ""))
+    if not payload:
         return None
     return await user_manager.get_user(payload["sub"])
 
 
+def _ip(req: Request) -> str:
+    return req.client.host if req.client else "unknown"
+
+
 @router.post("/register")
-async def register(request: RegisterRequest):
+async def register(request: RegisterRequest, req: Request):
     """Register a new user account."""
     result = await user_manager.register(request.email, request.username, request.password, request.display_name,
-                                         request.birth_date, request.consent, request.guardian_email)
+                                         request.birth_date, request.consent, request.guardian_email, ip=_ip(req))
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -74,8 +82,7 @@ async def register(request: RegisterRequest):
 @router.post("/login")
 async def login(request: LoginRequest, req: Request):
     """Authenticate and get access tokens."""
-    client_ip = req.client.host if req.client else "unknown"
-    result = await user_manager.login(request.email, request.password, ip=client_ip)
+    result = await user_manager.login(request.email, request.password, ip=_ip(req))
     if "error" in result:
         # Use 401 for credential errors, 423 for locked accounts
         status_code = 423 if "locked" in result["error"].lower() else 401
@@ -84,9 +91,9 @@ async def login(request: LoginRequest, req: Request):
 
 
 @router.post("/refresh")
-async def refresh_token(request: RefreshRequest):
-    """Refresh access token using refresh token."""
-    result = await user_manager.refresh(request.refresh_token)
+async def refresh_token(request: RefreshRequest, req: Request):
+    """Exchange a refresh token for a new pair; the old one stops working."""
+    result = await user_manager.refresh(request.refresh_token, ip=_ip(req))
     if "error" in result:
         raise HTTPException(status_code=401, detail=result["error"])
     return result
@@ -153,10 +160,53 @@ async def cancel_delete_account(authorization: Optional[str] = Header(None)):
 
 
 @router.post("/forgot-password")
-async def forgot_password(request: PasswordResetRequest):
-    """Request password reset (sends email in production)."""
-    # In production: send reset email with token
-    return {"message": "If the email exists, a reset link has been sent", "email": request.email}
+async def forgot_password(request: PasswordResetRequest, req: Request):
+    """Email a reset link. The answer is the same whether or not the address has an account."""
+    await user_manager.request_password_reset(request.email, ip=_ip(req))
+    return {"message": "If the email has an account, a reset link has been sent"}
+
+
+def _page(title: str, body: str) -> HTMLResponse:
+    return HTMLResponse(
+        f"<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,"
+        f"initial-scale=1'><meta name=referrer content=no-referrer><title>{html.escape(title)}</title><style>"
+        f"body{{font:16px/1.5 system-ui,sans-serif;max-width:32rem;margin:2rem auto;padding:0 1rem;color:#111;"
+        f"background:#fff}}label{{display:block;margin:.75rem 0}}input{{width:100%;padding:.5rem;font:inherit}}"
+        f"button{{font:inherit;padding:.6rem 1rem;margin-top:.5rem}}small{{color:#555}}</style></head><body>"
+        f"<h1>{html.escape(title)}</h1>{body}</body></html>"
+    )
+
+
+_EXPIRED = "<p>This link has expired or was already used. Ask for a new one from the sign-in screen.</p>"
+
+
+@router.get("/reset-password/{token}", response_class=HTMLResponse)
+async def reset_password_form(token: str):
+    if not user_manager.reset_link_valid(token):
+        return _page("Link expired", _EXPIRED)
+    return _page("Choose a new password", f"""
+<form method=post action="{html.escape(token, quote=True)}">
+<label>New password <input type=password name=password required minlength=8 maxlength=128
+autocomplete=new-password></label>
+<label>Repeat it <input type=password name=confirm required minlength=8 maxlength=128 autocomplete=new-password></label>
+<small>At least 8 characters with an upper-case letter, a lower-case letter and a digit. Every device signed in to
+the account will be signed out.</small><br>
+<button>Save password</button>
+</form>""")
+
+
+@router.post("/reset-password/{token}", response_class=HTMLResponse)
+async def reset_password_submit(token: str, req: Request, password: str = Form(...), confirm: str = Form(...)):
+    if password != confirm:
+        return _page("Not saved", f"<p>The two passwords differ.</p><p><a href='{html.escape(token, quote=True)}'>"
+                                  f"Back</a></p>")
+    result = await user_manager.reset_password(token, password, ip=_ip(req))
+    if "error" in result:
+        if "details" not in result:
+            return _page("Link expired", _EXPIRED)
+        items = "".join(f"<li>{html.escape(e)}</li>" for e in result["details"])
+        return _page("Not saved", f"<ul>{items}</ul><p><a href='{html.escape(token, quote=True)}'>Back</a></p>")
+    return _page("Password changed", "<p>Sign in to the app with your new password.</p>")
 
 
 @router.get("/validate")
@@ -168,7 +218,14 @@ async def validate_token(authorization: Optional[str] = Header(None)):
     return {"valid": True, "user": user}
 
 
+@router.get("/activity")
+async def my_security_activity(limit: int = 50, user: dict = Depends(require_user)):
+    """The caller's own security log: sign-ins, failed attempts, password and session changes, exports."""
+    return {"entries": await audit.entries(user["id"], limit)}
+
+
 @router.get("/audit-log")
-async def audit_log(limit: int = 50, admin: dict = Depends(require_admin)):
-    """Get security audit log (admin only)."""
-    return {"entries": get_audit_log(limit=limit), "admin": admin["id"]}
+async def audit_log(limit: int = 50, user_id: Optional[str] = None, admin: dict = Depends(require_admin)):
+    """Security audit log across all accounts (admin only). Reading it is itself logged."""
+    await audit.record("audit_log_read", user_id=user_id or "", actor_id=admin["id"])
+    return {"entries": await audit.entries(user_id, limit), "admin": admin["id"]}

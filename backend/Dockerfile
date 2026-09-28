@@ -28,6 +28,9 @@ RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
+# The container is reachable only through the platform proxy, so its X-Forwarded-For
+# is the real client address; rate limits and the audit log key on it.
+ENV FORWARDED_ALLOW_IPS="*"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1

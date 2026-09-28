@@ -15,7 +15,7 @@ import {
 import { TrendingUp, Trophy, Dumbbell, Clock, Zap } from 'lucide-react-native';
 import { API_BASE_URL as API } from '../../src/services/config';
 import { useTheme } from '../../src/services/theme';
-import { authHeader } from '../../src/services/authToken';
+import { authedFetch } from '../../src/services/authToken';
 import { getJson, postJson } from '../../src/services/http';
 import { useUserStore } from '../../src/stores';
 const SCREEN_WIDTH = Dimensions.get('window').width - 40;
@@ -98,7 +98,7 @@ export default function StatsScreen() {
   async function fetchStats() {
     try {
       const [res, f, t] = await Promise.all([
-        fetch(`${API}/api/v1/workout-stats/${userId}?days=365`, { headers: authHeader() }),
+        authedFetch(`${API}/api/v1/workout-stats/${userId}?days=365`),
         getJson<FormResponse>(`/training/form?user_id=${userId}&days=90`),
         getJson<IntensityResponse>(`/training/intensity?user_id=${userId}&days=28`),
       ]);

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
-import { restoreToken, setToken } from '../services/authToken';
+import { getRefreshToken, getToken, restoreToken, setSignedOutHandler, setTokens } from '../services/authToken';
+import { API_V1 } from '../services/config';
 import { cache } from '../services/cache';
 import { deleteLocalDatabase } from '../db/schema';
 
@@ -20,8 +21,10 @@ export interface UserProfile {
 }
 
 interface UserStore {
-  /** Persisted user id (falls back to the seeded 'default' user). */
+  /** The signed-in account's id; empty when signed out. */
   userId: string;
+  /** A session token is stored. Without one the app shows sign-in. */
+  signedIn: boolean;
   /** Cached profile from the backend. */
   profile: UserProfile | null;
   hydrated: boolean;
@@ -37,7 +40,8 @@ interface UserStore {
 const STORAGE_KEY = '@adapfit/user_id';
 
 export const useUserStore = create<UserStore>((set, get) => ({
-  userId: 'default',
+  userId: '',
+  signedIn: false,
   profile: null,
   hydrated: false,
   loading: true,
@@ -45,21 +49,23 @@ export const useUserStore = create<UserStore>((set, get) => ({
   hydrate: async () => {
     // Must land before the profile fetch below, which needs the header.
     await restoreToken();
+    setSignedOutHandler(() => {
+      get().clearUser();
+    });
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      const userId = stored || 'default';
-      set({ userId, hydrated: true });
-      // Best-effort profile fetch; never block render on it. Falling back to
-      // the seeded identity keeps a reachable backend out of the onboarding
-      // trap, which the root layout otherwise enforces whenever profile is null.
+      const userId = (await AsyncStorage.getItem(STORAGE_KEY)) || '';
+      if (!getToken() || !userId) {
+        set({ userId: '', signedIn: false, profile: null, hydrated: true, loading: false });
+        return;
+      }
+      set({ userId, signedIn: true, hydrated: true });
+      // A missing profile row sends the user to onboarding; an unreachable
+      // server keeps them in the app on the account id alone.
       api
         .getUser(userId)
         .then((profile) => set({ profile: profile as UserProfile, loading: false }))
-        .catch(() =>
-          api
-            .getUser('default')
-            .then((profile) => set({ userId: 'default', profile: profile as UserProfile, loading: false }))
-            .catch(() => set({ loading: false }))
+        .catch((err: Error) =>
+          set({ profile: String(err?.message).includes('404') ? null : { id: userId, email: '' }, loading: false })
         );
     } catch {
       set({ hydrated: true, loading: false });
@@ -68,7 +74,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
 
   setUser: async (user: UserProfile) => {
     await AsyncStorage.setItem(STORAGE_KEY, user.id);
-    set({ userId: user.id, profile: user });
+    set({ userId: user.id, signedIn: true, profile: user });
   },
 
   refreshProfile: async () => {
@@ -89,7 +95,16 @@ export const useUserStore = create<UserStore>((set, get) => ({
 
   // Signing out also removes the health data cached on the device, which may be shared.
   clearUser: async () => {
-    await setToken(null);
+    const refresh = getRefreshToken();
+    if (refresh) {
+      // Ends the session on the server too; a copy of the token left on a backup stops working.
+      fetch(`${API_V1}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refresh }),
+      }).catch(() => {});
+    }
+    await setTokens(null);
     cache.clear();
     try {
       const keys = await AsyncStorage.getAllKeys();
@@ -98,6 +113,6 @@ export const useUserStore = create<UserStore>((set, get) => ({
     } catch {
       /* nothing stored yet */
     }
-    set({ userId: 'default', profile: null });
+    set({ userId: '', signedIn: false, profile: null });
   },
 }));

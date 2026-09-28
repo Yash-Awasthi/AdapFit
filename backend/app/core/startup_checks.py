@@ -102,6 +102,20 @@ def validate_startup() -> list[str]:
             "all endpoints are unthrottled. Enable for protection against abuse."
         )
 
+    # ── 6. Encryption at rest needs a real key in production ───────────────
+    if is_prod:
+        import os
+        from app.core import crypto
+        try:
+            if not os.getenv("DATA_ENCRYPTION_KEYS"):
+                raise ValueError("DATA_ENCRYPTION_KEYS is not set")
+            crypto.keyring()
+        except Exception as exc:
+            errors.append(f"{exc}. Generate a key: python -c \"from app.core.crypto import new_key; "
+                          f"print('k1:' + new_key())\"")
+        if not settings.PUBLIC_BASE_URL.startswith("https://"):
+            errors.append("PUBLIC_BASE_URL must be https in production: reset and guardian links carry tokens.")
+
     return errors
 
 

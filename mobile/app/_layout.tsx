@@ -29,18 +29,21 @@ function RootStack() {
     startSyncDaemon();
   }, [hydrate]);
 
-  // Route new (no saved profile) users to onboarding, everyone else to the
-  // app. Waits for hydration to finish so an existing user's profile fetch
-  // in flight doesn't get misread as "no account" and bounce them back.
+  // Signed out: sign-in (or sign-up and the documents it links to). Signed in
+  // without a profile: onboarding. Waits for hydration so a profile fetch in
+  // flight is not misread as "no profile".
+  const signedIn = useUserStore((s) => s.signedIn);
   useEffect(() => {
     if (!hydrated || loading) return;
     const onOnboarding = segments[0] === "onboarding-welcome";
-    if (!profile && !onOnboarding) {
+    if (!signedIn) {
+      if (!["login", "register", "legal"].includes(segments[0] as string)) router.replace("/login" as any);
+    } else if (!profile && !onOnboarding) {
       router.replace("/onboarding-welcome");
     } else if (profile && onOnboarding) {
       router.replace("/(tabs)");
     }
-  }, [hydrated, loading, profile, segments, router]);
+  }, [hydrated, loading, signedIn, profile, segments, router]);
 
   // The server refuses data calls until consent is current, a guardian has
   // agreed, or a scheduled deletion is cancelled; send the user where they can act.

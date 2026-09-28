@@ -1,91 +1,72 @@
 """
-Health Data Security — Encryption, audit logging, and compliance
+Security self-check: which technical controls this deployment actually has.
+
+Each control is measured from configuration and code at request time. Controls
+that depend on the organisation (breach procedure, backups, contracts) cannot be
+seen from here and are reported as "not_verified", never as done. This is a
+self-check, not a certification.
 """
-from datetime import datetime
-from typing import Dict, List, Optional
-import uuid
-import hashlib
+import os
+
+CONTROLS = {
+    "encryption_in_transit": "TLS on the public URL",
+    "encryption_at_rest": "Stored feature data encrypted with a managed key",
+    "access_controls": "Every API call authenticated and bound to the caller's own records",
+    "audit_logging": "Durable security log kept 1 year",
+    "rate_limiting": "Per-caller request limits",
+    "consent_management": "Consent per purpose with history",
+    "right_to_erasure": "Account erasure reaching shared records",
+    "data_portability": "Export of everything held for an account",
+    "breach_notification": "Procedure to tell users and the Board",
+    "data_backup": "Tested backups with bounded retention",
+    "processor_contracts": "Contracts with every data processor",
+    "risk_assessment": "Documented security risk assessment",
+}
+
+STANDARDS = {
+    "dpdp": {"name": "DPDP Act 2023 and Rules 2025 (India)",
+             "controls": ["consent_management", "right_to_erasure", "data_portability", "encryption_at_rest",
+                          "encryption_in_transit", "access_controls", "audit_logging", "breach_notification",
+                          "processor_contracts"]},
+    "gdpr": {"name": "GDPR (EU)",
+             "controls": ["consent_management", "right_to_erasure", "data_portability", "encryption_at_rest",
+                          "access_controls", "breach_notification", "risk_assessment"]},
+    "hipaa": {"name": "HIPAA Security Rule (US); AdapFit is not a covered entity",
+              "controls": ["encryption_at_rest", "encryption_in_transit", "access_controls", "audit_logging",
+                           "data_backup", "breach_notification"]},
+}
 
 
-class HealthDataSecurity:
-    COMPLIANCE_STANDARDS = {
-        "hipaa": {"name": "HIPAA", "description": "Health Insurance Portability and Accountability Act", "requirements": ["encryption_at_rest", "encryption_in_transit", "access_controls", "audit_logging", "data_backup", "incident_response"]},
-        "gdpr": {"name": "GDPR", "description": "General Data Protection Regulation", "requirements": ["data_minimization", "consent_management", "right_to_erasure", "data_portability", "breach_notification", "privacy_by_design"]},
-        "HITECH": {"name": "HITECH Act", "description": "Health Information Technology for Economic and Clinical Health", "requirements": ["breach_notification", "encryption", "audit_trail", "business_associate_agreements"]},
-        "SOC2": {"name": "SOC 2", "description": "Service Organization Control 2", "requirements": ["security", "availability", "processing_integrity", "confidentiality", "privacy"]},
-        "ISO27001": {"name": "ISO 27001", "description": "Information Security Management", "requirements": ["risk_assessment", "access_control", "cryptography", "incident_management", "business_continuity"]},
+def control_status() -> dict:
+    from app.core.config import settings
+    from app.middleware.auth import auth_bypass_active
+
+    at_rest = "implemented" if os.getenv("DATA_ENCRYPTION_KEYS") else "development_key"
+    in_transit = "configured" if settings.PUBLIC_BASE_URL.startswith("https://") else "not_verified"
+    measured = {
+        "encryption_in_transit": in_transit,
+        "encryption_at_rest": at_rest,
+        "access_controls": "disabled" if auth_bypass_active() else "implemented",
+        "audit_logging": "implemented",
+        "rate_limiting": "implemented" if settings.RATE_LIMITING_ENABLED else "disabled",
+        "consent_management": "implemented",
+        "right_to_erasure": "implemented",
+        "data_portability": "implemented",
     }
+    return {cid: {"description": desc, "status": measured.get(cid, "not_verified")} for cid, desc in CONTROLS.items()}
 
-    ENCRYPTION_METHODS = {
-        "aes_256": {"name": "AES-256", "type": "symmetric", "use": "data_at_rest"},
-        "rsa_2048": {"name": "RSA-2048", "type": "asymmetric", "use": "key_exchange"},
-        "sha_256": {"name": "SHA-256", "type": "hash", "use": "data_integrity"},
-        "bcrypt": {"name": "bcrypt", "type": "hash", "use": "password_hashing"},
+
+def check_compliance(standard: str) -> dict:
+    config = STANDARDS.get(standard.lower())
+    if not config:
+        return {"error": f"Unknown standard: {standard}", "available": sorted(STANDARDS)}
+    status = control_status()
+    results = [{"control": cid, **status[cid]} for cid in config["controls"]]
+    return {
+        "standard": standard.lower(),
+        "name": config["name"],
+        "implemented": sum(1 for r in results if r["status"] in ("implemented", "configured")),
+        "total": len(results),
+        "results": results,
+        "note": "Self-check of technical controls, not a certification.",
     }
-
-    def __init__(self):
-        self.audit_logs: Dict[str, List[dict]] = {}
-        self.data_access_logs: Dict[str, List[dict]] = {}
-        self.encryption_keys: Dict[str, dict] = {}
-        self.compliance_status: Dict[str, dict] = {}
-
-    def log_audit_event(self, user_id: str, action: str, resource: str, details: str = "", ip_address: str = "") -> dict:
-        event = {
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "action": action,
-            "resource": resource,
-            "details": details,
-            "ip_address": ip_address,
-            "timestamp": datetime.now().isoformat(),
-            "hash": hashlib.sha256(f"{user_id}_{action}_{resource}_{datetime.now().isoformat()}".encode()).hexdigest()[:16],
-        }
-        self.audit_logs.setdefault(user_id, []).append(event)
-        return event
-
-    def log_data_access(self, user_id: str, accessor: str, data_type: str, purpose: str) -> dict:
-        log = {
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "accessor": accessor,
-            "data_type": data_type,
-            "purpose": purpose,
-            "timestamp": datetime.now().isoformat(),
-        }
-        self.data_access_logs.setdefault(user_id, []).append(log)
-        return log
-
-    def check_compliance(self, standard: str) -> dict:
-        config = self.COMPLIANCE_STANDARDS.get(standard)
-        if not config:
-            return {"error": f"Unknown standard: {standard}"}
-        
-        results = []
-        for req in config["requirements"]:
-            results.append({"requirement": req, "status": "implemented", "last_audit": datetime.now().isoformat()})
-        
-        score = sum(1 for r in results if r["status"] == "implemented") / len(results) * 100
-        
-        return {
-            "standard": standard,
-            "name": config["name"],
-            "description": config["description"],
-            "total_requirements": len(results),
-            "implemented": sum(1 for r in results if r["status"] == "implemented"),
-            "compliance_score": round(score, 1),
-            "results": results,
-        }
-
-    def get_audit_logs(self, user_id: str, limit: int = 100) -> List[dict]:
-        return self.audit_logs.get(user_id, [])[-limit:]
-
-    def get_data_access_summary(self, user_id: str) -> dict:
-        logs = self.data_access_logs.get(user_id, [])
-        accessors = {}
-        for log in logs:
-            acc = log["accessor"]
-            accessors[acc] = accessors.get(acc, 0) + 1
-        return {"total_accesses": len(logs), "unique_accessors": len(accessors), "by_accessor": dict(sorted(accessors.items(), key=lambda x: x[1], reverse=True)[:10])}
-
-
-health_security = HealthDataSecurity()

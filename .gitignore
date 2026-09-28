@@ -23,6 +23,10 @@ backend/*.db
 backend/data/
 backend/app/data/store.json
 backend/app/data/feature_state.sqlite3
+backend/app/data/security_audit.sqlite3
+backend/app/data/accounts.json
+backend/app/data/sessions.json
+backend/app/data/data_encryption_key
 dist/
 build/
 

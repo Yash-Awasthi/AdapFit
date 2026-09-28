@@ -13,7 +13,7 @@ import json
 import os
 import stat
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.config import settings
 
@@ -166,8 +166,8 @@ class SessionStore:
     has already signed out of. Only the SHA-256 of each token is kept.
     """
 
-    async def load_all(self) -> Dict[str, float]:
-        """token_hash -> expiry, with expired entries dropped."""
+    async def load_all(self) -> Dict[str, Tuple[str, float]]:
+        """token_hash -> (user id, expiry), with expired entries dropped."""
         now = _now()
         if use_database():
             from app.core.db import get_pool
@@ -176,9 +176,13 @@ class SessionStore:
             if pool is not None:
                 async with pool.acquire() as conn:
                     await conn.execute("DELETE FROM user_sessions WHERE expires_at < NOW()")
-                    rows = await conn.fetch("SELECT token_hash, expires_at FROM user_sessions")
-                return {r["token_hash"]: r["expires_at"].timestamp() for r in rows}
-        return {h: e for h, e in _read_json(SESSIONS_FILE, {}).items() if e > now}
+                    rows = await conn.fetch("SELECT token_hash, user_id, expires_at FROM user_sessions")
+                return {r["token_hash"]: (str(r["user_id"]), r["expires_at"].timestamp()) for r in rows}
+        return {h: tuple(v) for h, v in self._read().items() if v[1] > now}
+
+    def _read(self) -> Dict[str, list]:
+        # Files written before sessions carried a user id hold a bare expiry; those sessions are dropped.
+        return {h: v for h, v in _read_json(SESSIONS_FILE, {}).items() if isinstance(v, list)}
 
     async def add(self, token_hash: str, user_id: str, expires_at: float) -> None:
         if use_database():
@@ -194,10 +198,10 @@ class SessionStore:
                         token_hash, _uuid(user_id), datetime.fromtimestamp(expires_at, tz=timezone.utc),
                     )
                 return
-        sessions = _read_json(SESSIONS_FILE, {})
-        sessions[token_hash] = expires_at
+        sessions = self._read()
+        sessions[token_hash] = [user_id, expires_at]
         now = _now()
-        _write_json(SESSIONS_FILE, {h: e for h, e in sessions.items() if e > now})
+        _write_json(SESSIONS_FILE, {h: v for h, v in sessions.items() if v[1] > now})
 
     async def remove(self, token_hash: str) -> None:
         if use_database():
@@ -208,9 +212,20 @@ class SessionStore:
                 async with pool.acquire() as conn:
                     await conn.execute("DELETE FROM user_sessions WHERE token_hash = $1", token_hash)
                 return
-        sessions = _read_json(SESSIONS_FILE, {})
+        sessions = self._read()
         sessions.pop(token_hash, None)
         _write_json(SESSIONS_FILE, sessions)
+
+    async def remove_user(self, user_id: str) -> None:
+        if use_database():
+            from app.core.db import get_pool
+
+            pool = await get_pool()
+            if pool is not None:
+                async with pool.acquire() as conn:
+                    await conn.execute("DELETE FROM user_sessions WHERE user_id = $1", _uuid(user_id))
+                return
+        _write_json(SESSIONS_FILE, {h: v for h, v in self._read().items() if v[0] != user_id})
 
 
 SESSIONS_FILE = ACCOUNTS_FILE.with_name("sessions.json")

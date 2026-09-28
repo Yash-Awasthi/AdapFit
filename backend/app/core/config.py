@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     MAIL_FROM: str = os.getenv("MAIL_FROM", "no-reply@adapfit.app")
     # Base URL links in emails point at, e.g. https://api.adapfit.app
     PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+    # Bearer token Prometheus sends to /metrics. Unset in production means /metrics answers 404.
+    METRICS_TOKEN: str = os.getenv("METRICS_TOKEN", "")
 
     class Config:
         case_sensitive = True
