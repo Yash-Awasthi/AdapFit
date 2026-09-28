@@ -23,7 +23,7 @@ const HIDDEN_SCREENS = [
   "dashboard", "health-hub", "trends",
   "telemedicine", "forums", "analytics", "vital-signs",
   "family", "health-calendar", "recipes", "exercises", "wellness", "sleep",
-  "nutrition", "health", "stats", "social", "periodization",
+  "nutrition", "health", "stats", "periodization",
   "achievements", "settings", "personal-info", "dev-tools",
   "hrv", "mental-health", "medication", "emergency",
   "community", "workouts", "devices", "coach", "voice-health", "longevity",

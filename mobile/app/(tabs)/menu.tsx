@@ -99,7 +99,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
     {
       title: 'Community',
       items: [
-        { icon: Users, label: 'Social', sub: 'Feed & challenges', route: '/social', color: '#EC4899' },
+        { icon: Users, label: 'Community', sub: 'Challenges, leaderboard & feed', route: '/community', color: '#EC4899' },
         { icon: MessagesSquare, label: 'Forums', sub: 'Ask and answer', route: '/forums', color: '#8B5CF6' },
       ],
     },

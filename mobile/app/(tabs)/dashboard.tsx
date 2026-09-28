@@ -188,9 +188,9 @@ export default function DashboardScreen() {
         api.getRecoveryLogs(userId, 1),
         api.getHydrationToday(userId),
         api.getSleepAnalysis(userId, 1),
-        api.post('/api/v1/medication/today', { user_id: userId }),
+        getJson<any>('/medication/today'),
         getJson<any>(`/challenges?user_id=${userId}`),
-        api.post('/api/v1/activity-feed', { user_id: userId, limit: 5 }),
+        getJson<any[]>('/community/feed?limit=4'),
         getJson<any>(`/streaks?user_id=${userId}`),
         api.getAcwr(userId),
         fetchHealthData(),
@@ -222,23 +222,31 @@ export default function DashboardScreen() {
       if (sleepRes.status === 'fulfilled' && sleepRes.value) {
         setTodayData(prev => ({
           ...prev,
-          sleep: Math.round((sleepRes.value.avg_duration_hours ?? 7.2) * 10) / 10,
+          sleep: sleepRes.value.avg_duration_hours != null ? Math.round(sleepRes.value.avg_duration_hours * 10) / 10 : prev.sleep,
         }));
       }
 
       // Medications
-      if (medRes.status === 'fulfilled' && medRes.value?.medications) {
-        setMedications(medRes.value.medications.slice(0, 3));
+      if (medRes.status === 'fulfilled' && Array.isArray(medRes.value?.schedule)) {
+        setMedications(medRes.value.schedule.slice(0, 3).map((d: any) => ({
+          id: `${d.med_id}-${d.time}`, name: d.medication, dosage: d.dosage, time: d.time, taken: d.status === 'taken',
+        })));
       }
 
       // Challenges
-      if (challengeRes.status === 'fulfilled' && challengeRes.value?.challenges) {
-        setChallenges(challengeRes.value.challenges.slice(0, 3));
+      if (challengeRes.status === 'fulfilled' && Array.isArray(challengeRes.value)) {
+        setChallenges(challengeRes.value.filter((c: any) => c.joined).slice(0, 3).map((c: any) => ({
+          id: c.id, title: c.name, progress: Math.round(c.my_progress_pct ?? 0),
+          daysLeft: Math.max(0, Math.ceil((new Date(c.ends_at).getTime() - Date.now()) / 86400000)),
+        })));
       }
 
       // Activity feed
-      if (activityRes.status === 'fulfilled' && activityRes.value?.items) {
-        setActivityFeed(activityRes.value.items.slice(0, 4));
+      if (activityRes.status === 'fulfilled' && Array.isArray(activityRes.value)) {
+        setActivityFeed(activityRes.value.map((s: any) => ({
+          id: s.id, title: s.title, detail: `${s.user_name} · ${s.likes} likes`, time: (s.shared_at ?? '').slice(0, 10),
+          icon: 'people', color: colors.health.calm,
+        })));
       }
 
       // Streaks
@@ -379,7 +387,7 @@ export default function DashboardScreen() {
 
         {/* ─── Active Challenges ─────────────────── */}
         <View style={styles.section}>
-          <SectionHeaderPremium title="Active Challenges" icon="trophy" iconColor={colors.health.energy} action={{ label: 'Join More', onPress: () => router.push('/social' as any) }} />
+          <SectionHeaderPremium title="Active Challenges" icon="trophy" iconColor={colors.health.energy} action={{ label: 'Join More', onPress: () => router.push('/community' as any) }} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
             {challenges.length > 0 ? challenges.map((ch: any) => (
               <ChallengeCard key={ch.id ?? ch.title} title={ch.title} progress={ch.progress} daysLeft={ch.daysLeft} icon={ch.icon ?? 'trophy'} />
