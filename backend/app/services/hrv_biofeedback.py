@@ -84,8 +84,8 @@ class HRVBiofeedbackAnalyzer:
         ),
         "coherence": BreathingPattern(
             name="coherence",
-            inhale_seconds=5.0,
-            exhale_seconds=5.0,
+            inhale_seconds=5.5,
+            exhale_seconds=5.5,
             description="5.5 BPM coherence breathing"
         ),
         "energize": BreathingPattern(
@@ -97,8 +97,8 @@ class HRVBiofeedbackAnalyzer:
         "sleep": BreathingPattern(
             name="sleep",
             inhale_seconds=4.0,
-            exhale_seconds=7.0,
-            hold_in_seconds=1.0,
+            exhale_seconds=8.0,
+            hold_in_seconds=7.0,
             description="4-7-8 sleep pattern"
         ),
         "box": BreathingPattern(

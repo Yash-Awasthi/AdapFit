@@ -9,16 +9,30 @@ wellness, India first, every feature kept, nothing diagnoses.
 
 ---
 
-## Phase 2 — Consolidation
+## Phase 2 — Consolidation (in progress)
 
-Every feature stays; duplicates of the same feature do not.
+Every feature stays; duplicates of the same feature merge into the best one,
+and features that exist in code but nothing calls get an API and a screen.
+Decided with the user 2026-09-28.
 
-- Collapse duplicate generations (sleep, HRV, achievements, coach, community,
-  recovery, export) to one module each.
-- Resolve shared route prefixes, make registration idempotent.
-- Replace sample data that still ships in screens (the mental health screen
-  has a hard-coded journal and a wellbeing score fixed at 72).
-- Measure endpoint, service, screen and test counts before and after.
+Measured at start: 229 route modules, 281 services, 93 services unreachable
+(65 with no importer, 28 used only by tests), 146 route modules no screen calls.
+
+- [x] Sleep: one `/sleep` API and one screen (8d9aab5). Also removed the
+      unused `app/api/v1/domains/` routers and the fake `/tasks` jobs.
+- [x] HRV: one `/hrv` API over one analyzer with Lipponen artifact correction and
+      biofeedback; HRV screen reads a Bluetooth chest strap (standard 0x180D).
+- [ ] Achievements: `/achievements`, `-v2`, `-v3`.
+- [ ] Coach: `/ai-coach`, `-v2`, plus `health-coaching`, `habits`.
+- [ ] Community: `/community`, `-v2`, and `/challenges`.
+- [ ] Recovery: `/recovery-logs`, `/recovery`, `/recovery-v2`, seven services.
+- [ ] Export: `/export`, `-v2`, `/data-export`.
+- [ ] Leftover `-v2` prefixes: injury-risk, recommendations.
+- [ ] Wire the unreachable unique services (smart alarm is done), API and screen.
+- [ ] Mental health screen: hard-coded journal and wellbeing score of 72;
+      PHQ-9/GAD-7 service exists but has no route.
+- [ ] Extend `test_no_random_measurements.py` to route modules, not just services.
+- [ ] Make route registration idempotent; one owner per prefix.
 
 ## Phase 2b — Clinical modules built for real
 

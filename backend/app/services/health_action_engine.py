@@ -34,7 +34,7 @@ _INTENTS = [
     ("find_doctor", ["doctor", "physician", "specialist", "appointment", "clinic"], "telemedicine", "telemedicine", "/api/v1/telemedicine/doctors", "Let me find a provider.", 2),
     ("find_hospital", ["hospital", "emergency room", "urgent care", "pharmacy"], "hospital_finder", "telemedicine", "/api/v1/hospitals/search", "Finding nearby facilities.", 2),
     ("health_summary", ["how am i doing", "health summary", "overview", "dashboard"], "dashboard", "dashboard", "/api/v1/summary", "Here's your health overview.", 2),
-    ("hrv_trend", ["hrv", "heart rate variability"], "recovery", "health-hub", "/api/v1/hrv-trends", "Here's your HRV trend.", 3),
+    ("hrv_trend", ["hrv", "heart rate variability"], "recovery", "health-hub", "/api/v1/hrv/trend", "Here's your HRV trend.", 3),
     ("government_schemes", ["scheme", "government", "benefit", "insurance", "eligibility"], "government_health", "health-equity", "/api/v1/sdoh/schemes", "Checking scheme eligibility.", 3),
     ("medication", ["medication", "medicine", "pills", "supplement", "vitamin"], "medication", "medication", "/api/v1/medication", "Here's your medication tracker.", 2),
     ("drug_interaction", ["interaction", "drug interaction", "can i take", "combine medication"], "drug_interactions", "medication", "/api/v1/drug-interactions/check", "Checking drug interactions.", 1),
