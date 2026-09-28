@@ -19,6 +19,7 @@ import { useTheme } from '../../src/services/theme';
 import { useDevSettings } from '../../src/services/devSettings';
 import { WS_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
+import { offlineRedFlagReply } from '../../src/services/offlineSafety';
 
 const WS_URL = WS_BASE_URL;
 
@@ -162,7 +163,7 @@ export default function ChatScreen() {
           reply = data.reply;
         }
       } catch {
-        reply = "Couldn't reach the coach right now — check your connection and try again.";
+        reply = offlineRedFlagReply(text) ?? "Couldn't reach the coach right now — check your connection and try again.";
       }
 
       if (reply) {

@@ -94,12 +94,12 @@ class PregnancyTrackerService:
             "mood": data.get("mood"),
             "energy": data.get("energy"),
             "sleep_quality": data.get("sleep_quality"),
-            "nausea_level": data.get("nausea", 0),
+            "nausea_level": data.get("nausea"),
             "food_cravings": data.get("cravings", []),
-            "exercise": data.get("exercise", False),
-            "water_intake_ml": data.get("water_ml", 0),
-            "prenatal_vitamin": data.get("prenatal_vitamin", True),
-            "kick_count": data.get("kick_count", 0),
+            "exercise": data.get("exercise"),
+            "water_intake_ml": data.get("water_ml"),
+            "prenatal_vitamin": data.get("prenatal_vitamin"),
+            "kick_count": data.get("kick_count"),
             "contractions": data.get("contractions", []),
             "symptoms": data.get("symptoms", []),
             "notes": data.get("notes", ""),
@@ -143,12 +143,18 @@ class PregnancyTrackerService:
             return {"error": "kicks and duration_minutes are required"}
         kicks = data["kicks"]
         duration_min = data["duration_minutes"]
+        previous = [x["rate"] for x in self.kick_sessions.get(user_id, [])[-10:]]
+        rate = round(kicks / max(1, duration_min), 2)
+        # Reduced movement is judged against this baby's own pattern; any
+        # doubt goes to the maternity team the same day, never "count again later".
+        usual = sorted(previous)[len(previous) // 2] if len(previous) >= 3 else None
+        low = (kicks < 10 and duration_min >= 120) or (usual is not None and rate < usual / 2)
         session = {
             "date": data.get("date", time.strftime("%Y-%m-%d")),
             "kicks": kicks,
             "duration_minutes": duration_min,
-            "rate": round(kicks / max(1, duration_min), 1),
-            "status": "normal" if kicks >= 6 else "low",
+            "rate": rate,
+            "status": "fewer_than_usual" if low else "recorded",
             "recorded_at": time.time(),
         }
         self.kick_sessions.setdefault(user_id, []).append(session)
@@ -156,10 +162,16 @@ class PregnancyTrackerService:
         return {
             "kicks_counted": kicks,
             "duration_minutes": duration_min,
-            "rate": session["rate"],
-            "normal_range": "6-10 kicks in 2 hours",
-            "status": session["status"] if kicks >= 6 else "low — try again after a snack",
-            "tip": "Best time to count: baby is usually most active after meals",
+            "rate": rate,
+            "usual_rate": usual,
+            "status": session["status"],
+            "next_step": (
+                "Fewer movements than usual needs checking today. Call your doctor or maternity unit now, "
+                "or go to the hospital; do not wait until tomorrow or try to count again later."
+                if low else
+                "Recorded. What matters is your baby's usual pattern: if movements slow down or change, "
+                "contact your maternity team the same day."
+            ),
         }
 
     def get_kick_history(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:

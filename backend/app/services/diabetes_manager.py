@@ -18,6 +18,10 @@ from dataclasses import dataclass, field
 
 
 FOOD_CARB_DATABASE = [
+    {"name": "Roti / chapati", "carbs_per_serving": 15, "serving": "1 medium (approx.)"},
+    {"name": "White rice, cooked", "carbs_per_serving": 42, "serving": "1 katori, 150 g (approx.)"},
+    {"name": "Idli", "carbs_per_serving": 8, "serving": "1 piece (approx.)"},
+    {"name": "Plain dosa", "carbs_per_serving": 22, "serving": "1 medium (approx.)"},
     {"name": "White Bread", "carbs_per_serving": 15, "serving": "1 slice"},
     {"name": "Brown Rice", "carbs_per_serving": 45, "serving": "1 cup cooked"},
     {"name": "Pasta", "carbs_per_serving": 43, "serving": "1 cup cooked"},
@@ -66,10 +70,12 @@ class DiabetesManagerService:
     def log_glucose(self, value_mgdl: int, context: str = "fasting", notes: str = "") -> dict:
         if value_mgdl < 54:
             level = "severe_hypo"
-            alert = "SEVERE HYPOGLYCEMIA! Consume 15g fast-acting carbs immediately."
+            alert = ("Very low. Take 15 g fast sugar now (3 teaspoons of sugar or glucose in water, or 150 ml juice) "
+                     "and recheck in 15 minutes. If you are drowsy, confused or cannot swallow, someone must call 108; "
+                     "nothing by mouth if unconscious.")
         elif value_mgdl < 70:
             level = "hypo"
-            alert = "Low blood sugar. Eat 15g carbs and recheck in 15 minutes."
+            alert = "Low. Take 15 g fast sugar (3 teaspoons of sugar in water or 150 ml juice) and recheck in 15 minutes."
         elif value_mgdl <= 180:
             level = "in_range"
             alert = "Blood glucose is in target range."
@@ -78,7 +84,8 @@ class DiabetesManagerService:
             alert = "Blood glucose is elevated. Check for ketones if Type 1."
         else:
             level = "severe_high"
-            alert = "Very high blood glucose. Seek medical attention."
+            alert = ("Very high. Drink water and recheck in a few hours; contact your doctor today if it stays high. "
+                     "Call 108 if you are vomiting, very drowsy, breathing fast or confused.")
 
         reading = {"value": value_mgdl, "context": context, "notes": notes, "level": level, "alert": alert, "timestamp": time.time()}
         self._glucose_readings.append(reading)

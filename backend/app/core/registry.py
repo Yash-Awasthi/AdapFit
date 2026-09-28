@@ -107,6 +107,7 @@ ROUTE_MAP = {
     "allergy_api": ("/allergies", ["Allergy Tracking"]),
     "cognitive_api": ("/cognitive", ["Cognitive Training"]),
     "pregnancy_api": ("/pregnancy", ["Pregnancy Tracking"]),
+    "fatigue_pacing_api": ("/fatigue-pacing", ["Fatigue Pacing"]),
     "chronic_pain_api": ("/chronic-pain", ["Chronic Pain"]),
     "senior_health_api": ("/senior-health", ["Senior Health"]),
     "digital_detox_api": ("/digital-detox", ["Digital Detox"]),

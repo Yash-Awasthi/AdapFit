@@ -1,10 +1,9 @@
 /**
  * Cardiac Rehabilitation — the phase, the target zone, and the daily log.
  *
- * The target heart-rate zone is the one number on this screen that has to be
- * right, and it is derived from the patient's real age, so the screen asks
- * for what it needs before showing a program rather than assuming a
- * sixty-five-year-old.
+ * The zone is the one the rehab team prescribed, else a cap of resting heart
+ * rate plus 20; age-predicted zones do not hold for heart patients. Effort
+ * (RPE 11-14) is always shown, since it works on beta blockers too.
  *
  * Medications come from the medication tracker rather than a second list, so
  * a dose ticked there is ticked here.
@@ -39,14 +38,13 @@ interface Program {
   program?: {
     condition: string;
     current_phase: number;
-    age: number;
-    max_heart_rate: number;
-    target_hr_min: number;
-    target_hr_max: number;
+    target_hr_min: number | null;
+    target_hr_max: number | null;
+    zone_source: string;
     resting_hr: number | null;
   };
   current_phase?: Phase;
-  heart_rate_zones?: { resting: number | null; target_min: number; target_max: number; maximum: number };
+  heart_rate_zones?: { resting: number | null; target_min: number | null; target_max: number | null; effort: string; source: string };
   message?: string;
 }
 
@@ -70,8 +68,9 @@ interface MedicationEntry {
 
 export default function CardiacRehabScreen() {
   const userId = useUserStore((s) => s.userId);
-  const profile = useUserStore((s) => s.profile);
-  const [age, setAge] = useState(profile?.age ? String(profile.age) : '');
+  const [resting, setResting] = useState('');
+  const [rxMin, setRxMin] = useState('');
+  const [rxMax, setRxMax] = useState('');
   const [exerciseMinutes, setExerciseMinutes] = useState('');
   const [bp, setBp] = useState('');
   const [busy, setBusy] = useState(false);
@@ -96,15 +95,14 @@ export default function CardiacRehabScreen() {
   const configured = program?.status === 'ok' && !!zones;
 
   const setupProgram = useCallback(async () => {
-    const parsed = Number(age);
-    if (!Number.isFinite(parsed) || parsed < 18 || parsed > 100) {
-      Alert.alert('Age needed', 'Your target heart-rate zone is calculated from your age. Enter it between 18 and 100.');
-      return;
+    const data: Record<string, number> = {};
+    for (const [k, v] of [['resting_hr', resting], ['prescribed_hr_min', rxMin], ['prescribed_hr_max', rxMax]] as const) {
+      if (v.trim() && Number.isFinite(Number(v))) data[k] = Math.round(Number(v));
     }
     setBusy(true);
     const result = await postJson<Program>('/cardiac-rehab/setup', {
       user_id: userId,
-      data: { age: Math.round(parsed) },
+      data,
     });
     setBusy(false);
     if (!result || result.status !== 'ok') {
@@ -112,7 +110,7 @@ export default function CardiacRehabScreen() {
       return;
     }
     await reload();
-  }, [age, userId, reload]);
+  }, [resting, rxMin, rxMax, userId, reload]);
 
   const logToday = useCallback(async () => {
     const minutes = Number(exerciseMinutes);
@@ -172,7 +170,7 @@ export default function CardiacRehabScreen() {
           <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.6)', marginTop: 2 }]}>
             {configured
               ? `${phase?.duration_weeks} weeks · ${daysLogged} day${daysLogged === 1 ? '' : 's'} logged`
-              : 'Add your age to begin'}
+              : 'Set up to begin'}
           </Text>
           {configured && (
             <>
@@ -196,17 +194,14 @@ export default function CardiacRehabScreen() {
             <SectionHeaderPremium title="Set Up Your Program" icon="heart" iconColor={colors.health.heart} />
             <GlassCard>
               <Text style={styles.helperText}>
-                {program?.message ?? 'Your target heart-rate zone is calculated from your age, so it is needed before a program can start.'}
+                If your rehab team gave you a heart-rate zone from an exercise test, enter it. Otherwise enter your
+                resting heart rate and you will get a cap of resting + 20 bpm. Both are optional; effort guidance always applies.
               </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Your age"
-                placeholderTextColor={colors.text.muted}
-                keyboardType="numeric"
-                value={age}
-                onChangeText={setAge}
-                accessibilityLabel="Your age"
-              />
+              {([['Resting heart rate', resting, setResting], ['Zone from rehab team: lower bpm', rxMin, setRxMin],
+                 ['Zone from rehab team: upper bpm', rxMax, setRxMax]] as const).map(([label, value, set]) => (
+                <TextInput key={label} style={styles.input} placeholder={label} placeholderTextColor={colors.text.muted}
+                  keyboardType="numeric" value={value} onChangeText={set} accessibilityLabel={label} />
+              ))}
               <TouchableOpacity style={styles.primaryBtn} onPress={setupProgram} disabled={busy}>
                 <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Start program'}</Text>
               </TouchableOpacity>
@@ -221,8 +216,8 @@ export default function CardiacRehabScreen() {
               <GlassCard>
                 {[
                   { zone: 'Resting', value: zones.resting !== null ? `${zones.resting} bpm` : 'Not recorded', color: '#22C55E' },
-                  { zone: 'Target (training)', value: `${zones.target_min}–${zones.target_max} bpm`, color: '#F59E0B' },
-                  { zone: 'Maximum', value: `${zones.maximum} bpm`, color: '#EF4444' },
+                  { zone: 'Training', value: zones.target_min && zones.target_max ? `${zones.target_min}–${zones.target_max} bpm`
+                    : zones.target_max ? `Under ${zones.target_max} bpm` : 'By effort', color: '#F59E0B' },
                 ].map((row) => (
                   <View key={row.zone} style={styles.zoneRow}>
                     <View style={[styles.zoneDot, { backgroundColor: row.color }]} />
@@ -231,7 +226,8 @@ export default function CardiacRehabScreen() {
                   </View>
                 ))}
                 <Text style={styles.helperText}>
-                  From your age ({program?.program?.age}). {phase?.heart_rate_zone} in this phase.
+                  {zones.source === 'prescribed' ? 'Zone from your rehab team.' : zones.source === 'resting_plus_20' ? 'Resting + 20 bpm until your rehab team gives you a zone.' : ''}
+                  {' '}{phase?.heart_rate_zone} in this phase. {zones.effort}
                 </Text>
               </GlassCard>
             </View>

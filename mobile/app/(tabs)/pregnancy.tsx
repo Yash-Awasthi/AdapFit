@@ -83,7 +83,7 @@ export default function PregnancyScreen() {
       return;
     }
     setBusy(true);
-    const result = await postJson('/pregnancy/kick-counter', {
+    const result = await postJson<{ data?: { status?: string; next_step?: string } }>('/pregnancy/kick-counter', {
       user_id: userId,
       data: { kicks: Math.round(k), duration_minutes: Math.round(d) },
     });
@@ -92,6 +92,8 @@ export default function PregnancyScreen() {
       Alert.alert('Not recorded', 'The session could not be saved.');
       return;
     }
+    const out = result.data;
+    if (out?.next_step) Alert.alert(out.status === 'fewer_than_usual' ? 'Contact your maternity team today' : 'Recorded', out.next_step);
     setKicks('');
     await loadHistory();
   }, [kicks, duration, userId, loadHistory]);
@@ -200,7 +202,7 @@ export default function PregnancyScreen() {
                 <View key={i} style={styles.sessionRow}>
                   <Text style={[typography.body.sm, { color: colors.text.muted }]}>{s.date}</Text>
                   <Text style={[typography.body.md, { color: colors.text.primary }]}>{s.kicks} kicks / {s.duration_minutes} min</Text>
-                  <Text style={[typography.body.sm, { color: s.status === 'normal' ? colors.health.success : colors.health.warning }]}>{s.status}</Text>
+                  <Text style={[typography.body.sm, { color: s.status === 'fewer_than_usual' ? colors.health.warning : colors.health.success }]}>{s.status === 'fewer_than_usual' ? 'fewer than usual' : 'recorded'}</Text>
                 </View>
               ))
             )}

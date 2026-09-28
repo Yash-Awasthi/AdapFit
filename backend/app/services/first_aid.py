@@ -25,7 +25,7 @@ class FirstAidService:
                     {"step": 7, "action": "Continue until EMS arrives", "detail": "Switch compressors every 2 minutes to prevent fatigue", "time": "continuous"}
                 ],
                 "key_points": [
-                    "Push hard (at least 2 inches) and fast (100-120/min)",
+                    "Push hard (at least 5 cm) and fast (100-120/min)",
                     "Allow full chest recoil between compressions",
                     "Minimize interruptions in compressions",
                     "Compression-only CPR is effective for untrained bystanders",
@@ -64,7 +64,7 @@ class FirstAidService:
                     {"step": 1, "action": "Ensure scene safety", "detail": "Put on gloves if available", "time": "5 seconds"},
                     {"step": 2, "action": "Apply direct pressure", "detail": "Use clean cloth, press firmly on wound", "time": "immediate"},
                     {"step": 3, "action": "Do not remove blood-soaked cloths", "detail": "Add more layers on top", "time": "ongoing"},
-                    {"step": 4, "action": "If bleeding doesn't stop, apply tourniquet", "detail": "Place 2-3 inches above wound, tighten until bleeding stops, note time", "time": "if needed"},
+                    {"step": 4, "action": "If bleeding doesn't stop, apply tourniquet", "detail": "Place 5-8 cm above wound, tighten until bleeding stops, note time", "time": "if needed"},
                     {"step": 5, "action": "Elevate the injured limb above heart level", "detail": "While maintaining pressure", "time": "ongoing"},
                     {"step": 6, "action": "Keep person warm, treat for shock", "detail": "Cover with blanket, elevate legs if no spinal injury", "time": "ongoing"}
                 ],
@@ -143,7 +143,7 @@ class FirstAidService:
                 "icon": "💫",
                 "steps": [
                     {"step": 1, "action": "Lower person to ground", "detail": "If they appear about to faint", "time": "immediate"},
-                    {"step": 2, "action": "Elevate legs", "detail": "About 12 inches above heart", "time": "immediate"},
+                    {"step": 2, "action": "Elevate legs", "detail": "About 30 cm above heart level", "time": "immediate"},
                     {"step": 3, "action": "Check for injuries", "detail": "Look for head injury from fall", "time": "after safe"},
                     {"step": 4, "action": "Loosen tight clothing", "detail": "Collar, belt, tie", "time": "immediate"},
                     {"step": 5, "action": "Do NOT put anything in mouth", "detail": "Myth: they won't swallow tongue", "time": "important"}
@@ -171,7 +171,7 @@ class FirstAidService:
                     },
                     {
                         "name": "Heat Stroke (EMERGENCY)",
-                        "symptoms": ["High body temp >103°F", "Hot/red/dry skin", "Rapid strong pulse", "Loss of consciousness"],
+                        "symptoms": ["High body temperature, above 40°C", "Hot/red/dry skin", "Rapid strong pulse", "Loss of consciousness"],
                         "treatment": ["CALL 112 IMMEDIATELY", "Move to cooler area", "Cool rapidly with any means (ice, cold water)", "Do NOT give fluids if unconscious", "Monitor breathing"]
                     }
                 ]
@@ -206,6 +206,37 @@ class FirstAidService:
                     "Visible deformity",
                     "Inability to move fingers/toes"
                 ]
+            },
+            "snakebite": {
+                "name": "Snakebite",
+                "severity": "life-threatening",
+                "icon": "🐍",
+                "steps": [
+                    {"step": 1, "action": "Call 108 and get to a hospital with antivenom", "detail": "Government hospitals stock anti-snake venom; go even if the bite looks small", "time": "immediate"},
+                    {"step": 2, "action": "Keep the person still and calm", "detail": "Movement spreads venom faster; carry them if you can", "time": "immediate"},
+                    {"step": 3, "action": "Keep the bitten limb still, like a fracture", "detail": "Loose splint, at heart level", "time": "immediate"},
+                    {"step": 4, "action": "Remove rings, bangles, anklets and tight clothing", "detail": "The limb may swell", "time": "immediate"},
+                    {"step": 5, "action": "Do NOT cut, suck, tie a tight tourniquet, apply ice or herbs", "detail": "These cause harm and delay treatment", "time": "important"}
+                ],
+                "key_points": [
+                    "Note the time of the bite; do not try to catch or kill the snake",
+                    "Krait bites can be painless and happen at night; drowsiness or drooping eyelids need hospital care at once",
+                ]
+            },
+            "poisoning": {
+                "name": "Poisoning (including pesticides)",
+                "severity": "life-threatening",
+                "icon": "☠️",
+                "steps": [
+                    {"step": 1, "action": "Call 108, or the AIIMS poison information centre 1800-116-117", "detail": "Say what was swallowed, how much and when", "time": "immediate"},
+                    {"step": 2, "action": "Do NOT make the person vomit", "detail": "Unless a doctor or the poison centre tells you to", "time": "important"},
+                    {"step": 3, "action": "Remove contaminated clothes and wash skin with water", "detail": "For pesticides on skin; protect your own hands", "time": "immediate"},
+                    {"step": 4, "action": "Lay them on their side if drowsy", "detail": "Recovery position keeps the airway clear", "time": "if needed"},
+                    {"step": 5, "action": "Take the container or strip to hospital", "detail": "It tells doctors what to treat", "time": "on the way"}
+                ],
+                "key_points": [
+                    "If someone swallowed poison on purpose, stay with them; Tele-MANAS 14416 can help afterwards",
+                ]
             }
         }
 
@@ -224,7 +255,7 @@ class FirstAidService:
                 ],
                 "compression_details": {
                     "rate": "100-120 per minute (tempo of Stayin' Alive)",
-                    "depth": "At least 2 inches (5 cm) for adults",
+                    "depth": "At least 5 cm for adults",
                     "recoil": "Allow full chest recoil between compressions",
                     "hand_placement": "Heel of one hand on center of chest (lower half of sternum), other hand on top"
                 },
@@ -244,7 +275,7 @@ class FirstAidService:
                 ],
                 "compression_details": {
                     "rate": "100-120 per minute",
-                    "depth": "About 2 inches (5 cm) — one-third AP diameter",
+                    "depth": "About 5 cm, one-third the depth of the chest",
                     "hand_placement": "One or two hands on lower half of sternum"
                 }
             },
@@ -261,7 +292,7 @@ class FirstAidService:
                 ],
                 "compression_details": {
                     "rate": "100-120 per minute",
-                    "depth": "About 1.5 inches (4 cm) — one-third AP diameter",
+                    "depth": "About 4 cm, one-third the depth of the chest",
                     "hand_placement": "Two fingers on sternum, just below nipple line"
                 }
             },
@@ -340,7 +371,7 @@ class FirstAidService:
                     "after": ["Check for hot spots", "Wear N95 mask (ash/smoke)", "Check water before drinking"]
                 },
                 "flood": {
-                    "during": ["Move to higher ground", "Never walk/drive through floodwater", "6 inches can knock you down, 2 feet can carry a vehicle", "Avoid bridges over fast-moving water"],
+                    "during": ["Move to higher ground", "Never walk/drive through floodwater", "15 cm of moving water can knock you down; 60 cm can carry a car", "Avoid bridges over fast-moving water"],
                     "after": ["Don't return until authorities say safe", "Avoid contact with floodwater (contaminated)", "Check foundation for damage"]
                 }
             },
@@ -412,6 +443,14 @@ class FirstAidService:
             life_threatening_signs.append("Airway obstruction suspected")
             guidance.append(self.emergency_protocols["choking_adult"])
 
+        if any(s in symptom_lower for s in ["snakebite", "snake bite", "bitten by snake"]):
+            life_threatening_signs.append("Snakebite — hospital with antivenom now")
+            guidance.append(self.emergency_protocols["snakebite"])
+
+        if any(s in symptom_lower for s in ["poisoning", "swallowed poison", "pesticide", "overdose"]):
+            life_threatening_signs.append("Poisoning — call 108 or the poison centre now")
+            guidance.append(self.emergency_protocols["poisoning"])
+
         if any(s in symptom_lower for s in ["severe bleeding", "blood everywhere", "gushing blood"]):
             life_threatening_signs.append("Severe hemorrhage suspected")
             guidance.append(self.emergency_protocols["severe_bleeding"])
@@ -458,7 +497,7 @@ class FirstAidService:
             "life_threatening_signs": life_threatening_signs,
             "urgent_signs": urgent_signs,
             "relevant_protocols": guidance,
-            "call_911": len(life_threatening_signs) > 0
+            "call_emergency": len(life_threatening_signs) > 0
         }
 
     def get_cpr_training(self, age_group: str = "adult") -> Dict:

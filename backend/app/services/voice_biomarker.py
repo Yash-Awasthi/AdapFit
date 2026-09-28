@@ -69,7 +69,7 @@ class VoiceBiomarkerService:
             "status": "measured",
             "timestamp": time.time(),
             "voice_features": features,
-            "duration_seconds": audio_features.get("duration", 30),
+            "duration_seconds": audio_features.get("duration"),
             "comparison_to_baseline": comparison,
             "notable_changes": self._notable_changes(comparison),
             "disclaimer": (

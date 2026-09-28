@@ -1,0 +1,609 @@
+{
+ "protocols": {
+  "cardiac_arrest": {
+   "name": "Cardiac Arrest — CPR & AED",
+   "severity": "life-threatening",
+   "icon": "❤️",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Check responsiveness",
+     "detail": "Tap shoulders and shout 'Are you OK?'",
+     "time": "5 seconds"
+    },
+    {
+     "step": 2,
+     "action": "Call 112 / activate emergency response",
+     "detail": "If alone, put phone on speaker",
+     "time": "10 seconds"
+    },
+    {
+     "step": 3,
+     "action": "Check breathing",
+     "detail": "Look for chest rise for 10 seconds",
+     "time": "10 seconds"
+    },
+    {
+     "step": 4,
+     "action": "Begin chest compressions",
+     "detail": "Heel of hand on center of chest, push hard and fast, 100-120/min, full recoil",
+     "time": "until AED"
+    },
+    {
+     "step": 5,
+     "action": "Deliver 30 compressions",
+     "detail": "30:2 ratio if trained, compression-only if untrained",
+     "time": "about 15 seconds"
+    },
+    {
+     "step": 6,
+     "action": "Use AED when available",
+     "detail": "Turn on AED, follow voice prompts, ensure no one touching patient",
+     "time": "immediately"
+    },
+    {
+     "step": 7,
+     "action": "Continue until EMS arrives",
+     "detail": "Switch compressors every 2 minutes to prevent fatigue",
+     "time": "continuous"
+    }
+   ],
+   "key_points": [
+    "Push hard (at least 5 cm) and fast (100-120/min)",
+    "Allow full chest recoil between compressions",
+    "Minimize interruptions in compressions",
+    "Compression-only CPR is effective for untrained bystanders",
+    "AED use dramatically improves survival — use it as soon as available"
+   ],
+   "common_mistakes": [
+    "Compressing too shallow",
+    "Allowing incomplete chest recoil",
+    "Excessive ventilation pauses",
+    "Not pushing hard enough"
+   ]
+  },
+  "choking_adult": {
+   "name": "Choking — Conscious Adult",
+   "severity": "life-threatening",
+   "icon": "🫁",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Assess severity",
+     "detail": "Can they cough, speak, breathe? If yes, encourage coughing",
+     "time": "immediate"
+    },
+    {
+     "step": 2,
+     "action": "If cannot cough/breathe/speak",
+     "detail": "Stand behind person, wrap arms around waist",
+     "time": "immediate"
+    },
+    {
+     "step": 3,
+     "action": "Perform abdominal thrusts (Heimlich)",
+     "detail": "Make fist above navel, thrust inward and upward",
+     "time": "repeat"
+    },
+    {
+     "step": 4,
+     "action": "Repeat until object expelled or person becomes unconscious",
+     "detail": "Each thrust should be a separate attempt",
+     "time": "as needed"
+    },
+    {
+     "step": 5,
+     "action": "If unconscious: lower to ground, begin CPR",
+     "detail": "Look in mouth before each breath, remove visible object",
+     "time": "immediate"
+    }
+   ],
+   "key_points": [
+    "Ask 'Are you choking? Can you speak?' first",
+    "For pregnant or obese persons: chest thrusts instead of abdominal",
+    "Self-administered: make a fist above navel, thrust inward and upward",
+    "Infants (<1 year): 5 back slaps + 5 chest thrusts"
+   ]
+  },
+  "severe_bleeding": {
+   "name": "Severe Bleeding Control",
+   "severity": "life-threatening",
+   "icon": "🩸",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Ensure scene safety",
+     "detail": "Put on gloves if available",
+     "time": "5 seconds"
+    },
+    {
+     "step": 2,
+     "action": "Apply direct pressure",
+     "detail": "Use clean cloth, press firmly on wound",
+     "time": "immediate"
+    },
+    {
+     "step": 3,
+     "action": "Do not remove blood-soaked cloths",
+     "detail": "Add more layers on top",
+     "time": "ongoing"
+    },
+    {
+     "step": 4,
+     "action": "If bleeding doesn't stop, apply tourniquet",
+     "detail": "Place 5-8 cm above wound, tighten until bleeding stops, note time",
+     "time": "if needed"
+    },
+    {
+     "step": 5,
+     "action": "Elevate the injured limb above heart level",
+     "detail": "While maintaining pressure",
+     "time": "ongoing"
+    },
+    {
+     "step": 6,
+     "action": "Keep person warm, treat for shock",
+     "detail": "Cover with blanket, elevate legs if no spinal injury",
+     "time": "ongoing"
+    }
+   ],
+   "key_points": [
+    "Apply firm, continuous pressure for at least 10 minutes",
+    "Tourniquets save lives — don't be afraid to use one",
+    "Note the time of tourniquet application",
+    "Remove clothing from around the wound"
+   ]
+  },
+  "stroke": {
+   "name": "Stroke Recognition & Response (FAST)",
+   "severity": "life-threatening",
+   "icon": "🧠",
+   "steps": [
+    {
+     "step": 1,
+     "action": "F — Face drooping",
+     "detail": "Ask person to smile. Is one side drooping?",
+     "time": "30 seconds"
+    },
+    {
+     "step": 2,
+     "action": "A — Arm weakness",
+     "detail": "Ask person to raise both arms. Does one drift down?",
+     "time": "30 seconds"
+    },
+    {
+     "step": 3,
+     "action": "S — Speech difficulty",
+     "detail": "Ask person to repeat a simple sentence. Is speech slurred?",
+     "time": "30 seconds"
+    },
+    {
+     "step": 4,
+     "action": "T — Time to call 112",
+     "detail": "Note exact time symptoms began — critical for treatment",
+     "time": "immediate"
+    },
+    {
+     "step": 5,
+     "action": "Monitor and keep safe",
+     "detail": "Keep person calm, lying on affected side if vomiting, do NOT give food/drink",
+     "time": "until EMS"
+    }
+   ],
+   "key_points": [
+    "Time is brain — every minute counts",
+    "Do NOT drive to hospital yourself — call 112",
+    "Note the exact time symptoms started",
+    "Do NOT give aspirin (could be hemorrhagic stroke)",
+    "Keep airway clear if vomiting"
+   ]
+  },
+  "burns": {
+   "name": "Burns — First Aid",
+   "severity": "moderate",
+   "icon": "🔥",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Remove from heat source",
+     "detail": "Stop the burning process",
+     "time": "immediate"
+    },
+    {
+     "step": 2,
+     "action": "Cool the burn",
+     "detail": "Run cool (not ice cold) water for 10-20 minutes",
+     "time": "10-20 min"
+    },
+    {
+     "step": 3,
+     "action": "Remove jewelry/clothing",
+     "detail": "From burned area, unless stuck to skin",
+     "time": "after cooling"
+    },
+    {
+     "step": 4,
+     "action": "Cover with sterile dressing",
+     "detail": "Do NOT use butter, toothpaste, or home remedies",
+     "time": "after cooling"
+    },
+    {
+     "step": 5,
+     "action": "Take pain relief if needed",
+     "detail": "Ibuprofen or acetaminophen",
+     "time": "as needed"
+    }
+   ],
+   "key_points": [
+    "Cool with running water for 10-20 minutes",
+    "NEVER use ice, butter, toothpaste, or oil on burns",
+    "For chemical burns: flush with large amounts of water for 20+ minutes",
+    "For electrical burns: do NOT touch person if still in contact with source",
+    "Seek emergency care for burns larger than palm, on face/hands/joints, or circumferential"
+   ],
+   "severity_levels": [
+    {
+     "level": "First degree",
+     "description": "Red, painful, no blisters (sunburn-like)",
+     "treatment": "Cool water, aloe vera, OTC pain relief"
+    },
+    {
+     "level": "Second degree",
+     "description": "Red, blistered, very painful",
+     "treatment": "Cool water, sterile dressing, seek medical care"
+    },
+    {
+     "level": "Third degree",
+     "description": "White/charred, may be painless (nerve damage)",
+     "treatment": "Cover, call 112 immediately"
+    }
+   ]
+  },
+  "allergic_reaction": {
+   "name": "Anaphylaxis — Severe Allergic Reaction",
+   "severity": "life-threatening",
+   "icon": "⚠️",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Recognize symptoms",
+     "detail": "Hives, swelling (face/throat), difficulty breathing, rapid pulse, dizziness",
+     "time": "immediate"
+    },
+    {
+     "step": 2,
+     "action": "Administer epinephrine auto-injector (EpiPen)",
+     "detail": "Outer thigh (through clothing if needed), hold 10 seconds",
+     "time": "immediate"
+    },
+    {
+     "step": 3,
+     "action": "Call 112",
+     "detail": "Even after EpiPen, anaphylaxis can recur",
+     "time": "immediately"
+    },
+    {
+     "step": 4,
+     "action": "Lay person flat, elevate legs",
+     "detail": "Unless breathing is difficult — then allow them to sit up",
+     "time": "ongoing"
+    },
+    {
+     "step": 5,
+     "action": "Second dose if no improvement",
+     "detail": "After 5-15 minutes if symptoms persist",
+     "time": "5-15 min"
+    },
+    {
+     "step": 6,
+     "action": "Begin CPR if needed",
+     "detail": "If person stops breathing",
+     "time": "if needed"
+    }
+   ],
+   "key_points": [
+    "EpiPen first, 112 second (but do both)",
+    "EpiPen goes in outer thigh — can inject through clothing",
+    "Always call 112 even after EpiPen — biphasic reaction possible",
+    "Common triggers: peanuts, tree nuts, shellfish, bee stings, medications, latex"
+   ]
+  },
+  "fainting": {
+   "name": "Fainting (Syncope)",
+   "severity": "low",
+   "icon": "💫",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Lower person to ground",
+     "detail": "If they appear about to faint",
+     "time": "immediate"
+    },
+    {
+     "step": 2,
+     "action": "Elevate legs",
+     "detail": "About 30 cm above heart level",
+     "time": "immediate"
+    },
+    {
+     "step": 3,
+     "action": "Check for injuries",
+     "detail": "Look for head injury from fall",
+     "time": "after safe"
+    },
+    {
+     "step": 4,
+     "action": "Loosen tight clothing",
+     "detail": "Collar, belt, tie",
+     "time": "immediate"
+    },
+    {
+     "step": 5,
+     "action": "Do NOT put anything in mouth",
+     "detail": "Myth: they won't swallow tongue",
+     "time": "important"
+    }
+   ],
+   "key_points": [
+    "Most fainting is harmless but can indicate serious conditions",
+    "Seek medical care if: first faint, chest pain, prolonged unconsciousness, injury",
+    "Warning signs: lightheadedness, nausea, tunnel vision, sweating"
+   ]
+  },
+  "heat_emergency": {
+   "name": "Heat-Related Emergencies",
+   "severity": "moderate to life-threatening",
+   "icon": "🌡️",
+   "types": [
+    {
+     "name": "Heat Cramps",
+     "symptoms": [
+      "Muscle cramps",
+      "Heavy sweating"
+     ],
+     "treatment": [
+      "Rest in cool area",
+      "Drink water or electrolyte beverage",
+      "Gentle stretching",
+      "Cool compresses"
+     ]
+    },
+    {
+     "name": "Heat Exhaustion",
+     "symptoms": [
+      "Heavy sweating",
+      "Cold/pale/clammy skin",
+      "Weak/pulse",
+      "Nausea",
+      "Headache",
+      "Dizziness"
+     ],
+     "treatment": [
+      "Move to cool environment",
+      "Loosen clothing",
+      "Cool wet cloths on neck/armpits/groin",
+      "Sip water",
+      "If vomiting → 112"
+     ]
+    },
+    {
+     "name": "Heat Stroke (EMERGENCY)",
+     "symptoms": [
+      "High body temperature, above 40°C",
+      "Hot/red/dry skin",
+      "Rapid strong pulse",
+      "Loss of consciousness"
+     ],
+     "treatment": [
+      "CALL 112 IMMEDIATELY",
+      "Move to cooler area",
+      "Cool rapidly with any means (ice, cold water)",
+      "Do NOT give fluids if unconscious",
+      "Monitor breathing"
+     ]
+    }
+   ]
+  },
+  "hypothermia": {
+   "name": "Hypothermia — Cold Emergency",
+   "severity": "life-threatening",
+   "icon": "🥶",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Move to warm shelter",
+     "detail": "Remove wet clothing",
+     "time": "immediate"
+    },
+    {
+     "step": 2,
+     "action": "Warm center first",
+     "detail": "Neck, head, chest, groin — use skin-to-skin contact if needed",
+     "time": "immediate"
+    },
+    {
+     "step": 3,
+     "action": "Give warm, sweet beverages",
+     "detail": "Only if conscious and able to swallow",
+     "time": "ongoing"
+    },
+    {
+     "step": 4,
+     "action": "Handle gently",
+     "detail": "Rough movement can cause cardiac arrest",
+     "time": "always"
+    },
+    {
+     "step": 5,
+     "action": "Call 112 if severe",
+     "detail": "Confusion, slurred speech, drowsiness, loss of consciousness",
+     "time": "if severe"
+    }
+   ]
+  },
+  "fractures": {
+   "name": "Fracture & Sprain Management",
+   "severity": "moderate",
+   "icon": "🦴",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Do NOT move the injured area",
+     "detail": "Splint in position found",
+     "time": "immediate"
+    },
+    {
+     "step": 2,
+     "action": "Immobilize the joint",
+     "detail": "Splint above and below the injury",
+     "time": "immediate"
+    },
+    {
+     "step": 3,
+     "action": "Apply ice wrapped in cloth",
+     "detail": "20 minutes on, 20 minutes off",
+     "time": "ongoing"
+    },
+    {
+     "step": 4,
+     "action": "Elevate above heart level",
+     "detail": "If possible without moving fracture",
+     "time": "ongoing"
+    },
+    {
+     "step": 5,
+     "action": "Check circulation",
+     "detail": "Feel for pulse, check color/warmth below injury",
+     "time": "immediate"
+    }
+   ],
+   "red_flags": [
+    "Open fracture (bone protruding through skin)",
+    "Loss of pulse below injury",
+    "Numbness or tingling below injury",
+    "Visible deformity",
+    "Inability to move fingers/toes"
+   ]
+  },
+  "snakebite": {
+   "name": "Snakebite",
+   "severity": "life-threatening",
+   "icon": "🐍",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Call 108 and get to a hospital with antivenom",
+     "detail": "Government hospitals stock anti-snake venom; go even if the bite looks small",
+     "time": "immediate"
+    },
+    {
+     "step": 2,
+     "action": "Keep the person still and calm",
+     "detail": "Movement spreads venom faster; carry them if you can",
+     "time": "immediate"
+    },
+    {
+     "step": 3,
+     "action": "Keep the bitten limb still, like a fracture",
+     "detail": "Loose splint, at heart level",
+     "time": "immediate"
+    },
+    {
+     "step": 4,
+     "action": "Remove rings, bangles, anklets and tight clothing",
+     "detail": "The limb may swell",
+     "time": "immediate"
+    },
+    {
+     "step": 5,
+     "action": "Do NOT cut, suck, tie a tight tourniquet, apply ice or herbs",
+     "detail": "These cause harm and delay treatment",
+     "time": "important"
+    }
+   ],
+   "key_points": [
+    "Note the time of the bite; do not try to catch or kill the snake",
+    "Krait bites can be painless and happen at night; drowsiness or drooping eyelids need hospital care at once"
+   ]
+  },
+  "poisoning": {
+   "name": "Poisoning (including pesticides)",
+   "severity": "life-threatening",
+   "icon": "☠️",
+   "steps": [
+    {
+     "step": 1,
+     "action": "Call 108, or the AIIMS poison information centre 1800-116-117",
+     "detail": "Say what was swallowed, how much and when",
+     "time": "immediate"
+    },
+    {
+     "step": 2,
+     "action": "Do NOT make the person vomit",
+     "detail": "Unless a doctor or the poison centre tells you to",
+     "time": "important"
+    },
+    {
+     "step": 3,
+     "action": "Remove contaminated clothes and wash skin with water",
+     "detail": "For pesticides on skin; protect your own hands",
+     "time": "immediate"
+    },
+    {
+     "step": 4,
+     "action": "Lay them on their side if drowsy",
+     "detail": "Recovery position keeps the airway clear",
+     "time": "if needed"
+    },
+    {
+     "step": 5,
+     "action": "Take the container or strip to hospital",
+     "detail": "It tells doctors what to treat",
+     "time": "on the way"
+    }
+   ],
+   "key_points": [
+    "If someone swallowed poison on purpose, stay with them; Tele-MANAS 14416 can help afterwards"
+   ]
+  }
+ },
+ "medical": {
+  "patterns": [
+   "chest (pain|tightness|pressure)",
+   "can'?t breathe",
+   "cannot breathe",
+   "difficulty breathing",
+   "short(ness)? of breath at rest",
+   "heart attack",
+   "stroke",
+   "face (is )?droop",
+   "slurred speech",
+   "sudden (numbness|weakness)",
+   "one side of (my|the) body",
+   "(fainted|passed out|unconscious|collapsed)",
+   "severe bleeding",
+   "bleeding (won'?t|will not) stop",
+   "(seizure|convuls)",
+   "worst headache",
+   "anaphyla",
+   "throat (is )?(closing|swelling)",
+   "coughing (up )?blood",
+   "vomiting blood",
+   "overdose"
+  ],
+  "reply": "What you describe can be an emergency, and it needs a person, not an app.\n\nRight now:\n1. Call 112 (or 108 for an ambulance).\n2. Stop any activity. Sit or lie down somewhere safe.\n3. Do not drive yourself. Unlock the door and tell someone nearby.\n4. Note when it started. Responders will ask.\n\nOpen the Emergency tab to share your medical ID with responders."
+ },
+ "self_harm": {
+  "patterns": [
+   "suicid",
+   "kill (myself|me)",
+   "end (my|it) (life|all)",
+   "want to die",
+   "self[- ]?harm",
+   "hurt(ing)? myself",
+   "no reason to live",
+   "better off dead"
+  ],
+  "reply": "I'm really glad you told me. You don't have to handle this alone.\n\nRight now:\n1. Call Tele-MANAS on 14416 (free, 24/7, in your language), or iCall on 9152987821.\n2. If you might act on these thoughts, call 112 or go to the nearest hospital.\n3. Move away from anything you could hurt yourself with, and stay near someone you trust.\n4. Tell one person how you feel today, even in a single message.\n\nI'm still here if you want to keep talking."
+ }
+}

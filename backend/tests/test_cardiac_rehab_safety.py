@@ -1,11 +1,10 @@
 """
-Cardiac rehab: the target zone needs a real age, and a blank reading is not a
-reassuring one.
+Cardiac rehab: the zone is prescribed or resting + 20, never 220 minus age, and
+a blank reading is not a reassuring one.
 
-Age defaulted to 65, so a 45-year-old was given a 65-year-old's training
-ceiling. Blood pressure defaulted to "120/80" and oxygen saturation to 97,
-which silenced the alerts this service exists to raise for exactly the patient
-who recorded nothing.
+Age-predicted zones do not hold for heart patients, most of all on beta
+blockers. Blood pressure defaulted to "120/80" and oxygen saturation to 97,
+which silenced the alerts this service exists to raise.
 """
 import pytest
 
@@ -17,23 +16,29 @@ def service():
     return CardiacRehabService()
 
 
-def test_a_program_needs_an_age(service):
-    result = service.setup_program("u", {})
-    assert result["status"] == "insufficient_data"
-    assert "heart_rate_zones" not in result
+def test_no_heart_rate_given_means_effort_only(service):
+    zones = service.setup_program("u", {})["heart_rate_zones"]
+    assert zones["target_max"] is None and zones["source"] == "effort_only" and "RPE" in zones["effort"]
 
 
-def test_an_implausible_age_is_refused(service):
-    assert service.setup_program("u", {"age": 4})["status"] == "insufficient_data"
-    assert service.setup_program("u", {"age": "fifty"})["status"] == "insufficient_data"
+def test_age_does_not_set_a_zone(service):
+    zones = service.setup_program("u", {"age": 45})["heart_rate_zones"]
+    assert zones["target_max"] is None
 
 
-def test_the_target_zone_follows_the_age_given(service):
-    younger = service.setup_program("a", {"age": 45})["heart_rate_zones"]
-    older = service.setup_program("b", {"age": 70})["heart_rate_zones"]
-    assert younger["maximum"] == 175
-    assert older["maximum"] == 150
-    assert younger["target_max"] > older["target_max"]
+def test_prescribed_zone_wins(service):
+    zones = service.setup_program("u", {"resting_hr": 60, "prescribed_hr_min": 95, "prescribed_hr_max": 115})["heart_rate_zones"]
+    assert (zones["target_min"], zones["target_max"], zones["source"]) == (95, 115, "prescribed")
+
+
+def test_resting_plus_twenty_cap(service):
+    zones = service.setup_program("u", {"resting_hr": 64})["heart_rate_zones"]
+    assert zones["target_max"] == 84 and zones["source"] == "resting_plus_20"
+
+
+def test_no_invented_fluid_limit(service):
+    service.setup_program("u", {})
+    assert "Fluid intake over daily limit" not in service.log_daily("u", {"fluid_ml": 3000})["alerts"]
 
 
 def test_unrecorded_vitals_are_stored_as_absent(service):
