@@ -22,6 +22,8 @@ import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
+from app.core import crypto
+
 logger = logging.getLogger(__name__)
 
 SHARED_KEY = "_"
@@ -285,7 +287,9 @@ async def load_all() -> Dict[str, int]:
     _loading = True
     loaded, skipped = 0, 0
     try:
-        for namespace, key, blob in await _store().load_all():
+        for namespace, key, sealed in await _store().load_all():
+            # Outside the try: a missing key must stop startup, not restore empty state that is then saved.
+            blob = crypto.open_sealed(sealed, _aad(namespace, key))
             if namespace not in _holders:
                 _pending.setdefault(namespace, []).append((key, blob))
                 skipped += 1
@@ -327,7 +331,7 @@ async def flush() -> int:
                 continue
             digest = hashlib.sha256(blob).digest()
             if _saved_hash.get((namespace, key)) != digest:
-                upserts.append((namespace, key, blob))
+                upserts.append((namespace, key, crypto.seal(blob, _aad(namespace, key))))
                 _saved_hash[(namespace, key)] = digest
         if upserts:
             await _store().upsert(upserts)
@@ -446,6 +450,23 @@ def export_shared(user_id: str) -> Dict[str, Any]:
     """What shared services and module stores hold for one user, as plain data."""
     from app.core.per_user import _plain
     return {ns: _plain(items) for ns, items in _sweep(user_id, remove=False).items()}
+
+
+def _aad(namespace: str, key: str) -> bytes:
+    return f"feature_state/{namespace}/{key}".encode()
+
+
+async def reseal_all() -> int:
+    """Re-encrypt every stored row not already under the active key. Returns rows rewritten."""
+    active = crypto.active_key_id()
+    rows = []
+    for namespace, key, sealed in await _store().load_all():
+        if crypto.key_id_of(sealed) != active:
+            aad = _aad(namespace, key)
+            rows.append((namespace, key, crypto.seal(crypto.open_sealed(sealed, aad), aad)))
+    if rows:
+        await _store().upsert(rows)
+    return len(rows)
 
 
 async def erase_user(user_id: str) -> None:

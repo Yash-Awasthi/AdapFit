@@ -17,7 +17,7 @@ import { api } from '../../src/services/api';
 import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
-import { authHeader } from '../../src/services/authToken';
+import { authedFetch } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -71,7 +71,7 @@ export default function WellnessScreen() {
   async function fetchData() {
     try {
       const [exRes, hydData, medData] = await Promise.all([
-        fetch(`${API}/api/v1/mental-health/breathing-exercises`, { headers: authHeader() }),
+        authedFetch(`${API}/api/v1/mental-health/breathing-exercises`),
         api.getHydrationToday(userId).catch(() => null),
         api.getMeditationSessions().catch(() => null),
       ]);

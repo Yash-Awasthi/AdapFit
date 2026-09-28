@@ -6,7 +6,7 @@
  * renders as data right up until the first missing field throws.
  */
 import { API_V1 } from './config';
-import { authHeader } from './authToken';
+import { authedFetch } from './authToken';
 
 /** GET that returns null instead of throwing or handing back an error body. */
 export async function getJson<T>(path: string): Promise<T | null> {
@@ -32,7 +32,7 @@ export async function deleteJson<T>(path: string): Promise<T | null> {
 /** Multipart upload; `fetch` sets the boundary when Content-Type is left out. */
 export async function postForm<T>(path: string, form: FormData): Promise<T | null> {
   try {
-    const res = await fetch(`${API_V1}${path}`, { method: 'POST', headers: { ...authHeader() }, body: form });
+    const res = await authedFetch(`${API_V1}${path}`, { method: 'POST', body: form });
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
@@ -42,9 +42,9 @@ export async function postForm<T>(path: string, form: FormData): Promise<T | nul
 
 async function sendJson<T>(path: string, method: string, body?: unknown): Promise<T | null> {
   try {
-    const res = await fetch(path.startsWith('http') ? path : `${API_V1}${path}`, {
+    const res = await authedFetch(path.startsWith('http') ? path : `${API_V1}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
+      headers: { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!res.ok) return null;

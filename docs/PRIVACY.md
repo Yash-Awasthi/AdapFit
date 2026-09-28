@@ -61,9 +61,10 @@ production nothing is sent.
 | Account unused 3 years | Email warning, erased 48 h later unless the user signs in | `schedule_retention` |
 | Child account without guardian decision | Erased after 7 days | `schedule_retention` |
 | Guardian link | 72 hours | `guardian_link` |
-| Refresh sessions | 30 days, rotated on use | `auth.py` |
+| Refresh sessions | 30 days, rotated on use; all end on password change or reset | `auth.py` |
+| Password reset link | 30 minutes, single use | `auth.py` |
 | Raw DNA file | Never stored | `genomics_insights.py` |
-| Security audit log | 1 year (Rule 6) | Not yet: the log is in memory. Phase 4 |
+| Security audit log | 1 year (Rule 6) | `audit.purge_expired`, run by the erasure sweep |
 | Database backups | At most 30 days | Phase 8. A restore must re-run erasures requested after the backup was taken |
 
 ## Breach response
@@ -89,7 +90,7 @@ Google Play Data safety and the App Store privacy label must match this table.
 | Genetic data | Read once, not stored | No | App functionality | Yes |
 | App activity / analytics | No | No | - | - |
 
-Declare: data encrypted in transit; users can request deletion (in app and by
+Declare: data encrypted in transit and at rest; users can request deletion (in app and by
 email to the Grievance Officer); not used for advertising; not sold. Google
 Play also requires a web page for account deletion requests: point it at the
 privacy policy's erasure section once the site exists.

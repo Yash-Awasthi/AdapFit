@@ -1607,3 +1607,85 @@ back to the seeded `default` identity when no user is stored (Phase 4); backup
 retention and re-applying erasures after a restore (Phase 8); filling the
 placeholders, appointing the Grievance Officer, SMTP in production and
 DigiLocker (Phase 10).
+
+## Part 15 — Security hardening (todo.md Phase 4)
+
+Measured at the start: `AuthMiddleware` accepted a refresh token as a Bearer
+credential, and `IdentityMiddleware` only binds `user_id` for access tokens, so
+a refresh token reached every handler unbound: any user's records could be read
+or written by naming their id, and the consent gate was skipped. Any signed-in
+user could create, list and revoke API keys (`/auth/keys`), which nothing ever
+validated. `/encryption/encrypt` stored random bytes as "ciphertext" and threw
+the data away; `/security/compliance/*` reported every HIPAA/GDPR requirement
+"implemented". A suspended or erased account's access token kept working for 60
+minutes, and a password change left every refresh token valid. Login, signup
+and password reset had no rate limit (the token-bucket middleware existed but
+was never installed). `/forgot-password` was a stub. The app kept the access
+token in plain AsyncStorage and discarded the refresh token, so every session
+died after an hour; sign-out never revoked anything server-side. The audit log
+and `health_security` lived in process memory. `POST /users` was public and
+the app fell back to the seeded `default` identity. `/metrics`, `/docs`, the
+OpenAPI schema and the static admin pages were public in production, CORS
+allowed localhost there, and `/health` published record counts. Feature state,
+which holds the most sensitive modules, was stored as plain pickles.
+1,047 backend tests passed.
+
+Decided with the user: make the encryption API real rather than delete it;
+app-level AES-GCM at rest; audit sensitive events (not every read); build
+password reset by email now.
+
+- Sessions (`app/core/auth.py`): access tokens 15 minutes; refresh tokens
+  single use, and replaying a used one ends every session of the account
+  (theft). Password change (returns a fresh pair), reset, suspension and
+  erasure end every session; tokens of a suspended or erased account are
+  refused at once. Only access tokens authenticate API calls, in both
+  middlewares and the route dependencies. `JWT_SECRET_KEY_PREVIOUS` verifies
+  old tokens during a key rotation. `/auth/logout` takes the refresh token
+  without an access token, so sign-out works after expiry.
+- Password reset: single-use 30-minute link by email, same answer for unknown
+  addresses, server-rendered form, all sessions end, lockout cleared.
+- Rate limits (`app/core/rate_limiter.py`, now installed): per caller and route
+  class; sign-in routes per address with a generous burst for carrier-grade
+  NAT; AI and export routes tighter. The Dockerfiles trust the platform proxy's
+  `X-Forwarded-For` so the address is the client's.
+- Audit (`app/core/audit.py`, migration 009): durable, 1-year retention purged
+  by the erasure sweep; sign-ins, lockouts, session revocations, password
+  events, exports, consent and guardian decisions, erasure, vault sharing, key
+  operations, and any admin request naming another user. Unknown emails are
+  stored as a keyed hash. Users see their own log in the Privacy screen
+  (`/auth/activity`).
+- Encryption at rest (`app/core/crypto.py`): every `feature_state` row sealed
+  with AES-256-GCM under a keyring from `DATA_ENCRYPTION_KEYS`, authenticated
+  with its namespace and key. A missing key stops startup rather than
+  restoring empty state. Rows written before this are read as they are and
+  sealed on the next change; `POST /encryption/key/rotate` seals everything.
+- Vault (`/encryption/*`): records optionally locked with a passphrase the
+  server never stores (PBKDF2 600k), time- and read-limited shares to another
+  account (needs sharing consent, logged when read), key generation and
+  rotation for admins. `/security/*` reports the caller's own log and a
+  measured self-check: organisational controls show "not_verified".
+- Public surfaces: production serves no docs, schema, admin or static pages;
+  `/metrics` needs `METRICS_TOKEN`; `/health` has no counts; CORS only
+  `ALLOWED_ORIGINS`. Startup refuses production without a valid keyring or an
+  https `PUBLIC_BASE_URL`.
+- Removed the API key manager and its routes; `POST /users` now needs a token
+  and completes the caller's own profile.
+- Mobile: tokens in the Keystore/Keychain (`expo-secure-store`), one shared
+  refresh on 401 then retry, sign-in when the refresh fails; all 20 direct
+  `fetch` calls go through `authedFetch`. No `default` identity: signed out
+  means the sign-in screen, signed in without a profile means onboarding.
+  "Forgot password" works; sign-out revokes the session.
+- `docs/SECURITY.md`: key rotation runbooks, limits, audit contents, the
+  dependency scan and what is accepted.
+
+Dependency scan: pip-audit finds protobuf 4.25.9 (held by mediapipe 0.10.21);
+npm audit finds `uuid@7` (build tool) and `decode-uri-component@0.2.2` (via
+expo-router), both shipped with Expo 55. Accepted with reasons in SECURITY.md.
+
+1,060 backend tests pass; mobile typecheck clean.
+
+Left for later phases: run `POST /encryption/key/rotate` once after the first
+deploy with a key (Phase 8); container image scanning in CI (Phase 8);
+persist rotated-token memory and the session cut-off before a second worker
+(Phase 8); a change-password screen in the app (Phase 9); third-party
+penetration test (Phase 10).

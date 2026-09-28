@@ -53,7 +53,6 @@ ROUTE_MAP = {
     "auto_scale": ("/workouts", ["Auto-Scaling"]),
     "ws_chat": ("/chat", ["WebSocket Chat"]),
     "metrics": ("/metrics", ["Observability"]),
-    "auth": ("/auth", ["Authentication"]),
     "music_playlists": ("/music-playlists", ["Music Playlists"]),
     "challenges_ws": ("/challenges", ["Challenge WebSocket"]),
     "workout_stats": ("/workout-stats", ["Workout Stats"]),

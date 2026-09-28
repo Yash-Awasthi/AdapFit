@@ -67,7 +67,7 @@ Some providers process data outside India. We do not transfer data to any countr
 
 ## Security and breaches
 
-Data is encrypted in transit, passwords are hashed, and each account can reach only its own records. If a personal data breach affects you, we will tell you and the Data Protection Board without delay, with what happened, what it means for you and what you can do.
+Data is encrypted in transit and at rest, passwords are hashed, and each account can reach only its own records. If a personal data breach affects you, we will tell you and the Data Protection Board without delay, with what happened, what it means for you and what you can do.
 
 ## Grievance Officer
 

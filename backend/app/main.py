@@ -75,10 +75,12 @@ async def lifespan(app: FastAPI):
 async def _erase_due_accounts():
     """Accounts whose deletion grace period has passed are erased within a minute."""
     from app.core import durable, privacy
+    from app.core import audit
     while True:
         try:
             if await privacy.run_due_deletions():
                 await durable.flush()
+            await audit.purge_expired()
         except Exception:
             logger.exception("Scheduled account erasure failed")
         await asyncio.sleep(60)
@@ -87,11 +89,17 @@ async def _erase_due_accounts():
 # Rate limiter
 limiter = make_limiter()
 
+import os as _os
+_is_prod = _os.getenv("ENVIRONMENT", "development") == "production"
+
+# Production publishes no API map: docs, schema and the static admin pages are development tools.
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="AdapFit: AI-Powered Adaptive Fitness & Recovery Engine",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    openapi_url=None if _is_prod else f"{settings.API_V1_STR}/openapi.json",
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
     lifespan=lifespan,
 )
 app.state.limiter = limiter
@@ -99,21 +107,11 @@ if settings.RATE_LIMITING_ENABLED:
     from slowapi import _rate_limit_exceeded_handler
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS
-import os as _os
-_is_prod = _os.getenv("ENVIRONMENT", "development") == "production"
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:8081",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:8081",
-]
+# CORS. The mobile app sends no Origin; this only matters to browsers.
 if _is_prod:
-    ALLOWED_ORIGINS += [
-        origin.strip()
-        for origin in _os.getenv("ALLOWED_ORIGINS", "").split(",")
-        if origin.strip()
-    ]
+    ALLOWED_ORIGINS = [o.strip() for o in _os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+else:
+    ALLOWED_ORIGINS = ["http://localhost:3000", "http://localhost:8081", "http://127.0.0.1:3000", "http://127.0.0.1:8081"]
 
 # Middleware stack
 app.add_middleware(ValidationMiddleware)
@@ -154,12 +152,12 @@ app.include_router(metrics_router, prefix="/metrics", tags=["Observability"])
 
 # Static files
 static_dir = Path(__file__).parent / "static"
-if static_dir.exists():
+if static_dir.exists() and not _is_prod:
     from fastapi.staticfiles import StaticFiles
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 web_dir = Path(__file__).parent.parent.parent / "web"
-if web_dir.exists():
+if web_dir.exists() and not _is_prod:
     from fastapi.staticfiles import StaticFiles
     app.mount("/admin", StaticFiles(directory=str(web_dir), html=True), name="admin")
 
@@ -183,6 +181,9 @@ if _registration["errors"]:
 # and learn which paths carry a {user_id} segment.
 from app.middleware.identity import IdentityMiddleware
 app.add_middleware(IdentityMiddleware, fastapi_app=app)
+if settings.RATE_LIMITING_ENABLED:
+    from app.core.rate_limiter import RateLimitMiddleware
+    app.add_middleware(RateLimitMiddleware)
 
 
 # ─── Root endpoints ───
@@ -195,8 +196,7 @@ async def root():
 @app.get("/health")
 @limiter.limit("30/minute")
 async def health(request: Request):
-    from app.core.storage import storage
-    stats = await storage.get_stats()
+    # Record counts stay out: this route is public. Admins read them at /api/v1/admin/stats.
     services = {}
     for name, getter in [
         ("ml_engine", lambda: __import__("app.services.ml_engine", fromlist=["ml_engine"]).ml_engine.get_status()),
@@ -207,7 +207,7 @@ async def health(request: Request):
             services[name] = getter()
         except Exception:
             services[name] = {"status": "unavailable"}
-    return {"status": "healthy", "version": settings.VERSION, "storage": stats, "services": services}
+    return {"status": "healthy", "version": settings.VERSION, "services": services}
 
 
 @app.get("/ready")
@@ -240,9 +240,11 @@ async def seed_demo():
     return {"status": "seeded", "data": results}
 
 
-@app.get("/dashboard")
+@app.get("/dashboard", include_in_schema=False)
 async def dashboard():
     from fastapi.responses import FileResponse
+    if _is_prod:
+        raise HTTPException(status_code=404, detail="Not found")
     return FileResponse(str(Path(__file__).parent / "static" / "index.html"))
 
 

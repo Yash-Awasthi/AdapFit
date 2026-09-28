@@ -36,6 +36,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 # Expose port
 EXPOSE 8000
+# The container is reachable only through the platform proxy, so its X-Forwarded-For
+# is the real client address; rate limits and the audit log key on it.
+ENV FORWARDED_ALLOW_IPS="*"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

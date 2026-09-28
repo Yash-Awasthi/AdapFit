@@ -11,7 +11,7 @@ import { API_BASE_URL } from '../../src/services/config';
 import { asArray } from '../../src/services/http';
 import { useUserStore } from '../../src/stores';
 import { useTheme } from '../../src/services/theme';
-import { authHeader } from '../../src/services/authToken';
+import { authedFetch } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -74,9 +74,9 @@ export default function NutritionScreen() {
     setLoading(true);
     try {
       const [mealsRes, sumRes, tRes] = await Promise.all([
-        fetch(`${API}/api/v1/nutrition/meals?user_id=${userId}`, { headers: authHeader() }),
-        fetch(`${API}/api/v1/nutrition/daily?user_id=${userId}`, { headers: authHeader() }),
-        fetch(`${API}/api/v1/nutrition/targets?user_id=${userId}`, { headers: authHeader() }),
+        authedFetch(`${API}/api/v1/nutrition/meals?user_id=${userId}`),
+        authedFetch(`${API}/api/v1/nutrition/daily?user_id=${userId}`),
+        authedFetch(`${API}/api/v1/nutrition/targets?user_id=${userId}`),
       ]);
       if (tRes.ok) setTargets(await tRes.json());
       if (mealsRes.ok) setMeals(await mealsRes.json());
@@ -116,9 +116,9 @@ export default function NutritionScreen() {
       : { name: name.trim(), calories: parseInt(calories) || 0, protein_g: parseFloat(protein) || 0, carbs_g: parseFloat(carbs) || 0, fat_g: parseFloat(fat) || 0, meal_type: mealType };
     if (!payload.name) return;
     try {
-      const res = await fetch(`${API}/api/v1/nutrition/meals?user_id=${userId}`, {
+      const res = await authedFetch(`${API}/api/v1/nutrition/meals?user_id=${userId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (res.ok) {
@@ -137,7 +137,7 @@ export default function NutritionScreen() {
   async function deleteMeal(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const res = await fetch(`${API}/api/v1/nutrition/meals/${id}?user_id=${userId}`, { method: 'DELETE', headers: authHeader() });
+      const res = await authedFetch(`${API}/api/v1/nutrition/meals/${id}?user_id=${userId}`, { method: 'DELETE' });
       if (res.ok) {
         fetchData();
       } else {

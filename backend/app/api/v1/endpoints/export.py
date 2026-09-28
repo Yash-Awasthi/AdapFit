@@ -57,6 +57,8 @@ async def available_formats():
 
 @router.get("/all")
 async def export_all(user_id: str = Query("default")):
+    from app.core import audit
+    await audit.record("export_all", user_id=user_id)
     data = {key: await fetch(user_id) for key, (_, _, fetch) in SOURCES.items()}
     data["profile"] = await storage.get_user(user_id)
     data["baseline"] = await storage.get_baseline(user_id)

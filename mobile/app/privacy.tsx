@@ -11,7 +11,7 @@ import { colors, spacing, radius, presets } from '../src/theme';
 import { useUserStore } from '../src/stores';
 import {
   ConsentState, PurposeId, DOCUMENTS, isBlocked, getConsent, setConsent, resendGuardianEmail,
-  requestDeletion, cancelDeletion,
+  requestDeletion, cancelDeletion, getSecurityActivity, SECURITY_EVENT_LABELS, SecurityEvent,
 } from '../src/services/privacy';
 
 export default function PrivacyScreen() {
@@ -23,12 +23,14 @@ export default function PrivacyScreen() {
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [password, setPassword] = useState('');
+  const [activity, setActivity] = useState<SecurityEvent[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     const s = await getConsent();
     setState(s);
     if (s) setDraft(Object.fromEntries(Object.entries(s.purposes).map(([k, p]) => [k, !!p.granted])));
+    setActivity((await getSecurityActivity())?.entries ?? []);
     setLoading(false);
   }, []);
 
@@ -175,6 +177,21 @@ export default function PrivacyScreen() {
           <Text style={[ns.cardTitle, ns.rowText]}>{d.title}</Text>
         </TouchableOpacity>
       ))}
+      {activity.length > 0 && (
+        <>
+          <Text style={ns.section}>Recent security activity</Text>
+          <View style={ns.notice}>
+            {activity.slice(0, 10).map((e, i) => (
+              <Text key={`${e.at}-${i}`} style={ns.muted}>
+                {new Date(e.at * 1000).toLocaleString()} · {SECURITY_EVENT_LABELS[e.event] ?? e.event.replace(/_/g, ' ')}
+              </Text>
+            ))}
+            <Text style={[ns.muted, { marginTop: spacing.sm }]}>
+              Something you did not do? Change your password; that signs out every other device.
+            </Text>
+          </View>
+        </>
+      )}
       <TouchableOpacity style={ns.card} onPress={signOut}>
         <Ionicons name="log-out-outline" size={20} color={colors.text.secondary} />
         <Text style={[ns.cardTitle, ns.rowText]}>Sign out and clear this device</Text>

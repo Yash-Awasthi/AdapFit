@@ -8,7 +8,7 @@ import { API_BASE_URL } from '../src/services/config';
 import { useUserStore } from '../src/stores';
 import { useTheme } from '../src/services/theme';
 import { fetchHealthData, HealthBiometrics } from '../src/services/healthBridge';
-import { authHeader } from '../src/services/authToken';
+import { authedFetch } from '../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -106,9 +106,9 @@ export default function CheckinScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/v1/recovery-logs`, {
+      const res = await authedFetch(`${API}/api/v1/recovery-logs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: userId,
           log_date: new Date().toISOString().split('T')[0],

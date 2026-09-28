@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets } from '../src/theme';
 
 import { API_V1 as API } from '../src/services/config';
-import { setToken } from '../src/services/authToken';
+import { setTokens } from '../src/services/authToken';
 import { useUserStore } from '../src/stores';
 
 export default function LoginScreen() {
@@ -33,7 +33,7 @@ export default function LoginScreen() {
       });
       const data = await r.json();
       if (r.ok && data.tokens) {
-        await setToken(data.tokens.access_token ?? null);
+        await setTokens(data.tokens);
         // The root layout redirects to onboarding whenever the store holds no
         // profile, so the signed-in user has to be recorded before navigating.
         if (data.user?.id) {
@@ -51,6 +51,23 @@ export default function LoginScreen() {
       Alert.alert('Error', 'Network error. Please try again.');
     }
     setLoading(false);
+  };
+
+  const handleForgot = async () => {
+    if (!email.trim()) {
+      Alert.alert('Enter your email', 'Type the email of your account above, then tap Forgot Password again.');
+      return;
+    }
+    try {
+      await fetch(`${API}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      Alert.alert('Check your email', 'If this email has an account, a link to reset the password is on its way. It works for 30 minutes.');
+    } catch {
+      Alert.alert('Error', 'Network error. Please try again.');
+    }
   };
 
   return (
@@ -103,7 +120,7 @@ export default function LoginScreen() {
           {loading ? <ActivityIndicator color="#FFF" /> : <Text style={ns.buttonText}>Sign In</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity style={ns.forgotPassword}>
+        <TouchableOpacity style={ns.forgotPassword} onPress={handleForgot}>
           <Text style={ns.forgotText}>Forgot Password?</Text>
         </TouchableOpacity>
 

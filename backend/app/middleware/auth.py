@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.auth import decode_token
+from app.core.auth import decode_access_token, user_manager
 from app.core.config import settings
 
 
@@ -35,8 +35,9 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth-v2/login",
     "/api/v1/auth-v2/register",
     "/api/v1/auth-v2/refresh",
-    # User signup (no token exists yet at account creation)
-    "/api/v1/users",
+    "/api/v1/auth/forgot-password",
+    # The refresh token in the body is the credential; the access token may already have expired.
+    "/api/v1/auth/logout",
     # Health checks
     "/",
     "/health",
@@ -65,6 +66,8 @@ PUBLIC_PREFIXES = (
     # Guardian consent is given by someone without an account; documents are read before signing up.
     "/api/v1/privacy/guardian/",
     "/api/v1/privacy/documents",
+    # Opened from the reset email, by someone who cannot sign in.
+    "/api/v1/auth/reset-password/",
 )
 
 
@@ -120,8 +123,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         
         token = auth_header[7:]  # Remove "Bearer " prefix
         
-        # Decode and validate JWT
-        payload = decode_token(token)
+        await user_manager._ensure_loaded()
+        payload = decode_access_token(token)
         
         if payload is None:
             return Response(

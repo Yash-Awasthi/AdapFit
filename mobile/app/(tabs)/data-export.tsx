@@ -13,7 +13,7 @@ import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumCom
 import { useApi } from '../../src/hooks/useApi';
 import { asArray } from '../../src/services/http';
 import { API_V1 } from '../../src/services/config';
-import { authHeader } from '../../src/services/authToken';
+import { authedFetch } from '../../src/services/authToken';
 
 const TINT = '#22C55E';
 
@@ -43,7 +43,7 @@ export default function DataExportScreen() {
     setBusy(id);
     try {
       const all = id === 'all';
-      const res = await fetch(`${API_V1}/export/${id}${all ? '' : '?format=csv'}`, { headers: authHeader() });
+      const res = await authedFetch(`${API_V1}/export/${id}${all ? '' : '?format=csv'}`);
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const text = await res.text();
       const date = new Date().toISOString().slice(0, 10);

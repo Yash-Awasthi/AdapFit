@@ -9,7 +9,7 @@ import {
 import { useTheme } from "../../src/services/theme";
 import { API_BASE_URL } from "../../src/services/config";
 import { getJson, asArray } from "../../src/services/http";
-import { authHeader } from "../../src/services/authToken";
+import { authedFetch } from "../../src/services/authToken";
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync } from "expo-audio";
 import { File } from "expo-file-system";
 import { api } from "../../src/services/api";
@@ -133,9 +133,9 @@ export default function HealthScreen() {
 
   const addCondition = async (conditionId: string) => {
     try {
-      const res = await fetch(`${API}/api/v1/health/conditions?user_id=${userId}`, {
+      const res = await authedFetch(`${API}/api/v1/health/conditions?user_id=${userId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ condition_id: conditionId, severity: 5, is_active: true }),
       });
       if (res.ok) {
@@ -152,9 +152,9 @@ export default function HealthScreen() {
 
   const addMedication = async (name: string, dosage: string) => {
     try {
-      const res = await fetch(`${API}/api/v1/health/medications?user_id=${userId}`, {
+      const res = await authedFetch(`${API}/api/v1/health/medications?user_id=${userId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, dosage, frequency: "daily", category: "other", time_of_day: ["morning"] }),
       });
       if (res.ok) {

@@ -332,19 +332,6 @@ def test_warmup_cooldown():
     assert full["total_duration_seconds"] == full["warmup"]["total_duration_seconds"] + full["cooldown"]["total_duration_seconds"]
 
 
-def test_api_key_info():
-    r1 = post_json("/api/v1/auth/keys", json={"name": "info-key", "tier": "pro"})
-    key = r1.json()["api_key"]
-    r2 = get_json(f"/api/v1/auth/keys/info?api_key={key}")
-    assert r2.status_code == 200 and r2.json()["tier"] == "pro" and r2.json()["name"] == "info-key"
-
-
-def test_api_key_revoke():
-    key = post_json("/api/v1/auth/keys", json={"name": "revoke-key"}).json()["api_key"]
-    assert del_json(f"/api/v1/auth/keys/{key}").json()["revoked"] is True
-    assert get_json(f"/api/v1/auth/keys/info?api_key={key}").json()["is_active"] is False
-
-
 # ── NL + AI endpoints ────────────────────────────────────────────────────────
 
 def test_nl_workout_parse():

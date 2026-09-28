@@ -1,19 +1,24 @@
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from app.models.schemas import UserProfileCreate, UserProfileResponse, UserProfileUpdate
+from app.core.dependencies import require_user
 from app.core.storage import storage
 from app.services import personal_baseline
 
 router = APIRouter()
 
 @router.post("", response_model=UserProfileResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(profile: UserProfileCreate):
-    """Create a new user profile with default baselines."""
+async def create_user(profile: UserProfileCreate, account: dict = Depends(require_user)):
+    """Create or complete the signed-in account's profile. The id is always the account's own."""
     user_data = profile.model_dump()
-    user_data["id"] = str(uuid.uuid4())
+    user_data["email"] = account.get("email") or user_data["email"]
+    existing = await storage.get_user(account["id"])
+    if existing:
+        return UserProfileResponse(**await storage.update_user(account["id"], user_data))
+    user_data["id"] = account["id"]
 
     user = await storage.create_user(user_data)
 
