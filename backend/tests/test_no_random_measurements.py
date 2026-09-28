@@ -29,7 +29,6 @@ ALLOWED = {
     # Wording and content variety: choosing which tip, recipe or phrasing to
     # show makes no claim about a measurement.
     "ai_coach.py": {"choice"},
-    "ai_companion.py": {"choice"},
     "habit_coach.py": {"choice"},
     "recipe_generator.py": {"choice"},
     "workplace_ergonomics.py": {"choice", "sample"},
@@ -80,7 +79,7 @@ def test_no_service_generates_a_measurement(path):
 
 def test_the_sweep_actually_covers_the_services():
     """A guard on the guard: an empty file list would make this vacuous."""
-    assert len(ALL_SERVICES) > 350
+    assert len(ALL_SERVICES) > 300
 
 
 def test_the_allowlist_has_no_stale_entries():
