@@ -89,6 +89,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
       title: 'Body & Vitals',
       items: [
         { icon: HeartPulse, label: 'Vital Signs', sub: 'Heart rate & blood pressure', route: '/vital-signs', color: '#EF4444' },
+        { icon: Activity, label: 'HRV', sub: 'Readings & breathing coach', route: '/hrv', color: '#10B981' },
         { icon: Smile, label: 'Mental Health', sub: 'Mood & anxiety tracking', route: '/mental-health', color: '#A855F7' },
         { icon: Pill, label: 'Medication', sub: 'Doses & reminders', route: '/medication', color: '#22C55E' },
         { icon: Watch, label: 'Devices', sub: 'Wearables & sync', route: '/devices', color: '#64748B' },

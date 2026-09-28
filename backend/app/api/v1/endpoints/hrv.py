@@ -1,8 +1,15 @@
-"""HRV Trend Charts — visualizable HRV data with trend lines and statistics."""
+"""HRV: trends from check-ins, analysis of a recorded RR series, and breathing biofeedback."""
 
 from __future__ import annotations
-from fastapi import APIRouter, Query
-from typing import Optional
+from dataclasses import asdict
+from typing import List, Literal, Optional
+
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from app.services.hrv_analysis import HRVAnalyzer
+from app.services.hrv_artifact_correction import correct_artifacts
+from app.services.hrv_biofeedback import HRVBiofeedbackAnalyzer, HRVSample
 from app.core.storage import storage
 
 router = APIRouter()
@@ -141,3 +148,57 @@ async def hrv_zones(user_id: str = Query("default"), days: int = Query(14, ge=1,
         "total_readings": len(hrv_values),
         "mean_hrv": round(mean_val, 1),
     }
+
+
+class RRRecording(BaseModel):
+    rr_intervals_ms: List[float] = Field(min_length=30, max_length=20000,
+                                         description="Beat-to-beat intervals from a chest strap or ECG")
+
+
+@router.post("/analyze")
+async def analyze_recording(req: RRRecording):
+    """Clean a recording (Lipponen 2019 artifact correction), then full time, frequency and nonlinear analysis."""
+    if any(not 250 <= rr <= 2500 for rr in req.rr_intervals_ms):
+        raise HTTPException(status_code=422, detail="RR intervals must be between 250 and 2500 ms")
+    cleaned = correct_artifacts(req.rr_intervals_ms)
+    report = HRVAnalyzer.analyze(cleaned.corrected_rr)
+    if report is None:
+        raise HTTPException(status_code=422, detail="Too few clean beats to analyse; record for at least 2 minutes")
+    return {
+        **asdict(report),
+        "artifacts": {
+            "found": len(cleaned.artifacts),
+            "removed_beats": cleaned.removed_beats,
+            "added_beats": cleaned.added_beats,
+            "quality": round(cleaned.quality_score, 3),
+        },
+    }
+
+
+@router.get("/breathing-pattern")
+async def breathing_pattern(
+    goal: Literal["relax", "sleep", "focus", "energize"] = "relax",
+    stress_level: float = Query(0.5, ge=0, le=1),
+):
+    pattern = HRVBiofeedbackAnalyzer.get_recommended_pattern(stress_level, goal)
+    return {**asdict(pattern), "cycle_seconds": pattern.cycle_length,
+            "breaths_per_minute": round(pattern.breaths_per_minute, 2)}
+
+
+class BiofeedbackBeat(BaseModel):
+    timestamp_ms: float = Field(ge=0)
+    rr_interval_ms: float = Field(ge=250, le=2500)
+    heart_rate: float = Field(ge=20, le=250)
+
+
+class BiofeedbackRequest(BaseModel):
+    pattern: Literal["calm", "coherence", "energize", "sleep", "box"] = "coherence"
+    beats: List[BiofeedbackBeat] = Field(min_length=30, max_length=20000)
+
+
+@router.post("/biofeedback")
+async def biofeedback_session(req: BiofeedbackRequest):
+    """Coherence of a paced-breathing session recorded beat by beat."""
+    pattern = HRVBiofeedbackAnalyzer.PATTERNS[req.pattern]
+    samples = [HRVSample(b.timestamp_ms, b.rr_interval_ms, b.heart_rate) for b in req.beats]
+    return HRVBiofeedbackAnalyzer.analyze_breathing_session(samples, pattern)
