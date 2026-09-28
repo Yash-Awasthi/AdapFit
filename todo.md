@@ -9,24 +9,6 @@ wellness, India first, every feature kept, nothing diagnoses.
 
 ---
 
-## Phase 5 — Platform coverage and device data
-
-- Photo measurement of skin spots (`lesion_measure.py`) is tested on synthetic
-  images only; calibrate on real phone photos of moles with a coin.
-
-- iOS project, build profile and HealthKit entitlement.
-- Health Connect and HealthKit sync actually wired and installed.
-- Wearable and BLE integrations worth keeping for launch.
-- `actigraphy_analysis` (rest-activity rhythm) once hourly activity syncs.
-- Live GPS run recording (`gps_tracking`) and night sleep-audio (`sleep_audio`)
-  have APIs but need on-device capture.
-- `realtime_pipeline` is only exercised by tests; decide with live streaming.
-- Health Connect sync can supply blood glucose to the CGM summary
-  (`/diabetes/glucose/import` already takes bulk readings).
-- Real-device testing of camera heart rate, pose and sensors.
-- Offline behaviour and sync conflicts.
-- Push notifications end to end.
-
 ## Phase 6 — Monetisation
 
 - Subscription model and pricing tiers.
@@ -47,10 +29,19 @@ wellness, India first, every feature kept, nothing diagnoses.
 - Score and algorithm validation against references (recovery, HRV, sleep,
   readiness).
 - Remaining places where values are defaulted or estimated without input.
+- The home recovery ring shows 0 when there is no check-in, and the "Train, but
+  reduce intensity" advice appears with no data behind it.
+- Photo measurement of skin spots (`lesion_measure.py`) is tested on synthetic
+  images only; calibrate on real phone photos of moles with a coin.
+- Health Connect sync adds and updates records but never learns of deletions;
+  use the changes API so a record deleted on the phone leaves the server too.
 
 ## Phase 8 — Infrastructure and operations
 
 - Build and deploy images; staging and production environments.
+- iOS project, build profile and HealthKit entitlement, then HealthKit sync.
+- Remote push: needs a Firebase project (FCM) and the server sending through it.
+  Local reminders are scheduled on the phone already.
 - The server must run one worker until feature state moves to per-request
   loading (all three Dockerfiles now say so). Three Dockerfiles is two too many.
 - Verify `feature_state` on real Postgres: local login for `adapfit` failed with
@@ -83,6 +74,15 @@ wellness, India first, every feature kept, nothing diagnoses.
 - 12 new hub and feature screens this phase have only been typechecked, never
   run on a device.
 
+- With the user present, on their phone: camera heart rate, pose and sensors,
+  and a BLE heart-rate strap. Decide which wearables are worth keeping for launch.
+- Reminders are inexact alarms: Android gave a daily reminder a one-hour window.
+  Medication times may need exact alarms (`SCHEDULE_EXACT_ALARM`, user-granted).
+- Run recording hits expo/expo#50364: if the app is relaunched while a run's
+  location task is registered, fixes stop reaching JS (Finish now times out
+  instead of hanging). Patch expo-task-manager or move to a native service.
+- Sleep sounds stop listening if the screen turns off (JS timers pause); the
+  screen stays on under a black overlay. Native metering would lift that.
 - Change-password screen (the API returns a fresh token pair; reset by email works).
 - Onboarding flow and first-run experience.
 - Navigation and information architecture for the reduced feature set.

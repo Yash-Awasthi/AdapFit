@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Switch, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
 import { Bell, BellOff, Moon, Dumbbell, Activity, Droplets } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
 import { useUserStore } from '../stores';
 import { useTheme } from '../services/theme';
 import { authedFetch } from '../services/authToken';
+import { applyReminders } from '../services/reminders';
 
 const API = API_BASE_URL;
 
@@ -57,11 +58,18 @@ export function NotificationSetup() {
     setLoading(false);
   }
 
+  // Every change on the server is mirrored into the phone's alarm schedule.
+  async function reapply() {
+    if ((await applyReminders(true)) === null) {
+      Alert.alert('Reminders are off', 'Allow notifications for AdapFit in Android settings to get these reminders.');
+    }
+  }
+
   async function setupDefaults() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     try {
       const res = await authedFetch(`${API}/api/v1/notifications/setup-defaults?user_id=${userId}`, { method: 'POST' });
-      if (res.ok) fetchData();
+      if (res.ok) { await fetchData(); reapply(); }
     } catch {}
   }
 
@@ -69,7 +77,8 @@ export function NotificationSetup() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await authedFetch(`${API}/api/v1/notifications/${id}?user_id=${userId}`, { method: 'DELETE' });
-      fetchData();
+      await fetchData();
+      reapply();
     } catch {}
   }
 
@@ -81,7 +90,7 @@ export function NotificationSetup() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [key]: value }),
       });
-      if (res.ok) setPrefs(await res.json());
+      if (res.ok) { setPrefs(await res.json()); reapply(); }
     } catch {}
   }
 

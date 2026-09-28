@@ -1689,3 +1689,53 @@ deploy with a key (Phase 8); container image scanning in CI (Phase 8);
 persist rotated-token memory and the session cut-off before a second worker
 (Phase 8); a change-password screen in the app (Phase 9); third-party
 penetration test (Phase 10).
+
+## Part 16 — Platform coverage and device data (todo.md Phase 5)
+
+Measured at the start: Health Connect, local reminders, GPS runs and sleep
+audio had APIs or services but nothing installed on a device had exercised
+them. Offline completion of a workout queued a mutation the server wrote into
+the workouts table as a plain record, and the client marked the queue by its
+own id while the server answered with record ids, so a queued workout was
+replayed every 30 seconds forever. `realtime_pipeline` (558 lines) was only
+imported by its tests.
+
+Decided with the user: Health Connect core plus extras (16 types), local
+reminders now and remote push later (needs a Firebase project), iOS deferred,
+GPS runs and sleep audio both built.
+
+- Health Connect: sync of 16 types into `/device-data/import`, keyed by record
+  id so re-syncs change nothing; blood glucose feeds the CGM summary; a
+  rest-activity rhythm appears after three days of steps.
+- Reminders: server reminders and medication slots scheduled on the phone,
+  cancelled and rebuilt on every change and on sign-out.
+- Runs: foreground-service GPS with a persisted queue, uploaded in batches;
+  the server drops inaccurate fixes and jumps and saves the finished route to
+  workout history. Queue edits are serialised (overlapping task events lost
+  fixes). A run in progress is discarded on sign-out.
+- Sleep sounds: microphone levels only, snoring detected on the phone, the
+  recording file deleted when listening stops (or on the next visit after a
+  crash). The screen stays on under a black overlay because JS timers stop
+  with the screen off, and the screen says so. Apnoea risk is "not assessed"
+  because pauses are not detected.
+- Offline queue: the client sends its queue id and the server echoes it; a
+  queued workout replays through the real completion route and is applied
+  once per queue id.
+- Onboarding no longer asks for the email the account already has, and no
+  longer claims no account is needed. Menu entries for both new screens.
+- `expo-location` 55.0.7 crashed the app on the first background fix
+  (`expo.modules.core.MapHelper` missing); upgraded to the SDK's 55.1.14.
+- Deleted `realtime_pipeline`: live streaming is not planned; Health Connect
+  is batch and the BLE strap reads on the phone.
+
+Verified on the emulator (debug build, arm64-v8a and x86_64): sign-in and
+buttons without the gesture crash, onboarding, a 1.55 km mock-GPS run with the
+screen off saved to history, a reminder firing at its minute, Health Connect
+permission sheet and sync of Toolbox test data, and a sleep-sounds session
+posted with its audio file removed.
+
+1,054 backend tests pass; mobile typecheck clean; the four `*.check.ts` pass.
+
+Left for later phases: camera heart rate and a BLE strap on the user's phone
+(Phase 9); the task-manager relaunch bug and exact alarms (Phase 9); Health
+Connect deletions (Phase 7); iOS and remote push (Phase 8).

@@ -120,6 +120,7 @@ async function runSync() {
       try {
         const result = await api.post('/api/v1/tasks/sync/batch', {
           mutations: batch.map((m) => ({
+            id: m.id,
             table_name: m.table_name,
             record_id: m.record_id,
             operation: m.operation,
@@ -131,8 +132,7 @@ async function runSync() {
           syncedIds = syncedIds.concat(result.synced_ids);
         }
       } catch {
-        // Server may not support sync yet — mark as synced to avoid infinite retry
-        // In production, implement retry with exponential backoff
+        // Stays queued; the next cycle retries.
       }
     }
 

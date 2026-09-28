@@ -216,3 +216,41 @@ def generate_actigraphy_summary(counts: list[int]) -> dict[str, Any]:
             "is_diurnal": rhythm.is_diurnal,
         },
     }
+
+
+def rest_activity_rhythm(hourly_days: list[list[float]]) -> dict[str, Any]:
+    """
+    Non-parametric rest-activity rhythm (Van Someren 1999) from hourly activity, one list of 24 per day.
+
+    IS near 1 means the same daily pattern every day; IV near 0 a smooth one;
+    RA near 1 a clear gap between the most active 10 hours and the quietest 5.
+    """
+    days = [d for d in hourly_days if len(d) == 24]
+    if len(days) < 3:
+        return {"status": "insufficient_data", "days": len(days), "needed_days": 3}
+    x = [v for d in days for v in d]
+    n = len(x)
+    mean = sum(x) / n
+    total_var = sum((v - mean) ** 2 for v in x)
+    if total_var == 0:
+        return {"status": "insufficient_data", "days": len(days), "message": "No variation in activity"}
+    profile = [sum(d[h] for d in days) / len(days) for h in range(24)]
+    interdaily = n * sum((p - mean) ** 2 for p in profile) / (24 * total_var)
+    intradaily = n * sum((x[i] - x[i - 1]) ** 2 for i in range(1, n)) / ((n - 1) * total_var)
+
+    def window(size: int, pick):
+        means = [(sum(profile[(s + k) % 24] for k in range(size)) / size, s) for s in range(24)]
+        return pick(means)
+
+    m10, m10_start = window(10, max)
+    l5, l5_start = window(5, min)
+    return {
+        "status": "ok",
+        "days": len(days),
+        "interdaily_stability": round(interdaily, 3),
+        "intradaily_variability": round(intradaily, 3),
+        "m10": round(m10, 1), "m10_onset_hour": m10_start,
+        "l5": round(l5, 1), "l5_onset_hour": l5_start,
+        "relative_amplitude": round((m10 - l5) / (m10 + l5), 3) if m10 + l5 else 0.0,
+        "hourly_profile": [round(p, 1) for p in profile],
+    }

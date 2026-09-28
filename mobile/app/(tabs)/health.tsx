@@ -10,6 +10,7 @@ import { useTheme } from "../../src/services/theme";
 import { API_BASE_URL } from "../../src/services/config";
 import { getJson, asArray } from "../../src/services/http";
 import { authedFetch } from "../../src/services/authToken";
+import { applyReminders } from "../../src/services/reminders";
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync } from "expo-audio";
 import { File } from "expo-file-system";
 import { api } from "../../src/services/api";
@@ -160,6 +161,7 @@ export default function HealthScreen() {
       if (res.ok) {
         setShowAddMed(false);
         loadData();
+        applyReminders();
       } else {
         const detail = await res.text().catch(() => "");
         Alert.alert("Could not add medication", `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ""}`);

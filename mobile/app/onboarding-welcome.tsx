@@ -20,7 +20,6 @@ const FEATURES = [
 ];
 
 export default function OnboardingScreen() {
-  const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   // No default: an assumed gender silently unlocks cycle, fertility, and
   // pregnancy features for every account that skips the question.
@@ -32,10 +31,6 @@ export default function OnboardingScreen() {
   const s = makeStyles(theme);
 
   async function handleStart() {
-    if (!email.trim()) {
-      Alert.alert('Email required', 'Enter an email to continue.');
-      return;
-    }
     if (!gender) {
       Alert.alert('Gender required', 'Pick an option so we only show features that apply to you.');
       return;
@@ -47,7 +42,6 @@ export default function OnboardingScreen() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim(),
           name: name.trim() || null,
           gender,
         }),
@@ -110,16 +104,6 @@ export default function OnboardingScreen() {
           placeholderTextColor="#475569"
           autoCapitalize="words"
         />
-        <Text style={s.label}>Email</Text>
-        <TextInput
-          style={s.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="your@email.com"
-          placeholderTextColor="#475569"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
         <Text style={s.label}>Gender</Text>
         <View style={s.genderRow}>
           {GENDER_OPTIONS.map(({ value: g, label }) => (
@@ -140,10 +124,6 @@ export default function OnboardingScreen() {
           loading={loading}
         />
       </View>
-
-      <Text style={s.footer}>
-        Free, open-source, no account required.
-      </Text>
     </ScrollView>
   );
 }
@@ -190,6 +170,5 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     genderChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
     genderChipText: { fontSize: 14, color: theme.textSecondary },
     genderChipTextActive: { color: '#fff', fontWeight: '700' },
-    footer: { fontSize: 12, color: '#475569', textAlign: 'center' },
   });
 }
