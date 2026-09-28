@@ -1,120 +1,95 @@
-# AdapFit Deployment Guide
+# Deployment
 
-## Quick Start (Docker)
+One image (`Dockerfile` at the repository root) runs the API. On start it
+applies pending migrations when `DATABASE_URL` is set, re-encrypts any
+`feature_state` row not under the first key in `DATA_ENCRYPTION_KEYS`, and
+serves on `$PORT` (default 8000) with one worker: feature state lives in
+process memory (`backend/app/core/durable.py`), so a second worker or replica
+would hold its own copy. Before adding one, move feature state to per-request
+loading and persist the used-refresh-token memory and the "sessions ended at"
+cut-off (`backend/app/core/auth.py`), which also live in memory.
+
+## Local stack
 
 ```bash
-# 1. Clone and configure
-cp .env.example .env
-# Edit .env with your values
-
-# 2. Start all services
-docker-compose up -d
-
-# 3. Verify
-curl http://localhost:8000/health
-curl http://localhost/admin/
+docker compose up --build        # API on http://localhost:8010, Postgres inside the network
 ```
 
-## Development Setup
+Compose uses a development key it generates into its data volume. To reset
+everything: `docker compose down -v`.
+
+## Environment
+
+| Variable | Required in production | Notes |
+|---|---|---|
+| `ENVIRONMENT` | `production` | Hides docs, schema and admin pages; enforces the checks below |
+| `DATABASE_URL` | yes | Postgres 15+ with `pgcrypto`, `uuid-ossp` (and `vector` if available). Use a direct connection, not a transaction-mode pooler |
+| `DATA_ENCRYPTION_KEYS` | yes | `k1:<base64 32 bytes>`; generate with `python -c "from app.core.crypto import new_key; print('k1:' + new_key())"` from `backend/` |
+| `JWT_SECRET_KEY` | yes | 32+ random characters |
+| `PUBLIC_BASE_URL` | yes, https | Used in password-reset and guardian links |
+| `GROQ_API_KEY` or `GEMINI_API_KEY` | one of them | Both have free tiers |
+| `SENTRY_DSN` | no | Error reports without request bodies, headers or query strings |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | for reset and guardian mail | Without them the links are only logged |
+| `METRICS_TOKEN` | no | Bearer token for `/metrics` |
+| `ALLOWED_ORIGINS` | no | Only for a web client; the app does not need CORS |
+
+## Free staging (Render + Neon)
+
+1. Create a free Postgres at neon.tech (region Singapore) and copy the
+   direct connection string (the one without `-pooler`).
+2. On render.com: New > Blueprint > this repository. `render.yaml` defines the
+   service. Paste `DATABASE_URL`, a generated `DATA_ENCRYPTION_KEYS`,
+   `PUBLIC_BASE_URL` (the `https://...onrender.com` address Render shows) and
+   an LLM key when asked.
+3. Point the app at it: `EXPO_PUBLIC_API_URL=https://<service>.onrender.com`
+   when building (see below).
+4. Uptime: a free UptimeRobot monitor on `/health` every 5 minutes also keeps
+   the free instance from sleeping during a test.
+
+The free instance has 512 MB; the API idles at about 220 MB.
+
+## Backups
 
 ```bash
-# Backend
 cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m scripts.backup dump ../backups          # nightly; files older than 30 days are deleted
+python -m scripts.backup restore ../backups/adapfit-<stamp>.dump
+```
 
-# Mobile
+Both need `DATABASE_URL`, and `pg_dump`/`pg_restore` on `PATH` (or `PG_BIN`).
+A restore replays every erasure logged after the dump was taken (from the
+live database when reachable, and from the ledger files kept beside newer
+dumps), so an account deleted after the backup stays deleted. Restoring with
+`pg_restore` directly skips that step.
+
+Tested 2026-09-29 against Postgres 17: an account erased after the dump was
+restored by `pg_restore` alone and erased again by the script, from the live
+log and, with the live log overwritten, from a newer dump's ledger.
+
+## Load test
+
+```bash
+RATE_LIMITING_ENABLED=false docker compose up -d
+cd backend && python -m scripts.load_test http://127.0.0.1:8010 --users 20 --seconds 60
+```
+
+2026-09-29 on the compose stack (one worker, laptop): 20 users, 122
+requests/s, no errors; p95 check-in 308 ms, decision 165 ms, generate 296 ms,
+complete 289 ms.
+
+## Android release
+
+The release key is `mobile/android/app/adapfit-release.keystore`, described
+by `mobile/android/keystore.properties`; neither is in git. Keep both, and
+their passwords, in the company password manager: losing them means a new
+Play listing. Without `keystore.properties` the release build is unsigned.
+
+```bash
 cd mobile
-npm install
-npx expo start
+EXPO_PUBLIC_API_URL=https://<api host> npm run release:apk   # arm64 APK for a phone
+EXPO_PUBLIC_API_URL=https://<api host> npm run release:aab   # bundle for Play
 ```
 
-## Production Deployment
-
-### AWS (ECS + RDS)
-```bash
-# 1. Create ECR repository
-aws ecr create-repository --repository-name adapfit
-
-# 2. Build and push
-docker build -t adapfit .
-docker tag adapfit:latest <account>.dkr.ecr.<region>.amazonaws.com/adapfit:latest
-docker push <account>.dkr.ecr.<region>.amazonaws.com/adapfit:latest
-
-# 3. Create ECS cluster with Fargate
-# 4. Create RDS PostgreSQL instance
-# 5. Create ElastiCache Redis cluster
-# 6. Configure ALB for load balancing
-```
-
-### GCP (Cloud Run + Cloud SQL)
-```bash
-# 1. Build and deploy
-gcloud builds submit --tag gcr.io/<project>/adapfit
-gcloud run deploy adapfit --image gcr.io/<project>/adapfit --platform managed
-```
-
-### Azure (Container Apps + Azure Database)
-```bash
-# 1. Create Azure Container Registry
-az acr create --resource-group adapfit-rg --name adapfit --sku Standard
-
-# 2. Build and push
-az acr build --registry adapfit --image adapfit:v1 .
-```
-
-## Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `REDIS_URL` | Redis connection string | Yes |
-| `JWT_SECRET_KEY` | Secret for JWT signing | Yes |
-| `JWT_SECRET_KEY_PREVIOUS` | Old signing key, verify-only, during a rotation | No |
-| `DATA_ENCRYPTION_KEYS` | At-rest keyring, `id:base64key,...`; first one encrypts | Yes |
-| `PUBLIC_BASE_URL` | https URL used in reset and guardian links | Yes |
-| `METRICS_TOKEN` | Bearer token for Prometheus; without it `/metrics` is 404 in production | No |
-| `ALLOWED_ORIGINS` | Browser origins allowed by CORS, comma separated | No |
-| `GEMINI_API_KEY` | Google AI API key | No |
-| `ENVIRONMENT` | development/staging/production | Yes |
-| `LOG_LEVEL` | debug/info/warning/error | No |
-
-## SSL/TLS Setup
-
-```bash
-# Generate self-signed cert (development)
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout nginx/selfsigned.key \
-    -out nginx/selfsigned.crt
-
-# For production: Use Let's Encrypt
-certbot certonly --webroot -w /var/www/html -d adapfit.com
-```
-
-## Monitoring
-
-- **Health Check**: `GET /health`
-- **Metrics**: `GET /metrics`
-- **Admin Dashboard**: `GET /admin/`
-- **API Docs**: `GET /docs`
-- **OpenAPI Schema**: `GET /api/v1/openapi.json`
-
-## Database Migrations
-
-```bash
-# Initialize database
-python backend/app/scripts/init_db.py
-
-# Or use Docker
-docker-compose exec backend python /app/backend/app/scripts/init_db.py
-```
-
-## Scaling
-
-```bash
-# Horizontal scaling with docker-compose
-docker-compose up -d --scale backend=3
-
-# Or use Kubernetes
-kubectl scale deployment adapfit-backend --replicas=3
-```
+Bump `versionCode` in `mobile/android/app/build.gradle` for every upload.
+The build writes several GB under `mobile/node_modules/*/android/build`;
+delete those folders afterwards.

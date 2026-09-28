@@ -39,7 +39,8 @@ def main() -> int:
 
         registered = client.post("/api/v1/auth/register", json={
             "email": email, "username": f"pgcheck{suffix}",
-            "password": "Str0ngPassw0rd!", "display_name": "PG Check",
+            "password": "Str0ngPassw0rd!", "display_name": "PG Check", "birth_date": "1990-01-01",
+            "consent": {"health_data": True, "ai": True, "sharing": False, "analytics": False},
         })
         assert registered.status_code == 200, registered.text
         body = registered.json()
@@ -59,6 +60,11 @@ def main() -> int:
             })
             assert response.status_code == 201, response.text
         print("logged 7 check-ins, last recovery score:", response.json()["recovery_score"])
+
+        bp = client.post("/api/v1/blood-pressure/log", headers=headers,
+                         json={"systolic": 118, "diastolic": 76, "pulse": 61})
+        assert bp.status_code == 201, bp.text
+        print("logged a blood pressure reading (feature_state)")
 
         decision = client.get("/api/v1/decision/today", headers=headers)
         assert decision.status_code == 200, decision.text
@@ -91,7 +97,7 @@ def main() -> int:
         return reread.returncode
 
     print()
-    print("OK: accounts, check-ins and baselines are in the database.")
+    print("OK: accounts, check-ins, baselines and feature state are in the database.")
     return 0
 
 

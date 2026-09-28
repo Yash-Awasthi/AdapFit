@@ -36,28 +36,17 @@ wellness, India first, every feature kept, nothing diagnoses.
 - Health Connect sync adds and updates records but never learns of deletions;
   use the changes API so a record deleted on the phone leaves the server too.
 
-## Phase 8 — Infrastructure and operations
+## Phase 8 — Infrastructure and operations (rest)
 
-- Build and deploy images; staging and production environments.
-- iOS project, build profile and HealthKit entitlement, then HealthKit sync.
-- Remote push: needs a Firebase project (FCM) and the server sending through it.
-  Local reminders are scheduled on the phone already.
-- The server must run one worker until feature state moves to per-request
-  loading (all three Dockerfiles now say so). Three Dockerfiles is two too many.
-- Verify `feature_state` on real Postgres: local login for `adapfit` failed with
-  the password in `backend/.env` on 2026-09-28, so only SQLite was exercised.
-- Postgres backups with a tested restore. Keep backups at most 30 days (the
-  privacy policy says so) and re-run erasures requested after the backup.
-- Error tracking and crash reporting on backend and mobile.
-- Metrics, logs, uptime alerts, on-call basics.
-- CI that blocks on types, lint and mobile checks; release pipeline for EAS.
-- Container image scanning and `pip-audit`/`npm audit` in CI; upgrade protobuf
-  with mediapipe and Expo past 55 for the two accepted advisories (`docs/SECURITY.md`).
-- First deploy with `DATA_ENCRYPTION_KEYS`: call `POST /encryption/key/rotate`
-  once so rows written before encryption are sealed.
-- Before a second worker, persist the used-refresh-token memory and the
-  "sessions ended at" cut-off, which live in process memory today.
-- Load test the core loop.
+Done in plan.md Part 17. Left:
+
+- Staging on the free Render + Neon setup in `docs/DEPLOYMENT.md`: needs the
+  owner's accounts there, a Groq or Gemini key, and a Sentry DSN (all free).
+- Uptime monitor on `/health` (free UptimeRobot) once staging exists.
+- Remote push (FCM): needs a Firebase project, and a server event worth
+  pushing; every notification today is a local reminder.
+- iOS project, build profile, HealthKit entitlement and sync (deferred).
+- Expo past SDK 55 for the moderate advisories in `docs/SECURITY.md`.
 
 ## Phase 9 — User experience and quality
 

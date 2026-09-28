@@ -25,8 +25,22 @@ async def main(user_id: str, email: str) -> int:
     baseline = await storage.get_baseline(user_id)
     assert baseline is not None, "baseline was not persisted"
 
+    from app.api.v1.endpoints import blood_pressure_api
+    from app.core import crypto, durable
+    from app.core.db import get_pool
+    namespace = "app.api.v1.endpoints.blood_pressure_api.readings"
+    async with (await get_pool()).acquire() as conn:
+        payload = await conn.fetchval(
+            "SELECT payload FROM feature_state WHERE namespace = $1 AND key = $2", namespace, user_id)
+    assert payload is not None, "feature_state row was not written"
+    assert bytes(payload).startswith(crypto.MAGIC), "feature_state row is not sealed"
+    await durable.load_all()
+    readings = blood_pressure_api._readings.get(user_id, [])
+    assert [r["systolic"] for r in readings] == [118], readings
+
     print(f"re-read in a new process: {account['email']}, {len(logs)} recovery logs, "
-          f"baseline HRV {baseline['hrv_mean_rmssd']}")
+          f"baseline HRV {baseline['hrv_mean_rmssd']}, "
+          f"{len(readings)} sealed blood pressure reading")
     return 0
 
 

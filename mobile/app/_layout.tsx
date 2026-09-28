@@ -1,6 +1,6 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "../src/services/theme";
@@ -14,8 +14,24 @@ import { getToken } from "../src/services/authToken";
 import { getConsent, isBlocked } from "../src/services/privacy";
 import { syncHealthConnectIfDue } from "../src/services/healthConnect";
 import { applyReminders } from "../src/services/reminders";
+import { installCrashReporting, reportError } from "../src/services/crashReport";
 // Registers the background location task; must load before any run starts or resumes.
 import "../src/services/runTracker";
+
+installCrashReporting();
+
+/** A render error in any screen: report it and offer a retry instead of a blank app. */
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  useEffect(() => reportError(error), [error]);
+  return (
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24, gap: 16 }}>
+      <Text style={{ fontSize: 18, fontWeight: "600", textAlign: "center" }}>Something went wrong on this screen.</Text>
+      <Pressable accessibilityRole="button" onPress={retry} style={{ paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8, backgroundColor: "#2563eb" }}>
+        <Text style={{ color: "#fff", fontWeight: "600" }}>Try again</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 function RootStack() {
   const { theme, isDark } = useTheme();

@@ -59,14 +59,6 @@ def test_injury_risk_score():
     assert r["risk_level"] in ("LOW", "MODERATE", "ELEVATED", "CRITICAL")
 
 
-def test_online_learning_feedback():
-    f = [50.0] * 7 + [7.5] * 7 + [70, 70, 70] + [1.0, 7.0]
-    state_before = ml_engine.training_samples
-    result = ml_engine.record_feedback(f, 2)  # 2 = MODERATE
-    assert "status" in result
-    assert ml_engine.training_samples == state_before + 1
-
-
 # --- NLP pipeline ---
 
 @pytest.mark.parametrize("text,expected", [

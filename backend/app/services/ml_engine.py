@@ -10,7 +10,6 @@ from app.core.workout_metrics import session_duration_minutes, session_load, ses
 
 # Lazy-loaded ML dependencies — loaded on first use
 _HAS_NUMPY = None  # None = not checked yet
-_HAS_PYTORCH = None
 _HAS_XGBOOST = None
 _HAS_LIGHTGBM = None
 
@@ -23,16 +22,6 @@ def _ensure_numpy():
         _HAS_NUMPY = True
     except ImportError:
         _HAS_NUMPY = False
-
-def _ensure_pytorch():
-    global _HAS_PYTORCH
-    if _HAS_PYTORCH is not None:
-        return
-    try:
-        import torch
-        _HAS_PYTORCH = True
-    except ImportError:
-        _HAS_PYTORCH = False
 
 def _ensure_xgboost():
     global _HAS_XGBOOST
@@ -53,21 +42,6 @@ def _ensure_lightgbm():
         _HAS_LIGHTGBM = True
     except ImportError:
         _HAS_LIGHTGBM = False
-
-
-class ReadinessNet(object):
-    def __init__(self, input_dim=14, hidden_dim=32, output_dim=4):
-        if not _HAS_PYTORCH:
-            return
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim), nn.ReLU(), nn.Dropout(0.2),
-            nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), nn.Dropout(0.2),
-            nn.Linear(hidden_dim, output_dim),
-        )
-
-    def forward(self, x):
-        return self.net(x)
 
 
 class TrendCorrelationAnalyzer:
@@ -394,16 +368,11 @@ class FatigueForecaster:
 class AdvancedMLEngine:
     """
     Enterprise ML analytics engine v2.
-    Combines neural nets, XGBoost/LightGBM ensemble, trend correlation,
+    Combines an XGBoost/LightGBM ensemble, trend correlation,
     workout performance prediction, and fatigue forecasting.
     """
 
     def __init__(self):
-        self.readiness_model = None  # lazy-created on first train/predict
-        self.is_trained = False
-        self.training_samples = 0
-        self._feature_history: List[List[float]] = []
-        self._label_history: List[int] = []
 
         # New sub-systems
         self.correlation = TrendCorrelationAnalyzer()
@@ -456,53 +425,11 @@ class AdvancedMLEngine:
         return features
 
     def train_readiness_model(self, features_list: List[List[float]], labels: List[int]):
-        _ensure_pytorch()
-        if not _HAS_PYTORCH or len(features_list) < 5:
-            self._feature_history.extend(features_list)
-            self._label_history.extend(labels)
-            self.training_samples = len(self._label_history)
-            return {"status": "insufficient_data", "samples": self.training_samples}
-
-        self._feature_history.extend(features_list)
-        self._label_history.extend(labels)
-        self.training_samples = len(self._label_history)
-
-        X = torch.tensor(self._feature_history[-100:], dtype=torch.float32)
-        y = torch.tensor(self._label_history[-100:], dtype=torch.long)
-
-        optimizer = optim.Adam(self.readiness_model.parameters(), lr=0.001)
-        criterion = nn.CrossEntropyLoss()
-
-        self.readiness_model.train()
-        for epoch in range(50):
-            optimizer.zero_grad()
-            output = self.readiness_model(X)
-            loss = criterion(output, y)
-            loss.backward()
-            optimizer.step()
-
-        self.is_trained = True
-        return {"status": "trained", "samples": self.training_samples, "loss": loss.item()}
+        # No trained model: a global net over every user's feedback is not personal, and it never ran.
+        return {"status": "not_trained", "model_type": "rule_based"}
 
     def predict_readiness(self, features: List[float]) -> Dict[str, Any]:
         states = ["DEPLETED", "REDUCED", "MODERATE", "OPTIMAL"]
-
-        _ensure_pytorch()
-        if _HAS_PYTORCH and self.is_trained and self.readiness_model is not None:
-            self.readiness_model.eval()
-            with torch.no_grad():
-                x = torch.tensor([features], dtype=torch.float32)
-                output = self.readiness_model(x)
-                probs = torch.softmax(output, dim=1).numpy()[0]
-                pred_idx = int(probs.argmax())
-                return {
-                    "predicted_state": states[pred_idx],
-                    "confidence": float(probs[pred_idx]),
-                    "probabilities": {states[i]: float(probs[i]) for i in range(4)},
-                    "model_type": "pytorch_neural_network",
-                    "is_trained": True,
-                }
-
         avg_hrv = sum(features[:7]) / 7 if features[:7] else 50.0
         avg_sleep = sum(features[7:14]) / 7 if len(features) >= 14 else 7.5
         last_score = features[14] if len(features) > 14 else 70
@@ -598,21 +525,11 @@ class AdvancedMLEngine:
         level = "CRITICAL" if risk >= 70 else ("ELEVATED" if risk >= 40 else ("MODERATE" if risk >= 20 else "LOW"))
         return {"risk_score": round(risk, 1), "risk_level": level, "contributing_factors": factors}
 
-    def record_feedback(self, features: List[float], actual_state: int):
-        self._feature_history.append(features)
-        self._label_history.append(actual_state)
-        self.training_samples = len(self._label_history)
-        if self.training_samples >= 5 and self.training_samples % 5 == 0:
-            return self.train_readiness_model([], [])
-        return {"status": "buffered", "samples": self.training_samples}
-
     def get_status(self):
         return {
-            "pytorch_available": _HAS_PYTORCH,
             "xgboost_available": _HAS_XGBOOST,
             "lightgbm_available": _HAS_LIGHTGBM,
-            "model_trained": self.is_trained,
-            "training_samples": self.training_samples,
+            "model_trained": False,
             "correlation_engine": "active",
             "fatigue_forecaster": "active",
             "performance_predictor": "active",

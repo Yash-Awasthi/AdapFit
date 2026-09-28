@@ -1739,3 +1739,62 @@ posted with its audio file removed.
 Left for later phases: camera heart rate and a BLE strap on the user's phone
 (Phase 9); the task-manager relaunch bug and exact alarms (Phase 9); Health
 Connect deletions (Phase 7); iOS and remote push (Phase 8).
+
+## Part 17 — Infrastructure and operations (todo.md Phase 8)
+
+Measured at the start: three Dockerfiles (Python 3.11 and 3.12, uvicorn and
+gunicorn), two compose files with Redis and nginx that nothing used, a Railway
+config, and a CI workflow for branches that do not exist that ran mypy with
+`|| true` and built the wrong directory. The local Postgres login "failure"
+was a port clash: `127.0.0.1:5432` belongs to another project's Docker
+container, and the native Postgres 17 service listens on 5434. The image was
+4.1 GB, most of it CUDA torch pulled in for `ReadinessNet`, a global neural
+net that could never run (`nn` and `torch` were undefined at module level, so
+training raised and prediction always fell back to rules). pip-audit flagged
+protobuf, held back by mediapipe 0.10.21. No crash reporting on either side.
+
+Decided with the user: every feature free (no billing yet), free hosting only,
+the existing release keystore, exact alarms allowed, push and crash reporting
+wanted.
+
+- One `Dockerfile` at the root: Python 3.12 slim, non-root, CPU-only, applies
+  migrations when `DATABASE_URL` is set, one worker on `$PORT`. 2.5 GB, idles
+  at about 220 MB. `docker-compose.yml` is the API plus pgvector Postgres 17,
+  published on `127.0.0.1:8010` only. Deleted the other Dockerfiles, compose
+  file, `railway.toml`, `nginx/`, `monitoring/` and `start.sh`.
+- Startup re-encrypts every `feature_state` row not under the first key, so
+  the first deploy with a key and every key rotation need no manual call.
+- `scripts/backup.py`: `pg_dump` with 30-day pruning and an erasure ledger per
+  dump; restore replays erasures and deletion requests logged after the dump.
+  Cancelling a deletion is now audited so a restore does not undo it.
+- Sentry on the backend when `SENTRY_DSN` is set, with request query, headers
+  and body stripped. The app reports uncaught JS errors and render errors
+  (with a "Try again" screen) to `POST /client-errors`, which is public,
+  size-bounded, rate-limited, logged and forwarded to Sentry. Native crashes
+  are not captured; add `@sentry/react-native` if they turn up.
+- Deleted `ReadinessNet` and torch; readiness prediction is the rule-based
+  score it always was. mediapipe 1.0.1 with the Tasks `PoseLandmarker` (model
+  downloaded into the image); protobuf is gone from the tree.
+- CI: pytest, ruff for syntax errors and undefined names (one found: the
+  unused `service_health` middleware, deleted), pip-audit, tsc, the
+  `*.check.ts` files, npm audit at high, and a Trivy image scan.
+- Android release: `npm run release:apk` / `release:aab`; without
+  `keystore.properties` the release is unsigned instead of debug-signed.
+- `render.yaml` and `docs/DEPLOYMENT.md` for free staging on Render + Neon.
+- `scripts/load_test.py`: sign-up, profile, check-in, decision, generate and
+  complete a workout per virtual user.
+
+Verified: native Postgres 17 (`scripts/verify_postgres.py`, now also writing
+a sealed `feature_state` row and reading it back in a new process); compose
+stack (migrations, sealed rows, data survives a restart); production mode
+refuses to start without the key that sealed the rows, and with the new key
+first and the old one second it re-sealed both rows and served no docs;
+backup, erase, restore on Postgres 17 re-erased the account from the live log
+and, with the live log overwritten, from a newer dump's ledger; load test 20
+users for 60 s, 122 requests/s, no errors, p95 at most 308 ms; Trivy no high
+or critical; pip-audit clean. 1,058 backend tests pass; typecheck clean; the
+four `*.check.ts` pass.
+
+Left: staging, Sentry DSN, uptime monitor and an LLM key need the owner's free
+accounts; remote push needs Firebase and a reason to push; iOS deferred; Expo
+upgrade past 55.

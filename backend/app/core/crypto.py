@@ -2,8 +2,8 @@
 Encryption at rest: AES-256-GCM under a keyring.
 
 DATA_ENCRYPTION_KEYS holds "id:base64key" pairs separated by commas. The first
-key encrypts; every key decrypts. To rotate: put a new key first, restart, call
-POST /encryption/key/rotate (re-encrypts every stored row), then drop the old key.
+key encrypts; every key decrypts. To rotate: put a new key first and restart
+(startup re-encrypts every stored row), then drop the old key.
 
 Without the variable, development generates one key into the data directory.
 Production refuses to start without it (startup_checks).

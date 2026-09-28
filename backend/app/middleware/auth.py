@@ -38,6 +38,8 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/forgot-password",
     # The refresh token in the body is the credential; the access token may already have expired.
     "/api/v1/auth/logout",
+    # The app can crash before sign-in.
+    "/api/v1/client-errors",
     # Health checks
     "/",
     "/health",

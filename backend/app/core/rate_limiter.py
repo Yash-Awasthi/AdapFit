@@ -23,6 +23,7 @@ RULES = (
     (("/api/v1/chat", "/api/v1/ai-coach", "/api/v1/diet/photo-log", "/api/v1/voice-engine", "/api/v1/voice",
       "/api/v1/memory", "/api/v1/misinformation", "/api/v1/meal-photo"), 20, 20 / 300, "ai"),
     (("/api/v1/export", "/api/v1/encryption/key/rotate"), 5, 5 / 600, "export"),
+    (("/api/v1/client-errors",), 10, 10 / 600, "crash"),
     (("/api/v1/",), 180, 3.0, "api"),
 )
 MAX_BUCKETS = 50_000
