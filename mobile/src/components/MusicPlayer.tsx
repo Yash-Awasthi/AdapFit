@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
 import { useUserStore } from '../stores';
 import { useTheme } from '../services/theme';
+import { authedFetch } from '../services/authToken';
 
 const API = API_BASE_URL;
 
@@ -32,7 +33,7 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
 
   async function fetchState() {
     try {
-      const res = await fetch(`${API}/api/v1/music/state?user_id=${userId}`);
+      const res = await authedFetch(`${API}/api/v1/music/state?user_id=${userId}`);
       if (res.ok) {
         const s = await res.json();
         setPlaying(s.is_playing);
@@ -46,7 +47,7 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const endpoint = playing ? 'pause' : 'resume';
     try {
-      const res = await fetch(`${API}/api/v1/music/${endpoint}?user_id=${userId}`, { method: 'POST' });
+      const res = await authedFetch(`${API}/api/v1/music/${endpoint}?user_id=${userId}`, { method: 'POST' });
       if (res.ok) {
         const s = await res.json();
         setPlaying(s.is_playing);
@@ -58,7 +59,7 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
   async function nextTrack() {
     Haptics.selectionAsync();
     try {
-      const res = await fetch(`${API}/api/v1/music/next?user_id=${userId}`, { method: 'POST' });
+      const res = await authedFetch(`${API}/api/v1/music/next?user_id=${userId}`, { method: 'POST' });
       if (res.ok) {
         const s = await res.json();
         if (s.current_track) setTrack(s.current_track);
@@ -69,7 +70,7 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
   async function startPreset(id: string) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     try {
-      const res = await fetch(`${API}/api/v1/music/play?user_id=${userId}&playlist_id=${id}`, { method: 'POST' });
+      const res = await authedFetch(`${API}/api/v1/music/play?user_id=${userId}&playlist_id=${id}`, { method: 'POST' });
       if (res.ok) {
         const s = await res.json();
         setPlaying(s.is_playing);

@@ -67,7 +67,8 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
     {
       title: 'Wellness',
       items: [
-        { icon: Brain, label: 'Wellness', sub: 'Mood & mind check-in', route: '/wellness', color: '#A855F7' },
+        { icon: Brain, label: 'Mind', sub: 'Mood, journal & wellbeing', route: '/mental-health', color: '#A855F7' },
+        { icon: Droplets, label: 'Wellness', sub: 'Hydration, breathing & meditation', route: '/wellness', color: '#06B6D4' },
         { icon: Moon, label: 'Sleep', sub: 'Stages & consistency', route: '/sleep', color: '#6366F1' },
         { icon: Shield, label: 'Health', sub: 'Conditions & meds', route: '/health', color: '#22C55E' },
         ...(showFemaleScreens
@@ -91,7 +92,6 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
       items: [
         { icon: HeartPulse, label: 'Vital Signs', sub: 'Heart rate & blood pressure', route: '/vital-signs', color: '#EF4444' },
         { icon: Activity, label: 'HRV', sub: 'Readings & breathing coach', route: '/hrv', color: '#10B981' },
-        { icon: Smile, label: 'Mental Health', sub: 'Mood & anxiety tracking', route: '/mental-health', color: '#A855F7' },
         { icon: Pill, label: 'Medication', sub: 'Doses & reminders', route: '/medication', color: '#22C55E' },
         { icon: Watch, label: 'Devices', sub: 'Wearables & sync', route: '/devices', color: '#64748B' },
       ],

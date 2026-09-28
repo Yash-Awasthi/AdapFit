@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets, glass } from '../../src/theme';
 
 import { API_V1 as API } from '../../src/services/config';
+import { authedFetch } from '../../src/services/authToken';
 function RecipeCard({ recipe, onPress }: { recipe: any; onPress: () => void }) {
   const dietColors: Record<string, string> = { 'high-protein': colors.health.heart, vegan: colors.health.calm, keto: colors.health.energy, 'low-carb': colors.primary, 'gluten-free': colors.health.sleep };
   return (
@@ -50,14 +51,14 @@ export default function RecipesScreen() {
   const loadRecipes = async (diet: string = '') => {
     const params = new URLSearchParams();
     if (diet) params.set('diet', diet);
-    const r = await fetch(`${API}/recipes/all?${params}`);
+    const r = await authedFetch(`${API}/recipes/all?${params}`);
     const d = await r.json();
     setRecipes(d.recipes || []);
   };
 
   const searchRecipes = async () => {
     if (!query.trim()) { loadRecipes(selectedDiet); return; }
-    const r = await fetch(`${API}/recipes/search?query=${encodeURIComponent(query)}&diet=${selectedDiet}`);
+    const r = await authedFetch(`${API}/recipes/search?query=${encodeURIComponent(query)}&diet=${selectedDiet}`);
     const d = await r.json();
     setRecipes(d.recipes || []);
   };

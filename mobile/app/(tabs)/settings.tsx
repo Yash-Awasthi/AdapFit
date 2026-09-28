@@ -22,6 +22,7 @@ import { API_BASE_URL } from '../../src/services/config';
 import { useUserStore } from '../../src/stores';
 import { useTheme, AccentName } from '../../src/services/theme';
 import { NotificationSetup } from '../../src/components/NotificationSetup';
+import { authedFetch } from '../../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -58,7 +59,7 @@ export default function SettingsScreen() {
   async function exportData(format: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const res = await fetch(`${API}/api/v1/export/all?user_id=${userId}&format=${format}`);
+      const res = await authedFetch(`${API}/api/v1/export/all?user_id=${userId}&format=${format}`);
       if (res.ok) {
         Alert.alert('Export Ready', `Your data has been exported as ${format.toUpperCase()}.`);
       }

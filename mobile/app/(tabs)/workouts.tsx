@@ -7,7 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets, getScoreColor } from '../../src/theme';
 
 import { API_V1 as API } from '../../src/services/config';
-const api = async (p: string, o?: RequestInit) => { try { const r = await fetch(`${API}${p}`, { headers: { 'Content-Type': 'application/json' }, ...o }); return r.ok ? await r.json() : null; } catch { return null; } };
+import { authedFetch } from '../../src/services/authToken';
+const api = async (p: string, o?: RequestInit) => { try { const r = await authedFetch(`${API}${p}`, { headers: { 'Content-Type': 'application/json' }, ...o }); return r.ok ? await r.json() : null; } catch { return null; } };
 
 const MUSCLE_GROUPS = ['All', 'chest', 'back', 'shoulders', 'quads', 'hamstrings', 'glutes', 'core', 'biceps', 'triceps'];
 const DIFFICULTY_COLORS: Record<string, string> = { beginner: colors.health.calm, intermediate: colors.health.energy, advanced: colors.health.danger };

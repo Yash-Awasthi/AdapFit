@@ -18,9 +18,10 @@ import {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { API_V1 as API } from '../../src/services/config';
 import { SCREEN_HEADER_TOP } from '../../src/theme/layout';
+import { authedFetch } from '../../src/services/authToken';
 const api = async (path: string, opts?: RequestInit) => {
   try {
-    const r = await fetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
+    const r = await authedFetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
     if (!r.ok) return null;
     return await r.json();
   } catch { return null; }

@@ -19,6 +19,7 @@ import {
 import { api } from '../../src/services/api';
 import { useUserStore } from '../../src/stores';
 import { API_V1 as API } from '../../src/services/config';
+import { authedFetch } from '../../src/services/authToken';
 interface Exercise {
   exercise_id: string;
   name: string;
@@ -85,7 +86,7 @@ export default function WorkoutScreen() {
 
   const fetchWorkouts = async () => {
     try {
-      const res = await fetch(`${API}/workouts?user_id=default&days=14`);
+      const res = await authedFetch(`${API}/workouts?days=14`);
       if (res.ok) {
         const data = await res.json();
         setWorkouts(data.items || []);
@@ -97,7 +98,7 @@ export default function WorkoutScreen() {
   const generateWorkout = async () => {
     setGenerating(true);
     try {
-      const res = await fetch(`${API}/workouts/generate`, {
+      const res = await authedFetch(`${API}/workouts/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -34,3 +34,8 @@ export function getToken(): string | null {
 export function authHeader(): Record<string, string> {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 }
+
+/** fetch() for our own API: adds the Authorization header to whatever headers the caller set. */
+export function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, { ...init, headers: { ...((init.headers as Record<string, string>) ?? {}), ...authHeader() } });
+}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -9,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Wind, Brain, TrendingUp, TrendingDown, Minus, Droplets, Plus, Clock, Angry, Frown, Meh, Smile, Laugh } from 'lucide-react-native';
+import { Wind, Brain, Droplets, Plus, Clock } from 'lucide-react-native';
 import { SectionHeader } from '../../src/components';
 import MeditationPlayer from '../../src/components/MeditationPlayer';
 import { api } from '../../src/services/api';
@@ -31,14 +32,6 @@ interface BreathingExercise {
   benefit: string;
 }
 
-interface MoodTrend {
-  avg_mood: number;
-  avg_energy: number;
-  avg_anxiety: number;
-  mood_trend: string;
-  count: number;
-}
-
 interface MeditationSessionSummary {
   id: string;
   name: string;
@@ -51,10 +44,6 @@ interface MeditationSessionSummary {
   steps_count: number;
 }
 
-// index 0 unused, mood is logged 1-10; icon progresses through 5 expressions, color ramps red to green
-const MOOD_ICONS = [Angry, Angry, Frown, Frown, Meh, Meh, Smile, Smile, Laugh, Laugh];
-const MOOD_COLORS = ['#EF4444', '#F87171', '#FB923C', '#FBBF24', '#FACC15', '#A3E635', '#84CC16', '#4ADE80', '#22C55E', '#10B981'];
-const TAGS = ['work_stress', 'good_sleep', 'social', 'exercise', 'meditation', 'nature'];
 const QUICK_DRINKS = [
   { ml: 150, label: '150ml' },
   { ml: 250, label: '250ml' },
@@ -64,17 +53,12 @@ const QUICK_DRINKS = [
 ];
 
 export default function WellnessScreen() {
+  const router = useRouter();
   const { theme } = useTheme();
   const s = makeStyles(theme);
   const userId = useUserStore((s) => s.userId);
   const [exercises, setExercises] = useState<BreathingExercise[]>([]);
-  const [trend, setTrend] = useState<MoodTrend | null>(null);
   const [hydration, setHydration] = useState<{ total_ml: number; daily_goal_ml: number; progress_pct: number } | null>(null);
-  const [selectedMood, setSelectedMood] = useState(5);
-  const [selectedEnergy, setSelectedEnergy] = useState(5);
-  const [selectedAnxiety, setSelectedAnxiety] = useState(5);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [logged, setLogged] = useState(false);
   const [activeBreathing, setActiveBreathing] = useState<string | null>(null);
   const [meditations, setMeditations] = useState<MeditationSessionSummary[]>([]);
   const [activeMeditation, setActiveMeditation] = useState<Awaited<ReturnType<typeof api.getMeditationSession>> | null>(null);
@@ -86,14 +70,12 @@ export default function WellnessScreen() {
 
   async function fetchData() {
     try {
-      const [exRes, trendRes, hydData, medData] = await Promise.all([
+      const [exRes, hydData, medData] = await Promise.all([
         fetch(`${API}/api/v1/mental-health/breathing-exercises`, { headers: authHeader() }),
-        fetch(`${API}/api/v1/mental-health?user_id=${userId}&days=7`, { headers: authHeader() }),
         api.getHydrationToday(userId).catch(() => null),
         api.getMeditationSessions().catch(() => null),
       ]);
       if (exRes.ok) setExercises(await exRes.json());
-      if (trendRes.ok) setTrend(await trendRes.json());
       if (hydData) setHydration(hydData);
       if (medData) setMeditations(medData.sessions);
     } catch {}
@@ -115,37 +97,6 @@ export default function WellnessScreen() {
     } catch (err: any) {
       Alert.alert('Could not log water', err?.message || String(err));
     }
-  }
-
-  async function logMood() {
-    try {
-      const res = await fetch(`${API}/api/v1/mental-health`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
-        body: JSON.stringify({
-          user_id: userId,
-          mood: selectedMood,
-          energy: selectedEnergy,
-          anxiety: selectedAnxiety,
-          tags: selectedTags,
-        }),
-      });
-      if (res.ok) {
-        setLogged(true);
-        fetchData();
-      } else {
-        Alert.alert('Check-in failed', `Server returned ${res.status}.`);
-      }
-    } catch (err: any) {
-      Alert.alert('Could not reach the server', err?.message || String(err));
-    }
-  }
-
-  function toggleTag(tag: string) {
-    Haptics.selectionAsync();
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
   }
 
   function startBreathing(ex: BreathingExercise) {
@@ -189,12 +140,6 @@ export default function WellnessScreen() {
     };
     cycle();
   }
-
-  const trendIcon = (trendStatus: string) => {
-    if (trendStatus === 'improving') return <TrendingUp size={16} color={theme.success} />;
-    if (trendStatus === 'declining') return <TrendingDown size={16} color={theme.danger} />;
-    return <Minus size={16} color={theme.textMuted} />;
-  };
 
   if (activeMeditation) {
     return (
@@ -243,94 +188,10 @@ export default function WellnessScreen() {
         </View>
       </View>
 
-      {/* Mood Check-in */}
-      <SectionHeader title="How are you feeling?" />
-
-      <Text style={s.label}>Mood ({selectedMood}/10)</Text>
-      <View style={s.slider}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => {
-          const MoodIcon = MOOD_ICONS[v - 1];
-          return (
-            <TouchableOpacity
-              key={v}
-              style={[s.dot, selectedMood === v && s.dotActive]}
-              onPress={() => { Haptics.selectionAsync(); setSelectedMood(v); }}
-            >
-              <MoodIcon size={selectedMood === v ? 20 : 16} color={selectedMood === v ? '#fff' : MOOD_COLORS[v - 1]} />
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <Text style={s.label}>Energy ({selectedEnergy}/10)</Text>
-      <View style={s.slider}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
-          <TouchableOpacity
-            key={v}
-            style={[s.dot, selectedEnergy === v && s.dotActive]}
-            onPress={() => { Haptics.selectionAsync(); setSelectedEnergy(v); }}
-          >
-            <Text style={[s.dotNum, selectedEnergy === v && s.dotNumActive]}>{v}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={s.label}>Stress / Anxiety ({selectedAnxiety}/10)</Text>
-      <View style={s.slider}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
-          <TouchableOpacity
-            key={v}
-            style={[s.dot, selectedAnxiety === v && s.dotActive]}
-            onPress={() => { Haptics.selectionAsync(); setSelectedAnxiety(v); }}
-          >
-            <Text style={[s.dotNum, selectedAnxiety === v && s.dotNumActive]}>{v}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={s.label}>Context Tags</Text>
-      <View style={s.tagGrid}>
-        {TAGS.map((tag) => (
-          <TouchableOpacity
-            key={tag}
-            style={[s.tag, selectedTags.includes(tag) && s.tagActive]}
-            onPress={() => toggleTag(tag)}
-          >
-            <Text style={[s.tagText, selectedTags.includes(tag) && s.tagTextActive]}>
-              {tag.replace('_', ' ')}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity style={s.logButton} onPress={logMood}>
-        <Text style={s.logButtonText}>{logged ? 'Updated!' : 'Log Check-in'}</Text>
+      {/* Mood lives on the Mind screen; one place records it. */}
+      <TouchableOpacity style={s.logButton} onPress={() => router.push('/mental-health' as any)}>
+        <Text style={s.logButtonText}>Check in your mood on Mind</Text>
       </TouchableOpacity>
-
-      {/* Mood Trends */}
-      {trend && trend.count > 0 && (
-        <>
-          <SectionHeader title="7-Day Trends" />
-          <View style={s.trendCard}>
-            <View style={s.trendRow}>
-              <Text style={s.trendLabel}>Avg Mood</Text>
-              <View style={s.trendValue}>
-                <Text style={s.trendNum}>{trend.avg_mood.toFixed(1)}/10</Text>
-                {trendIcon(trend.mood_trend)}
-              </View>
-            </View>
-            <View style={s.trendRow}>
-              <Text style={s.trendLabel}>Avg Energy</Text>
-              <Text style={s.trendNum}>{trend.avg_energy.toFixed(1)}/10</Text>
-            </View>
-            <View style={s.trendRow}>
-              <Text style={s.trendLabel}>Avg Anxiety</Text>
-              <Text style={s.trendNum}>{trend.avg_anxiety.toFixed(1)}/10</Text>
-            </View>
-            <Text style={s.trendStatus}>Trend: {trend.mood_trend}</Text>
-          </View>
-        </>
-      )}
 
       {/* Breathing Exercises */}
       <SectionHeader title="Breathing Exercises" />

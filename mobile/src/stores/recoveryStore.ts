@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { API_BASE_URL } from '../services/config';
+import { authedFetch } from '../services/authToken';
 
 const API = API_BASE_URL;
 
@@ -31,7 +32,7 @@ export const useRecoveryStore = create<RecoveryStore>((set) => ({
   fetchRecovery: async (userId: string) => {
     set({ loading: true, error: null });
     try {
-      const res = await fetch(`${API}/api/v1/recovery-logs?user_id=${userId}&days=1`);
+      const res = await authedFetch(`${API}/api/v1/recovery-logs?user_id=${userId}&days=1`);
       if (res.ok) {
         const json = await res.json();
         if (json.items?.length > 0) {

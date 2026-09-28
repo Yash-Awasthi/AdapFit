@@ -2,11 +2,20 @@
 import uuid
 import random
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-router = APIRouter()
+from app.core.config import settings
+
+
+def _not_in_production():
+    # Synthetic readings must never be reachable by real users.
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+
+
+router = APIRouter(dependencies=[Depends(_not_in_production)])
 
 
 class SimulatedDay(BaseModel):

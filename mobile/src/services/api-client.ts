@@ -4,6 +4,7 @@
  */
 import { z } from 'zod';
 import { API_V1 } from './config';
+import { authedFetch } from './authToken';
 
 // ===== Zod Schemas =====
 
@@ -46,7 +47,7 @@ async function request<T>(
 ): Promise<T | null> {
   try {
     const { body, ...fetchOptions } = options;
-    const response = await fetch(`${API_V1}${path}`, {
+    const response = await authedFetch(`${API_V1}${path}`, {
       headers: { 'Content-Type': 'application/json' },
       ...fetchOptions,
       body: body ? JSON.stringify(body) : undefined,

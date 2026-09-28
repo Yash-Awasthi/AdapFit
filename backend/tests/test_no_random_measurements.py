@@ -16,7 +16,9 @@ import pathlib
 
 import pytest
 
-SERVICES = pathlib.Path(__file__).resolve().parent.parent / "app" / "services"
+APP = pathlib.Path(__file__).resolve().parent.parent / "app"
+SERVICES = APP / "services"
+ENDPOINTS = APP / "api" / "v1" / "endpoints"
 
 # Uses of `random` that produce an id or pick between equivalent phrasings,
 # neither of which claims anything about the user. Each entry is one file.
@@ -31,6 +33,8 @@ ALLOWED = {
     "habit_coach.py": {"choice"},
     "recipe_generator.py": {"choice"},
     "workplace_ergonomics.py": {"choice", "sample"},
+    # Labelled synthetic data for exercising the pipeline in development.
+    "simulator.py": {"uniform", "randint"},
 }
 
 # Functions that produce a number or a verdict rather than choosing wording.
@@ -55,7 +59,7 @@ def _random_calls(path: pathlib.Path):
     return found
 
 
-ALL_SERVICES = sorted(SERVICES.glob("*.py"))
+ALL_SERVICES = sorted(SERVICES.glob("*.py")) + sorted(ENDPOINTS.glob("*.py"))
 
 
 @pytest.mark.parametrize("path", ALL_SERVICES, ids=lambda p: p.name)
@@ -76,14 +80,14 @@ def test_no_service_generates_a_measurement(path):
 
 def test_the_sweep_actually_covers_the_services():
     """A guard on the guard: an empty file list would make this vacuous."""
-    assert len(ALL_SERVICES) > 200
+    assert len(ALL_SERVICES) > 350
 
 
 def test_the_allowlist_has_no_stale_entries():
     """An entry left behind after a fix would quietly re-open the hole."""
     stale = []
     for name, allowed in ALLOWED.items():
-        path = SERVICES / name
+        path = SERVICES / name if (SERVICES / name).exists() else ENDPOINTS / name
         if not path.exists():
             stale.append(f"{name} (no such file)")
             continue
