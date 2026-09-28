@@ -356,7 +356,7 @@ export default function DashboardScreen() {
               { id: 'mood', icon: 'happy', label: 'Log Mood', color: colors.health.mental, screen: 'mental-health' },
               { id: 'weight', icon: 'scale', label: 'Log Weight', color: colors.health.nutrition, screen: 'health' },
               { id: 'meditate', icon: 'leaf', label: 'Meditate', color: colors.health.calm, screen: 'wellness' },
-              { id: 'sleep', icon: 'moon', label: 'Sleep Log', color: colors.health.sleep, screen: 'sleep-tracker' },
+              { id: 'sleep', icon: 'moon', label: 'Sleep Log', color: colors.health.sleep, screen: 'sleep' },
               { id: 'meds', icon: 'medical', label: 'Medication', color: colors.health.heart, screen: 'medication' },
               { id: 'recovery', icon: 'pulse', label: 'Recovery', color: colors.health.sleep, screen: 'recovery-dashboard' },
             ].map((action) => (

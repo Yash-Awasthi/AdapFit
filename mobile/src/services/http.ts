@@ -21,6 +21,14 @@ export async function patchJson<T>(path: string, body?: unknown): Promise<T | nu
   return sendJson<T>(path, 'PATCH', body);
 }
 
+export async function putJson<T>(path: string, body?: unknown): Promise<T | null> {
+  return sendJson<T>(path, 'PUT', body);
+}
+
+export async function deleteJson<T>(path: string): Promise<T | null> {
+  return sendJson<T>(path, 'DELETE');
+}
+
 async function sendJson<T>(path: string, method: string, body?: unknown): Promise<T | null> {
   try {
     const res = await fetch(path.startsWith('http') ? path : `${API_V1}${path}`, {

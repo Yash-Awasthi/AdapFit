@@ -423,97 +423,47 @@ def classify_sleep_quality(score: float) -> dict:
         }
 
 
-def detect_sleep_disorders_indicators(stages: list[int]) -> list[dict]:
-    """Detect potential sleep disorder indicators.
+def detect_sleep_patterns(stages: list[int]) -> list[dict]:
+    """Patterns in one night worth watching, each with a safe next step.
 
-    NOTE: This is informational only, not a medical diagnosis.
-
-    Args:
-        stages: List of sleep stage codes (30s epochs)
-
-    Returns:
-        List of potential indicators with severity
+    Describes what the night showed. It never names a disorder: one night of
+    staging cannot tell insomnia from a bad evening.
     """
-    indicators = []
-
+    patterns = []
     if not stages:
-        return indicators
+        return patterns
 
     sol = calculate_sol(stages)
     se = calculate_sleep_efficiency(stages)
     waso = calculate_waso(stages)
     tst = calculate_tst(stages)
     percentages = get_stage_percentages(stages)
-
-    # Insomnia indicators
-    if sol > 30:
-        indicators.append({
-            "condition": "Sleep Onset Insomnia",
-            "indicator": f"SOL of {sol:.0f} min (>30 min threshold)",
-            "severity": "moderate" if sol <= 60 else "severe",
-        })
-
-    if waso > 60:
-        indicators.append({
-            "condition": "Sleep Maintenance Insomnia",
-            "indicator": f"WASO of {waso:.0f} min (>60 min threshold)",
-            "severity": "moderate" if waso <= 90 else "severe",
-        })
-
-    if se < 85:
-        indicators.append({
-            "condition": "Reduced Sleep Efficiency",
-            "indicator": f"SE of {se:.0f}% (<85% threshold)",
-            "severity": "mild" if se >= 75 else "moderate",
-        })
-
-    # Short sleep
-    if tst < 360:
-        indicators.append({
-            "condition": "Short Sleep Duration",
-            "indicator": f"TST of {tst:.0f} min (<6 hours)",
-            "severity": "moderate",
-        })
-
-    # Excessive sleep
-    if tst > 600:
-        indicators.append({
-            "condition": "Long Sleep Duration",
-            "indicator": f"TST of {tst:.0f} min (>10 hours)",
-            "severity": "mild",
-        })
-
-    # REM abnormalities
-    rem_pct = percentages.get("REM", 0.0)
-    if rem_pct < 15:
-        indicators.append({
-            "condition": "Reduced REM Sleep",
-            "indicator": f"REM at {rem_pct:.0f}% (<15% of TST)",
-            "severity": "mild",
-        })
-    elif rem_pct > 35:
-        indicators.append({
-            "condition": "Elevated REM Sleep",
-            "indicator": f"REM at {rem_pct:.0f}% (>35% of TST)",
-            "severity": "mild",
-        })
-
-    # SWS abnormalities
-    deep_pct = percentages.get("N3 (Deep/SWS)", 0.0)
-    if deep_pct < 5:
-        indicators.append({
-            "condition": "Reduced Deep Sleep",
-            "indicator": f"N3 at {deep_pct:.0f}% (<5% of TST)",
-            "severity": "moderate",
-        })
-
-    # Fragmentation
     wake_count = count_wake_episodes(stages)
-    if wake_count > 10:
-        indicators.append({
-            "condition": "Sleep Fragmentation",
-            "indicator": f"{wake_count} wake episodes after onset",
-            "severity": "moderate" if wake_count <= 15 else "severe",
-        })
+    rem_pct = percentages.get("REM", 0.0)
+    deep_pct = percentages.get("N3 (Deep/SWS)", 0.0)
+    see_doctor = "If this happens most nights for a month, mention it to a doctor."
 
-    return indicators
+    checks = [
+        (sol > 30, "long_time_to_fall_asleep", f"Took {sol:.0f} min to fall asleep",
+         "Keep a fixed wake time and get out of bed if you are awake after 20 minutes. " + see_doctor),
+        (waso > 60, "long_awake_periods", f"{waso:.0f} min awake after falling asleep",
+         "Limit fluids and alcohol in the evening and keep the room dark and cool. " + see_doctor),
+        (se < 85, "low_efficiency", f"Asleep for {se:.0f}% of the time in bed",
+         "Go to bed only when sleepy so time in bed matches time asleep."),
+        (tst < 360, "short_sleep", f"Slept {tst / 60:.1f} h",
+         "Move bedtime 30 minutes earlier for the next week."),
+        (tst > 600, "long_sleep", f"Slept {tst / 60:.1f} h",
+         "Keep a consistent wake time. If you still feel unrested, mention it to a doctor."),
+        (rem_pct < 15, "low_rem", f"REM was {rem_pct:.0f}% of sleep",
+         "Regular sleep times and less evening alcohol tend to restore REM."),
+        (rem_pct > 35, "high_rem", f"REM was {rem_pct:.0f}% of sleep",
+         "Often follows short sleep on previous nights. Watch the trend."),
+        (deep_pct < 5, "low_deep", f"Deep sleep was {deep_pct:.0f}% of sleep",
+         "Daytime exercise and a cool room help deep sleep."),
+        (wake_count > 10, "fragmented", f"{wake_count} awakenings after falling asleep",
+         "Check for noise, light or a partner's movement. " + see_doctor),
+    ]
+    for hit, key, observed, next_step in checks:
+        if hit:
+            patterns.append({"pattern": key, "observed": observed, "next_step": next_step})
+    return patterns

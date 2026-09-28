@@ -1,353 +1,256 @@
 """
-Sleep Tracker Service — Comprehensive Sleep Analysis & Coaching
+Sleep journal: each user's logged nights and everything derived from them.
 
-Features:
-- Sleep session logging (bedtime, wake time, quality)
-- Sleep stage estimation (light, deep, REM, awake)
-- Sleep score computation (duration + quality + consistency)
-- Sleep debt tracking
-- Sleep schedule consistency analysis
-- Circadian rhythm optimization
-- Sleep environment recommendations
-- Smart alarm window suggestion
-
-Inspired by: Samsung Health Sleep, Oura Ring sleep staging, Sleep Cycle app
+A night records what was measured and nothing else. Stage minutes come from a
+wearable or not at all; a manual log carries bedtime, wake time, how it felt
+and, optionally, awakenings. Scores use only the measured parts
+(SleepAnalyzer rescales weights over what is present).
 """
-import time
-import math
+import uuid
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from dataclasses import dataclass, field
-from enum import Enum
+
+from app.services.sleep_analyzer import (
+    SleepAnalyzer, bedtime_consistency_std, grade_for,
+)
+
+RECOMMENDED_SLEEP = {
+    "teenager": (8, 10),
+    "young_adult": (7, 9),
+    "adult": (7, 9),
+    "older_adult": (7, 8),
+}
+CYCLE_MINUTES = 90
+STAGES = ("deep", "rem", "light", "awake")
 
 
-class SleepStage(Enum):
-    AWAKE = "awake"
-    LIGHT = "light"
-    DEEP = "deep"
-    REM = "rem"
+def _clock_minutes(value: str) -> int:
+    hour, minute = (int(part) for part in value.split(":")[:2])
+    if not (0 <= hour < 24 and 0 <= minute < 60):
+        raise ValueError(f"Not a clock time: {value}")
+    return hour * 60 + minute
 
 
-class SleepQuality(Enum):
-    EXCELLENT = "excellent"
-    GOOD = "good"
-    FAIR = "fair"
-    POOR = "poor"
-    TERRIBLE = "terrible"
+def minutes_between(bedtime: str, wake_time: str) -> int:
+    """Minutes from bedtime to wake time, across midnight when needed."""
+    return (_clock_minutes(wake_time) - _clock_minutes(bedtime)) % 1440
+
+
+def _fmt_clock(total_minutes: float) -> str:
+    m = int(round(total_minutes)) % 1440
+    return f"{m // 60:02d}:{m % 60:02d}"
 
 
 @dataclass
-class SleepSession:
-    session_id: str
-    bedtime: float
-    wake_time: float
-    total_duration_minutes: float
-    sleep_onset_minutes: float  # time to fall asleep
-    awake_minutes: float
-    light_minutes: float
-    deep_minutes: float
-    rem_minutes: float
-    sleep_score: float
-    quality: SleepQuality
-    heart_rate_avg: Optional[int] = None
+class SleepNight:
+    id: str
+    date: str
+    bedtime: str
+    wake_time: str
+    total_minutes: int
+    source: str = "manual"
+    efficiency_pct: Optional[float] = None
+    deep_minutes: Optional[float] = None
+    rem_minutes: Optional[float] = None
+    light_minutes: Optional[float] = None
+    awake_minutes: Optional[float] = None
+    interruptions: Optional[int] = None
+    minutes_to_fall_asleep: Optional[float] = None
+    quality_rating: Optional[int] = None
+    heart_rate_avg: Optional[float] = None
     hrv_avg: Optional[float] = None
-    respiratory_rate: Optional[float] = None
-    notes: str = ""
+    notes: Optional[str] = None
+    logged_at: str = ""
+
+    @property
+    def has_stages(self) -> bool:
+        return self.deep_minutes is not None and self.rem_minutes is not None
 
 
-@dataclass
-class SleepDebt:
-    current_debt_hours: float
-    weekly_average_hours: float
-    recommended_sleep_hours: float
-    deficit_days: int
-    recovery_plan: str
-
-
-@dataclass
-class SleepInsight:
-    category: str
-    title: str
-    detail: str
-    impact: str  # "positive", "negative", "neutral"
-    action: str
-
-
-class SleepTrackerService:
-    """
-    Advanced sleep tracking and analysis system.
-    
-    Uses phone sensor data (accelerometer, ambient light, time patterns)
-    combined with wearable data when available to estimate sleep stages.
-    
-    Sleep stage estimation follows established research:
-    - Accelerometer + HRV → sleep/wake classification
-    - HRV patterns → light vs deep vs REM estimation
-    - Consistency of schedule → circadian health
-    """
-
-    # Recommended sleep by age bracket (hours)
-    RECOMMENDED_SLEEP = {
-        "teenager": (8, 10),
-        "young_adult": (7, 9),
-        "adult": (7, 9),
-        "older_adult": (7, 8),
-    }
-
+class SleepJournal:
     def __init__(self):
-        self._sessions: list[SleepSession] = []
-        self._target_bedtime = "23:00"
-        self._target_wake = "07:00"
-        self._age_group = "adult"
+        self._nights: list[SleepNight] = []
+        self.age_group = "adult"
+        self.target_bedtime: Optional[str] = None
+        self.target_wake: Optional[str] = None
+        self._analyzer = SleepAnalyzer()
 
-    def set_profile(self, age_group: str = "adult", target_bedtime: str = "23:00", target_wake: str = "07:00"):
-        self._age_group = age_group
-        self._target_bedtime = target_bedtime
-        self._target_wake = target_wake
+    # --- profile ---
+    def set_profile(self, age_group: str = "adult", target_bedtime: Optional[str] = None,
+                    target_wake: Optional[str] = None) -> dict:
+        if age_group not in RECOMMENDED_SLEEP:
+            raise ValueError(f"age_group must be one of {sorted(RECOMMENDED_SLEEP)}")
+        for value in (target_bedtime, target_wake):
+            if value is not None:
+                _clock_minutes(value)
+        self.age_group, self.target_bedtime, self.target_wake = age_group, target_bedtime, target_wake
+        return self.profile()
 
-    def log_sleep_session(self, bedtime: str, wake_time: str, quality_rating: int = 5,
-                          heart_rate_avg: Optional[int] = None, hrv_avg: Optional[float] = None,
-                          notes: str = "") -> dict:
-        """Log a sleep session with smart analysis."""
-        # Parse times (simplified — in prod use proper datetime)
-        now = time.time()
-        bedtime_ts = now - 8 * 3600  # placeholder
-        wake_ts = now
+    def profile(self) -> dict:
+        low, high = RECOMMENDED_SLEEP[self.age_group]
+        return {"age_group": self.age_group, "target_bedtime": self.target_bedtime,
+                "target_wake": self.target_wake, "recommended_hours": [low, high]}
 
-        total_min = (wake_ts - bedtime_ts) / 60
-        total_hours = total_min / 60
-
-        # Estimate sleep stages based on quality and duration
-        sleep_onset = max(5, 30 - quality_rating * 3)  # better quality → faster onset
-        awake_min = max(0, (10 - quality_rating) * 5)
-
-        actual_sleep_min = total_min - sleep_onset - awake_min
-        # Normal distribution: 50% light, 25% deep, 25% REM (adjusted by quality)
-        deep_pct = 0.15 + quality_rating * 0.03  # 15-45%
-        rem_pct = 0.15 + quality_rating * 0.02  # 15-35%
-        light_pct = 1 - deep_pct - rem_pct
-
-        deep_min = actual_sleep_min * deep_pct
-        rem_min = actual_sleep_min * rem_pct
-        light_min = actual_sleep_min * light_pct
-
-        # Sleep score (0-100)
-        duration_score = self._duration_score(total_hours)
-        quality_score = quality_rating * 10
-        consistency_score = self._consistency_score(bedtime)
-        sleep_score = duration_score * 0.4 + quality_score * 0.35 + consistency_score * 0.25
-
-        quality_level = self._quality_from_score(sleep_score)
-
-        session = SleepSession(
-            session_id=f"sleep_{int(now)}",
-            bedtime=bedtime_ts,
-            wake_time=wake_ts,
-            total_duration_minutes=total_min,
-            sleep_onset_minutes=sleep_onset,
-            awake_minutes=awake_min,
-            light_minutes=light_min,
-            deep_minutes=deep_min,
-            rem_minutes=rem_min,
-            sleep_score=round(sleep_score, 1),
-            quality=quality_level,
-            heart_rate_avg=heart_rate_avg,
-            hrv_avg=hrv_avg,
-            notes=notes,
+    # --- nights ---
+    def log(self, bedtime: str, wake_time: str, date: Optional[str] = None,
+            total_minutes: Optional[int] = None, **measured) -> dict:
+        in_bed = minutes_between(bedtime, wake_time)
+        night = SleepNight(
+            id=uuid.uuid4().hex[:8],
+            date=date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            bedtime=bedtime, wake_time=wake_time,
+            total_minutes=total_minutes if total_minutes is not None else in_bed,
+            logged_at=datetime.now(timezone.utc).isoformat(),
+            **{k: v for k, v in measured.items() if v is not None},
         )
-        self._sessions.append(session)
+        if night.total_minutes <= 0:
+            raise ValueError("Wake time must differ from bedtime")
+        self._nights.append(night)
+        self._nights.sort(key=lambda n: (n.date, n.logged_at))
+        return self._public(night)
 
+    def nights(self, days: int = 7) -> list[dict]:
+        return [self._public(n) for n in self._recent(days)]
+
+    def delete(self, night_id: str) -> bool:
+        before = len(self._nights)
+        self._nights = [n for n in self._nights if n.id != night_id]
+        return len(self._nights) < before
+
+    def _recent(self, days: int) -> list[SleepNight]:
+        return self._nights[-days:]
+
+    def _public(self, night: SleepNight) -> dict:
+        data = asdict(night)
+        data["score"] = self._score_night(night)["sleep_score"]
+        return data
+
+    def _score_night(self, night: SleepNight, consistency_std: Optional[float] = None) -> dict:
+        return self._analyzer.calculate_sleep_score(
+            duration_hours=night.total_minutes / 60,
+            deep_minutes=night.deep_minutes,
+            rem_minutes=night.rem_minutes,
+            awake_minutes=night.awake_minutes,
+            interruptions=night.interruptions,
+            bedtime_consistency_std=consistency_std,
+            efficiency_pct=night.efficiency_pct,
+        )
+
+    # --- derived views ---
+    def analysis(self, days: int = 7) -> dict:
+        nights = self._recent(days)
+        if not nights:
+            return {
+                "score": 0, "grade": None, "quality_label": "insufficient_data", "nights_analyzed": 0,
+                "avg_duration_hours": None, "avg_efficiency_pct": None, "bedtime_consistency_min": None,
+                "stage_breakdown": [], "measured": [], "debt": self.debt(), "trend": self.trend(days),
+                "recommendations": [{
+                    "category": "general", "priority": "low", "title": "Log last night",
+                    "description": "Nothing is logged yet, so there is nothing to score.",
+                    "tips": ["Add your bedtime and wake time. A wearable adds sleep stages."],
+                }],
+                "bedtime_plan": self.bedtime_plan(),
+            }
+
+        n = len(nights)
+        avg_minutes = sum(x.total_minutes for x in nights) / n
+        effs = [x.efficiency_pct for x in nights if x.efficiency_pct is not None]
+        interrupts = [x.interruptions for x in nights if x.interruptions is not None]
+        staged = [x for x in nights if x.has_stages]
+        consistency = bedtime_consistency_std([x.bedtime for x in nights]) if n >= 2 else None
+
+        def avg_stage(stage: str) -> Optional[float]:
+            vals = [getattr(x, f"{stage}_minutes") for x in staged if getattr(x, f"{stage}_minutes") is not None]
+            return sum(vals) / len(vals) if vals else None
+
+        stage_avgs = {st: avg_stage(st) for st in STAGES}
+        staged_minutes = sum(x.total_minutes for x in staged) / len(staged) if staged else 0
+        breakdown = [
+            {"name": st, "minutes": round(v, 1), "percentage": round(v / max(staged_minutes, 1) * 100, 1)}
+            for st, v in stage_avgs.items() if v is not None
+        ]
+
+        scored = self._analyzer.calculate_sleep_score(
+            duration_hours=avg_minutes / 60,
+            deep_minutes=stage_avgs["deep"] * avg_minutes / staged_minutes if staged and stage_avgs["deep"] is not None else None,
+            rem_minutes=stage_avgs["rem"] * avg_minutes / staged_minutes if staged and stage_avgs["rem"] is not None else None,
+            interruptions=round(sum(interrupts) / len(interrupts)) if interrupts else None,
+            bedtime_consistency_std=consistency,
+            efficiency_pct=sum(effs) / len(effs) if effs else None,
+        )
         return {
-            "session_id": session.session_id,
-            "total_sleep_hours": round(total_hours, 1),
-            "sleep_score": session.sleep_score,
-            "quality": session.quality.value,
-            "stages": {
-                "light_minutes": round(light_min),
-                "deep_minutes": round(deep_min),
-                "rem_minutes": round(rem_min),
-                "awake_minutes": round(awake_min),
-                "sleep_onset_minutes": round(sleep_onset),
-            },
-            "insights": self._generate_insights(session),
+            "score": scored["sleep_score"],
+            "grade": grade_for(scored["sleep_score"]),
+            "quality_label": scored["quality_label"],
+            "nights_analyzed": n,
+            "avg_duration_hours": round(avg_minutes / 60, 2),
+            "avg_efficiency_pct": round(sum(effs) / len(effs), 1) if effs else None,
+            "bedtime_consistency_min": round(consistency, 1) if consistency is not None else None,
+            "stage_breakdown": breakdown,
+            "measured": scored["measured"],
+            "breakdown": scored["breakdown"],
+            "debt": self.debt(),
+            "trend": self.trend(days),
+            "recommendations": self._analyzer.get_recommendations(scored),
+            "bedtime_plan": self.bedtime_plan(),
         }
 
-    def get_sleep_score(self) -> dict:
-        """Get current sleep score from most recent session."""
-        if not self._sessions:
-            return {"score": 0, "quality": "no_data", "message": "Log your first sleep session to get a score"}
-
-        latest = self._sessions[-1]
-        return {
-            "score": latest.sleep_score,
-            "quality": latest.quality.value,
-            "total_sleep_hours": round(latest.total_duration_minutes / 60, 1),
-            "deep_sleep_minutes": round(latest.deep_minutes),
-            "rem_sleep_minutes": round(latest.rem_minutes),
-            "sleep_onset_minutes": round(latest.sleep_onset_minutes),
-        }
-
-    def get_sleep_debt(self) -> dict:
-        """Calculate sleep debt over recent days."""
-        recommended = self.RECOMMENDED_SLEEP.get(self._age_group, (7, 9))
-        rec_avg = (recommended[0] + recommended[1]) / 2
-
-        recent = self._sessions[-7:]
-        if not recent:
-            return {"debt_hours": 0, "message": "No sleep data yet"}
-
-        avg_sleep = sum(s.total_duration_minutes / 60 for s in recent) / len(recent)
-        debt_per_day = max(0, rec_avg - avg_sleep)
-        total_debt = debt_per_day * 7
-        deficit_days = sum(1 for s in recent if s.total_duration_minutes / 60 < recommended[0])
-
-        if total_debt > 5:
-            plan = "Critical sleep debt. Prioritize 8+ hours tonight. Avoid caffeine after noon."
-        elif total_debt > 2:
-            plan = "Moderate sleep debt. Add 30-60 minutes to your sleep tonight."
-        elif total_debt > 0:
-            plan = "Slight deficit. Maintain consistent schedule to recover."
+    def debt(self, days: int = 7) -> dict:
+        """Accumulated shortfall against the lower end of the recommended range."""
+        low, high = RECOMMENDED_SLEEP[self.age_group]
+        nights = self._recent(days)
+        if not nights:
+            return {"debt_hours": None, "nights_counted": 0, "target_hours": low}
+        shortfall = sum(max(0.0, low - x.total_minutes / 60) for x in nights)
+        short_nights = sum(1 for x in nights if x.total_minutes / 60 < low)
+        if shortfall > 5:
+            plan = "Large sleep debt. Protect 8+ hours for the next few nights and keep caffeine before noon."
+        elif shortfall > 2:
+            plan = "Some sleep debt. Add 30-60 minutes a night this week rather than one long lie-in."
+        elif shortfall > 0:
+            plan = "A small shortfall. A consistent schedule will close it."
         else:
-            plan = "No sleep debt! Keep up the great work."
+            plan = "No sleep debt over the nights logged."
+        return {"debt_hours": round(shortfall, 1), "nights_counted": len(nights),
+                "short_nights": short_nights, "target_hours": low, "recovery_plan": plan}
 
-        return {
-            "debt_hours": round(total_debt, 1),
-            "average_sleep_hours": round(avg_sleep, 1),
-            "recommended_hours": rec_avg,
-            "deficit_days": deficit_days,
-            "recovery_plan": plan,
-        }
+    def trend(self, days: int = 14) -> dict:
+        nights = self._recent(days)
+        scored = [self._score_night(x) for x in nights]
+        return self._analyzer.detect_trends(scored)
 
-    def get_sleep_trend(self, days: int = 7) -> dict:
-        """Get sleep trends over recent days."""
-        recent = self._sessions[-days:]
-        if not recent:
-            return {"trend": "no_data", "data_points": 0}
-
-        scores = [s.sleep_score for s in recent]
-        durations = [s.total_duration_minutes / 60 for s in recent]
-        deeps = [s.deep_minutes for s in recent]
-
-        if len(scores) >= 3:
-            first_half = sum(scores[:len(scores)//2]) / max(1, len(scores)//2)
-            second_half = sum(scores[len(scores)//2:]) / max(1, len(scores) - len(scores)//2)
-            trend = "improving" if second_half > first_half + 3 else "worsening" if second_half < first_half - 3 else "stable"
-        else:
-            trend = "insufficient_data"
-
-        return {
-            "trend": trend,
-            "average_score": round(sum(scores) / len(scores), 1),
-            "average_duration_hours": round(sum(durations) / len(durations), 1),
-            "average_deep_sleep": round(sum(deeps) / len(deeps)),
-            "best_score": round(max(scores), 1),
-            "worst_score": round(min(scores), 1),
-            "data_points": len(scores),
-        }
-
-    def get_sleep_insights(self) -> list[dict]:
-        """Get personalized sleep insights."""
-        insights = []
-        recent = self._sessions[-7:]
-
-        if not recent:
-            return [{"category": "general", "title": "Start Tracking", "detail": "Log your sleep to get personalized insights", "impact": "neutral", "action": "Use the sleep tracker tonight"}]
-
-        avg_duration = sum(s.total_duration_minutes / 60 for s in recent) / len(recent)
-        avg_deep = sum(s.deep_minutes for s in recent) / len(recent)
-
-        if avg_duration < 7:
-            insights.append({
-                "category": "duration",
-                "title": "Insufficient Sleep Duration",
-                "detail": f"Your average is {avg_duration:.1f}h. Adults need 7-9 hours for optimal recovery.",
-                "impact": "negative",
-                "action": "Set a consistent bedtime alarm 30 minutes earlier",
+    def bedtime_plan(self) -> Optional[dict]:
+        """Bedtimes that end on a full 90-minute cycle at the target wake time."""
+        if not self.target_wake:
+            return None
+        onsets = [x.minutes_to_fall_asleep for x in self._nights[-14:] if x.minutes_to_fall_asleep is not None]
+        onset = round(sum(onsets) / len(onsets)) if onsets else 15
+        wake = _clock_minutes(self.target_wake)
+        low, high = RECOMMENDED_SLEEP[self.age_group]
+        options = []
+        for cycles in (6, 5, 4):
+            sleep_minutes = cycles * CYCLE_MINUTES
+            options.append({
+                "bedtime": _fmt_clock(wake - sleep_minutes - onset),
+                "cycles": cycles,
+                "sleep_hours": sleep_minutes / 60,
+                "within_recommended": low <= sleep_minutes / 60 <= high,
             })
+        return {"target_wake": self.target_wake, "minutes_to_fall_asleep": onset,
+                "onset_source": "your logs" if onsets else "typical 15 minutes", "options": options}
 
-        if avg_deep < 30:
-            insights.append({
-                "category": "deep_sleep",
-                "title": "Low Deep Sleep",
-                "detail": f"Average deep sleep: {avg_deep:.0f} min. Target: 60-90 min for physical recovery.",
-                "impact": "negative",
-                "action": "Exercise regularly, avoid alcohol before bed, keep room cool (18°C)",
-            })
-
-        # Check consistency
-        bedtimes = [s.bedtime for s in recent]
-        if len(bedtimes) >= 3:
-            variance = max(bedtimes) - min(bedtimes)
-            if variance > 3600:  # >1 hour variance
-                insights.append({
-                    "category": "consistency",
-                    "title": "Irregular Sleep Schedule",
-                    "detail": "Your bedtime varies by over 1 hour. Consistency is key for circadian health.",
-                    "impact": "negative",
-                    "action": "Set a fixed bedtime and wake time, even on weekends",
-                })
-
-        if not insights:
-            insights.append({
-                "category": "positive",
-                "title": "Great Sleep Habits!",
-                "detail": "Your sleep patterns look healthy. Keep maintaining your routine.",
-                "impact": "positive",
-                "action": "Continue your current sleep routine",
-            })
-
-        return insights
-
-    def get_smart_alarm_window(self) -> dict:
-        """Suggest optimal wake-up window based on sleep cycle."""
-        # Sleep cycles are ~90 minutes; wake at end of cycle
-        recommended = self.RECOMMENDED_SLEEP.get(self._age_group, (7, 9))
-        target_hours = recommended[1]  # use upper end
-
-        cycles = round(target_hours * 60 / 90)
-        optimal_min = cycles * 90
-
-        return {
-            "target_sleep_hours": round(optimal_min / 60, 1),
-            "optimal_cycles": cycles,
-            "alarm_window_start": f"Target bedtime minus {optimal_min + 15} min (for sleep onset)",
-            "recommendation": f"Sleep {cycles} complete cycles ({optimal_min} min) for optimal alertness",
-        }
-
-    # === Private helpers ===
-
-    def _duration_score(self, hours: float) -> float:
-        rec = self.RECOMMENDED_SLEEP.get(self._age_group, (7, 9))
-        if rec[0] <= hours <= rec[1]:
-            return 100
-        elif hours < rec[0]:
-            return max(0, 100 - (rec[0] - hours) * 20)
-        else:
-            return max(0, 100 - (hours - rec[1]) * 10)
-
-    def _consistency_score(self, bedtime: str) -> float:
-        if len(self._sessions) < 3:
-            return 70  # neutral
-        return 80  # placeholder — real impl compares variance
-
-    def _quality_from_score(self, score: float) -> SleepQuality:
-        if score >= 85: return SleepQuality.EXCELLENT
-        if score >= 70: return SleepQuality.GOOD
-        if score >= 50: return SleepQuality.FAIR
-        if score >= 30: return SleepQuality.POOR
-        return SleepQuality.TERRIBLE
-
-    def _generate_insights(self, session: SleepSession) -> list[dict]:
-        insights = []
-        if session.deep_minutes < 30:
-            insights.append("Try exercising earlier in the day to increase deep sleep")
-        if session.sleep_onset_minutes > 20:
-            insights.append("Long sleep onset — try the 4-7-8 breathing exercise before bed")
-        if session.total_duration_minutes / 60 < 7:
-            insights.append("Consider going to bed 30 minutes earlier tonight")
-        return insights
+    def latest_summary(self) -> dict:
+        """Last night in brief, for the health summary card."""
+        if not self._nights:
+            return {"score": None, "quality": "no_data"}
+        night = self._nights[-1]
+        scored = self._score_night(night)
+        return {"score": scored["sleep_score"], "quality": scored["quality_label"],
+                "total_sleep_hours": round(night.total_minutes / 60, 1),
+                "deep_sleep_minutes": night.deep_minutes, "rem_sleep_minutes": night.rem_minutes}
 
 
-# Singleton
 from app.core.per_user import per_user, register
 
-sleep_tracker_service = register("sleep_tracker.sleep_tracker_service", per_user(SleepTrackerService))
+sleep_journal = register("sleep_tracker.sleep_journal", per_user(SleepJournal))

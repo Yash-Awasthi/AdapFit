@@ -1,294 +1,321 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Moon, Plus, Trash2, TrendingUp, TrendingDown, Minus, MinusCircle, PlusCircle } from 'lucide-react-native';
-import Svg, { Circle, Rect } from 'react-native-svg';
+/**
+ * Sleep — the journal, its analysis, and a bedtime plan.
+ *
+ * A manual log records bedtime, wake time and how the night felt. Stages only
+ * appear when a wearable measured them; the score is built from whatever was
+ * measured and says which parts that was.
+ */
+import React, { useCallback, useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
+  ActivityIndicator, RefreshControl, Alert,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { LoadingScreen } from '../../src/components';
-import { API_BASE_URL } from '../../src/services/config';
-import { useUserStore } from '../../src/stores';
-import { useTheme } from '../../src/services/theme';
-import { authHeader } from '../../src/services/authToken';
+import { colors, spacing, typography, getScoreColor } from '../../src/theme';
+import { GlassCard, ScoreRing, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { useApis } from '../../src/hooks/useApi';
+import { asArray, deleteJson, postJson, putJson } from '../../src/services/http';
 
-const API = API_BASE_URL;
+const TINT = '#6366F1';
+const STAGE_COLORS: Record<string, string> = { deep: '#4F46E5', rem: '#8B5CF6', light: '#06B6D4', awake: '#EF4444' };
+const MEASURED_LABELS: Record<string, string> = {
+  duration: 'duration', efficiency: 'efficiency', deep_sleep: 'deep sleep', rem_sleep: 'REM',
+  consistency: 'schedule', interruptions: 'awakenings',
+};
 
-interface SleepStage { name: string; minutes: number; percentage: number; }
+interface Stage { name: string; minutes: number; percentage: number }
+interface Recommendation { category: string; priority: string; title: string; description: string; tips: string[] }
+interface PlanOption { bedtime: string; cycles: number; sleep_hours: number; within_recommended: boolean }
 interface Analysis {
-  score: number; grade: string; consistency_score: number;
-  avg_duration_hours: number; avg_efficiency: number;
-  deep_sleep_pct: number; rem_sleep_pct: number;
-  consistency_trend: string; recommendations: string[];
-  stage_breakdown: SleepStage[];
+  score: number;
+  grade: string | null;
+  quality_label: string;
+  nights_analyzed: number;
+  avg_duration_hours: number | null;
+  avg_efficiency_pct: number | null;
+  bedtime_consistency_min: number | null;
+  stage_breakdown: Stage[];
+  measured: string[];
+  debt: { debt_hours: number | null; nights_counted: number; short_nights?: number; target_hours: number; recovery_plan?: string };
+  trend: { trend: string; average_score?: number; data_points: number };
+  recommendations: Recommendation[];
+  bedtime_plan: { target_wake: string; minutes_to_fall_asleep: number; onset_source: string; options: PlanOption[] } | null;
 }
+interface Night { id: string; date: string; bedtime: string; wake_time: string; total_minutes: number; source: string; quality_rating: number | null; score: number }
 
-interface SleepLog {
-  id: string; date: string; total_minutes: number; efficiency_pct: number; logged_at: string;
-}
-
-const STAGE_COLORS: Record<string, string> = {
-  awake: '#EF4444', light: '#818CF8', deep: '#4F46E5', rem: '#22C55E',
+const pad = (n: number) => n.toString().padStart(2, '0');
+const shift = (clock: string, minutes: number) => {
+  const [h, m] = clock.split(':').map(Number);
+  const t = (((h * 60 + m + minutes) % 1440) + 1440) % 1440;
+  return `${pad(Math.floor(t / 60))}:${pad(t % 60)}`;
 };
 
-const GRADE_COLORS: Record<string, string> = {
-  A: '#22C55E', B: '#818CF8', C: '#EAB308', D: '#F97316', F: '#EF4444',
-};
+function ClockStepper({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <View style={styles.stepper}>
+      <Text style={styles.stepperLabel}>{label}</Text>
+      <View style={styles.stepperRow}>
+        <TouchableOpacity accessibilityLabel={`${label} 15 minutes earlier`} onPress={() => onChange(shift(value, -15))}>
+          <Ionicons name="remove-circle-outline" size={28} color={colors.text.secondary} />
+        </TouchableOpacity>
+        <Text style={styles.stepperValue}>{value}</Text>
+        <TouchableOpacity accessibilityLabel={`${label} 15 minutes later`} onPress={() => onChange(shift(value, 15))}>
+          <Ionicons name="add-circle-outline" size={28} color={colors.text.secondary} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
 
 export default function SleepScreen() {
-  const userId = useUserStore((s) => s.userId);
-  const { theme } = useTheme();
-  const s = makeStyles(theme);
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [logs, setLogs] = useState<SleepLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [hoursSlept, setHoursSlept] = useState(8);
-  const [quality, setQuality] = useState(3);
+  const [bedtime, setBedtime] = useState('23:00');
+  const [wake, setWake] = useState('07:00');
+  const [quality, setQuality] = useState<number | null>(null);
+  const [awakenings, setAwakenings] = useState<number | null>(null);
+  const [targetWake, setTargetWake] = useState('06:30');
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => { fetchData(); }, []);
+  const { data, loading, refresh, refreshing, reload } = useApis<{ analysis: Analysis; logs: Night[] }>({
+    analysis: '/sleep/analysis?days=7',
+    logs: '/sleep/logs?days=14',
+  });
+  const analysis = data.analysis;
+  const logs = asArray<Night>(data.logs).slice().reverse();
+  const hasData = !!analysis && analysis.nights_analyzed > 0;
 
-  async function fetchData() {
-    setLoading(true);
-    try {
-      const [aRes, lRes] = await Promise.all([
-        fetch(`${API}/api/v1/sleep/analysis?user_id=${userId}&days=7`, { headers: authHeader() }),
-        fetch(`${API}/api/v1/sleep/logs?user_id=${userId}&days=7`, { headers: authHeader() }),
-      ]);
-      if (aRes.ok) setAnalysis(await aRes.json());
-      if (lRes.ok) setLogs(await lRes.json());
-    } catch {}
-    setLoading(false);
-  }
-
-  async function logSleep() {
+  const logNight = useCallback(async () => {
+    setBusy(true);
+    const result = await postJson('/sleep/logs', {
+      bedtime, wake_time: wake, source: 'manual',
+      quality_rating: quality ?? undefined,
+      interruptions: awakenings ?? undefined,
+    });
+    setBusy(false);
+    if (!result) {
+      Alert.alert('Not saved', 'The night could not be logged. Check your connection and try again.');
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const wake = new Date();
-    const bed = new Date(wake.getTime() - hoursSlept * 60 * 60 * 1000);
-    const fmtClock = (d: Date) => `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-    const efficiency = quality * 20; // 1-5 rating -> 20-100%
-    const awake_pct = 100 - efficiency;
-    const restPct = efficiency; // deep/rem/light split proportionally within the "asleep" share
-    try {
-      const res = await fetch(`${API}/api/v1/sleep/logs?user_id=${userId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
-        body: JSON.stringify({
-          bedtime: fmtClock(bed),
-          wake_time: fmtClock(wake),
-          total_minutes: Math.round(hoursSlept * 60),
-          efficiency_pct: efficiency,
-          deep_pct: Math.round(restPct * 0.23),
-          rem_pct: Math.round(restPct * 0.25),
-          light_pct: Math.round(restPct * 0.52),
-          awake_pct,
-        }),
-      });
-      if (res.ok) {
-        setShowForm(false);
-        fetchData();
-      } else {
-        const detail = await res.text().catch(() => '');
-        Alert.alert('Could not save sleep log', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
-      }
-    } catch (err: any) {
-      Alert.alert('Could not reach the server', `${API}\n\n${err?.message || String(err)}`);
-    }
-  }
+    setQuality(null);
+    setAwakenings(null);
+    await reload();
+  }, [bedtime, wake, quality, awakenings, reload]);
 
-  async function deleteLog(id: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      const res = await fetch(`${API}/api/v1/sleep/logs/${id}?user_id=${userId}`, { method: 'DELETE', headers: authHeader() });
-      if (res.ok) {
-        fetchData();
-      } else {
-        const detail = await res.text().catch(() => '');
-        Alert.alert('Could not delete sleep log', `Server returned ${res.status}.${detail ? ` ${detail.slice(0, 200)}` : ''}`);
-      }
-    } catch (err: any) {
-      Alert.alert('Could not reach the server', `${API}\n\n${err?.message || String(err)}`);
-    }
-  }
+  const removeNight = useCallback(async (id: string) => {
+    if (await deleteJson(`/sleep/logs/${id}`)) await reload();
+    else Alert.alert('Not deleted', 'The night could not be removed.');
+  }, [reload]);
 
-  function ScoreRing({ score, color }: { score: number; color: string }) {
-    const r = 54;
-    const circ = 2 * Math.PI * r;
-    const offset = circ - (score / 100) * circ;
+  const saveTarget = useCallback(async () => {
+    if (await putJson('/sleep/profile', { target_wake: targetWake })) await reload();
+    else Alert.alert('Not saved', 'The wake time could not be saved.');
+  }, [targetWake, reload]);
+
+  if (loading) {
     return (
-      <View style={{ width: 140, height: 140 }}>
-        <Svg width={140} height={140} viewBox="0 0 140 140">
-          <Circle cx={70} cy={70} r={r} stroke={theme.border} strokeWidth={10} fill="none" />
-          <Circle cx={70} cy={70} r={r} stroke={color} strokeWidth={10} fill="none"
-            strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-            transform="rotate(-90 70 70)" />
-        </Svg>
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 36, fontWeight: '800', color }}>{score}</Text>
-          <Text style={{ fontSize: 12, color: theme.textMuted }}>/ 100</Text>
-        </View>
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color={TINT} />
       </View>
     );
   }
 
-  if (loading) return <LoadingScreen />;
-
-  const gradeColor = analysis ? GRADE_COLORS[analysis.grade] || theme.textMuted : theme.textMuted;
-  const TrendIcon = analysis?.consistency_trend === 'improving' ? TrendingUp
-    : analysis?.consistency_trend === 'declining' ? TrendingDown : Minus;
+  const scoreColor = hasData ? getScoreColor(analysis!.score) : colors.text.muted;
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 100 }}>
-      <Text style={s.title} accessibilityRole="header">Sleep</Text>
-      <Text style={s.subtitle}>Rest and recovery analysis</Text>
-
-      {analysis && analysis.score > 0 ? (
-        <>
-          <View style={s.scoreSection}>
-            <ScoreRing score={analysis.score} color={gradeColor} />
-            <View style={s.scoreInfo}>
-              <Text style={[s.grade, { color: gradeColor }]}>Grade {analysis.grade}</Text>
-              <Text style={s.metric}>Duration: {analysis.avg_duration_hours}h</Text>
-              <Text style={s.metric}>Efficiency: {analysis.avg_efficiency}%</Text>
-              <View style={s.trendRow}>
-                <TrendIcon size={14} color={gradeColor} />
-                <Text style={[s.metric, { color: gradeColor }]}>{analysis.consistency_trend}</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={TINT} />}
+      >
+        <LinearGradient colors={[TINT, '#8B5CF6', colors.bg.deep]} style={styles.hero}>
+          <Text style={[typography.body.sm, styles.heroMuted]}>Sleep</Text>
+          {hasData ? (
+            <View style={styles.heroRow}>
+              <ScoreRing score={analysis!.score} size={132} strokeWidth={10} color={scoreColor} label="SCORE" />
+              <View style={styles.heroStats}>
+                <Text style={styles.heroValue}>{analysis!.avg_duration_hours}h</Text>
+                <Text style={styles.heroMuted}>average over {analysis!.nights_analyzed} night{analysis!.nights_analyzed === 1 ? '' : 's'}</Text>
+                {analysis!.trend.trend !== 'insufficient_data' && (
+                  <Text style={[styles.heroMuted, { marginTop: 6, textTransform: 'capitalize' }]}>Trend: {analysis!.trend.trend}</Text>
+                )}
+                <Text style={[styles.heroMuted, { marginTop: 6 }]}>
+                  From {analysis!.measured.map((m) => MEASURED_LABELS[m] ?? m).join(', ')}
+                </Text>
               </View>
             </View>
-          </View>
+          ) : (
+            <Text style={[typography.heading.h2, { color: '#fff', marginTop: 8 }]}>Log last night to begin</Text>
+          )}
+        </LinearGradient>
 
-          <Text style={s.sectionTitle}>Sleep Stages</Text>
-          <View style={s.stagesCard}>
-            {analysis.stage_breakdown.map((st) => (
-              <View key={st.name} style={s.stageRow}>
-                <View style={[s.stageDot, { backgroundColor: STAGE_COLORS[st.name] }]} />
-                <Text style={s.stageName}>{st.name}</Text>
-                <View style={s.stageBarBg}>
-                  <View style={[s.stageBarFill, { width: `${st.percentage}%`, backgroundColor: STAGE_COLORS[st.name] }]} />
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Log a Night" icon="moon" iconColor={TINT} />
+          <GlassCard>
+            <View style={styles.row}>
+              <ClockStepper label="Bedtime" value={bedtime} onChange={setBedtime} />
+              <ClockStepper label="Woke up" value={wake} onChange={setWake} />
+            </View>
+            <Text style={styles.fieldLabel}>How did it feel? (optional)</Text>
+            <View style={styles.chipRow}>
+              {[1, 2, 3, 4, 5].map((v) => (
+                <TouchableOpacity key={v} style={[styles.chip, quality === v && styles.chipActive]}
+                  onPress={() => setQuality(quality === v ? null : v)} accessibilityLabel={`Quality ${v} of 5`}>
+                  <Text style={[styles.chipText, quality === v && styles.chipTextActive]}>{v}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.fieldLabel}>Times you woke up (optional)</Text>
+            <View style={styles.chipRow}>
+              {[0, 1, 2, 3, 4, 5].map((v) => (
+                <TouchableOpacity key={v} style={[styles.chip, awakenings === v && styles.chipActive]}
+                  onPress={() => setAwakenings(awakenings === v ? null : v)}>
+                  <Text style={[styles.chipText, awakenings === v && styles.chipTextActive]}>{v === 5 ? '5+' : v}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.primaryBtn} onPress={logNight} disabled={busy}>
+              <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Save night'}</Text>
+            </TouchableOpacity>
+          </GlassCard>
+        </View>
+
+        {hasData && analysis!.stage_breakdown.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="Sleep Stages" subtitle="From your wearable" icon="layers" iconColor={TINT} />
+            <GlassCard>
+              {analysis!.stage_breakdown.map((st) => (
+                <View key={st.name} style={styles.stageRow}>
+                  <Text style={styles.stageName}>{st.name}</Text>
+                  <View style={styles.barBg}>
+                    <View style={[styles.barFill, { width: `${Math.min(100, st.percentage)}%`, backgroundColor: STAGE_COLORS[st.name] ?? TINT }]} />
+                  </View>
+                  <Text style={styles.stageValue}>{Math.round(st.minutes)}m</Text>
                 </View>
-                <Text style={s.stagePct}>{st.percentage}%</Text>
-                <Text style={s.stageMin}>{st.minutes}m</Text>
-              </View>
+              ))}
+            </GlassCard>
+          </View>
+        )}
+
+        {hasData && analysis!.debt.debt_hours !== null && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="Sleep Debt" icon="hourglass" iconColor="#F59E0B" />
+            <GlassCard>
+              <Text style={styles.bigValue}>{analysis!.debt.debt_hours}h</Text>
+              <Text style={styles.helperText}>
+                Short of {analysis!.debt.target_hours}h on {analysis!.debt.short_nights ?? 0} of {analysis!.debt.nights_counted} nights.
+              </Text>
+              {analysis!.debt.recovery_plan && <Text style={styles.bodyText}>{analysis!.debt.recovery_plan}</Text>}
+            </GlassCard>
+          </View>
+        )}
+
+        {hasData && analysis!.recommendations.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="What To Try" icon="bulb" iconColor="#10B981" />
+            {analysis!.recommendations.map((r) => (
+              <GlassCard key={r.title} style={styles.cardGap}>
+                <Text style={styles.recTitle}>{r.title}</Text>
+                <Text style={styles.helperText}>{r.description}</Text>
+                {asArray<string>(r.tips).slice(0, 3).map((tip) => (
+                  <Text key={tip} style={styles.bodyText}>• {tip}</Text>
+                ))}
+              </GlassCard>
             ))}
           </View>
+        )}
 
-          <Text style={s.sectionTitle}>Recommendations</Text>
-          {analysis.recommendations.map((r, i) => (
-            <View key={i} style={s.recCard}>
-              <Moon size={14} color={theme.primaryLight} />
-              <Text style={s.recText}>{r}</Text>
-            </View>
-          ))}
-        </>
-      ) : (
-        <View style={s.empty}>
-          <Moon size={40} color={theme.border} />
-          <Text style={s.emptyTitle}>No Sleep Data</Text>
-          <Text style={s.emptyDesc}>Log your sleep to see analysis and recommendations.</Text>
-        </View>
-      )}
-
-      {showForm ? (
-        <View style={s.logForm}>
-          <Text style={s.formLabel}>Hours Slept</Text>
-          <View style={s.formRow}>
-            <TouchableOpacity onPress={() => setHoursSlept((h) => Math.max(1, h - 0.5))}>
-              <MinusCircle size={26} color={theme.textSecondary} />
-            </TouchableOpacity>
-            <Text style={s.formValue}>{hoursSlept}h</Text>
-            <TouchableOpacity onPress={() => setHoursSlept((h) => Math.min(14, h + 0.5))}>
-              <PlusCircle size={26} color={theme.textSecondary} />
-            </TouchableOpacity>
-          </View>
-          <Text style={s.formLabel}>Sleep Quality</Text>
-          <View style={s.formRow}>
-            {[1, 2, 3, 4, 5].map((v) => (
-              <TouchableOpacity
-                key={v}
-                style={[s.qualityDot, quality === v && s.qualityDotActive]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setQuality(v);
-                }}
-              >
-                <Text style={[s.qualityDotText, quality === v && s.qualityDotTextActive]}>{v}</Text>
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Bedtime Plan" subtitle="Wake at the end of a 90-minute cycle" icon="alarm" iconColor={TINT} />
+          <GlassCard>
+            {analysis?.bedtime_plan ? (
+              <>
+                {analysis.bedtime_plan.options.map((o) => (
+                  <View key={o.cycles} style={styles.planRow}>
+                    <Text style={styles.planTime}>{o.bedtime}</Text>
+                    <Text style={styles.helperText}>{o.cycles} cycles · {o.sleep_hours}h{o.within_recommended ? '' : ' · below your range'}</Text>
+                  </View>
+                ))}
+                <Text style={styles.helperText}>
+                  Includes {analysis.bedtime_plan.minutes_to_fall_asleep} min to fall asleep ({analysis.bedtime_plan.onset_source}).
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.helperText}>Set the time you want to wake up.</Text>
+            )}
+            <View style={[styles.row, { marginTop: 8 }]}>
+              <ClockStepper label="Wake at" value={targetWake} onChange={setTargetWake} />
+              <TouchableOpacity style={[styles.primaryBtn, styles.inlineBtn]} onPress={saveTarget}>
+                <Text style={styles.primaryBtnText}>Save</Text>
               </TouchableOpacity>
-            ))}
-          </View>
-          <TouchableOpacity style={s.addBtn} onPress={logSleep}>
-            <Plus size={16} color="#fff" />
-            <Text style={s.addBtnText}>Save Sleep Log</Text>
-          </TouchableOpacity>
+            </View>
+          </GlassCard>
         </View>
-      ) : (
-        <TouchableOpacity style={s.addBtn} onPress={() => setShowForm(true)}>
-          <Plus size={16} color="#fff" />
-          <Text style={s.addBtnText}>Log Sleep</Text>
-        </TouchableOpacity>
-      )}
 
-      <Text style={s.sectionTitle}>Recent Logs</Text>
-      {logs.map((l) => (
-        <View key={l.id} style={s.logCard}>
-          <View style={s.logInfo}>
-            <Text style={s.logDate}>{l.date}</Text>
-            <Text style={s.logDetail}>{Math.floor(l.total_minutes / 60)}h {l.total_minutes % 60}m · {l.efficiency_pct}% efficiency</Text>
-          </View>
-          <TouchableOpacity onPress={() => deleteLog(l.id)}>
-            <Trash2 size={14} color={theme.danger} />
-          </TouchableOpacity>
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Recent Nights" icon="calendar" iconColor={TINT} />
+          {logs.length === 0 ? (
+            <Text style={styles.helperText}>No nights logged yet.</Text>
+          ) : logs.map((n) => (
+            <GlassCard key={n.id} style={styles.cardGap}>
+              <View style={styles.logRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.recTitle}>{n.date}</Text>
+                  <Text style={styles.helperText}>
+                    {n.bedtime}–{n.wake_time} · {Math.floor(n.total_minutes / 60)}h {n.total_minutes % 60}m · score {n.score}
+                    {n.source === 'wearable' ? ' · wearable' : ''}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => removeNight(n.id)} accessibilityLabel={`Delete night of ${n.date}`}>
+                  <Ionicons name="trash-outline" size={18} color={colors.text.muted} />
+                </TouchableOpacity>
+              </View>
+            </GlassCard>
+          ))}
         </View>
-      ))}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background, padding: 20 },
-    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 48 },
-    subtitle: { fontSize: 14, color: theme.textMuted, marginBottom: 16 },
-    scoreSection: { flexDirection: 'row', backgroundColor: theme.surface, borderRadius: 16, padding: 20, marginBottom: 16, alignItems: 'center' },
-    scoreInfo: { flex: 1, marginLeft: 16 },
-    grade: { fontSize: 20, fontWeight: '700', marginBottom: 4 },
-    metric: { fontSize: 14, color: theme.textSecondary, marginBottom: 2 },
-    trendRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-    sectionTitle: { fontSize: 16, fontWeight: '600', color: theme.text, marginTop: 16, marginBottom: 8 },
-    stagesCard: { backgroundColor: theme.surface, borderRadius: 12, padding: 14 },
-    stageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-    stageDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-    stageName: { fontSize: 13, color: theme.textSecondary, width: 50 },
-    stageBarBg: { flex: 1, height: 6, backgroundColor: theme.surfaceHover, borderRadius: 3, marginHorizontal: 8 },
-    stageBarFill: { height: 6, borderRadius: 3 },
-    stagePct: { fontSize: 12, color: theme.textSecondary, width: 35, textAlign: 'right' },
-    stageMin: { fontSize: 11, color: theme.textMuted, width: 30, textAlign: 'right' },
-    recCard: {
-      flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-      backgroundColor: theme.surface, borderRadius: 12, padding: 12, marginBottom: 8,
-    },
-    recText: { flex: 1, fontSize: 13, color: theme.textSecondary, lineHeight: 18 },
-    addBtn: {
-      flexDirection: 'row', alignItems: 'center', gap: 8,
-      backgroundColor: theme.primary, borderRadius: 12, padding: 12, marginVertical: 12,
-    },
-    addBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-    logForm: { backgroundColor: theme.surface, borderRadius: 12, padding: 14, marginVertical: 12 },
-    formLabel: { fontSize: 13, fontWeight: '600', color: theme.textSecondary, marginBottom: 8, marginTop: 4 },
-    formRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 },
-    formValue: { fontSize: 18, fontWeight: '700', color: theme.text, minWidth: 50, textAlign: 'center' },
-    qualityDot: {
-      width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
-      backgroundColor: theme.surfaceHover, borderWidth: 1, borderColor: theme.border,
-    },
-    qualityDotActive: { backgroundColor: theme.primary, borderColor: theme.primary },
-    qualityDotText: { fontSize: 13, fontWeight: '600', color: theme.textMuted },
-    qualityDotTextActive: { color: '#fff' },
-    logCard: {
-      flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surface,
-      borderRadius: 12, padding: 12, marginBottom: 8,
-    },
-    logInfo: { flex: 1 },
-    logDate: { fontSize: 14, fontWeight: '600', color: theme.text },
-    logDetail: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
-    empty: { alignItems: 'center', padding: 40 },
-    emptyTitle: { fontSize: 18, fontWeight: '600', color: theme.text, marginTop: 12 },
-    emptyDesc: { fontSize: 14, color: theme.textMuted, marginTop: 4, textAlign: 'center' },
-  });
-}
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg.deep },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  scrollContent: { paddingBottom: 100 },
+  hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 16 },
+  heroStats: { flex: 1 },
+  heroValue: { color: '#fff', fontSize: 30, fontWeight: '800' },
+  heroMuted: { color: 'rgba(255,255,255,0.75)', fontSize: 13 },
+  section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  stepper: { flex: 1 },
+  stepperLabel: { color: colors.text.muted, fontSize: 12, marginBottom: 6 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stepperValue: { color: colors.text.primary, fontSize: 22, fontWeight: '700', minWidth: 64, textAlign: 'center' },
+  fieldLabel: { color: colors.text.secondary, fontSize: 13, fontWeight: '600', marginTop: 14, marginBottom: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { minWidth: 40, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, alignItems: 'center', backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border },
+  chipActive: { backgroundColor: TINT + '25', borderColor: TINT },
+  chipText: { color: colors.text.muted, fontSize: 13 },
+  chipTextActive: { color: TINT, fontWeight: '700' },
+  primaryBtn: { backgroundColor: TINT, borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 16 },
+  inlineBtn: { marginTop: 0, paddingHorizontal: 20 },
+  primaryBtnText: { color: '#fff', fontWeight: '700' },
+  stageRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  stageName: { color: colors.text.secondary, width: 52, textTransform: 'capitalize', fontSize: 13 },
+  barBg: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.bg.card, marginHorizontal: 8 },
+  barFill: { height: 8, borderRadius: 4 },
+  stageValue: { color: colors.text.muted, width: 44, textAlign: 'right', fontSize: 12 },
+  bigValue: { color: colors.text.primary, fontSize: 28, fontWeight: '800' },
+  helperText: { color: colors.text.muted, fontSize: 13, marginTop: 4, lineHeight: 18 },
+  bodyText: { color: colors.text.secondary, fontSize: 13, marginTop: 6, lineHeight: 18 },
+  recTitle: { color: colors.text.primary, fontSize: 15, fontWeight: '700' },
+  cardGap: { marginBottom: 10 },
+  planRow: { flexDirection: 'row', alignItems: 'baseline', gap: 12, paddingVertical: 4 },
+  planTime: { color: colors.text.primary, fontSize: 20, fontWeight: '700', width: 64 },
+  logRow: { flexDirection: 'row', alignItems: 'center' },
+});

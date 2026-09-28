@@ -105,7 +105,7 @@ export default function HomeScreen() {
 
   const quickActions = [
     { icon: 'heart', label: 'Heart Rate', color: colors.health.heart, route: '/health-hub' },
-    { icon: 'moon', label: 'Sleep', color: colors.health.sleep, route: '/sleep-tracker' },
+    { icon: 'moon', label: 'Sleep', color: colors.health.sleep, route: '/sleep' },
     { icon: 'fitness', label: 'Workout', color: colors.health.activity, route: '/workout' },
     { icon: 'restaurant', label: 'Nutrition', color: colors.health.nutrition, route: '/nutrition-log' },
     { icon: 'brain', label: 'Mental', color: colors.health.mental, route: '/mental-health' },
@@ -269,7 +269,7 @@ export default function HomeScreen() {
               <View style={[styles.miniProgressFill, { width: `${strain ?? 0}%`, backgroundColor: colors.health.calm }]} />
             </View>
           </GlassCard>
-          <GlassCard variant="health" healthType="sleep" style={styles.wellnessCard} onPress={() => router.push('/sleep-tracker' as any)}>
+          <GlassCard variant="health" healthType="sleep" style={styles.wellnessCard} onPress={() => router.push('/sleep' as any)}>
             <Ionicons name="moon" size={24} color={colors.health.sleep} />
             <Text style={styles.wellnessCardValue}>{sleepScore ?? '--'}</Text>
             <Text style={styles.wellnessCardLabel}>Sleep Score</Text>

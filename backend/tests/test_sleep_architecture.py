@@ -14,7 +14,7 @@ from app.services.sleep_architecture import (
     calculate_sleep_score,
     analyze_sleep_architecture,
     classify_sleep_quality,
-    detect_sleep_disorders_indicators,
+    detect_sleep_patterns,
     WAKE, N1, N2, N3, REM,
 )
 
@@ -234,18 +234,15 @@ class TestQualityClassification:
         assert result["label"] == "Poor"
 
 
-class TestDisorderIndicators:
-    def test_normal_sleep(self):
-        # Short sleep that's mostly sleep (no insomnia indicators)
+class TestSleepPatterns:
+    def test_ordinary_night_has_no_long_onset(self):
         stages = [WAKE] * 10 + [N2] * 100 + [N3] * 40 + [REM] * 40 + [WAKE] * 10
-        indicators = detect_sleep_disorders_indicators(stages)
-        # Normal-ish sleep should have few indicators
-        severe = [i for i in indicators if i["severity"] == "severe"]
-        assert len(severe) == 0
+        keys = [p["pattern"] for p in detect_sleep_patterns(stages)]
+        assert "long_time_to_fall_asleep" not in keys
 
-    def test_insomnia(self):
-        stages = [WAKE] * 100 + [N2] * 50  # long SOL, low SE
-        indicators = detect_sleep_disorders_indicators(stages)
-        assert len(indicators) >= 1
-        conditions = [i["condition"] for i in indicators]
-        assert any("Insomnia" in c for c in conditions)
+    def test_long_onset_is_described_not_diagnosed(self):
+        stages = [WAKE] * 100 + [N2] * 50
+        patterns = detect_sleep_patterns(stages)
+        assert "long_time_to_fall_asleep" in [p["pattern"] for p in patterns]
+        text = " ".join(p["observed"] + p["next_step"] for p in patterns).lower()
+        assert "insomnia" not in text
