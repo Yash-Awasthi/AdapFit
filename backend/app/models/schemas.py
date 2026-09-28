@@ -32,7 +32,8 @@ class ACWRStatus(str, Enum):
 
 # --- User & Baseline ---
 class UserProfileCreate(BaseModel):
-    email: str = Field(..., examples=["athlete@example.com"])
+    # Ignored when set: the profile takes the signed-in account's email.
+    email: Optional[str] = Field(None, examples=["athlete@example.com"])
     name: Optional[str] = Field(None, examples=["Alex Johnson"])
     fitness_level: FitnessLevel = Field(FitnessLevel.INTERMEDIATE, examples=["intermediate"])
     primary_goal: PrimaryGoal = Field(PrimaryGoal.HYPERTROPHY, examples=["hypertrophy"])

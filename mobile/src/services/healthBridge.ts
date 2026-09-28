@@ -2,7 +2,7 @@
  * Unified Health Data Bridge
  *
  * Abstracts platform-specific health APIs:
- * - Android: react-native-health-connect (Google Health Connect)
+ * - Android: Health Connect, read through ./healthConnect without prompting
  * - iOS: react-native-health (Apple HealthKit)
  *
  * Never returns fabricated readings. When a value cannot be read from the
@@ -68,95 +68,57 @@ function unavailable(reason: HealthUnavailableReason): HealthBiometrics {
 }
 
 async function fetchAndroid(): Promise<HealthBiometrics> {
-  let initialize: any, requestPermission: any, readRecords: any;
-  try {
-    ({ initialize, requestPermission, readRecords } = require('react-native-health-connect'));
-  } catch {
-    return unavailable('module-missing');
-  }
+  const { healthConnectState, grantedTypes, readAll } = require('./healthConnect') as typeof import('./healthConnect');
+  if ((await healthConnectState()) !== 'ready') return unavailable('module-missing');
+  const granted = await grantedTypes();
+  if (!granted.size) return unavailable('permission-denied');
 
-  try {
-    const isInit = await initialize();
-    if (!isInit) return unavailable('module-missing');
-  } catch {
-    return unavailable('module-missing');
-  }
+  const now = Date.now();
+  const since15h = now - 15 * 3600_000;
+  const since24h = now - 24 * 3600_000;
+  const read = async (type: Parameters<typeof readAll>[0], from: number) =>
+    granted.has(type) ? readAll(type, from, now).catch(() => [] as any[]) : [];
+  const ms = (iso: string) => new Date(iso).getTime();
 
-  let granted: any[];
-  try {
-    granted = await requestPermission([
-      { accessType: 'read', recordType: 'SleepSession' },
-      { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
-      { accessType: 'read', recordType: 'RestingHeartRate' },
-      { accessType: 'read', recordType: 'Steps' },
-      { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
-    ]);
-  } catch {
-    return unavailable('permission-denied');
-  }
-  if (!granted || granted.length === 0) return unavailable('permission-denied');
-
-  const now = new Date();
-  const start24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-  const endNow = now.toISOString();
-  const start15h = new Date(now.getTime() - 15 * 60 * 60 * 1000).toISOString();
-  const timeFilter = { operator: 'between' as const, startTime: start15h, endTime: endNow };
-  const dayFilter = { operator: 'between' as const, startTime: start24h, endTime: endNow };
-
-  // Sleep — efficiency is only reported when the record carries stage
-  // breakdown; otherwise it stays undefined rather than guessed.
+  // Last night: the longest session ending in the past 15 hours. Stage minutes and
+  // efficiency only when the record carries stages; otherwise left undefined.
   let sleepHours: number | undefined, sleepEfficiency: number | undefined;
   let deepMin: number | undefined, remMin: number | undefined, lightMin: number | undefined;
-  try {
-    const sleep = await readRecords('SleepSession', { timeRangeFilter: timeFilter });
-    if (sleep.records.length > 0) {
-      const s = sleep.records[0];
-      const totalMin = (new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 60000;
-      sleepHours = parseFloat((totalMin / 60).toFixed(1));
-      if (s.stages && s.stages.length > 0) {
-        deepMin = s.stages.filter((st: any) => st.stage === 'STAGE_TYPE_DEEP').reduce((a: number, st: any) => a + st.duration / 60000, 0);
-        remMin = s.stages.filter((st: any) => st.stage === 'STAGE_TYPE_REM').reduce((a: number, st: any) => a + st.duration / 60000, 0);
-        const awakeMin = s.stages.filter((st: any) => st.stage === 'STAGE_TYPE_AWAKE').reduce((a: number, st: any) => a + st.duration / 60000, 0);
-        lightMin = totalMin - (deepMin || 0) - (remMin || 0) - awakeMin;
-        sleepEfficiency = Math.round(((totalMin - awakeMin) / totalMin) * 100);
-      }
+  const sessions = (await read('SleepSession', since15h)).sort(
+    (a: any, b: any) => ms(b.endTime) - ms(b.startTime) - (ms(a.endTime) - ms(a.startTime)),
+  );
+  if (sessions.length) {
+    const s = sessions[0];
+    const totalMin = (ms(s.endTime) - ms(s.startTime)) / 60000;
+    sleepHours = parseFloat((totalMin / 60).toFixed(1));
+    const stages: any[] = s.stages ?? [];
+    if (stages.length) {
+      const minutes = (kinds: number[]) =>
+        stages.filter((st) => kinds.includes(st.stage)).reduce((a, st) => a + (ms(st.endTime) - ms(st.startTime)) / 60000, 0);
+      deepMin = Math.round(minutes([5]));
+      remMin = Math.round(minutes([6]));
+      lightMin = Math.round(minutes([4]));
+      const awake = minutes([1, 3]);
+      sleepEfficiency = Math.round(((totalMin - awake) / totalMin) * 100);
     }
-  } catch {}
+  }
 
-  let hrv: number | undefined;
-  try {
-    const hrvRec = await readRecords('HeartRateVariabilityRmssd', { timeRangeFilter: timeFilter });
-    if (hrvRec.records.length > 0) {
-      hrv = hrvRec.records.reduce((a: number, r: any) => a + r.heartRateVariabilityMillis, 0) / hrvRec.records.length;
-    }
-  } catch {}
-
-  let rhr: number | undefined;
-  try {
-    const rhrRec = await readRecords('RestingHeartRate', { timeRangeFilter: timeFilter });
-    if (rhrRec.records.length > 0) rhr = rhrRec.records[rhrRec.records.length - 1].beatsPerMinute;
-  } catch {}
-
-  let steps: number | undefined;
-  try {
-    const stepsRec = await readRecords('Steps', { timeRangeFilter: dayFilter });
-    steps = stepsRec.records.reduce((a: number, r: any) => a + r.count, 0);
-  } catch {}
-
-  let cal: number | undefined;
-  try {
-    const calRec = await readRecords('ActiveCaloriesBurned', { timeRangeFilter: dayFilter });
-    cal = calRec.records.reduce((a: number, r: any) => a + r.energy?.inKilocalories || 0, 0);
-  } catch {}
+  const hrvs = (await read('HeartRateVariabilityRmssd', since15h)).map((r: any) => r.heartRateVariabilityMillis);
+  const rhr = (await read('RestingHeartRate', since24h)).sort((a: any, b: any) => ms(a.time) - ms(b.time)).pop()?.beatsPerMinute;
+  const stepRecs = await read('Steps', since24h);
+  const calRecs = await read('ActiveCaloriesBurned', since24h);
+  const weight = (await read('Weight', now - 30 * 86400_000)).sort((a: any, b: any) => ms(a.time) - ms(b.time)).pop()?.weight?.inKilograms;
 
   return {
     sleepHours, sleepEfficiency,
     deepSleepMinutes: deepMin, remSleepMinutes: remMin, lightSleepMinutes: lightMin,
-    hrvRmssd: hrv ? parseFloat(hrv.toFixed(1)) : undefined,
+    hrvRmssd: hrvs.length ? parseFloat((hrvs.reduce((a: number, b: number) => a + b, 0) / hrvs.length).toFixed(1)) : undefined,
     restingHeartRate: rhr,
-    steps, activeCalories: cal ? parseFloat(cal.toFixed(0)) : undefined,
+    steps: stepRecs.length ? stepRecs.reduce((a: number, r: any) => a + r.count, 0) : undefined,
+    activeCalories: calRecs.length ? Math.round(calRecs.reduce((a: number, r: any) => a + (r.energy?.inKilocalories ?? 0), 0)) : undefined,
+    weightKg: weight,
     source: 'healthconnect',
-    fetchedAt: now.toISOString(),
+    fetchedAt: new Date(now).toISOString(),
   };
 }
 

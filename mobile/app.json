@@ -31,7 +31,27 @@
         "RECORD_AUDIO",
         "BLUETOOTH_SCAN",
         "BLUETOOTH_CONNECT",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_HEART_RATE_VARIABILITY",
+        "android.permission.health.READ_WEIGHT",
+        "android.permission.health.READ_BODY_FAT",
+        "android.permission.health.READ_BLOOD_GLUCOSE",
+        "android.permission.health.READ_EXERCISE",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_DISTANCE",
+        "android.permission.health.READ_OXYGEN_SATURATION",
+        "android.permission.health.READ_BLOOD_PRESSURE",
+        "android.permission.health.READ_BODY_TEMPERATURE",
+        "android.permission.health.READ_NUTRITION",
+        "android.permission.health.READ_MENSTRUATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
       ]
     },
     "plugins": [
@@ -74,9 +94,27 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "AdapFit uses your location only to show hospitals, clinics and pharmacies near you."
+          "locationWhenInUsePermission": "AdapFit uses your location to record the route of a run you start, and to show care, air quality and routes near you when you ask.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": true
         }
-      ]
+      ],
+      "react-native-health-connect",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "AdapFit uses the microphone for voice logging and, when you start it, to listen for snoring overnight. Audio is analysed on the phone and never saved.",
+          "enableBackgroundRecording": true,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0F172A"
+        }
+      ],
+      "expo-task-manager"
     ],
     "scheme": "adapfit",
     "experiments": {

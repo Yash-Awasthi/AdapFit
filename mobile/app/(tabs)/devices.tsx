@@ -13,10 +13,102 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { colors, spacing } from '../../src/theme';
 import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
 import { getJson, postJson } from '../../src/services/http';
+import {
+  HealthConnectState, healthConnectState, grantedTypes, requestHealthAccess, syncHealthConnect, openHealthConnectSettings,
+  HC_RECORD_TYPES,
+} from '../../src/services/healthConnect';
 
 const TINT = '#64748B';
 
 interface SourceStatus { imports: number; records: number; last_import: string | null }
+interface DeviceStatus { last_sync: number | null; records: Record<string, number> }
+interface Rhythm { status: string; days: number; interdaily_stability?: number; intradaily_variability?: number;
+  relative_amplitude?: number; m10_onset_hour?: number; l5_onset_hour?: number; needed_days?: number }
+
+const hour = (h: number) => `${String(h).padStart(2, '0')}:00`;
+
+function HealthConnectCard() {
+  const [state, setState] = useState<HealthConnectState | null>(null);
+  const [granted, setGranted] = useState(0);
+  const [server, setServer] = useState<DeviceStatus | null>(null);
+  const [rhythm, setRhythm] = useState<Rhythm | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setState(await healthConnectState());
+    setGranted((await grantedTypes()).size);
+    setServer(await getJson<DeviceStatus>('/device-data/status'));
+    setRhythm(await getJson<Rhythm>('/device-data/rest-activity?days=14'));
+  }, []);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const sync = async () => {
+    setBusy(true);
+    const r = await syncHealthConnect();
+    setBusy(false);
+    if ('error' in r) {
+      Alert.alert('Not synced', r.error === 'no-permission' ? 'Allow AdapFit to read at least one type in Health Connect.' : 'The server could not be reached. Try again later.');
+    } else {
+      Alert.alert('Synced', `${r.sent} records read, ${r.added} new.`);
+    }
+    refresh();
+  };
+
+  const connect = async () => {
+    const got = await requestHealthAccess();
+    setGranted(got.size);
+    if (got.size) sync();
+  };
+
+  if (state === null) return <GlassCard><ActivityIndicator /></GlassCard>;
+  if (state === 'unsupported') {
+    return <GlassCard><Text style={styles.sub}>Health Connect is Android only. Apple Health comes with the iPhone app.</Text></GlassCard>;
+  }
+  if (state !== 'ready') {
+    return (
+      <GlassCard>
+        <Text style={styles.title}>{state === 'not-installed' ? 'Health Connect is not installed' : 'Health Connect needs an update'}</Text>
+        <Text style={styles.sub}>Android 14 and later have it built in. On older phones install or update "Health Connect" from the Play Store, then come back.</Text>
+      </GlassCard>
+    );
+  }
+  const total = server ? Object.values(server.records).reduce((a, b) => a + b, 0) : 0;
+  return (
+    <GlassCard>
+      <Text style={styles.title}>Health Connect</Text>
+      <Text style={styles.sub}>
+        {granted ? `Reading ${granted} of ${HC_RECORD_TYPES.length} data types.` : 'Steps, sleep, heart rate, HRV, weight, glucose, blood pressure, SpO2, temperature, food and cycle from your watch, scale and other apps.'}
+        {server?.last_sync ? ` Last sync ${new Date(server.last_sync * 1000).toLocaleString()} · ${total} records stored.` : ''}
+      </Text>
+      <View style={styles.buttons}>
+        {granted ? (
+          <TouchableOpacity style={styles.button} onPress={sync} disabled={busy} accessibilityRole="button">
+            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sync now</Text>}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.button} onPress={connect} accessibilityRole="button">
+            <Text style={styles.buttonText}>Connect</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={[styles.button, styles.secondary]} onPress={openHealthConnectSettings} accessibilityRole="button">
+          <Text style={styles.buttonText}>Choose data</Text>
+        </TouchableOpacity>
+      </View>
+      {rhythm?.status === 'ok' ? (
+        <View style={{ marginTop: 12 }}>
+          <Text style={styles.title}>Daily rhythm ({rhythm.days} days of steps)</Text>
+          <Text style={styles.sub}>
+            Most active from about {hour(rhythm.m10_onset_hour!)} for 10 hours; quietest 5 hours start about {hour(rhythm.l5_onset_hour!)}.
+            {' '}Day-to-day regularity {Math.round(rhythm.interdaily_stability! * 100)}% · contrast between active and rest {Math.round(rhythm.relative_amplitude! * 100)}%.
+            {' '}A regular pattern with a clear quiet night supports sleep and energy.
+          </Text>
+        </View>
+      ) : granted ? (
+        <Text style={[styles.sub, { marginTop: 8 }]}>Your daily rhythm appears after 3 full days of step data.</Text>
+      ) : null}
+    </GlassCard>
+  );
+}
 
 export default function DevicesScreen() {
   const router = useRouter();
@@ -101,9 +193,7 @@ export default function DevicesScreen() {
 
         <View style={styles.section}>
           <SectionHeaderPremium title="Phone Health Apps" icon="phone-portrait" iconColor={TINT} />
-          <GlassCard>
-            <Text style={styles.sub}>Automatic sync with Health Connect (Android) and Apple Health is being built. Until then, add readings in your morning check-in or import files above.</Text>
-          </GlassCard>
+          <HealthConnectCard />
         </View>
       </ScrollView>
     </View>
@@ -119,4 +209,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   title: { color: colors.text.primary, fontSize: 15, fontWeight: '700' },
   sub: { color: colors.text.muted, fontSize: 12, marginTop: 2, lineHeight: 17 },
+  buttons: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  button: { flex: 1, backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  secondary: { backgroundColor: '#334155' },
+  buttonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });

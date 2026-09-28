@@ -5,6 +5,9 @@ import { getRefreshToken, getToken, restoreToken, setSignedOutHandler, setTokens
 import { API_V1 } from '../services/config';
 import { cache } from '../services/cache';
 import { deleteLocalDatabase } from '../db/schema';
+import { resetHealthSync } from '../services/healthConnect';
+import { cancelAllReminders } from '../services/reminders';
+import { discardRun } from '../services/runTracker';
 
 export interface UserProfile {
   id: string;
@@ -110,6 +113,10 @@ export const useUserStore = create<UserStore>((set, get) => ({
       const keys = await AsyncStorage.getAllKeys();
       await AsyncStorage.multiRemove(keys.filter((k) => k === STORAGE_KEY || k.startsWith('adapfit:cache:')));
       await deleteLocalDatabase();
+      await resetHealthSync();
+      await cancelAllReminders();
+      // Queued fixes would otherwise upload into the next account's history.
+      await discardRun();
     } catch {
       /* nothing stored yet */
     }

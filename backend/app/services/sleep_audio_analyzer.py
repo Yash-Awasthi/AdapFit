@@ -81,7 +81,17 @@ class SleepAudioAnalyzerService:
         # Calculate scores
         snoring_score = len(snoring_events) * 5
         breathing_events_per_hour = len(breathing_pauses) / (total_sleep_min / 60)
-        apnea_risk = self._assess_apnea_risk(snoring_events, breathing_pauses, audio_data)
+        if "breathing_pauses" in audio_data:
+            apnea_risk = self._assess_apnea_risk(snoring_events, breathing_pauses, audio_data)
+        else:
+            # A phone recorder that cannot hear pauses must not report a low risk by their absence.
+            apnea_risk = {
+                "risk_level": "not_assessed",
+                "risk_factors": [],
+                "recommendation": ("This recording does not detect breathing pauses. Loud snoring most nights, "
+                                   "someone seeing you stop breathing, or sleepiness in the day are worth "
+                                   "raising with a doctor."),
+            }
 
         sleep_quality = max(0, 100 - snoring_score - len(breathing_pauses) * 10 - len(noise_events) * 3)
 
@@ -185,7 +195,8 @@ class SleepAudioAnalyzerService:
     def _generate_insights(self, snoring, pauses, talking, apnea_risk) -> List[str]:
         insights = []
         if snoring:
-            insights.append(f"Snoring detected {len(snoring)} times — side sleeping may help")
+            minutes = sum(e.get("duration_min", 0) for e in snoring)
+            insights.append(f"Snoring in {len(snoring)} stretches, about {round(minutes)} min in all. Side sleeping may help")
         if pauses:
             insights.append(f"{len(pauses)} breathing pauses detected")
         if apnea_risk["risk_level"] == "high":

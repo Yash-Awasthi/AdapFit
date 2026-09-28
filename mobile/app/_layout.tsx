@@ -12,6 +12,10 @@ import { LoadingScreen, SyncStatusBadge } from "../src/components";
 import { startSyncDaemon } from "../src/services/sync";
 import { getToken } from "../src/services/authToken";
 import { getConsent, isBlocked } from "../src/services/privacy";
+import { syncHealthConnectIfDue } from "../src/services/healthConnect";
+import { applyReminders } from "../src/services/reminders";
+// Registers the background location task; must load before any run starts or resumes.
+import "../src/services/runTracker";
 
 function RootStack() {
   const { theme, isDark } = useTheme();
@@ -52,6 +56,10 @@ function RootStack() {
     if (!hydrated || loading || !profile || !getToken()) return;
     getConsent().then((state) => {
       if (isBlocked(state)) router.replace("/privacy" as any);
+      else {
+        syncHealthConnectIfDue();
+        applyReminders(false);
+      }
     });
   }, [hydrated, loading, profile, userId, router]);
 
@@ -80,7 +88,7 @@ function RootStack() {
         <Stack.Screen name="privacy" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="legal" options={{ headerShown: false }} />
       </Stack>
-      {profile && (
+      {profile && segments[0] !== "sleep-sounds" && (
         <View style={{ position: "absolute", top: 96, right: 12 }} pointerEvents="none">
           <SyncStatusBadge />
         </View>

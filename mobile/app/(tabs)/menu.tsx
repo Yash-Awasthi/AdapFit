@@ -10,7 +10,7 @@ import {
   Brain, Moon, Shield, Utensils, Users, Settings as SettingsIcon,
   Download, Bell, Info, Pencil, Ruler, Droplet, Wrench,
   LayoutDashboard, CheckSquare, Stethoscope, ClipboardList, Leaf, Scale, HeartHandshake, Activity, TrendingUp, HeartPulse, Baby, MessagesSquare,
-  ChefHat, Droplets, Smile, Pill, Watch, CalendarDays, Siren, Accessibility,
+  ChefHat, Droplets, Smile, Pill, Watch, CalendarDays, Siren, Accessibility, Route, AudioLines,
 } from 'lucide-react-native';
 import { useTheme, AccentName, CARD_SHADOW } from '../../src/services/theme';
 import { useDevSettings } from '../../src/services/devSettings';
@@ -58,6 +58,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
     {
       title: 'Training',
       items: [
+        { icon: Route, label: 'Record a route', sub: 'Run, walk, ride or hike with GPS', route: '/run-record', color: '#22C55E' },
         { icon: Search, label: 'Exercises', sub: 'Movement library', route: '/exercises', color: theme.primary },
         { icon: Calendar, label: 'Periodization', sub: 'Long-term plan', route: '/periodization', color: '#06B6D4' },
         { icon: Award, label: 'Achievements', sub: 'Badges, level & streaks', route: '/achievements', color: '#EAB308' },
@@ -72,6 +73,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
         { icon: Droplets, label: 'Wellness', sub: 'Hydration, breathing & meditation', route: '/wellness', color: '#06B6D4' },
         { icon: Leaf, label: 'Everyday Wellbeing', sub: 'Air quality, desk health, memory, travel', route: '/everyday', color: '#22C55E' },
         { icon: Moon, label: 'Sleep', sub: 'Stages & consistency', route: '/sleep', color: '#6366F1' },
+        { icon: AudioLines, label: 'Sleep sounds', sub: 'Snoring and noise overnight', route: '/sleep-sounds', color: '#8B5CF6' },
         { icon: Shield, label: 'Health', sub: 'Conditions & meds', route: '/health', color: '#22C55E' },
         ...(showFemaleScreens
           ? [

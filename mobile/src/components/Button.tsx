@@ -36,7 +36,14 @@ export function Button({
     transform: [{ scale: scale.value }],
   }));
 
+  const press = () => {
+    Haptics.selectionAsync();
+    onPress();
+  };
+
+  // Callbacks on the JS thread: haptics and onPress are plain JS, which the UI thread cannot call.
   const tapGesture = Gesture.Tap()
+    .runOnJS(true)
     .onBegin(() => {
       if (!reduceMotion) scale.value = withSpring(0.96, { damping: 15, stiffness: 300 });
     })
@@ -44,10 +51,7 @@ export function Button({
       if (!reduceMotion) scale.value = withSpring(1, { damping: 15, stiffness: 300 });
     })
     .onEnd(() => {
-      if (!disabled && !loading) {
-        Haptics.selectionAsync();
-        onPress();
-      }
+      if (!disabled && !loading) press();
     });
 
   const variantStyles = {
