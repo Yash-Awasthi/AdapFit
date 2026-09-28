@@ -27,7 +27,6 @@ WS_ROUTES = [
     ("/api/v1/chat/ws/{uid}", True),
     ("/api/v1/sensors/ws/{uid}", True),
     ("/api/v1/camera-ws/ws/bpm", False),
-    ("/api/v1/rooms/ws/demo-room?user_id={uid}", True),
     # The declared prefix (/challenges) is applied on top of a route path that
     # already carries /ws/challenges/, so the public URL repeats the segment.
     ("/api/v1/challenges/ws/challenges/demo-challenge", False),

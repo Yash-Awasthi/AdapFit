@@ -8,7 +8,7 @@ import { speak } from '../src/services/tts';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../src/services/theme';
 import { useWorkoutStore, useUserStore } from '../src/stores';
-import { patchJson } from '../src/services/http';
+import { patchJson, postJson } from '../src/services/http';
 
 const FALLBACK_IMAGE =
   'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/0.jpg';
@@ -58,6 +58,7 @@ export default function WorkoutActive() {
   const [weight, setWeight] = useState(20);
   const [reps, setReps] = useState(defaultReps(currentExercise?.target_reps));
   const [rpe, setRpe] = useState(currentExercise?.target_rpe ?? 8);
+  const [scaleTip, setScaleTip] = useState<string | null>(null);
 
   const spokeMilestones = useRef(new Set<number>());
 
@@ -114,6 +115,14 @@ export default function WorkoutActive() {
       reps_completed: loggedReps,
       rpe: loggedRpe,
     });
+    const thisExercise = [...loggedSets, { weight_kg: loggedWeight, reps_completed: loggedReps, rpe: loggedRpe, exercise_id: currentExercise.exercise_id }]
+      .filter((x) => x.exercise_id === currentExercise.exercise_id);
+    setScaleTip(null);
+    postJson<{ should_scale: boolean; summary: string; decisions: { description: string }[] }>('/workouts/auto-scale', {
+      completed_sets: thisExercise.map((x) => ({ weight: x.weight_kg, reps: x.reps_completed, rpe: x.rpe, exercise_id: x.exercise_id })),
+      target_rpe: currentExercise.target_rpe ?? 8,
+      target_reps: defaultReps(currentExercise.target_reps),
+    }).then((r) => { if (r?.should_scale) setScaleTip(r.decisions[0]?.description ?? r.summary); });
 
     if (setNum < (currentExercise.sets || 1)) {
       setSetNum((n) => n + 1);
@@ -205,6 +214,12 @@ export default function WorkoutActive() {
         </Text>
         <Image source={{ uri: currentExercise.gif_url || FALLBACK_IMAGE }} style={s.exerciseGif} />
       </View>
+
+      {scaleTip && (
+        <TouchableOpacity style={s.scaleTip} onPress={() => setScaleTip(null)} accessibilityRole="alert">
+          <Text style={s.scaleTipText}>{scaleTip}</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Manual set adjusters */}
       <View style={s.adjusterRow}>
@@ -336,6 +351,8 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
       alignItems: 'center',
       marginBottom: 16,
     },
+    scaleTip: { backgroundColor: theme.warning + '22', borderColor: theme.warning, borderWidth: 1, borderRadius: 12, padding: 12, marginHorizontal: 20, marginBottom: 12 },
+    scaleTipText: { color: theme.text, fontSize: 14, lineHeight: 20 },
     exerciseName: {
       fontSize: 22,
       fontWeight: '700',
