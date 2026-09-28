@@ -315,4 +315,6 @@ class FertilityTrackerService:
             return "Low fertility. Focus on overall health and wellness."
 
 
-fertility_tracker_service = FertilityTrackerService()
+from app.core.durable import shared  # noqa: E402
+
+fertility_tracker_service = shared("app.services.fertility_tracker.fertility_tracker_service", FertilityTrackerService())

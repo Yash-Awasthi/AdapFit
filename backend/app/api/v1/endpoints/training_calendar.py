@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -55,7 +56,7 @@ class MonthOverview(BaseModel):
 
 
 # In-memory storage
-calendar_entries: dict = {}  # user_id -> list of CalendarEntry dicts
+calendar_entries = durable_dict("app.api.v1.endpoints.training_calendar.calendar_entries")  # user_id -> list of CalendarEntry dicts
 
 
 def _get_week_range(date_str: str) -> tuple[str, str]:

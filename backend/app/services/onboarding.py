@@ -6,6 +6,7 @@ personalized recommendations, and skip-able steps.
 """
 from dataclasses import dataclass, field
 from typing import Optional
+from app.core.durable import durable_dict
 
 
 @dataclass
@@ -151,7 +152,7 @@ class OnboardingState:
 
 
 # In-memory store (replace with DB in production)
-_onboarding: dict[str, OnboardingState] = {}
+_onboarding = durable_dict("app.services.onboarding._onboarding")
 
 
 def get_onboarding(user_id: str) -> OnboardingState:

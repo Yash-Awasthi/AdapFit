@@ -210,4 +210,6 @@ class HospitalAtHomeService:
         return [{"key": k, **v} for k, v in self.ACUTE_CONDITIONS.items()]
 
 
-hospital_at_home = HospitalAtHomeService()
+from app.core.durable import shared  # noqa: E402
+
+hospital_at_home = shared("app.services.hospital_at_home.hospital_at_home", HospitalAtHomeService())

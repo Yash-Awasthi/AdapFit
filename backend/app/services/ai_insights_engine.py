@@ -240,4 +240,6 @@ class AIInsightsEngine:
         return reports[-1] if reports else None
 
 
-ai_insights_engine = AIInsightsEngine()
+from app.core.durable import shared  # noqa: E402
+
+ai_insights_engine = shared("app.services.ai_insights_engine.ai_insights_engine", AIInsightsEngine())

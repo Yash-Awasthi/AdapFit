@@ -157,4 +157,6 @@ class ChronicFatigueService:
         }
 
 
-chronic_fatigue_service = ChronicFatigueService()
+from app.core.durable import shared  # noqa: E402
+
+chronic_fatigue_service = shared("app.services.chronic_fatigue.chronic_fatigue_service", ChronicFatigueService())

@@ -155,4 +155,6 @@ class HealthPassportService:
         return list(self.TRAVEL_REQUIREMENTS.keys())
 
 
-health_passport = HealthPassportService()
+from app.core.durable import shared  # noqa: E402
+
+health_passport = shared("app.services.health_passport.health_passport", HealthPassportService())

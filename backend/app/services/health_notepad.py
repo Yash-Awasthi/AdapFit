@@ -61,4 +61,6 @@ class HealthNotepad:
         return {"total_notes": len(notes), "categories": categories, "pinned_count": sum(1 for n in notes if n["pinned"])}
 
 
-health_notepad = HealthNotepad()
+from app.core.durable import shared  # noqa: E402
+
+health_notepad = shared("app.services.health_notepad.health_notepad", HealthNotepad())

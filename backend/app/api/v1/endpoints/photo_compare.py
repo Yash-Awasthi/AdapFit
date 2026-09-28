@@ -7,11 +7,12 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.core.storage import storage
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
 # In-memory photo storage
-_photo_records: dict[str, list[dict]] = {}
+_photo_records = durable_dict("app.api.v1.endpoints.photo_compare._photo_records")
 
 
 class PhotoRecordRequest(BaseModel):

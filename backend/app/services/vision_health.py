@@ -138,4 +138,6 @@ class VisionHealthService:
         return alerts
 
 
-vision_health_service = VisionHealthService()
+from app.core.durable import shared  # noqa: E402
+
+vision_health_service = shared("app.services.vision_health.vision_health_service", VisionHealthService())

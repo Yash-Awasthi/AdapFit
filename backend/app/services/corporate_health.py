@@ -94,4 +94,6 @@ class CorporateHealthService:
         return {"scheduled": True, "type": screening_type, "date": "Next available slot", "location": "On-site wellness center", "reminder": "You'll receive a reminder 24 hours before"}
 
 
-corporate_health_service = CorporateHealthService()
+from app.core.durable import shared  # noqa: E402
+
+corporate_health_service = shared("app.services.corporate_health.corporate_health_service", CorporateHealthService())

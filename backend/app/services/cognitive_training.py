@@ -236,4 +236,6 @@ class CognitiveTrainingService:
             return "Every session makes your brain stronger. Keep training! 💪"
 
 
-cognitive_training_service = CognitiveTrainingService()
+from app.core.durable import shared  # noqa: E402
+
+cognitive_training_service = shared("app.services.cognitive_training.cognitive_training_service", CognitiveTrainingService())

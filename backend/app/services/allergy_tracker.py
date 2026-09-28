@@ -274,4 +274,6 @@ class AllergyTrackerService:
         }
 
 
-allergy_tracker_service = AllergyTrackerService()
+from app.core.durable import shared  # noqa: E402
+
+allergy_tracker_service = shared("app.services.allergy_tracker.allergy_tracker_service", AllergyTrackerService())

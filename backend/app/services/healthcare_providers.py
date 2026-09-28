@@ -247,4 +247,6 @@ class HealthcareProviderService:
         }
 
 
-healthcare_providers_service = HealthcareProviderService()
+from app.core.durable import shared  # noqa: E402
+
+healthcare_providers_service = shared("app.services.healthcare_providers.healthcare_providers_service", HealthcareProviderService())

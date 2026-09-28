@@ -247,4 +247,6 @@ class CardiacRehabService:
         }
 
 
-cardiac_rehab_service = CardiacRehabService()
+from app.core.durable import shared  # noqa: E402
+
+cardiac_rehab_service = shared("app.services.cardiac_rehab.cardiac_rehab_service", CardiacRehabService())

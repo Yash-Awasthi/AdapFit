@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -49,8 +50,8 @@ class TemplateUseRequest(BaseModel):
 
 
 # In-memory storage
-templates: dict = {}  # user_id -> list of templates
-use_counts: dict[str, int] = {}  # template_id -> count
+templates = durable_dict("app.api.v1.endpoints.workout_templates.templates")  # user_id -> list of templates
+use_counts = durable_dict("app.api.v1.endpoints.workout_templates.use_counts")  # template_id -> count
 
 
 # --- Built-in templates ---

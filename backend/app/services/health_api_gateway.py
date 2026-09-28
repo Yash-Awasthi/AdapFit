@@ -61,7 +61,7 @@ class HealthAPIGateway:
             ("ai_companion", "AI Companion", "Empathetic conversation"),
             ("meal_delivery", "Meal Delivery", "Healthy meal ordering"),
             ("gym_integration", "Gym Integration", "Facility and class booking"),
-            ("health_coaching", "Health Coaching", "Certified coach matching"),
+
             ("generative_wellness", "AI Wellness Plans", "Personalized wellness plans"),
             ("misinformation", "Misinformation", "Health claim verification"),
             ("wellness_score", "Wellness Score", "Unified health scoring"),

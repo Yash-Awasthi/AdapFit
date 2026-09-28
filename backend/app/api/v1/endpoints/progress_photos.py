@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -28,7 +29,7 @@ class PhotoResponse(BaseModel):
 
 
 # In-memory storage
-progress_photos: dict = {}  # user_id -> list
+progress_photos = durable_dict("app.api.v1.endpoints.progress_photos.progress_photos")  # user_id -> list
 
 
 @router.get("", response_model=List[PhotoResponse])

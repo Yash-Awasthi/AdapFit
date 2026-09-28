@@ -13,10 +13,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from typing import Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
-_routes: dict[str, list[dict]] = {}
+_routes = durable_dict("app.api.v1.endpoints.gps_tracking._routes")
 
 
 class GPSCoordinate(BaseModel):

@@ -482,4 +482,6 @@ class FamilyNetworkService:
             self._audit_log[:] = self._audit_log[-2500:]
 
 
-family_network_service = FamilyNetworkService()
+from app.core.durable import shared  # noqa: E402
+
+family_network_service = shared("app.services.family_network.family_network_service", FamilyNetworkService())

@@ -15,10 +15,11 @@ from typing import Optional
 
 from app.core.config import settings
 from app.services.food_vision import analyze_food_from_gemini_vision
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
-_meals: dict[str, list[dict]] = {}
+_meals = durable_dict("app.api.v1.endpoints.diet_logging._meals")
 
 
 class MealLogRequest(BaseModel):

@@ -261,4 +261,6 @@ class PregnancyTrackerService:
         return signs
 
 
-pregnancy_tracker_service = PregnancyTrackerService()
+from app.core.durable import shared  # noqa: E402
+
+pregnancy_tracker_service = shared("app.services.pregnancy_tracker.pregnancy_tracker_service", PregnancyTrackerService())

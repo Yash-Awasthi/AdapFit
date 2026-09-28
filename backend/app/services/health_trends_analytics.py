@@ -139,4 +139,6 @@ class HealthTrendsAnalytics:
         return {"user_id": user_id, "period_days": days, "total_metrics": len(metrics), "trends": trends, "insights": insights, "generated_at": datetime.now().isoformat()}
 
 
-health_trends = HealthTrendsAnalytics()
+from app.core.durable import shared  # noqa: E402
+
+health_trends = shared("app.services.health_trends_analytics.health_trends", HealthTrendsAnalytics())

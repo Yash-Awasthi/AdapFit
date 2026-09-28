@@ -245,4 +245,6 @@ class TravelHealthService:
         return [{"vaccine": v["vaccine"], "when": f"{v['advance_notice_weeks']} weeks before travel"} for v in sorted_v]
 
 
-travel_health_service = TravelHealthService()
+from app.core.durable import shared  # noqa: E402
+
+travel_health_service = shared("app.services.travel_health.travel_health_service", TravelHealthService())

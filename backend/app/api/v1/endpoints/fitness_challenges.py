@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -132,9 +133,9 @@ BUILTIN_CHALLENGES = [
 
 
 # In-memory storage
-fitness_challenges: dict = {}  # challenge_id -> challenge data
-fitness_participants: dict = {}  # challenge_id -> {user_id -> participant data}
-fitness_daily_logs: dict = {}  # challenge_id -> {user_id -> [{date, value, note}]}
+fitness_challenges = durable_dict("app.api.v1.endpoints.fitness_challenges.fitness_challenges")  # challenge_id -> challenge data
+fitness_participants = durable_dict("app.api.v1.endpoints.fitness_challenges.fitness_participants")  # challenge_id -> {user_id -> participant data}
+fitness_daily_logs = durable_dict("app.api.v1.endpoints.fitness_challenges.fitness_daily_logs")  # challenge_id -> {user_id -> [{date, value, note}]}
 builtin_used: set = set()  # track which builtins have been instantiated
 
 

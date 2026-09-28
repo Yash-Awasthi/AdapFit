@@ -207,4 +207,6 @@ class SeniorHealthService:
         }
 
 
-senior_health_service = SeniorHealthService()
+from app.core.durable import shared  # noqa: E402
+
+senior_health_service = shared("app.services.senior_health.senior_health_service", SeniorHealthService())

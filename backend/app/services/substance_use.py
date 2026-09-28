@@ -187,4 +187,6 @@ class SubstanceUseService:
         }
 
 
-substance_use_service = SubstanceUseService()
+from app.core.durable import shared  # noqa: E402
+
+substance_use_service = shared("app.services.substance_use.substance_use_service", SubstanceUseService())

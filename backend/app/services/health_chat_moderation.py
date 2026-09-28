@@ -66,4 +66,6 @@ class ChatModeration:
         return self.HELPLINE_NUMBERS.get(country, self.HELPLINE_NUMBERS["india"])
 
 
-chat_moderation = ChatModeration()
+from app.core.durable import shared  # noqa: E402
+
+chat_moderation = shared("app.services.health_chat_moderation.chat_moderation", ChatModeration())

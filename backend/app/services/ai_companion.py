@@ -221,4 +221,6 @@ class AICompanionService:
         return "Keep up the great work! Consistency in self-care pays off."
 
 
-ai_companion_service = AICompanionService()
+from app.core.durable import shared  # noqa: E402
+
+ai_companion_service = shared("app.services.ai_companion.ai_companion_service", AICompanionService())

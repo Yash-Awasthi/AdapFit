@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -45,7 +46,7 @@ class DailySummary(BaseModel):
 
 
 # --- In-memory storage ---
-meal_logs: dict = {}  # user_id -> list of meals
+meal_logs = durable_dict("app.api.v1.endpoints.nutrition.meal_logs")  # user_id -> list of meals
 
 
 @router.get("/daily", response_model=DailySummary)

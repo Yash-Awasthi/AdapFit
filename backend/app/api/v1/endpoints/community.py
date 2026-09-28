@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -48,9 +49,9 @@ class CommentResponse(BaseModel):
 
 
 # In-memory storage
-shared_workouts: dict = {}  # share_id -> share data
-community_comments: dict = {}  # share_id -> list of comments
-community_likes: dict = {}  # share_id -> set of user_ids
+shared_workouts = durable_dict("app.api.v1.endpoints.community.shared_workouts")  # share_id -> share data
+community_comments = durable_dict("app.api.v1.endpoints.community.community_comments")  # share_id -> list of comments
+community_likes = durable_dict("app.api.v1.endpoints.community.community_likes")  # share_id -> set of user_ids
 
 
 @router.get("/feed", response_model=List[ShareResponse])

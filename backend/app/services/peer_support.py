@@ -133,4 +133,6 @@ class PeerSupportService:
         return partner_checks
 
 
-peer_support_service = PeerSupportService()
+from app.core.durable import shared  # noqa: E402
+
+peer_support_service = shared("app.services.peer_support.peer_support_service", PeerSupportService())

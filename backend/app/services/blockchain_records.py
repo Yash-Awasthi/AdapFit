@@ -150,4 +150,6 @@ class BlockchainRecordsService:
         ]
 
 
-blockchain_records_service = BlockchainRecordsService()
+from app.core.durable import shared  # noqa: E402
+
+blockchain_records_service = shared("app.services.blockchain_records.blockchain_records_service", BlockchainRecordsService())

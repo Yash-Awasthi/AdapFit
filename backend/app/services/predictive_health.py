@@ -293,4 +293,6 @@ class PredictiveHealthService:
         return unique[:10]
 
 
-predictive_health_service = PredictiveHealthService()
+from app.core.durable import shared  # noqa: E402
+
+predictive_health_service = shared("app.services.predictive_health.predictive_health_service", PredictiveHealthService())

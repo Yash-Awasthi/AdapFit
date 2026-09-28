@@ -7,6 +7,7 @@ from typing import List, Optional
 
 from app.core import health_validation
 from app.core.health_data import health_data_store
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -43,8 +44,8 @@ class DeviceInfo(BaseModel):
 
 
 # In-memory storage
-sync_history: dict = {}  # user_id -> list of sync records
-device_registry: dict = {}  # user_id -> {device_id -> info}
+sync_history = durable_dict("app.api.v1.endpoints.wearos.sync_history")  # user_id -> list of sync records
+device_registry = durable_dict("app.api.v1.endpoints.wearos.device_registry")  # user_id -> {device_id -> info}
 
 
 def _parse_ts(value) -> Optional[float]:

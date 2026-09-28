@@ -12,6 +12,7 @@ from typing import Optional
 
 from app.core.storage import storage
 from app.services.sleep_tracker import sleep_journal
+from app.core.durable import durable_dict
 
 MOTIVATIONAL = [
     "Every workout counts. Even 10 minutes is better than none.",
@@ -278,7 +279,7 @@ async def weekly_report(user_id: str) -> dict:
     }
 
 
-_feedback: dict[str, list[dict]] = {}
+_feedback = durable_dict("app.services.ai_coach._feedback")
 
 
 def log_feedback(user_id: str, insight_category: str, helpful: bool, comment: str = "") -> dict:

@@ -110,4 +110,6 @@ class GymIntegrationService:
         return self.bookings.get(user_id, [])
 
 
-gym_integration_service = GymIntegrationService()
+from app.core.durable import shared  # noqa: E402
+
+gym_integration_service = shared("app.services.gym_integration.gym_integration_service", GymIntegrationService())

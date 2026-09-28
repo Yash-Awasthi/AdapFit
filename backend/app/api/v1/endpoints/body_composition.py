@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -40,7 +41,7 @@ class CompositionTrend(BaseModel):
 
 
 # In-memory storage
-measurements: dict = {}  # user_id -> list
+measurements = durable_dict("app.api.v1.endpoints.body_composition.measurements")  # user_id -> list
 
 
 def _calc_trend(entries: list, days: int) -> CompositionTrend:

@@ -189,4 +189,6 @@ class PreventiveScreeningService:
         return entry
 
 
-preventive_screening_service = PreventiveScreeningService()
+from app.core.durable import shared  # noqa: E402
+
+preventive_screening_service = shared("app.services.preventive_screening.preventive_screening_service", PreventiveScreeningService())

@@ -150,4 +150,6 @@ class HealthDataAggregator:
         }
 
 
-health_aggregator = HealthDataAggregator()
+from app.core.durable import shared  # noqa: E402
+
+health_aggregator = shared("app.services.health_aggregator.health_aggregator", HealthDataAggregator())

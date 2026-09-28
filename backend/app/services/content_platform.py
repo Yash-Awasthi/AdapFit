@@ -736,4 +736,6 @@ class ContentPlatformService:
 
 
 # Singleton
-content_platform_service = ContentPlatformService()
+from app.core.durable import shared  # noqa: E402
+
+content_platform_service = shared("app.services.content_platform.content_platform_service", ContentPlatformService())

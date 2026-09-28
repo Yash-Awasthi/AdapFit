@@ -156,13 +156,13 @@ export default function DashboardScreen() {
   const [healthScore, setHealthScore] = useState<number | null>(null);
   const [todayData, setTodayData] = useState<{
     steps: number | null; stepsGoal: number;
-    sleep: number; sleepGoal: number;
+    sleep: number | null; sleepGoal: number;
     calories: number | null; caloriesGoal: number;
     water: number; waterGoal: number;
     activeMinutes: number | null; activeMinutesGoal: number;
   }>({
     steps: null, stepsGoal: 10000,
-    sleep: 0, sleepGoal: 8,
+    sleep: null, sleepGoal: 8,
     calories: null, caloriesGoal: 2200,
     water: 0, waterGoal: 8,
     activeMinutes: null, activeMinutesGoal: 30,
@@ -170,10 +170,6 @@ export default function DashboardScreen() {
   const [medications, setMedications] = useState<any[]>([]);
   const [challenges, setChallenges] = useState<any[]>([]);
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
-  const [recoveryScore, setRecoveryScore] = useState(0);
-  const [hrv, setHrv] = useState(0);
-  const [acwr, setAcwr] = useState(0);
-  const [streak, setStreak] = useState(0);
   const dailyTip = getDailyTip();
 
   useEffect(() => {
@@ -184,15 +180,13 @@ export default function DashboardScreen() {
   const loadData = useCallback(async () => {
     try {
       // Fetch multiple data sources in parallel
-      const [recoveryRes, hydrationRes, sleepRes, medRes, challengeRes, activityRes, streakRes, acwrRes, healthRes] = await Promise.allSettled([
+      const [recoveryRes, hydrationRes, sleepRes, medRes, challengeRes, activityRes, healthRes] = await Promise.allSettled([
         api.getRecoveryLogs(userId, 1),
         api.getHydrationToday(userId),
         api.getSleepAnalysis(userId, 1),
         getJson<any>('/medication/today'),
         getJson<any>(`/challenges?user_id=${userId}`),
         getJson<any[]>('/community/feed?limit=4'),
-        getJson<any>(`/streaks?user_id=${userId}`),
-        api.getAcwr(userId),
         fetchHealthData(),
       ]);
 
@@ -203,9 +197,7 @@ export default function DashboardScreen() {
         const score = latest.recovery_score ?? latest.score;
         if (score != null) {
           setHealthScore(Math.round(score));
-          setRecoveryScore(Math.round(score));
         }
-        setHrv(Math.round(latest.hrv_rmssd ?? latest.wearable_data?.hrv_rmssd ?? 0));
       }
 
       // Hydration
@@ -247,16 +239,6 @@ export default function DashboardScreen() {
           id: s.id, title: s.title, detail: `${s.user_name} · ${s.likes} likes`, time: (s.shared_at ?? '').slice(0, 10),
           icon: 'people', color: colors.health.calm,
         })));
-      }
-
-      // Streaks
-      if (streakRes.status === 'fulfilled') {
-        setStreak(streakRes.value?.current_streak ?? streakRes.value?.streak ?? 5);
-      }
-
-      // ACWR
-      if (acwrRes.status === 'fulfilled') {
-        setAcwr(acwrRes.value?.acwr ?? 0);
       }
 
       // Steps and active calories come from the device's health API. When
@@ -349,7 +331,7 @@ export default function DashboardScreen() {
           <SectionHeaderPremium title="Today's Summary" icon="today" iconColor={colors.health.activity} />
           <View style={styles.metricsGrid}>
             <TodayMetric icon="footsteps" label="Steps" value={todaySummary.steps != null ? todaySummary.steps.toLocaleString() : '--'} unit="steps" goal={todaySummary.stepsGoal} color={colors.health.activity} progress={pct(todaySummary.steps, todaySummary.stepsGoal)} />
-            <TodayMetric icon="bed" label="Sleep" value={todaySummary.sleep} unit="hrs" goal={todaySummary.sleepGoal} color={colors.health.sleep} progress={(todaySummary.sleep / todaySummary.sleepGoal) * 100} />
+            <TodayMetric icon="bed" label="Sleep" value={todaySummary.sleep ?? '--'} unit="hrs" goal={todaySummary.sleepGoal} color={colors.health.sleep} progress={pct(todaySummary.sleep, todaySummary.sleepGoal)} />
             <TodayMetric icon="flame" label="Calories" value={todaySummary.calories ?? '--'} unit="cal" goal={todaySummary.caloriesGoal} color={colors.health.energy} progress={pct(todaySummary.calories, todaySummary.caloriesGoal)} />
             <TodayMetric icon="water" label="Water" value={todaySummary.water} unit="glasses" goal={todaySummary.waterGoal} color={colors.health.activity} progress={(todaySummary.water / todaySummary.waterGoal) * 100} />
           </View>

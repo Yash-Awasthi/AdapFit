@@ -172,4 +172,6 @@ class MicrobiomeHealthService:
         return recs
 
 
-microbiome_health_service = MicrobiomeHealthService()
+from app.core.durable import shared  # noqa: E402
+
+microbiome_health_service = shared("app.services.microbiome_health.microbiome_health_service", MicrobiomeHealthService())

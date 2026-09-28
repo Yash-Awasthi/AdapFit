@@ -9,7 +9,7 @@ import {
   ChevronRight, Sun, Moon as MoonIcon, Search, Calendar, BarChart3, Award,
   Brain, Moon, Shield, Utensils, Users, Settings as SettingsIcon,
   Download, Bell, Info, Pencil, Ruler, Droplet, Wrench,
-  LayoutDashboard, Activity, TrendingUp, HeartPulse, Baby, MessagesSquare,
+  LayoutDashboard, CheckSquare, Activity, TrendingUp, HeartPulse, Baby, MessagesSquare,
   ChefHat, Droplets, Smile, Pill, Watch, CalendarDays, Siren, Accessibility,
 } from 'lucide-react-native';
 import { useTheme, AccentName, CARD_SHADOW } from '../../src/services/theme';
@@ -61,6 +61,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
         { icon: Search, label: 'Exercises', sub: 'Movement library', route: '/exercises', color: theme.primary },
         { icon: Calendar, label: 'Periodization', sub: 'Long-term plan', route: '/periodization', color: '#06B6D4' },
         { icon: Award, label: 'Achievements', sub: 'Badges, level & streaks', route: '/achievements', color: '#EAB308' },
+        { icon: CheckSquare, label: 'Habits', sub: 'Small daily wins', route: '/habits', color: '#14B8A6' },
         { icon: HeartPulse, label: 'Recovery', sub: 'Readiness breakdown', route: '/recovery-dashboard', color: '#EF4444' },
       ],
     },

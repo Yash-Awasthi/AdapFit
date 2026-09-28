@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -51,9 +52,9 @@ class MilestoneResponse(BaseModel):
 
 
 # In-memory storage
-user_goals: dict = {}  # user_id -> list of goals
-goal_logs: dict = {}  # goal_id -> list of {date, value}
-goal_streaks: dict = {}  # goal_id -> {current, best, last_date}
+user_goals = durable_dict("app.api.v1.endpoints.goals.user_goals")  # user_id -> list of goals
+goal_logs = durable_dict("app.api.v1.endpoints.goals.goal_logs")  # goal_id -> list of {date, value}
+goal_streaks = durable_dict("app.api.v1.endpoints.goals.goal_streaks")  # goal_id -> {current, best, last_date}
 
 
 CELEBRATIONS = {

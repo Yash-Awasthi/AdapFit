@@ -213,4 +213,6 @@ class DigitalTwinService:
         return int(10 * weight + 6.25 * height - 5 * age + 5)
 
 
-digital_twin_service = DigitalTwinService()
+from app.core.durable import shared  # noqa: E402
+
+digital_twin_service = shared("app.services.digital_twin.digital_twin_service", DigitalTwinService())

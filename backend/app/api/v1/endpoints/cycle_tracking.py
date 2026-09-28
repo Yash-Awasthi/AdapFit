@@ -12,11 +12,12 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from typing import Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
 # In-memory storage
-_cycle_records: dict[str, list[dict]] = {}
+_cycle_records = durable_dict("app.api.v1.endpoints.cycle_tracking._cycle_records")
 
 
 class CycleLogRequest(BaseModel):

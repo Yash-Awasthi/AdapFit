@@ -22,6 +22,7 @@ mobile/.expo/
 backend/*.db
 backend/data/
 backend/app/data/store.json
+backend/app/data/feature_state.sqlite3
 dist/
 build/
 
