@@ -274,7 +274,8 @@ def parse_gpx_points(gpx_xml: str) -> list[GPSPoint]:
     """Parse GPX XML string into GPS points (simplified)."""
     points = []
     try:
-        import xml.etree.ElementTree as ET
+        # Uploaded XML: defusedxml refuses entity expansion and external entities.
+        import defusedxml.ElementTree as ET
         root = ET.fromstring(gpx_xml)
         ns = {"gpx": "http://www.topografix.com/GPX/1/1"}
         for trkpt in root.findall(".//gpx:trkpt", ns):
