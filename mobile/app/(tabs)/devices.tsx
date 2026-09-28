@@ -1,128 +1,122 @@
 /**
- * Devices — Wearable sync, connected devices, and data management
+ * Devices — the real ways data gets in: a Bluetooth heart-rate strap, and
+ * files exported from Garmin, Strava or any app that writes GPX. Nothing here
+ * produces a reading the user's own device did not.
  */
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, radius, presets } from '../../src/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { colors, spacing } from '../../src/theme';
+import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { getJson, postJson } from '../../src/services/http';
 
-import { API_V1 as API } from '../../src/services/config';
-import { authedFetch } from '../../src/services/authToken';
-const api = async (p: string, o?: RequestInit) => { try { const r = await authedFetch(`${API}${p}`, { headers: { 'Content-Type': 'application/json' }, ...o }); return r.ok ? await r.json() : null; } catch { return null; } };
+const TINT = '#64748B';
 
-const PLATFORMS = [
-  { id: 'apple_health', name: 'Apple Health', icon: 'heart', color: '#FF2D55' },
-  { id: 'google_fit', name: 'Google Fit', icon: 'walk', color: '#4285F4' },
-  { id: 'fitbit', name: 'Fitbit', icon: 'watch', color: '#00B0B9' },
-  { id: 'samsung_health', name: 'Samsung Health', icon: 'phone-portrait', color: '#1428A0' },
-] as const;
+interface SourceStatus { imports: number; records: number; last_import: string | null }
 
 export default function DevicesScreen() {
-  const [devices, setDevices] = useState<any[]>([]);
-  const [status, setStatus] = useState<any>({});
-  const [syncHistory, setSyncHistory] = useState<any[]>([]);
+  const router = useRouter();
+  const [status, setStatus] = useState<Record<string, SourceStatus>>({});
+  const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [d, s, h] = await Promise.allSettled([api('/device-sync/devices'), api('/device-sync/status'), api('/device-sync/history')]);
-    if (d.status === 'fulfilled') setDevices(d.value?.devices || []);
-    if (s.status === 'fulfilled') setStatus(s.value || {});
-    if (h.status === 'fulfilled') setSyncHistory(h.value?.history || []);
+    setStatus((await getJson<Record<string, SourceStatus>>('/wearable/status')) ?? {});
   }, []);
-
   useEffect(() => { load(); }, [load]);
 
-  const connect = async (platform: string, name: string) => {
-    const r = await api('/device-sync/connect', { method: 'POST', body: JSON.stringify({ platform, display_name: name }) });
-    if (r?.connected) { Alert.alert('Connected!', `${name} is now connected`); load(); }
+  const pick = async (): Promise<string | null> => {
+    const res = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
+    if (res.canceled || !res.assets?.[0]) return null;
+    return FileSystem.readAsStringAsync(res.assets[0].uri);
   };
 
-  const sync = async (deviceId: string) => {
-    const r = await api(`/device-sync/sync/${deviceId}`, { method: 'POST', body: '{}' });
-    if (r?.synced) { Alert.alert('Synced!', `${r.records_synced} records synced`); load(); }
+  const importGpx = async (activity: 'run' | 'ride' | 'walk' | 'hike') => {
+    const text = await pick();
+    if (!text) return;
+    setBusy('gpx');
+    const r = await postJson<{ saved: boolean; distance_km: number; duration_minutes: number }>('/wearable/gpx/import', { gpx: text, activity });
+    setBusy(null);
+    if (!r) return Alert.alert('Not imported', 'That file is not a GPX track with times.');
+    Alert.alert(r.saved ? 'Imported' : 'Already imported', `${r.distance_km} km in ${r.duration_minutes} min.`);
+    load();
   };
 
-  const disconnect = async (deviceId: string) => {
-    Alert.alert('Disconnect', 'Remove this device?', [
-      { text: 'Disconnect', style: 'destructive', onPress: async () => { await api(`/device-sync/disconnect/${deviceId}`, { method: 'DELETE' }); load(); } },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  const importJson = async (source: 'garmin' | 'strava') => {
+    const text = await pick();
+    if (!text) return;
+    let parsed: any;
+    try { parsed = JSON.parse(text); } catch { return Alert.alert('Not imported', 'That file is not JSON.'); }
+    const body = source === 'strava'
+      ? { activities: Array.isArray(parsed) ? parsed : parsed.activities ?? [] }
+      : { workouts: parsed.workouts ?? (Array.isArray(parsed) ? parsed : []), sleep_records: parsed.sleep_records ?? parsed.sleep ?? [] };
+    setBusy(source);
+    const r = await postJson<Record<string, number>>(`/wearable/${source}/import`, body);
+    setBusy(null);
+    if (!r) return Alert.alert('Not imported', 'The file could not be read.');
+    const nights = r.nights_saved ? `, ${r.nights_saved} nights` : '';
+    Alert.alert('Imported', `${r.workouts_saved ?? 0} workouts${nights}. ${r.skipped_duplicates ?? 0} already imported.`);
+    load();
   };
+
+  const Row = ({ icon, title, sub, onPress, id }: { icon: string; title: string; sub: string; onPress: () => void; id: string }) => (
+    <TouchableOpacity onPress={onPress} disabled={!!busy}>
+      <GlassCard style={styles.row}>
+        <Ionicons name={icon as any} size={22} color={colors.text.secondary} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.sub}>{sub}</Text>
+        </View>
+        {busy === id ? <ActivityIndicator /> : <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />}
+      </GlassCard>
+    </TouchableOpacity>
+  );
+  const last = (k: string) => status[k]?.last_import ? `Last import ${status[k].last_import!.slice(0, 10)} · ${status[k].records} records` : 'Not imported yet';
 
   return (
-    <ScrollView style={ds.container}>
-      <View style={ds.header}>
-        <Text style={typography.heading.h1}>Devices</Text>
-        <Text style={typography.body.sm}>Connect wearables and health platforms</Text>
-      </View>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+        <LinearGradient colors={['#334155', '#1E293B', colors.bg.deep]} style={styles.hero}>
+          <Text style={styles.heroMuted}>Devices & Imports</Text>
+          <Text style={styles.heroTitle}>Bring in your real data</Text>
+        </LinearGradient>
 
-      {/* Sync Status */}
-      <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={typography.heading.h4}>Sync Status</Text>
-          <Text style={[typography.body.sm, { color: colors.health.calm }]}>{status.connected_devices || 0} devices</Text>
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Bluetooth" icon="bluetooth" iconColor={TINT} />
+          <Row id="strap" icon="heart" title="Heart-rate strap" sub="Polar, Garmin HRM, Wahoo and other standard straps. Used for HRV readings and breathing."
+            onPress={() => router.push('/hrv' as any)} />
         </View>
-        <Text style={[typography.body.xs, { marginTop: spacing.xs }]}>{status.total_synced_records || 0} total records synced</Text>
-      </View>
 
-      {/* Available Platforms */}
-      <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
-        <Text style={[typography.heading.h4, { marginBottom: spacing.md }]}>Available Platforms</Text>
-        {PLATFORMS.map(p => {
-          const connected = devices.some((d: any) => d.platform === p.id);
-          return (
-            <TouchableOpacity key={p.id} style={ds.platformCard} onPress={() => !connected && connect(p.id, p.name)}>
-              <Ionicons name={p.icon} size={24} color={p.color} />
-              <View style={{ flex: 1 }}>
-                <Text style={typography.label.lg}>{p.name}</Text>
-                <Text style={[typography.body.xs, { color: connected ? colors.health.calm : colors.text.muted }]}>
-                  {connected ? '✓ Connected' : 'Tap to connect'}
-                </Text>
-              </View>
-              {connected && <Ionicons name="checkmark-circle" size={22} color={colors.health.calm} />}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Connected Devices */}
-      {devices.length > 0 && (
-        <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
-          <Text style={[typography.heading.h4, { marginBottom: spacing.md }]}>Connected Devices</Text>
-          {devices.map((d, i) => (
-            <View key={i} style={ds.deviceCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={typography.label.lg}>{d.name}</Text>
-                <Text style={typography.body.xs}>Last sync: {d.last_sync} • {d.data_types?.length || 0} data types</Text>
-              </View>
-              <TouchableOpacity style={ds.syncBtn} onPress={() => sync(d.id)}><Ionicons name="sync" size={16} color={colors.primary} /></TouchableOpacity>
-              <TouchableOpacity onPress={() => disconnect(d.id)}><Ionicons name="close-circle" size={20} color={colors.health.danger} /></TouchableOpacity>
-            </View>
-          ))}
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Import Files" icon="document-attach" iconColor={TINT} />
+          <Row id="gpx" icon="map" title="GPX track (run)" sub={last('gpx')} onPress={() => importGpx('run')} />
+          <Row id="gpx-ride" icon="bicycle" title="GPX track (ride)" sub="From Strava, Komoot, Garmin or a phone app" onPress={() => importGpx('ride')} />
+          <Row id="strava" icon="flash" title="Strava activities (JSON)" sub={last('strava')} onPress={() => importJson('strava')} />
+          <Row id="garmin" icon="watch" title="Garmin workouts and sleep (JSON)" sub={last('garmin')} onPress={() => importJson('garmin')} />
+          <Text style={styles.sub}>Imports are added to your history once; importing the same file again changes nothing.</Text>
         </View>
-      )}
 
-      {/* Sync History */}
-      {syncHistory.length > 0 && (
-        <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
-          <Text style={[typography.heading.h4, { marginBottom: spacing.md }]}>Sync History</Text>
-          {syncHistory.slice(0, 5).map((h, i) => (
-            <View key={i} style={ds.historyItem}>
-              <Text style={typography.body.sm}>{h.device}</Text>
-              <Text style={typography.body.xs}>{h.time} • {h.records} records • {h.status}</Text>
-            </View>
-          ))}
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Phone Health Apps" icon="phone-portrait" iconColor={TINT} />
+          <GlassCard>
+            <Text style={styles.sub}>Automatic sync with Health Connect (Android) and Apple Health is being built. Until then, add readings in your morning check-in or import files above.</Text>
+          </GlassCard>
         </View>
-      )}
-      <View style={{ height: 40 }} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-const ds = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
-  header: { padding: spacing.screenPadding, paddingTop: 50, paddingBottom: spacing.lg },
-  platformCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.bg.input, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.surface.border },
-  deviceCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.bg.input, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.surface.border },
-  syncBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primaryMuted, justifyContent: 'center', alignItems: 'center' },
-  historyItem: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.surface.divider },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg.deep },
+  hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
+  section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  title: { color: colors.text.primary, fontSize: 15, fontWeight: '700' },
+  sub: { color: colors.text.muted, fontSize: 12, marginTop: 2, lineHeight: 17 },
 });

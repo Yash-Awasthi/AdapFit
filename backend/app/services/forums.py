@@ -67,21 +67,6 @@ class ForumsService:
         self._likes: dict[str, set[str]] = {}  # post_id -> set of user_ids
         self._user_reputation: dict[str, int] = {}
         self._reports: list[dict] = []
-        self._init_sample_posts()
-
-    def _init_sample_posts(self):
-        samples = [
-            ("user_1", "FitFan", "cat_002", "My 30-day push-up challenge results!", "Started with 10 push-ups, now doing 50! Here's what worked for me...", ["fitness", "progress"]),
-            ("user_2", "HealthNut", "cat_003", "Best meal prep strategies for busy professionals", "I've been meal prepping for 6 months and lost 20lbs. Here are my top 5 tips...", ["nutrition", "meal-prep"]),
-            ("user_3", "ZenRunner", "cat_004", "How meditation changed my anxiety", "After years of struggling with anxiety, meditation has been a game-changer...", ["mental-health", "meditation"]),
-            ("user_4", "SleepMaster", "cat_005", "Complete guide to sleep hygiene", "Here's everything I've learned about optimizing sleep quality...", ["sleep", "guide"]),
-            ("user_5", "TransformMe", "cat_007", "Lost 50lbs in 6 months - my story", "From 250lbs to 200lbs. It wasn't easy but here's how I did it...", ["weight-loss", "success"]),
-        ]
-        for uid, uname, cat_id, title, content, tags in samples:
-            post_id = f"post_{secrets.token_hex(6)}"
-            self._posts[post_id] = Post(id=post_id, user_id=uid, username=uname, category_id=cat_id, title=title, content=content, tags=tags, likes=5, comment_count=3)
-            self._categories[cat_id]["post_count"] = self._categories[cat_id].get("post_count", 0) + 1
-            self._likes[post_id] = {uid}
 
     def get_categories(self) -> list[dict]:
         return list(self._categories.values())

@@ -13,7 +13,7 @@ if _zfit_root not in sys.path:
     sys.path.insert(0, _zfit_root)
 
 import uuid
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -209,6 +209,9 @@ async def ready():
 
 @app.post("/seed-demo")
 async def seed_demo():
+    # Demo data must never reach a real account.
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(status_code=404, detail="Not found")
     from app.core.seed_demo import seed_all
     from app.core.storage import storage
     results = seed_all("demo_user", storage)
