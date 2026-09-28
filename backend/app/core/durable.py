@@ -336,14 +336,126 @@ async def flush() -> int:
         return len(upserts) + len(deletes)
 
 
+# ── Erasure and export ──────────────────────────────────────────────────────
+# Shared services keep every user's records in one object, keyed by user id or
+# carrying it as a field. A record belongs to a user when it is keyed by their
+# id or any of its string fields equals it; user ids are UUIDs, so a collision
+# with reference data is not a practical concern.
+
+def _fields(value: Any) -> Optional[dict]:
+    if isinstance(value, dict):
+        return value
+    if type(value).__module__.startswith("app.") and hasattr(value, "__dict__"):
+        return vars(value)
+    return None
+
+
+def _owned(value: Any, uid: str) -> bool:
+    fields = _fields(value)
+    return fields is not None and any(v == uid for v in fields.values() if isinstance(v, str))
+
+
+def _record_ids(value: Any, ids: set, depth: int = 0) -> None:
+    """Ids of records inside a removed value, so stores keyed by those ids can follow."""
+    if depth > 4:
+        return
+    fields = _fields(value)
+    if fields is not None:
+        for k, v in fields.items():
+            if k == "id" and isinstance(v, str):
+                ids.add(v)
+            elif isinstance(v, (dict, list)):
+                _record_ids(v, ids, depth + 1)
+    elif isinstance(value, list):
+        for v in value:
+            _record_ids(v, ids, depth + 1)
+
+
+def _walk(node: Any, uid: str, remove: bool, found: list, ids: Optional[set], depth: int = 0) -> None:
+    """Collect (and with remove, delete) everything in node keyed by or referring to uid."""
+    if depth > 8:
+        return
+    if isinstance(node, dict):
+        for key in list(dict.keys(node)):
+            value = dict.__getitem__(node, key)
+            if key == uid or _owned(value, uid) or (ids is not None and key in ids):
+                found.append(value)
+                if ids is not None:
+                    _record_ids(value, ids)
+                if remove:
+                    dict.__delitem__(node, key)
+            else:
+                _walk(value, uid, remove, found, ids, depth + 1)
+    elif isinstance(node, list):
+        keep = []
+        for value in node:
+            if value == uid or _owned(value, uid):
+                found.append(value)
+            else:
+                _walk(value, uid, remove, found, ids, depth + 1)
+                keep.append(value)
+        if remove:
+            node[:] = keep
+    elif isinstance(node, set):
+        if uid in node:
+            found.append(uid)
+            if remove:
+                node.discard(uid)
+    else:
+        fields = _fields(node)
+        if fields is not None:
+            _walk(fields, uid, remove, found, ids, depth + 1)
+
+
+def _sweep(uid: str, remove: bool) -> Dict[str, list]:
+    """Per holder, what the shared services and module stores hold for uid."""
+    # Module stores are keyed by record id (goal_id, share_id), so a removed goal
+    # takes its logs with it; a second pass catches stores walked before the owner.
+    ids: set = set()
+    out: Dict[str, list] = {}
+    for _ in range(2):
+        if not remove:
+            out = {}
+        for namespace, (kind, holder) in _holders.items():
+            found: list = []
+            if kind == "shared":
+                for value in vars(object.__getattribute__(holder, "_instance")).values():
+                    if isinstance(value, (dict, list, set)):
+                        _walk(value, uid, remove, found, None)
+            elif kind == "dict":
+                _walk(holder, uid, remove, found, ids)
+            elif remove:
+                for other, instance in list(object.__getattribute__(holder, "_instances").items()):
+                    if other != uid:
+                        _walk(vars(instance), uid, True, found, None)
+            if not found:
+                continue
+            out.setdefault(namespace, []).extend(found)
+            if kind == "shared":
+                touch(namespace, SHARED_KEY)
+            elif kind == "dict":
+                for key in set(dict.keys(holder)) | {k for n, k in _saved_hash if n == namespace}:
+                    touch(namespace, str(key))
+            else:
+                for other in object.__getattribute__(holder, "_instances"):
+                    touch(namespace, other)
+    return out
+
+
+def export_shared(user_id: str) -> Dict[str, Any]:
+    """What shared services and module stores hold for one user, as plain data."""
+    from app.core.per_user import _plain
+    return {ns: _plain(items) for ns, items in _sweep(user_id, remove=False).items()}
+
+
 async def erase_user(user_id: str) -> None:
-    """Drop a user's per-user service state and user-keyed entries, in memory and stored."""
+    """Drop everything held for a user: their own state, and their records inside shared state."""
     for kind, holder in _holders.values():
         if kind == "per_user":
             holder.reset(user_id)
-        elif kind == "dict":
-            dict.pop(holder, user_id, None)
+    _sweep(user_id, remove=True)
     await forget(user_id)
+    await flush()
 
 
 async def forget(user_id: str) -> None:

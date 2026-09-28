@@ -1,8 +1,8 @@
 /**
  * Register Screen — Premium signup UI
  */
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets } from '../src/theme';
@@ -10,6 +10,18 @@ import { colors, typography, spacing, radius, presets } from '../src/theme';
 import { API_V1 as API } from '../src/services/config';
 import { setToken } from '../src/services/authToken';
 import { useUserStore } from '../src/stores';
+import { DOCUMENTS, Purpose, PurposeId, getPurposes } from '../src/services/privacy';
+
+function ageFrom(birth: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birth)) return null;
+  const b = new Date(`${birth}T00:00:00`);
+  if (isNaN(b.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - b.getFullYear();
+  if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
+  return age;
+}
+
 export default function RegisterScreen() {
   const router = useRouter();
   const setUser = useUserStore((s) => s.setUser);
@@ -20,6 +32,23 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [birthDate, setBirthDate] = useState('');
+  const [guardianEmail, setGuardianEmail] = useState('');
+  const [purposes, setPurposes] = useState<Record<PurposeId, Purpose> | null>(null);
+  const [adultAge, setAdultAge] = useState(18);
+  const [choices, setChoices] = useState<Record<PurposeId, boolean>>({ health_data: false, ai: false, sharing: false, analytics: false });
+
+  useEffect(() => {
+    getPurposes().then((p) => {
+      if (p) {
+        setPurposes(p.purposes);
+        setAdultAge(p.adult_age);
+      }
+    });
+  }, []);
+
+  const age = ageFrom(birthDate);
+  const minor = age !== null && age < adultAge;
 
   const handleRegister = async () => {
     if (!displayName.trim() || !email.trim() || !username.trim() || !password) {
@@ -34,12 +63,28 @@ export default function RegisterScreen() {
       Alert.alert('Error', 'Password must be at least 8 characters');
       return;
     }
+    if (age === null || age < 0 || age > 120) {
+      Alert.alert('Date of birth', 'Enter your date of birth as YYYY-MM-DD');
+      return;
+    }
+    if (minor && !guardianEmail.includes('@')) {
+      Alert.alert('Parent or guardian', "Under 18, enter a parent or guardian's email so they can agree for you.");
+      return;
+    }
+    if (!minor && !choices.health_data) {
+      Alert.alert('Consent needed', 'AdapFit cannot work without storing your health data. Turn on the first item to continue.');
+      return;
+    }
     setLoading(true);
     try {
       const r = await fetch(`${API}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), username: username.trim(), password, display_name: displayName.trim() }),
+        body: JSON.stringify({
+          email: email.trim(), username: username.trim(), password, display_name: displayName.trim(),
+          birth_date: birthDate, guardian_email: minor ? guardianEmail.trim() : '',
+          consent: minor ? { ...choices, analytics: false } : choices,
+        }),
       });
       const data = await r.json();
       if (r.ok && data.tokens) {
@@ -52,7 +97,7 @@ export default function RegisterScreen() {
             name: data.user.display_name ?? data.user.username ?? null,
           });
         }
-        router.replace('/(tabs)');
+        router.replace(data.privacy?.guardian_pending ? ('/privacy' as any) : '/(tabs)');
       } else {
         Alert.alert('Registration Failed', data.detail || data.error || 'Please try again');
       }
@@ -140,6 +185,51 @@ export default function RegisterScreen() {
             </View>
           </View>
 
+          <View style={ns.inputGroup}>
+            <Text style={ns.label}>Date of Birth</Text>
+            <View style={ns.inputRow}>
+              <Ionicons name="calendar-outline" size={20} color={colors.text.muted} />
+              <TextInput style={ns.input} value={birthDate} onChangeText={setBirthDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.muted} keyboardType="numbers-and-punctuation" maxLength={10} accessibilityLabel="Date of birth, year month day" />
+            </View>
+          </View>
+
+          {minor && (
+            <View style={ns.inputGroup}>
+              <Text style={ns.label}>Parent or Guardian's Email</Text>
+              <Text style={ns.hint}>Under {adultAge}, a parent or guardian has to agree before the app stores anything for you. We will email them.</Text>
+              <View style={ns.inputRow}>
+                <Ionicons name="people-outline" size={20} color={colors.text.muted} />
+                <TextInput style={ns.input} value={guardianEmail} onChangeText={setGuardianEmail} placeholder="parent@example.com" placeholderTextColor={colors.text.muted} keyboardType="email-address" autoCapitalize="none" />
+              </View>
+            </View>
+          )}
+
+          {purposes && (
+            <View style={ns.inputGroup}>
+              <Text style={ns.label}>{minor ? 'What you would like (your guardian decides)' : 'What you allow'}</Text>
+              {(Object.keys(purposes) as PurposeId[]).filter((id) => !(minor && id === 'analytics')).map((id) => (
+                <View key={id} style={ns.consentRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={ns.consentTitle}>{purposes[id].title}{purposes[id].required ? ' (needed)' : ''}</Text>
+                    <Text style={ns.hint}>{purposes[id].detail}</Text>
+                  </View>
+                  <Switch value={choices[id]} onValueChange={(v) => setChoices((c) => ({ ...c, [id]: v }))}
+                    trackColor={{ false: colors.surface.border, true: colors.primary }} accessibilityLabel={purposes[id].title} />
+                </View>
+              ))}
+              <Text style={ns.hint}>You can change these any time in Settings, Privacy.</Text>
+            </View>
+          )}
+
+          <View style={ns.docsRow}>
+            {DOCUMENTS.map((d) => (
+              <TouchableOpacity key={d.id} onPress={() => router.push({ pathname: '/legal', params: { doc: d.id } } as any)}>
+                <Text style={ns.loginLink}>{d.title}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={ns.hint}>By creating an account you accept the Terms of Service and Health Disclaimer.</Text>
+
           <TouchableOpacity style={[presets.buttonPrimary, { marginTop: spacing.md }]} onPress={handleRegister} disabled={loading}>
             {loading ? <ActivityIndicator color="#FFF" /> : <Text style={ns.buttonText}>Create Account</Text>}
           </TouchableOpacity>
@@ -176,4 +266,8 @@ const ns = StyleSheet.create({
   loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl },
   loginText: { color: colors.text.muted, fontSize: 14 },
   loginLink: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  hint: { fontSize: 12, color: colors.text.muted, marginTop: 4, marginBottom: spacing.xs, lineHeight: 17 },
+  consentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.bg.card, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
+  consentTitle: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
+  docsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.xs },
 });

@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     # does not fail validation.
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
 
+    # Outgoing mail (guardian consent). Without SMTP_HOST the link is logged, which only suits development.
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    MAIL_FROM: str = os.getenv("MAIL_FROM", "no-reply@adapfit.app")
+    # Base URL links in emails point at, e.g. https://api.adapfit.app
+    PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+
     class Config:
         case_sensitive = True
         env_file = ".env"

@@ -15,6 +15,7 @@ from langgraph.graph import END, StateGraph
 
 from app.core.config import settings
 from app.core.gemini import DEFAULT_MODEL, extract_text, gemini_endpoint
+from app.core.privacy import allowed
 from app.core.storage import storage
 from app.services.agent.orchestrator import FitnessAgentState, agent_orchestrator
 from app.services.agent.supervisor import supervisor_agent
@@ -95,7 +96,7 @@ async def _phrasing_node(state: FitnessAgentState) -> FitnessAgentState:
     """The only LLM node. Restates the decision; never allowed to pick one."""
     decision = state["decision"]
     key = settings.GEMINI_API_KEY
-    if not key:
+    if not key or not allowed("ai"):
         state["phrased_summary"] = decision["headline"]
         return state
 

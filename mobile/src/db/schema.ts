@@ -17,6 +17,15 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   return db;
 }
 
+/** Delete the local copy of the user's records; the next getDatabase() starts empty. */
+export async function deleteLocalDatabase(): Promise<void> {
+  if (db) {
+    await db.closeAsync();
+    db = null;
+  }
+  await SQLite.deleteDatabaseAsync('adapfit.db');
+}
+
 async function initSchema(database: SQLite.SQLiteDatabase) {
   await database.execAsync(`
     PRAGMA journal_mode = WAL;

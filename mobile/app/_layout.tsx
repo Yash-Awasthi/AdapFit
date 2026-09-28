@@ -10,6 +10,8 @@ import { useUserStore } from "../src/stores";
 import { useEffect } from "react";
 import { LoadingScreen, SyncStatusBadge } from "../src/components";
 import { startSyncDaemon } from "../src/services/sync";
+import { getToken } from "../src/services/authToken";
+import { getConsent, isBlocked } from "../src/services/privacy";
 
 function RootStack() {
   const { theme, isDark } = useTheme();
@@ -40,6 +42,16 @@ function RootStack() {
     }
   }, [hydrated, loading, profile, segments, router]);
 
+  // The server refuses data calls until consent is current, a guardian has
+  // agreed, or a scheduled deletion is cancelled; send the user where they can act.
+  const userId = useUserStore((s) => s.userId);
+  useEffect(() => {
+    if (!hydrated || loading || !profile || !getToken()) return;
+    getConsent().then((state) => {
+      if (isBlocked(state)) router.replace("/privacy" as any);
+    });
+  }, [hydrated, loading, profile, userId, router]);
+
   if (!hydrated || loading) {
     return <LoadingScreen />;
   }
@@ -62,6 +74,8 @@ function RootStack() {
         <Stack.Screen name="workout-active" options={{ headerShown: false }} />
         <Stack.Screen name="workout-detail" options={{ headerShown: false }} />
         <Stack.Screen name="form-checker" options={{ headerShown: false }} />
+        <Stack.Screen name="privacy" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="legal" options={{ headerShown: false }} />
       </Stack>
       {profile && (
         <View style={{ position: "absolute", top: 96, right: 12 }} pointerEvents="none">

@@ -8,6 +8,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.core.config import settings
 from app.core.dependencies import authenticate_websocket
 from app.core.gemini import DEFAULT_MODEL, extract_text, gemini_endpoint
+from app.core.privacy import allowed
 from app.services.rag_knowledge import rag_retriever
 from app.services.chat_actions import maybe_execute_action
 from app.services.coach_prompts import coach_prompts
@@ -29,7 +30,7 @@ async def _stream_gemini(prompt: str, history: list[dict], system: str = "") -> 
     contents.append({"role": "user", "parts": [{"text": prompt}]})
 
     key = settings.GOOGLE_AI_API_KEY
-    if not key:
+    if not key or not allowed("ai"):
         return ""
     url, headers = gemini_endpoint(key)
 
