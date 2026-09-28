@@ -34,9 +34,9 @@ const DOMAIN_META: Record<string, { icon: string; color: string; label: string }
   sleep:          { icon: 'moon',           color: colors.health.sleep,      label: 'Sleep' },
   hrv:            { icon: 'pulse',          color: colors.health.heart,      label: 'HRV' },
   training_load:  { icon: 'barbell',        color: colors.health.energy,     label: 'Training Load' },
-  subjective:     { icon: 'happy-outline',  color: colors.health.mental,     label: 'Subjective' },
+  subjective:     { icon: 'happy-outline',  color: colors.health.mental,     label: 'How You Feel' },
   nutrition:      { icon: 'nutrition',      color: colors.health.nutrition,  label: 'Nutrition' },
-  heart_rate:     { icon: 'heart',          color: colors.health.heart,      label: 'Heart Rate' },
+  heart_rate:     { icon: 'heart',          color: colors.health.heart,      label: 'Resting HR' },
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -227,7 +227,7 @@ export default function RecoveryDashboardScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const [data, setData] = useState<{
-    overall_score: number;
+    overall_score: number | null;
     recovery_level: string;
     domains: { name: string; score: number; weight: number; weighted_score: number; status: string; insight: string; data_available: boolean }[];
     cross_domain_insights: string[];
@@ -261,8 +261,9 @@ export default function RecoveryDashboardScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  const scoreColor = data ? getScoreColor(data.overall_score) : colors.text.muted;
-  const levelLabel = data ? getScoreLabel(data.overall_score) : '';
+  const hasScore = data?.overall_score != null;
+  const scoreColor = hasScore ? getScoreColor(data!.overall_score!) : colors.text.muted;
+  const levelLabel = hasScore ? getScoreLabel(data!.overall_score!) : 'No check-in yet';
   const confidenceIcon = data?.confidence === 'high' ? 'checkmark-circle' : data?.confidence === 'medium' ? 'help-circle' : 'alert-circle';
 
   return (
@@ -315,7 +316,14 @@ export default function RecoveryDashboardScreen() {
 
             <Text style={[typography.body.sm, { color: colors.text.muted, marginBottom: spacing.xs }]}>Recovery Score</Text>
 
-            <RecoveryScoreRing score={data?.overall_score ?? 0} size={180} />
+            {hasScore ? (
+              <RecoveryScoreRing score={data!.overall_score!} size={180} />
+            ) : (
+              <Pressable onPress={() => router.push('/checkin' as any)} style={styles.retryButton} accessibilityRole="button">
+                <Ionicons name="sunny" size={18} color="#fff" />
+                <Text style={[typography.body.md, { color: '#fff', fontWeight: '600' }]}>Do today's check-in</Text>
+              </Pressable>
+            )}
 
             <View style={styles.levelBadge}>
               <Text style={[typography.heading.h3, { color: scoreColor }]}>{levelLabel}</Text>

@@ -1,105 +1,116 @@
 /**
- * Data Export — Export health data in FHIR R4, JSON, or CSV format
+ * Data Export — download your records as CSV, or everything the app holds
+ * about you as one JSON file. Files are fetched from the server and saved
+ * where you choose.
  */
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, radius, presets } from '../../src/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as FileSystem from 'expo-file-system/legacy';
+import { colors, spacing } from '../../src/theme';
+import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { useApi } from '../../src/hooks/useApi';
+import { asArray } from '../../src/services/http';
+import { API_V1 } from '../../src/services/config';
+import { authHeader } from '../../src/services/authToken';
 
-import { API_V1 as API } from '../../src/services/config';
+const TINT = '#22C55E';
+
+interface DataType { id: string; name: string; description: string }
+
+async function saveFile(name: string, mime: string, contents: string) {
+  if (Platform.OS === 'android') {
+    const saf = FileSystem.StorageAccessFramework;
+    const perm = await saf.requestDirectoryPermissionsAsync();
+    if (!perm.granted) return false;
+    const uri = await saf.createFileAsync(perm.directoryUri, name, mime);
+    await FileSystem.writeAsStringAsync(uri, contents);
+    return true;
+  }
+  const uri = `${FileSystem.documentDirectory}${name}`;
+  await FileSystem.writeAsStringAsync(uri, contents);
+  await Share.share({ url: uri, title: name });
+  return true;
+}
+
 export default function DataExportScreen() {
-  const [formats, setFormats] = useState<any>({});
-  const [exporting, setExporting] = useState(false);
-  const [selectedFormat, setSelectedFormat] = useState('fhir');
+  const { data } = useApi<{ data_types: DataType[] }>('/export/formats');
+  const [busy, setBusy] = useState<string | null>(null);
+  const types = asArray<DataType>(data?.data_types);
 
-  useEffect(() => {
-    fetch(`${API}/export/formats`).then(r => r.ok ? r.json() : null).then(setFormats).catch(() => {});
-  }, []);
-
-  const exportData = async () => {
-    setExporting(true);
+  const download = async (id: string) => {
+    setBusy(id);
     try {
-      const r = await fetch(`${API}/export/preview?format=${selectedFormat}`);
-      const data = await r.json();
-      Alert.alert('Export Ready', `Format: ${selectedFormat.toUpperCase()}\nRecords: ${data.record_count || 'N/A'}\nSize: ${data.size_bytes ? `${(data.size_bytes / 1024).toFixed(1)} KB` : 'N/A'}`);
-    } catch {
-      Alert.alert('Export', 'Export preview generated. In production, this would download the file.');
+      const all = id === 'all';
+      const res = await fetch(`${API_V1}/export/${id}${all ? '' : '?format=csv'}`, { headers: authHeader() });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const text = await res.text();
+      const date = new Date().toISOString().slice(0, 10);
+      const saved = await saveFile(`adapfit-${id}-${date}.${all ? 'json' : 'csv'}`, all ? 'application/json' : 'text/csv', text);
+      if (saved) Alert.alert('Saved', all ? 'Your complete data file is saved.' : 'The CSV file is saved.');
+    } catch (e: any) {
+      Alert.alert('Export failed', e?.message ?? String(e));
     }
-    setExporting(false);
+    setBusy(null);
   };
 
-  const formatOptions = [
-    { key: 'fhir', icon: 'medical', title: 'FHIR R4', desc: 'Healthcare interoperability standard', color: colors.health.heart },
-    { key: 'json', icon: 'code-slash', title: 'JSON', desc: 'Complete data dump, all fields', color: colors.primary },
-    { key: 'csv', icon: 'document-text', title: 'CSV', desc: 'Spreadsheet-compatible format', color: colors.health.calm },
-  ];
-
   return (
-    <ScrollView style={ns.container}>
-      <View style={ns.header}>
-        <Text style={typography.heading.h1 as any}>Data Export</Text>
-        <Text style={typography.body.sm as any}>Export your health data in standard formats</Text>
-      </View>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <LinearGradient colors={[TINT, '#15803D', colors.bg.deep]} style={styles.hero}>
+          <Text style={styles.heroMuted}>Your Data</Text>
+          <Text style={styles.heroTitle}>Take a copy anytime</Text>
+          <Text style={styles.heroBody}>It is your data. Download it as spreadsheets, or everything in one file.</Text>
+        </LinearGradient>
 
-      <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
-        <Text style={[typography.heading.h4 as any, { marginBottom: spacing.md }]}>Export Format</Text>
-        {formatOptions.map(f => (
-          <TouchableOpacity
-            key={f.key}
-            style={[ns.formatCard, selectedFormat === f.key && { borderColor: f.color, backgroundColor: f.color + '10' }]}
-            onPress={() => setSelectedFormat(f.key)}
-          >
-            <View style={[ns.formatIcon, { backgroundColor: f.color + '20' }]}>
-              <Ionicons name={f.icon as any} size={24} color={f.color} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[typography.label.lg as any, { color: colors.text.primary }]}>{f.title}</Text>
-              <Text style={typography.body.xs as any}>{f.desc}</Text>
-            </View>
-            {selectedFormat === f.key && <Ionicons name="checkmark-circle" size={22} color={f.color} />}
-          </TouchableOpacity>
-        ))}
-      </View>
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Everything" icon="archive" iconColor={TINT} />
+          {types.filter((t) => t.id === 'all').map((t) => (
+            <TouchableOpacity key={t.id} onPress={() => download(t.id)} disabled={!!busy}>
+              <GlassCard style={styles.row}>
+                <Ionicons name="cloud-download" size={24} color={TINT} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>{t.name} (JSON)</Text>
+                  <Text style={styles.rowDesc}>{t.description}</Text>
+                </View>
+                {busy === t.id ? <ActivityIndicator color={TINT} /> : <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />}
+              </GlassCard>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
-        <Text style={[typography.heading.h4 as any, { marginBottom: spacing.md }]}>What's Included</Text>
-        {['Workout History', 'Nutrition Logs', 'Sleep Data', 'Mental Health', 'Body Metrics', 'Medications', 'Health Goals', 'Device Sync Data'].map((item, i) => (
-          <View key={i} style={ns.includedRow}>
-            <Ionicons name="checkmark-circle" size={16} color={colors.health.calm} />
-            <Text style={typography.body.sm as any}>{item}</Text>
-          </View>
-        ))}
-      </View>
-
-      <TouchableOpacity
-        style={[presets.buttonPrimary, { marginHorizontal: spacing.lg, marginVertical: spacing.lg }]}
-        onPress={exportData}
-        disabled={exporting}
-      >
-        {exporting ? (
-          <ActivityIndicator color="#FFF" />
-        ) : (
-          <>
-            <Ionicons name="download" size={18} color="#FFF" />
-            <Text style={[typography.heading.h4 as any, { color: '#FFF' }]}>Export {selectedFormat.toUpperCase()}</Text>
-          </>
-        )}
-      </TouchableOpacity>
-
-      <View style={[presets.card, { marginHorizontal: spacing.lg, marginBottom: spacing.xl }]}>
-        <Text style={[typography.heading.h4 as any, { marginBottom: spacing.sm }]}>Privacy Note</Text>
-        <Text style={[typography.body.sm as any, { color: colors.text.secondary }]}>
-          Your data is exported locally and never leaves your device unless you explicitly share it. All exports are encrypted and can be imported into other health apps.
-        </Text>
-      </View>
-    </ScrollView>
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Spreadsheets (CSV)" icon="grid" iconColor={TINT} />
+          {types.filter((t) => t.id !== 'all').map((t) => (
+            <TouchableOpacity key={t.id} onPress={() => download(t.id)} disabled={!!busy}>
+              <GlassCard style={[styles.row, styles.gap]}>
+                <Ionicons name="document-text" size={22} color={TINT} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>{t.name}</Text>
+                  <Text style={styles.rowDesc}>{t.description}</Text>
+                </View>
+                {busy === t.id ? <ActivityIndicator color={TINT} /> : <Ionicons name="download-outline" size={18} color={colors.text.muted} />}
+              </GlassCard>
+            </TouchableOpacity>
+          ))}
+          {types.length === 0 && <Text style={styles.rowDesc}>Could not reach the server.</Text>}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const ns = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
-  header: { padding: spacing.screenPadding, paddingTop: 50, paddingBottom: spacing.lg },
-  formatCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.input, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1.5, borderColor: colors.surface.border, gap: spacing.md },
-  formatIcon: { width: 44, height: 44, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
-  includedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs + 2 },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg.deep },
+  scrollContent: { paddingBottom: 100 },
+  hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
+  heroBody: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 6, lineHeight: 20 },
+  section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  gap: { marginBottom: 10 },
+  rowTitle: { color: colors.text.primary, fontSize: 15, fontWeight: '700' },
+  rowDesc: { color: colors.text.muted, fontSize: 12, marginTop: 2 },
 });

@@ -116,53 +116,6 @@ async def generate_workout_plan(profile: UserProfileRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get(
-    "/recovery",
-    summary="Get today's recovery score",
-    description="Calculates HRV-based recovery score from latest wearable data. Returns readiness level, training recommendations, and trend analysis.",
-    responses={
-        200: {
-            "description": "Recovery score and recommendations",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "recovery_score": 78.5,
-                        "readiness": "good",
-                        "recommendation": "moderate",
-                        "trend": "improving",
-                        "max_intensity": 0.85,
-                        "volume_multiplier": 1.0,
-                        "notes": "Good recovery. Resume normal training.",
-                        "factors": {"hrv": 85, "sleep": 70, "resting_hr": 75},
-                    }
-                }
-            },
-        }
-    },
-)
-async def get_recovery_score():
-    """Get today's HRV-based recovery score."""
-    try:
-        from app.services.hrv_recovery_scorer import HRVRecoveryScorer
-        from datetime import datetime
-
-        scorer = HRVRecoveryScorer()
-        report = scorer.calculate_recovery(datetime.now().strftime("%Y-%m-%d"))
-
-        return {
-            "recovery_score": report.recovery_score,
-            "readiness": report.readiness.value,
-            "recommendation": report.recommendation.value,
-            "trend": report.trend,
-            "max_intensity": report.suggested_max_intensity,
-            "volume_multiplier": report.suggested_volume_multiplier,
-            "notes": report.notes,
-            "factors": report.factors,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.post(
     "/nutrition",
     summary="Analyze meal nutritional content",
