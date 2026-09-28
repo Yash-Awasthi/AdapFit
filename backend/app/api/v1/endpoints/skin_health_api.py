@@ -1,5 +1,5 @@
 """Skin Health & Mole Tracking API"""
-from fastapi import APIRouter
+from fastapi import APIRouter, File, Form, UploadFile
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.services.skin_health import skin_health_service
@@ -63,6 +63,20 @@ async def measure_mole(mole_id: str, measurement: MoleMeasurement):
     return skin_health_service.record_measurement(
         mole_id, measurement.size_mm, measurement.color, measurement.notes
     )
+
+
+@router.post("/mole/{mole_id}/photo")
+async def measure_mole_photo(mole_id: str, file: UploadFile = File(...),
+                             reference_mm: Optional[float] = Form(None, gt=5, le=40)):
+    """Measure the mole in a photo and compare with its last check. The photo is not kept."""
+    from app.services import lesion_measure
+    measured = lesion_measure.measure(await file.read(lesion_measure.MAX_UPLOAD_BYTES + 1), reference_mm)
+    if measured["status"] != "measured":
+        return measured
+    f = measured["features"]
+    result = skin_health_service.record_measurement(
+        mole_id, f["diameter_mm"], features={k: f[k] for k in ("asymmetry_score", "border_irregularity", "color_variation")})
+    return {**result, "measurement": measured}
 
 
 @router.get("/mole/{mole_id}/history")

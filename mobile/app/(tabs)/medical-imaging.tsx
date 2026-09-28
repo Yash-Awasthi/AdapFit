@@ -1,14 +1,7 @@
 /**
- * Medical Imaging — ABCDE screening from measurements you take.
- *
- * There is no image analysis behind this: the app cannot measure asymmetry or
- * border irregularity from a photo, and the version that pretended to filled
- * those four numbers in at random, which could return "high suspicion for
- * melanoma" — or miss one — by chance.
- *
- * What it can honestly do is score the ABCDE criteria you assess yourself,
- * which is how the criteria are meant to be used, and be explicit that a
- * score is a prompt to see someone, not a diagnosis.
+ * Skin spot check — ABCDE screening from a photo the server measures, or
+ * from the user's own assessment when a photo will not work. A score is a
+ * prompt to see a dermatologist, not a diagnosis.
  */
 import React, { useState } from 'react';
 import {
@@ -20,6 +13,7 @@ import { colors, spacing, radius } from '../../src/theme';
 import { ScreenWrapper } from '../../src/components/ScreenWrapper';
 import { GlassCard, SectionHeaderPremium, ProgressBarPremium } from '../../src/components/PremiumComponents';
 import { postJson } from '../../src/services/http';
+import { COINS, photographAndMeasure } from '../../src/services/photoMeasure';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -31,6 +25,7 @@ interface ABCDEDetail {
 interface LesionResult {
   status: 'scored' | 'insufficient_data';
   abcde_score?: number;
+  criteria_assessed?: number;
   abcde_details?: Record<string, ABCDEDetail>;
   risk_level?: string;
   recommendation?: string;
@@ -68,6 +63,22 @@ export default function MedicalImagingScreen() {
   const [evolving, setEvolving] = useState(false);
   const [result, setResult] = useState<LesionResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [coin, setCoin] = useState<number | null>(null);
+
+  const measurePhoto = async () => {
+    setSubmitting(true);
+    const out = await photographAndMeasure<{ success: boolean; data: LesionResult & { message?: string } }>(
+      '/medical-imaging/measure-photo', coin, evolving ? { evolution_detected: 'true' } : {}
+    );
+    setSubmitting(false);
+    if (out === 'cancelled') return;
+    if (!out?.success) {
+      Alert.alert('Try another photo', out?.data?.message ?? 'The photo could not be measured.');
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setResult(out.data);
+  };
 
   const answered = CRITERIA.filter((c) => scores[c.key] !== undefined).length;
   const ready = answered === CRITERIA.length && Number(diameter) > 0;
@@ -118,31 +129,57 @@ export default function MedicalImagingScreen() {
       <GlassCard variant="light" style={styles.sectionCard}>
         <Text style={styles.introTitle}>How this works</Text>
         <Text style={styles.introText}>
-          The app cannot measure a lesion from a photo, so it asks you what you see. ABCDE
-          is a screening prompt used exactly this way — it decides whether something is
-          worth showing a clinician, and nothing more.
+          Photograph the spot in daylight, about 10 cm away, centred with clear skin around it. Put a
+          coin flat beside it to measure its size. ABCDE decides whether a spot is worth showing a
+          dermatologist, and nothing more. The photo is not kept.
         </Text>
       </GlassCard>
+
+      {!result && (
+        <GlassCard variant="light" style={styles.sectionCard}>
+          <Text style={styles.introTitle}>Measure from a photo</Text>
+          <View style={styles.levelRow}>
+            {COINS.map((c) => {
+              const on = coin === c.mm;
+              return (
+                <TouchableOpacity key={c.label} style={[styles.levelBtn, on && styles.levelBtnOn]} onPress={() => setCoin(c.mm)}
+                  accessibilityRole="radio" accessibilityState={{ selected: on }}>
+                  <Text style={[styles.levelText, on && styles.levelTextOn]}>{c.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TouchableOpacity style={[styles.levelBtn, evolving && styles.levelBtnOn, { marginTop: spacing.sm }]}
+            onPress={() => setEvolving(!evolving)} accessibilityRole="checkbox" accessibilityState={{ checked: evolving }}>
+            <Text style={[styles.levelText, evolving && styles.levelTextOn]}>It has changed recently</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.levelBtn, styles.levelBtnOn, { marginTop: spacing.md }]} onPress={measurePhoto}
+            disabled={submitting} accessibilityRole="button">
+            <Text style={[styles.levelText, styles.levelTextOn]}>{submitting ? 'Measuring…' : 'Take photo'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.abcdeDesc}>Or answer the questions below yourself.</Text>
+        </GlassCard>
+      )}
 
       {result?.status === 'scored' ? (
         <>
           <View style={styles.resultSection}>
             <View style={[styles.resultBadge, { backgroundColor: tint + '20', borderColor: tint }]}>
-              <Text style={[styles.resultScore, { color: tint }]}>{result.abcde_score}/5</Text>
+              <Text style={[styles.resultScore, { color: tint }]}>{result.abcde_score}/{result.criteria_assessed ?? 5}</Text>
               <Text style={[styles.resultRisk, { color: tint }]}>{risk}</Text>
             </View>
             <Text style={styles.resultRecommendation}>{result.recommendation}</Text>
           </View>
 
-          <SectionHeaderPremium icon="list" iconColor="#3B82F6" title="What You Reported" />
+          <SectionHeaderPremium icon="list" iconColor="#3B82F6" title="What Was Assessed" />
           <GlassCard variant="light" style={styles.sectionCard}>
             {Object.entries(result.abcde_details ?? {}).map(([key, detail]) => (
               <View key={key} style={styles.detailRow}>
                 <Text style={styles.detailLabel}>{key.replace(/_/g, ' ')}</Text>
                 <Text style={[styles.detailValue, {
-                  color: ['normal', 'regular', 'uniform', 'stable'].includes(detail.score) ? '#22C55E' : tint,
+                  color: ['normal', 'regular', 'uniform', 'stable', 'not_measured', 'not_assessed'].includes(detail.score) ? '#22C55E' : tint,
                 }]}>
-                  {detail.score}
+                  {detail.score.replace(/_/g, ' ')}
                 </Text>
               </View>
             ))}

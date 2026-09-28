@@ -73,3 +73,21 @@ def test_every_measurement_is_kept(service, mole_id):
     service.record_measurement(mole_id, 5.0)
     history = service.get_mole_history(mole_id)
     assert [round(entry["size_mm"], 1) for entry in history] == [4.5, 5.0]
+
+
+def test_abcde_without_a_photo_assesses_only_diameter(service):
+    mole = service.add_mole("arm", "arm", 8.0, "black")["mole"]
+    score = mole["abcde_score"]
+    assert score["asymmetry"] is None and score["border"] is None and score["assessed"] == 1
+
+
+def test_photo_features_that_worsen_count_as_change(service, mole_id):
+    service.record_measurement(mole_id, None, features={"asymmetry_score": 0.1, "border_irregularity": 0.2, "color_variation": 0.1})
+    result = service.record_measurement(mole_id, None, features={"asymmetry_score": 0.6, "border_irregularity": 0.2, "color_variation": 0.1})
+    assert "Shape became less even" in result["changes"]
+    assert service.get_mole(mole_id)["abcde_score"]["evolution"] == 1
+
+
+def test_fitzpatrick_type_feeds_the_check_plan(service):
+    service.assess_skin_type({"skin_color": 1, "sun_reaction": 1, "tanning_ability": 1})
+    assert service.get_skin_cancer_risk()["skin_type_risk"] == "very_high"

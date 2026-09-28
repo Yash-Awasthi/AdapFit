@@ -17,7 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius } from '../../src/theme';
 import { ScreenWrapper } from '../../src/components/ScreenWrapper';
-import { GlassCard, SectionHeaderPremium, ScoreRing } from '../../src/components/PremiumComponents';
+import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { COINS, photographAndMeasure } from '../../src/services/photoMeasure';
 import { useApis } from '../../src/hooks/useApi';
 import { postJson, asArray, asNumber } from '../../src/services/http';
 
@@ -162,10 +163,25 @@ export default function SkinHealthScreen() {
   const moles = asArray<Mole>(data.moles?.moles);
   const uv = location ? data.uv : null;
 
-  // The highest ABCDE total across tracked moles, which is what should draw
-  // the eye. No moles means no score rather than a reassuring one.
-  const highest = moles.reduce((worst, mole) => Math.max(worst, mole.abcde_score?.total ?? 0), 0);
-  const skinScore = moles.length ? Math.max(0, 100 - highest * 20) : null;
+  const [coin, setCoin] = useState<number | null>(null);
+  const [photoFor, setPhotoFor] = useState<string | null>(null);
+
+  const photoCheck = async (mole: Mole) => {
+    setPhotoFor(mole.id);
+    const out = await photographAndMeasure<{ status?: string; message?: string; changes?: string[]; recommendation?: string; error?: string }>(
+      `/skin/mole/${mole.id}/photo`, coin
+    );
+    setPhotoFor(null);
+    if (out === 'cancelled') return;
+    if (!out || out.error || out.status === 'retake') {
+      Alert.alert('Try another photo', out?.message ?? out?.error ?? 'The photo could not be measured.');
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(out.changes?.length ? 'This mole has changed' : 'Recorded',
+      [...(out.changes ?? []), out.recommendation ?? ''].filter(Boolean).join('\n\n'));
+    await reload();
+  };
 
   const addMole = async (values: { name: string; location: string; size: number; color: string }) => {
     const result = await postJson('/skin/mole', {
@@ -210,16 +226,19 @@ export default function SkinHealthScreen() {
       refreshing={refreshing}
       onRefresh={refresh}
     >
-      <View style={styles.scoreSection}>
-        <ScoreRing
-          score={skinScore ?? 0}
-          size={120}
-          strokeWidth={8}
-          color={colors.health.calm}
-          label="SKIN"
-          sublabel={skinScore !== null ? `${moles.length} tracked` : 'Nothing tracked'}
-        />
-      </View>
+      <GlassCard variant="light" style={styles.sectionCard}>
+        <Text style={styles.emptyText}>
+          Photo checks measure shape, edge and colour, and size when a coin is beside the spot. Coin in photo:
+        </Text>
+        <View style={styles.coinRow}>
+          {COINS.map((c) => (
+            <TouchableOpacity key={c.label} onPress={() => setCoin(c.mm)} accessibilityRole="radio"
+              accessibilityState={{ selected: coin === c.mm }} style={[styles.coinChip, coin === c.mm && styles.coinChipOn]}>
+              <Text style={[styles.measureText, coin === c.mm && { color: '#FFF' }]}>{c.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </GlassCard>
 
       <SectionHeaderPremium
         icon="medical"
@@ -256,7 +275,7 @@ export default function SkinHealthScreen() {
               </View>
               <View style={styles.abcdeRow}>
                 {ABCDE_GUIDE.map((item) => {
-                  const active = (mole.abcde_score?.[item.key] ?? 0) > 0;
+                  const active = ((mole.abcde_score as any)?.[item.key] ?? 0) > 0;
                   return (
                     <View key={item.letter} style={[styles.abcdeItem, active && styles.abcdeItemActive]}>
                       <Text style={[styles.abcdeLetter, active && styles.abcdeLetterActive]}>{item.letter}</Text>
@@ -271,6 +290,16 @@ export default function SkinHealthScreen() {
                 >
                   <Ionicons name="resize" size={14} color="#F97316" />
                   <Text style={styles.measureText}>Measure</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.measureBtn}
+                  onPress={() => photoCheck(mole)}
+                  disabled={photoFor === mole.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Photo check for ${mole.name}`}
+                >
+                  <Ionicons name="camera" size={14} color="#F97316" />
+                  <Text style={styles.measureText}>{photoFor === mole.id ? '…' : 'Photo'}</Text>
                 </TouchableOpacity>
               </View>
             </GlassCard>
@@ -357,7 +386,9 @@ export default function SkinHealthScreen() {
 }
 
 const styles = StyleSheet.create({
-  scoreSection: { alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.lg },
+  coinRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  coinChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: '#F97316' },
+  coinChipOn: { backgroundColor: '#F97316' },
   sectionCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.md },
   emptyTitle: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
   emptyText: { fontSize: 13, color: colors.text.muted, marginTop: 6, lineHeight: 19 },

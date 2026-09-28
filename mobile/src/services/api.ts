@@ -428,13 +428,6 @@ export const api = {
   logFertilityDaily: (data: { user_id: string; date: string; data: Record<string, any> }) =>
     request<any>('/api/v1/fertility/log', { method: 'POST', body: JSON.stringify(data) }),
 
-  // Genomics
-  getGenomicsProfile: (userId: string) =>
-    request<any>(`/api/v1/genomics/profile/${userId}`),
-
-  analyzeGenetics: (data: { user_id: string; genetic_data: Record<string, any> }) =>
-    request<any>('/api/v1/genomics/analyze', { method: 'POST', body: JSON.stringify(data) }),
-
   // Health Equity
   getHealthEquityRecommendations: (communityId: string) =>
     request<any>(`/api/v1/health-equity/recommendations/${communityId}`),

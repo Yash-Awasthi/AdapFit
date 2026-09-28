@@ -1,7 +1,7 @@
 """
 Medical Imaging AI API Endpoints
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, File, Form, UploadFile
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
@@ -18,15 +18,8 @@ class SkinLesionRequest(BaseModel):
     asymmetry_score: float = Field(ge=0, le=1)
     border_irregularity: float = Field(ge=0, le=1)
     color_variation: float = Field(ge=0, le=1)
-    diameter_mm: float = Field(gt=0, le=100)
-    evolution_detected: bool = False
-
-
-class WoundRequest(BaseModel):
-    type: str = "surgical_wound"
-    stage: str = "healing"
-    size_cm: Dict = {"length": 3, "width": 2, "depth": 0.5}
-    infection_signs: List[str] = []
+    diameter_mm: Optional[float] = Field(None, gt=0, le=100)
+    evolution_detected: Optional[bool] = None
 
 
 class RashRequest(BaseModel):
@@ -41,23 +34,20 @@ async def analyze_skin_lesion(request: SkinLesionRequest):
     return {"success": True, "data": medical_imaging_service.analyze_skin_lesion(request.model_dump())}
 
 
-@router.post("/assess-wound")
-async def assess_wound(request: WoundRequest):
-    from app.services.medical_imaging import medical_imaging_service
-    return {"success": True, "data": medical_imaging_service.assess_wound(request.model_dump())}
-
-
 @router.post("/detect-rash")
 async def detect_rash(request: RashRequest):
     from app.services.medical_imaging import medical_imaging_service
     return {"success": True, "data": medical_imaging_service.detect_rash(request.model_dump())}
 
 
-@router.get("/categories")
-async def get_analysis_categories():
+@router.post("/measure-photo")
+async def measure_photo(file: UploadFile = File(...), reference_mm: Optional[float] = Form(None, gt=5, le=40),
+                        evolution_detected: Optional[bool] = Form(None)):
+    """Measure a spot in a photo, then screen the measured features. The photo is not kept."""
+    from app.services import lesion_measure
     from app.services.medical_imaging import medical_imaging_service
-    return {"success": True, "data": {
-        "skin_lesion": list(medical_imaging_service.skin_lesion_categories.keys()),
-        "wound_types": list(medical_imaging_service.wound_classifications.keys()),
-        "rash_patterns": list(medical_imaging_service.rash_patterns.keys()),
-    }}
+    measured = lesion_measure.measure(await file.read(lesion_measure.MAX_UPLOAD_BYTES + 1), reference_mm)
+    if measured["status"] != "measured":
+        return {"success": False, "data": measured}
+    features = {**measured["features"], "evolution_detected": evolution_detected}
+    return {"success": True, "data": {**medical_imaging_service.analyze_skin_lesion(features), "measurement": measured}}

@@ -5,7 +5,7 @@
  * adherence figure above the list is computed server-side from the same logs,
  * so an optimistic tick would disagree with the score next to it.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, Alert, Modal, TextInput,
@@ -64,6 +64,17 @@ function AddMedicationModal({ visible, onClose, onAdded }: {
   const [dosage, setDosage] = useState('');
   const [time, setTime] = useState('08:00');
   const [saving, setSaving] = useState(false);
+  const [suggestions, setSuggestions] = useState<IndianProduct[]>([]);
+
+  useEffect(() => {
+    const q = name.trim();
+    if (q.length < 3) { setSuggestions([]); return; }
+    const timer = setTimeout(async () => {
+      const r = await getJson<{ products: IndianProduct[] }>(`/medication/india-search?q=${encodeURIComponent(q)}`);
+      setSuggestions(asArray<IndianProduct>(r?.products).filter((p) => p.brand !== q).slice(0, 5));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [name]);
 
   const save = async () => {
     if (!name.trim() || !dosage.trim()) {
@@ -102,6 +113,13 @@ function AddMedicationModal({ visible, onClose, onAdded }: {
             onChangeText={setName}
             accessibilityLabel="Medication name"
           />
+          {suggestions.map((p) => (
+            <TouchableOpacity key={p.brand + p.pack} onPress={() => { setName(p.brand); setDosage(p.composition); setSuggestions([]); }}
+              accessibilityRole="button" style={{ paddingVertical: 6 }}>
+              <Text style={styles.medDetail}>{p.brand}</Text>
+              <Text style={styles.emptyBody}>{p.composition} · {p.manufacturer}</Text>
+            </TouchableOpacity>
+          ))}
           <TextInput
             style={styles.input}
             placeholder="Dosage (e.g. 2000 IU)"
@@ -132,7 +150,10 @@ function AddMedicationModal({ visible, onClose, onAdded }: {
   );
 }
 
+interface IndianProduct { brand: string; manufacturer: string; pack: string; composition: string }
 interface DrugInfo {
+  india?: IndianProduct[];
+  india_source?: string;
   searched_as: string;
   matches: { brand_name: string | null; generic_name: string | null; purpose: string[]; warnings: string[] }[];
   recalls: { reason: string; classification: string; date: string }[];
@@ -166,9 +187,11 @@ export default function MedicationScreen() {
 
   const checkInteractions = useCallback(async () => {
     const names = Array.from(new Set(schedule.map((e) => e.medication)));
-    const r = await postJson<{ data: { interactions: Interaction[] } }>('/drug-interactions/check', { medications: names });
+    const r = await postJson<{ data: { interactions: Interaction[]; resolved?: { message?: string }[] } }>('/drug-interactions/check', { medications: names });
     if (!r) return Alert.alert('Unavailable', 'The interaction check could not run.');
     setInteractions(asArray<Interaction>(r.data?.interactions));
+    const unclear = asArray<{ message?: string }>(r.data?.resolved).map((x) => x.message).filter(Boolean);
+    if (unclear.length) Alert.alert('Check the exact product', unclear.join('\n\n'));
   }, [schedule]);
 
   const markTaken = useCallback(async (entry: ScheduleEntry) => {
@@ -269,8 +292,10 @@ export default function MedicationScreen() {
               if (d === 'loading' || d === undefined) return <ActivityIndicator style={{ marginTop: 8 }} color={colors.primary} />;
               if (d === 'error') return <Text style={styles.medDetail}>Could not reach the drug database.</Text>;
               const m = d.matches[0];
+              const india = asArray<IndianProduct>(d.india)[0];
               return (
                 <View style={{ marginTop: 8 }}>
+                  {india && <Text style={styles.medDetail}>In India: {india.brand} · {india.composition} · {india.manufacturer}</Text>}
                   {m ? (
                     <>
                       <Text style={styles.medDetail}>{[m.brand_name, m.generic_name].filter(Boolean).join(' · ')}</Text>

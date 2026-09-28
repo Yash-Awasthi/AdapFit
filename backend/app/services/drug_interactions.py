@@ -1,24 +1,19 @@
-"""Drug Interaction Checker & Polypharmacy Risk Service.
+"""
+Drug-drug and food-drug interaction lookup over a small reviewed table.
 
-Based on 2025 AI polypharmacy research:
-- Drug-drug interaction database (100+ interactions)
-- Polypharmacy risk scoring for elderly
-- Contraindication alerts
-- Dosage calculator with age/weight adjustment
-- Medication timing optimization
-- BEERS criteria for potentially inappropriate medications
+Names may be generics or Indian brands; brands resolve to their ingredients
+through `indian_medicines`. The "action" text is written for prescribers and
+the API replaces it with a next step for the user.
 """
 
-import time
 from typing import Dict, List, Any
 
 
 class DrugInteractionService:
-    """AI-powered drug interaction checking and medication safety."""
+    """Interaction lookup; never suggests a dose."""
 
     def __init__(self):
         self._init_interaction_database()
-        self._init_beers_criteria()
 
     def _init_interaction_database(self):
         self.interactions = {
@@ -39,34 +34,41 @@ class DrugInteractionService:
             ("levothyroxine", "calcium"): {"severity": "moderate", "effect": "Reduced thyroid hormone absorption", "action": "Separate by 4 hours"},
         }
 
-    def _init_beers_criteria(self):
-        self.beers_medications = {
-            "diazepam": {"risk": "high", "reason": "Increased fall risk in elderly", "alternative": "Lorazepam (lower dose)"},
-            "diphenhydramine": {"risk": "high", "reason": "Anticholinergic effects, confusion", "alternative": "Cetirizine or loratadine"},
-            "glibenclamide": {"risk": "high", "reason": "Prolonged hypoglycemia in elderly", "alternative": "Glipizide"},
-            "nsaids_chronic": {"risk": "high", "reason": "GI bleeding, renal impairment", "alternative": "Acetaminophen or topical NSAIDs"},
-            "muscle_relaxants": {"risk": "moderate", "reason": "Sedation, fall risk", "alternative": "Physical therapy"},
-            "benzodiazepines": {"risk": "high", "reason": "Cognitive impairment, falls, fractures", "alternative": "CBT for insomnia/anxiety"},
-        }
+    # Indian and international spellings, and classes the table is keyed by.
+    ALIASES = {
+        "thyroxine": {"levothyroxine"}, "paracetamol": {"acetaminophen"}, "salbutamol": {"albuterol"},
+        "acetylsalicylic acid": {"aspirin"}, "aspirin": {"nsaids"},
+        "ibuprofen": {"nsaids"}, "diclofenac": {"nsaids"}, "naproxen": {"nsaids"}, "aceclofenac": {"nsaids"},
+        "nimesulide": {"nsaids"}, "etoricoxib": {"nsaids"}, "ketorolac": {"nsaids"}, "mefenamic acid": {"nsaids"},
+        "calcium carbonate": {"calcium", "antacids"}, "aluminium hydroxide": {"antacids"},
+        "magnesium hydroxide": {"antacids"}, "potassium chloride": {"potassium"},
+        "selegiline": {"maoi"}, "rasagiline": {"maoi"}, "linezolid": {"maoi"},
+        "metoprolol succinate": {"metoprolol"}, "metoprolol tartrate": {"metoprolol"},
+    }
+
+    def _terms(self, generic: str) -> set:
+        return {generic} | self.ALIASES.get(generic, set())
 
     def check_interactions(self, medications: List[str]) -> Dict[str, Any]:
-        """Check for drug interactions among a medication list."""
-        found_interactions = []
-        meds_lower = [m.lower() for m in medications]
+        """Check a list of names; each may be a generic or an Indian brand, resolved to its ingredients."""
+        from app.services import indian_medicines
 
-        for i, med1 in enumerate(meds_lower):
-            for med2 in meds_lower[i+1:]:
-                pair = (med1, med2)
-                reverse_pair = (med2, med1)
-                interaction = self.interactions.get(pair) or self.interactions.get(reverse_pair)
-                if interaction:
-                    found_interactions.append({
-                        "drug_1": medications[i],
-                        "drug_2": medications[i+1:] if isinstance(medications[i+1:], str) else medications[meds_lower.index(med2)],
-                        "severity": interaction["severity"],
-                        "effect": interaction["effect"],
-                        "action": interaction["action"],
-                    })
+        resolved = [indian_medicines.resolve(m) for m in medications]
+        items = [(r["name"], set().union(*(self._terms(g) for g in r["generics"]))) for r in resolved]
+        found_interactions = []
+        seen = set()
+        for i, (name1, terms1) in enumerate(items):
+            for name2, terms2 in items[i + 1:]:
+                for t1 in terms1:
+                    for t2 in terms2:
+                        interaction = self.interactions.get((t1, t2)) or self.interactions.get((t2, t1))
+                        key = (name1, name2, interaction and interaction["effect"])
+                        if interaction and key not in seen:
+                            seen.add(key)
+                            found_interactions.append({
+                                "drug_1": name1, "drug_2": name2, "severity": interaction["severity"],
+                                "effect": interaction["effect"], "action": interaction["action"],
+                            })
 
         major = sum(1 for i in found_interactions if i["severity"] == "major")
         moderate = sum(1 for i in found_interactions if i["severity"] == "moderate")
@@ -74,94 +76,13 @@ class DrugInteractionService:
 
         return {
             "medications_checked": len(medications),
+            "resolved": [{k: r[k] for k in ("name", "kind", "generics", "message") if k in r} for r in resolved],
             "interactions_found": len(found_interactions),
             "interactions": found_interactions,
-            "risk_summary": {
-                "major": major,
-                "moderate": moderate,
-                "contraindicated": contraindicated,
-            },
+            "risk_summary": {"major": major, "moderate": moderate, "contraindicated": contraindicated},
             "overall_risk": "critical" if contraindicated > 0 else "high" if major > 0 else "moderate" if moderate > 0 else "low",
+            "source": indian_medicines.SOURCE,
         }
-
-    def check_beers_criteria(self, medications: List[str], age: int) -> Dict[str, Any]:
-        """Check medications against Beers Criteria for elderly."""
-        flagged = []
-        for med in medications:
-            med_lower = med.lower()
-            for beer_med, info in self.beers_medications.items():
-                if beer_med in med_lower:
-                    flagged.append({
-                        "medication": med,
-                        "risk_level": info["risk"],
-                        "concern": info["reason"],
-                        "alternative": info["alternative"],
-                    })
-
-        return {
-            "patient_age": age,
-            "medications_checked": len(medications),
-            "potentially_inappropriate": len(flagged),
-            "flagged_medications": flagged,
-            "recommendation": "Consult pharmacist for medication review" if flagged else "No Beers Criteria concerns found",
-        }
-
-    def calculate_dosage(self, drug: str, patient_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Calculate adjusted dosage based on patient parameters."""
-        age = patient_data.get("age", 40)
-        weight = patient_data.get("weight", 70)
-        renal_function = patient_data.get("renal_function", "normal")
-
-        adjustment = 1.0
-        reasons = []
-        if age > 65:
-            adjustment *= 0.75
-            reasons.append("Age >65: reduce dose by 25%")
-        if weight < 50:
-            adjustment *= 0.8
-            reasons.append("Low weight: reduce dose by 20%")
-        if renal_function == "mild":
-            adjustment *= 0.75
-            reasons.append("Mild renal impairment: reduce by 25%")
-        elif renal_function == "moderate":
-            adjustment *= 0.5
-            reasons.append("Moderate renal impairment: reduce by 50%")
-        elif renal_function == "severe":
-            adjustment *= 0.25
-            reasons.append("Severe renal impairment: reduce by 75% or avoid")
-
-        return {
-            "drug": drug,
-            "standard_dose": "Per prescribing information",
-            "adjustment_factor": round(adjustment, 2),
-            "adjustment_reasons": reasons,
-            "recommendation": "Consult healthcare provider for final dosing" if adjustment < 1.0 else "Standard dosing appropriate",
-        }
-
-    def optimize_timing(self, medications: List[str]) -> List[Dict]:
-        """Optimize medication timing to reduce interactions."""
-        timing = []
-        for med in medications:
-            med_lower = med.lower()
-            if "statin" in med_lower:
-                timing.append({"medication": med, "time": "Evening", "reason": "Cholesterol synthesis peaks at night"})
-            elif "levothyroxine" in med_lower:
-                timing.append({"medication": med, "time": "Morning, empty stomach", "reason": "Best absorption without food"})
-            elif "omeprazole" in med_lower or "pantoprazole" in med_lower:
-                timing.append({"medication": med, "time": "30 min before breakfast", "reason": "Proton pump activation timing"})
-            elif "metformin" in med_lower:
-                timing.append({"medication": med, "time": "With meals", "reason": "Reduce GI side effects"})
-            elif "lisinopril" in med_lower or "losartan" in med_lower:
-                timing.append({"medication": med, "time": "Morning", "reason": "Blood pressure dips at night"})
-            elif "iron" in med_lower:
-                timing.append({"medication": med, "time": "Away from meals", "reason": "Food reduces iron absorption; take with vitamin C"})
-            elif "calcium" in med_lower or "antacid" in med_lower:
-                timing.append({"medication": med, "time": "Separate from other meds", "reason": "Calcium and antacids reduce absorption of many drugs"})
-            elif "antibiotic" in med_lower or "ciprofloxacin" in med_lower or "amoxicillin" in med_lower:
-                timing.append({"medication": med, "time": "Evenly spaced intervals", "reason": "Maintain consistent blood levels"})
-            else:
-                timing.append({"medication": med, "time": "As prescribed", "reason": "Follow prescriber instructions"})
-        return timing
 
     # === Food-Drug Interactions ===
 

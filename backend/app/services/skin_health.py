@@ -39,7 +39,7 @@ class SkinHealthService:
     def assess_skin_type(self, Fitzpatrick_answers: dict) -> dict:
         score = Fitzpatrick_answers.get("skin_color", 3) + Fitzpatrick_answers.get("sun_reaction", 3) + Fitzpatrick_answers.get("tanning_ability", 3)
         skin_type = min(6, max(1, (score - 3) // 2 + 1))
-        self._skin_type = FITZPATRICK_SCALE[skin_type]
+        self._skin_type = {**FITZPATRICK_SCALE[skin_type], "level": skin_type}
         return {"skin_type": self._skin_type, "recommendations": self._get_care_recommendations(skin_type)}
 
     def _get_care_recommendations(self, skin_type: int) -> list[str]:
@@ -64,21 +64,32 @@ class SkinHealthService:
         self._moles[mole_id] = mole
         return {"mole": mole, "message": f"Mole '{name}' added. Track it monthly for changes."}
 
-    def _calculate_abcde(self, size_mm: float, color: str) -> dict:
-        a = 0 if size_mm < 6 else 1
-        b = 0 if size_mm < 10 else 1
-        c = 0 if color.lower() in ["brown", "tan", "light brown"] else 1
-        d = 1 if size_mm > 6 else 0
-        e = 0  # evolution tracked separately
-        total = a + b + c + d + e
-        return {"asymmetry": a, "border": b, "color_irregularity": c, "diameter": d, "evolution": e, "total": total, "risk_level": "low" if total <= 1 else "moderate" if total <= 3 else "high"}
+    def _calculate_abcde(self, size_mm: float, color: str, features: Optional[dict] = None) -> dict:
+        """
+        Only criteria something measured. Asymmetry, border and colour come from
+        a photo measurement; without one they are None, not guessed from size.
+        """
+        f = features or {}
+        a = None if f.get("asymmetry_score") is None else int(f["asymmetry_score"] >= 0.5)
+        b = None if f.get("border_irregularity") is None else int(f["border_irregularity"] >= 0.5)
+        c = None if f.get("color_variation") is None else int(f["color_variation"] >= 0.4)
+        d = int(size_mm > 6)
+        met = sum(x for x in (a, b, c, d) if x)
+        assessed = sum(x is not None for x in (a, b, c, d))
+        return {"asymmetry": a, "border": b, "color_irregularity": c, "diameter": d, "evolution": 0,
+                "total": met, "assessed": assessed,
+                "risk_level": "low" if met == 0 else "moderate" if met == 1 else "high"}
 
     # A mole growing by more than this between checks is the change that
     # matters most — the "E" in ABCDE — and is worth acting on by itself.
     NOTABLE_GROWTH_MM = 2.0
 
+    # A jump this large on the 0-1 photo scales between checks counts as change.
+    NOTABLE_FEATURE_CHANGE = 0.2
+
     def record_measurement(
-        self, mole_id: str, size_mm: float, color: str = "", notes: str = ""
+        self, mole_id: str, size_mm: Optional[float], color: str = "", notes: str = "",
+        features: Optional[dict] = None,
     ) -> dict:
         """
         Record a fresh measurement of a mole and compare it with the last.
@@ -92,17 +103,23 @@ class SkinHealthService:
         mole = self._moles.get(mole_id)
         if not mole:
             return {"error": "Mole not found"}
-        if not isinstance(size_mm, (int, float)) or size_mm <= 0:
+        if size_mm is None and features is None:
+            return {"error": "A measured size in millimetres is required."}
+        if size_mm is not None and (not isinstance(size_mm, (int, float)) or size_mm <= 0):
             return {"error": "A measured size in millimetres is required."}
 
         previous_size = mole["size_mm"]
         previous_color = mole.get("color", "")
-        growth = round(size_mm - previous_size, 1)
+        previous_features = mole.get("features") or {}
+        growth = round(size_mm - previous_size, 1) if size_mm is not None else 0.0
 
-        mole["size_mm"] = float(size_mm)
+        if size_mm is not None:
+            mole["size_mm"] = float(size_mm)
         if color:
             mole["color"] = color
-        mole["abcde_score"] = self._calculate_abcde(mole["size_mm"], mole.get("color", ""))
+        if features:
+            mole["features"] = features
+        mole["abcde_score"] = self._calculate_abcde(mole["size_mm"], mole.get("color", ""), mole.get("features"))
         mole["last_checked"] = time.time()
 
         changes = []
@@ -110,6 +127,15 @@ class SkinHealthService:
             changes.append(f"Grew {growth} mm since the last measurement")
         if color and previous_color and color.lower() != previous_color.lower():
             changes.append(f"Colour changed from {previous_color} to {color}")
+        labels = {"asymmetry_score": "Shape became less even", "border_irregularity": "Edge became more irregular",
+                  "color_variation": "Colour became more varied"}
+        for key, label in labels.items():
+            before, now = previous_features.get(key), (features or {}).get(key)
+            if before is not None and now is not None and now - before >= self.NOTABLE_FEATURE_CHANGE:
+                changes.append(label)
+        if changes:
+            mole["abcde_score"]["evolution"] = 1
+            mole["abcde_score"]["total"] += 1
 
         entry = {
             "mole_id": mole_id,
@@ -117,6 +143,7 @@ class SkinHealthService:
             "color": mole.get("color", ""),
             "growth_mm": growth,
             "changes": changes,
+            "features": features,
             "notes": notes,
             "timestamp": time.time(),
         }
@@ -169,7 +196,7 @@ class SkinHealthService:
         return self._moles.get(mole_id)
 
     def get_skin_cancer_risk(self) -> dict:
-        skin_type_risk = FITZPATRICK_SCALE.get(self._skin_type.get("type", "III") if self._skin_type else 3, {}).get("risk", "moderate")
+        skin_type_risk = self._skin_type.get("risk", "unknown") if self._skin_type else "unknown"
         mole_count = len(self._moles)
         high_risk_moles = sum(1 for m in self._moles.values() if m["abcde_score"]["total"] >= 3)
         uv_exposure = len(self._uv_log)
@@ -181,7 +208,7 @@ class SkinHealthService:
             "uv_exposure_sessions": uv_exposure,
             "recommendations": [
                 "Monthly self-examination of all moles" if mole_count > 0 else "Start tracking any new or changing spots",
-                "Annual dermatologist visit" if skin_type_risk in ["very_high", "high"] else "Biannual dermatologist visit",
+                "Yearly skin check by a dermatologist" if skin_type_risk in ["very_high", "high"] else "Show a dermatologist any spot that changes",
                 "Daily sunscreen application",
                 "Wear protective clothing and sunglasses",
             ],
@@ -196,7 +223,7 @@ class SkinHealthService:
             "moles_tracked": [{"name": m["name"], "location": m["body_location"], "size": m["size_mm"], "abcde": m["abcde_score"], "status": m["status"]} for m in self._moles.values()],
             "uv_exposure_summary": {"total_sessions": len(self._uv_log), "avg_uv_index": round(sum(u["uv_index"] for u in self._uv_log) / max(1, len(self._uv_log)), 1)},
             "risk_assessment": self.get_skin_cancer_risk(),
-            "disclaimer": "This report is generated by AI for informational purposes. Please share with your dermatologist.",
+            "disclaimer": "Your own records and photo measurements, to share with a dermatologist. Not a diagnosis.",
         }
 
 

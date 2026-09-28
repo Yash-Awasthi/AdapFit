@@ -55,18 +55,24 @@ async def get_refill_alerts():
 
 @router.get("/drug-info")
 async def drug_info(name: str = Query(min_length=2, max_length=60, pattern=r"^[A-Za-z0-9 \-]+$")):
-    """Label summary and recalls from the US FDA's open data, for a brand or generic name."""
+    """Indian products matching the name, then FDA label and recalls for its ingredient."""
     import asyncio
 
+    from app.services import indian_medicines
     from app.services import openfda_client as fda
 
+    india = await asyncio.to_thread(indian_medicines.search, name, 8)
+    resolved = await asyncio.to_thread(indian_medicines.resolve, name)
+    generic = resolved["generics"][0] if resolved["kind"] in ("brand", "product") and len(resolved["generics"]) == 1 else name
     labels, recalls = await asyncio.gather(
-        asyncio.to_thread(fda.search_drug_label, name),
-        asyncio.to_thread(fda.search_drug_recalls, fda.us_name(name), 5),
+        asyncio.to_thread(fda.search_drug_label, fda.us_name(generic)),
+        asyncio.to_thread(fda.search_drug_recalls, fda.us_name(generic), 5),
     )
     return {
         "query": name,
-        "searched_as": fda.us_name(name),
+        "india": india,
+        "india_source": indian_medicines.SOURCE,
+        "searched_as": fda.us_name(generic),
         "matches": [
             {"brand_name": l.brand_name, "generic_name": l.generic_name, "manufacturer": l.manufacturer,
              "route": l.route, "purpose": [p[:400] for p in l.purpose][:2], "warnings": [w[:600] for w in l.warnings][:3]}
@@ -77,3 +83,13 @@ async def drug_info(name: str = Query(min_length=2, max_length=60, pattern=r"^[A
         "source": "US FDA (openFDA). Indian brands may differ; your pharmacist can confirm.",
         "note": "General label information. Ask your doctor or pharmacist before changing how you take any medicine.",
     }
+
+
+@router.get("/india-search")
+async def india_search(q: str = Query(min_length=2, max_length=60)):
+    """Indian products whose name starts with q, with their composition."""
+    import asyncio
+
+    from app.services import indian_medicines
+
+    return {"products": await asyncio.to_thread(indian_medicines.search, q, 8), "source": indian_medicines.SOURCE}
