@@ -1,39 +1,38 @@
-"""Preventive Screening API endpoints."""
-from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import Dict, Any, List
+"""Preventive check-ups due by age and sex, with when each was last done."""
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
 from app.services.preventive_screening import preventive_screening_service
 
-router = APIRouter(prefix="/screening", tags=["Preventive Screening"])
+router = APIRouter()
+
 
 class ProfileRequest(BaseModel):
-    user_id: str
-    data: Dict[str, Any]
+    age: int = Field(ge=18, le=120)
+    sex: Literal["female", "male"]
 
-class ScreeningLogRequest(BaseModel):
-    user_id: str
-    data: Dict[str, Any]
+
+class LogRequest(BaseModel):
+    check_id: str = Field(min_length=2, max_length=40)
+    done_on: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    note: str = Field("", max_length=200)
+
 
 @router.post("/profile")
-async def create_profile(req: ProfileRequest):
-    result = preventive_screening_service.create_profile(req.user_id, req.data)
-    return {"success": True, "data": result}
+async def set_profile(req: ProfileRequest):
+    return preventive_screening_service.set_profile(req.age, req.sex)
 
-@router.get("/schedule/{user_id}")
-async def get_schedule(user_id: str):
-    result = preventive_screening_service.get_screening_schedule(user_id)
-    return {"success": True, "data": result}
 
-@router.get("/cancer-risk/{user_id}")
-async def assess_cancer_risk(user_id: str):
-    result = preventive_screening_service.assess_cancer_risk(user_id)
-    return {"success": True, "data": result}
+@router.get("/schedule")
+async def schedule():
+    return preventive_screening_service.schedule()
+
 
 @router.post("/log")
-async def log_screening(req: ScreeningLogRequest):
-    result = preventive_screening_service.log_screening(req.user_id, req.data)
-    return {"success": True, "data": result}
-
-@router.get("/guidelines")
-async def get_guidelines():
-    return {"success": True, "data": preventive_screening_service.screenings}
+async def log_check(req: LogRequest):
+    try:
+        return preventive_screening_service.log(req.check_id, req.done_on, req.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

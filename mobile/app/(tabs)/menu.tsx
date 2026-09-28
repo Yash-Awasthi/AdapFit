@@ -9,7 +9,7 @@ import {
   ChevronRight, Sun, Moon as MoonIcon, Search, Calendar, BarChart3, Award,
   Brain, Moon, Shield, Utensils, Users, Settings as SettingsIcon,
   Download, Bell, Info, Pencil, Ruler, Droplet, Wrench,
-  LayoutDashboard, CheckSquare, Stethoscope, Activity, TrendingUp, HeartPulse, Baby, MessagesSquare,
+  LayoutDashboard, CheckSquare, Stethoscope, ClipboardList, Leaf, Scale, HeartHandshake, Activity, TrendingUp, HeartPulse, Baby, MessagesSquare,
   ChefHat, Droplets, Smile, Pill, Watch, CalendarDays, Siren, Accessibility,
 } from 'lucide-react-native';
 import { useTheme, AccentName, CARD_SHADOW } from '../../src/services/theme';
@@ -70,6 +70,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
       items: [
         { icon: Brain, label: 'Mind', sub: 'Mood, journal & wellbeing', route: '/mental-health', color: '#A855F7' },
         { icon: Droplets, label: 'Wellness', sub: 'Hydration, breathing & meditation', route: '/wellness', color: '#06B6D4' },
+        { icon: Leaf, label: 'Everyday Wellbeing', sub: 'Air quality, desk health, memory, travel', route: '/everyday', color: '#22C55E' },
         { icon: Moon, label: 'Sleep', sub: 'Stages & consistency', route: '/sleep', color: '#6366F1' },
         { icon: Shield, label: 'Health', sub: 'Conditions & meds', route: '/health', color: '#22C55E' },
         ...(showFemaleScreens
@@ -91,6 +92,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
     {
       title: 'Body & Vitals',
       items: [
+        { icon: Scale, label: 'Body', sub: 'Weight, measurements, goals & photos', route: '/body', color: '#F97316' },
         { icon: HeartPulse, label: 'Vital Signs', sub: 'Heart rate & blood pressure', route: '/vital-signs', color: '#EF4444' },
         { icon: Activity, label: 'HRV', sub: 'Readings & breathing coach', route: '/hrv', color: '#10B981' },
         { icon: Pill, label: 'Medication', sub: 'Doses & reminders', route: '/medication', color: '#22C55E' },
@@ -100,6 +102,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
     {
       title: 'Community',
       items: [
+        { icon: HeartHandshake, label: 'Family', sub: 'Private sharing with people you trust', route: '/family', color: '#EC4899' },
         { icon: Users, label: 'Community', sub: 'Challenges, leaderboard & feed', route: '/community', color: '#EC4899' },
         { icon: MessagesSquare, label: 'Forums', sub: 'Ask and answer', route: '/forums', color: '#8B5CF6' },
       ],
@@ -109,6 +112,7 @@ function buildCatalog(theme: any, showFemaleScreens: boolean): CatalogSection[] 
       items: [
         { icon: CalendarDays, label: 'Calendar', sub: 'Plan and history', route: '/health-calendar', color: '#06B6D4' },
         { icon: Siren, label: 'Emergency', sub: 'Contacts & medical ID', route: '/emergency', color: '#DC2626' },
+        { icon: ClipboardList, label: 'Conditions & Recovery', sub: 'Check-ups, lab results, physio, falls', route: '/conditions', color: '#0EA5E9' },
         { icon: Stethoscope, label: 'Care & Safety', sub: 'Care nearby, symptoms, first aid, schemes', route: '/care', color: '#EF4444' },
         { icon: Accessibility, label: 'Accessibility', sub: 'Text size & motion', route: '/accessibility-settings', color: '#0EA5E9' },
         { icon: Download, label: 'Export Data', sub: 'Download your records', route: '/data-export', color: '#22C55E' },

@@ -1,160 +1,161 @@
 /**
- * Family & Caregiver Mode — Monitor family members' health
+ * Family — private connections with people you trust. Nothing is shared by
+ * default; each person decides, per category, what the other may see, and can
+ * pause or end the connection at any time.
  */
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, radius, presets, glass } from '../../src/theme';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert, Switch } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, spacing } from '../../src/theme';
+import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { asArray, getJson, postJson } from '../../src/services/http';
 
-import { API_V1 as API } from '../../src/services/config';
-function MemberCard({ member, onPress }: { member: any; onPress: () => void }) {
-  const relationshipColors: Record<string, string> = { parent: colors.health.heart, child: colors.health.sleep, spouse: '#EC4899', sibling: colors.health.energy, self: colors.primary };
-  const color = relationshipColors[member.relationship] || colors.primary;
-  return (
-    <TouchableOpacity style={[ns.memberCard, { borderLeftColor: color }]} onPress={onPress}>
-      <View style={[ns.memberAvatar, { backgroundColor: color + '20' }]}>
-        <Ionicons
-          name={member.relationship === 'parent' ? 'person' : member.relationship === 'child' ? 'happy-outline' : member.relationship === 'spouse' ? 'heart' : 'person-outline'}
-          size={20}
-          color={color}
-        />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[typography.label.lg as any, { color: colors.text.primary }]}>{member.name}</Text>
-        <Text style={[typography.body.xs as any, { color }]}>{member.relationship}</Text>
-        <Text style={typography.body.xs as any}>Age: {member.age}</Text>
-      </View>
-      {member.is_caregiver && <View style={ns.caregiverBadge}><Text style={ns.caregiverText}>Caregiver</Text></View>}
-      <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
-    </TouchableOpacity>
-  );
-}
+const TINT = '#EC4899';
+const RELATIONS = ['parent', 'child', 'spouse', 'sibling', 'caregiver', 'custom'];
+const SHAREABLE = [
+  { key: 'view_emergency', label: 'Emergency medical info' },
+  { key: 'view_recovery', label: 'Daily recovery score' },
+  { key: 'view_sleep', label: 'Last night’s sleep' },
+  { key: 'view_workouts', label: 'Workout count' },
+];
 
 export default function FamilyScreen() {
-  const [dashboard, setDashboard] = useState<any>({});
-  const [elderly, setElderly] = useState<any>({});
-  const [child, setChild] = useState<any>({});
+  const [invitee, setInvitee] = useState('');
+  const [relation, setRelation] = useState('parent');
+  const [invites, setInvites] = useState<any[]>([]);
+  const [connections, setConnections] = useState<any[]>([]);
+  const [open, setOpen] = useState<string | null>(null);
+  const [member, setMember] = useState<Record<string, any>>({});
 
-  useEffect(() => {
-    // Demo data
-    setDashboard({
-      total_members: 4, caregivers: 1, dependents: 3, unread_alerts: 2,
-      members: [
-        { user_id: 'u1', name: 'You', relationship: 'self', age: 35, is_caregiver: true },
-        { user_id: 'u2', name: 'Mom', relationship: 'parent', age: 65, is_caregiver: false },
-        { user_id: 'u3', name: 'Dad', relationship: 'parent', age: 68, is_caregiver: false },
-        { user_id: 'u4', name: 'Sarah', relationship: 'child', age: 8, is_caregiver: false },
-      ],
-    });
-    setElderly({ medication_adherence: 92, activity_level: 'moderate', sleep_quality: 7, mood_trend: 'stable', fall_risk: 'low', alerts: ['Medication due in 2 hours', 'Blood pressure check recommended'] });
-    setChild({ activity_minutes_today: 45, screen_time_today: 120, sleep_hours_last_night: 9.5, nutrition_score: 82 });
+  const load = useCallback(async () => {
+    const [i, c] = await Promise.all([getJson<any>('/family-network/invites'), getJson<any>('/family-network/connections')]);
+    setInvites(asArray(i?.invites).filter((x: any) => !x.is_expired));
+    setConnections(asArray(c?.connections));
   }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const invite = async () => {
+    if (!invitee.trim()) return;
+    const r = await postJson<any>('/family-network/invite', { invitee: invitee.trim(), relationship: relation });
+    if (r?.message) Alert.alert('Invite sent', r.message);
+    setInvitee('');
+  };
+  const accept = async (id: string) => { await postJson('/family-network/invite/accept', { invite_id: id }); load(); };
+  const decline = async (id: string) => { await postJson(`/family-network/invite/decline?invite_id=${id}`); load(); };
+  const toggle = async (conn: any, key: string, value: boolean) => {
+    await postJson('/family-network/permissions', { connection_id: conn.connection_id, permissions: { ...conn.i_share, [key]: value } });
+    load();
+  };
+  const view = async (id: string) => {
+    setOpen(open === id ? null : id);
+    if (open !== id) setMember({ ...member, [id]: await getJson(`/family-network/member/${id}`) });
+  };
+  const end = (id: string) => Alert.alert('End this connection?', 'Sharing stops for both of you. This cannot be undone.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'End', style: 'destructive', onPress: async () => { await postJson(`/family-network/connection/revoke?connection_id=${id}`); load(); } },
+  ]);
 
   return (
-    <ScrollView style={ns.container}>
-      <View style={ns.header}>
-        <Text style={typography.heading.h1 as any}>Family</Text>
-        <Text style={typography.body.sm as any}>Keep your loved ones healthy</Text>
-      </View>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+        <LinearGradient colors={[TINT, '#BE185D', colors.bg.deep]} style={styles.hero}>
+          <Text style={styles.heroMuted}>Family</Text>
+          <Text style={styles.heroTitle}>{connections.length ? `${connections.length} connected` : 'Look after each other'}</Text>
+          <Text style={styles.heroMuted}>Nothing is shared until you switch it on.</Text>
+        </LinearGradient>
 
-      {/* Quick Stats */}
-      <View style={ns.statsRow}>
-        <View style={[ns.statCard, glass.light]}>
-          <Text style={[typography.metric.large as any, { color: colors.primary }]}>{dashboard.total_members || 0}</Text>
-          <Text style={typography.body.xs as any}>Members</Text>
-        </View>
-        <View style={[ns.statCard, glass.light]}>
-          <Text style={[typography.metric.large as any, { color: colors.health.heart }]}>{dashboard.unread_alerts || 0}</Text>
-          <Text style={typography.body.xs as any}>Alerts</Text>
-        </View>
-        <View style={[ns.statCard, glass.light]}>
-          <Text style={[typography.metric.large as any, { color: colors.health.calm }]}>{dashboard.caregivers || 0}</Text>
-          <Text style={typography.body.xs as any}>Caregivers</Text>
-        </View>
-      </View>
-
-      {/* Family Members */}
-      <View style={[presets.card, { marginHorizontal: spacing.lg, marginBottom: spacing.lg }]}>
-        <Text style={[typography.heading.h4 as any, { marginBottom: spacing.md }]}>Family Members</Text>
-        {(dashboard.members || []).map((m: any) => (
-          <MemberCard key={m.user_id} member={m} onPress={() => Alert.alert(m.name, `Relationship: ${m.relationship}\nAge: ${m.age}`)} />
-        ))}
-        <TouchableOpacity style={[presets.buttonSecondary, { marginTop: spacing.md }]}>
-          <Ionicons name="person-add" size={16} color={colors.primary} />
-          <Text style={[typography.label.sm as any, { color: colors.primary }]}>Invite Family Member</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Elderly Monitoring */}
-      {elderly.medication_adherence && (
-        <View style={[glass.light, { marginHorizontal: spacing.lg, padding: spacing.lg, marginBottom: spacing.lg }]}>
-          <Text style={[typography.heading.h4 as any, { marginBottom: spacing.md }]}>Elderly Care Dashboard</Text>
-          <View style={ns.monitorRow}>
-            <View style={ns.monitorItem}>
-              <Text style={[typography.metric.large as any, { color: elderly.medication_adherence >= 90 ? colors.health.calm : colors.health.stress }]}>{elderly.medication_adherence}%</Text>
-              <Text style={typography.body.xs as any}>Med Adherence</Text>
-            </View>
-            <View style={ns.monitorItem}>
-              <Text style={[typography.metric.large as any, { color: colors.health.sleep }]}>{elderly.sleep_quality}/10</Text>
-              <Text style={typography.body.xs as any}>Sleep Quality</Text>
-            </View>
-            <View style={ns.monitorItem}>
-              <Text style={[typography.metric.large as any, { color: colors.health.calm }]}>{elderly.fall_risk}</Text>
-              <Text style={typography.body.xs as any}>Fall Risk</Text>
-            </View>
+        {invites.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="Invites for You" icon="mail" iconColor={TINT} />
+            {invites.map((i) => (
+              <GlassCard key={i.invite_id} style={styles.gap}>
+                <Text style={styles.title}>Someone added you as their {i.relationship}</Text>
+                {i.message ? <Text style={styles.sub}>“{i.message}”</Text> : null}
+                <View style={styles.row}>
+                  <TouchableOpacity style={[styles.btn, { flex: 1 }]} onPress={() => accept(i.invite_id)}><Text style={styles.btnText}>Accept</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.btn, styles.ghost, { flex: 1 }]} onPress={() => decline(i.invite_id)}><Text style={[styles.btnText, { color: TINT }]}>Decline</Text></TouchableOpacity>
+                </View>
+              </GlassCard>
+            ))}
           </View>
-          {elderly.alerts?.map((a: string, i: number) => (
-            <View key={i} style={ns.alertRow}>
-              <Ionicons name="alert-circle" size={16} color={colors.health.stress} />
-              <Text style={[typography.body.sm as any, { flex: 1 }]}>{a}</Text>
-            </View>
-          ))}
+        )}
+
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Connections" icon="people" iconColor={TINT} />
+          {connections.length === 0 && <Text style={styles.sub}>No one yet. Invite a family member below.</Text>}
+          {connections.map((c) => {
+            const m = member[c.connection_id];
+            return (
+              <GlassCard key={c.connection_id} style={styles.gap}>
+                <TouchableOpacity onPress={() => view(c.connection_id)}>
+                  <Text style={styles.title}>Your {c.relationship} · since {c.connected_since}</Text>
+                  <Text style={styles.sub}>Tap to see what they share with you</Text>
+                </TouchableOpacity>
+                {open === c.connection_id && m && (
+                  <View style={styles.box}>
+                    {m.shared?.length === 0 && <Text style={styles.sub}>They have not shared anything yet.</Text>}
+                    {m.recovery && <Text style={styles.body}>Recovery {m.recovery.recovery_score ?? '--'} ({m.recovery.readiness_state ?? 'no check-in'}) on {m.recovery.log_date}</Text>}
+                    {m.sleep && <Text style={styles.body}>Last night: {m.sleep.total_sleep_hours ?? '--'} h sleep</Text>}
+                    {m.workouts_last_7_days !== undefined && <Text style={styles.body}>{m.workouts_last_7_days} workouts this week</Text>}
+                    {m.emergency && (
+                      <Text style={styles.body}>Blood type {m.emergency.blood_type ?? '--'} · allergies {asArray<string>(m.emergency.allergies).join(', ') || 'none recorded'}</Text>
+                    )}
+                  </View>
+                )}
+                <Text style={[styles.label, { marginTop: 12 }]}>What you share with them</Text>
+                {SHAREABLE.map((p) => (
+                  <View key={p.key} style={styles.toggle}>
+                    <Text style={styles.body}>{p.label}</Text>
+                    <Switch value={!!c.i_share?.[p.key]} onValueChange={(v) => toggle(c, p.key, v)} trackColor={{ true: TINT }} />
+                  </View>
+                ))}
+                <Text style={styles.link} onPress={() => end(c.connection_id)}>End connection</Text>
+              </GlassCard>
+            );
+          })}
         </View>
-      )}
 
-      {/* Child Health */}
-      {child.activity_minutes_today && (
-        <View style={[glass.light, { marginHorizontal: spacing.lg, padding: spacing.lg, marginBottom: spacing.lg }]}>
-          <Text style={[typography.heading.h4 as any, { marginBottom: spacing.md }]}>Child Activity</Text>
-          <View style={ns.monitorRow}>
-            <View style={ns.monitorItem}>
-              <Text style={[typography.metric.large as any, { color: colors.health.calm }]}>{child.activity_minutes_today}m</Text>
-              <Text style={typography.body.xs as any}>Active Time</Text>
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Invite Someone" icon="person-add" iconColor={TINT} />
+          <GlassCard>
+            <TextInput style={styles.input} value={invitee} onChangeText={setInvitee} autoCapitalize="none"
+              placeholder="Their email or username on AdapFit" placeholderTextColor={colors.text.muted} />
+            <View style={styles.chips}>
+              {RELATIONS.map((r) => (
+                <TouchableOpacity key={r} style={[styles.chip, relation === r && styles.chipOn]} onPress={() => setRelation(r)}>
+                  <Text style={[styles.chipText, relation === r && { color: TINT, fontWeight: '700' }]}>{r}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            <View style={ns.monitorItem}>
-              <Text style={[typography.metric.large as any, { color: child.screen_time_today > 120 ? colors.health.stress : colors.primary }]}>{child.screen_time_today}m</Text>
-              <Text style={typography.body.xs as any}>Screen Time</Text>
-            </View>
-            <View style={ns.monitorItem}>
-              <Text style={[typography.metric.large as any, { color: colors.health.sleep }]}>{child.sleep_hours_last_night}h</Text>
-              <Text style={typography.body.xs as any}>Sleep</Text>
-            </View>
-          </View>
+            <TouchableOpacity style={styles.btn} onPress={invite}><Text style={styles.btnText}>Send invite</Text></TouchableOpacity>
+          </GlassCard>
         </View>
-      )}
-
-      {/* Emergency SOS */}
-      <TouchableOpacity style={[ns.sosButton, { marginHorizontal: spacing.lg }]}>
-        <Ionicons name="alert-circle" size={24} color="#FFF" />
-        <Text style={[typography.heading.h4 as any, { color: '#FFF' }]}>Emergency Family Alert</Text>
-      </TouchableOpacity>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-const ns = StyleSheet.create({
+const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
-  header: { padding: spacing.screenPadding, paddingTop: 50, paddingBottom: spacing.md },
-  statsRow: { flexDirection: 'row', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.lg },
-  statCard: { flex: 1, padding: spacing.md, borderRadius: radius.md, alignItems: 'center' },
-  memberCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.input, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, borderLeftWidth: 3, gap: spacing.md },
-  memberAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  caregiverBadge: { backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
-  caregiverText: { fontSize: 10, color: colors.primary, fontWeight: '700' },
-  monitorRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.md },
-  monitorItem: { alignItems: 'center' },
-  alertRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, backgroundColor: colors.health.stress + '10', borderRadius: radius.sm, marginBottom: spacing.xs },
-  sosButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.health.heart, padding: spacing.lg, borderRadius: radius.md, marginBottom: spacing.xl },
+  hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 4 },
+  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
+  section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
+  gap: { marginBottom: 10 },
+  title: { color: colors.text.primary, fontSize: 15, fontWeight: '700', textTransform: 'capitalize' },
+  sub: { color: colors.text.muted, fontSize: 12, marginTop: 3 },
+  body: { color: colors.text.secondary, fontSize: 14, marginTop: 4, flex: 1 },
+  label: { color: colors.text.secondary, fontSize: 13, fontWeight: '600' },
+  box: { borderWidth: 1, borderColor: colors.surface.border, borderRadius: 10, padding: 10, marginTop: 10 },
+  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
+  input: { backgroundColor: colors.bg.card, borderRadius: 12, padding: 12, color: colors.text.primary, borderWidth: 1, borderColor: colors.surface.border },
+  btn: { backgroundColor: TINT, borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 10 },
+  ghost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: TINT },
+  btnText: { color: '#fff', fontWeight: '700' },
+  row: { flexDirection: 'row', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border },
+  chipOn: { backgroundColor: TINT + '25', borderColor: TINT },
+  chipText: { color: colors.text.muted, fontSize: 12, textTransform: 'capitalize' },
+  link: { color: '#F87171', fontSize: 13, marginTop: 12 },
 });

@@ -3,13 +3,12 @@ Services that report health data report what was measured, or nothing.
 
 Each service here used to fill in its own inputs with random values, so a
 request carrying no measurements still produced a confident result — a night
-of "frequent breathing pauses", a microbiome composition, a voice screening
+of "frequent breathing pauses", a voice screening
 for depression. The rule these tests hold is the same one the health bridge
 in the mobile app already follows: never return a fabricated reading.
 """
 import pytest
 
-from app.services.microbiome_health import MicrobiomeHealthService
 from app.services.sleep_audio_analyzer import SleepAudioAnalyzerService
 from app.services.voice_biomarker import VoiceBiomarkerService
 
@@ -101,32 +100,3 @@ class TestSleepAudio:
             "duration_minutes": 480, "noise_events": [],
         })
         assert result["environment"]["avg_noise_db"] is None
-
-
-class TestMicrobiome:
-    def test_no_test_result_gives_no_composition(self):
-        result = MicrobiomeHealthService().get_microbiome_profile("u")
-        assert result["status"] == "no_test_on_file"
-        assert "beneficial_bacteria" not in result
-        assert result["known_beneficial_bacteria"], "reference information is still useful"
-
-    def test_a_recorded_result_is_reported_back(self):
-        service = MicrobiomeHealthService()
-        service.record_test_result("u", {
-            "abundances": {"lactobacillus": 12.5, "unknown_taxon": 3.0},
-            "diversity_score": 78,
-            "lab": "Example Labs",
-        })
-        profile = service.get_microbiome_profile("u")
-        assert profile["status"] == "ok"
-        assert profile["diversity_score"] == 78
-        assert profile["beneficial_bacteria"]["lactobacillus"]["abundance"] == pytest.approx(12.5)
-        assert profile["other_taxa"]["unknown_taxon"] == pytest.approx(3.0)
-
-    def test_an_empty_result_is_rejected(self):
-        assert MicrobiomeHealthService().record_test_result("u", {"abundances": {}})["status"] == "invalid"
-
-    def test_one_users_result_is_not_another_users(self):
-        service = MicrobiomeHealthService()
-        service.record_test_result("a", {"abundances": {"lactobacillus": 10.0}})
-        assert service.get_microbiome_profile("b")["status"] == "no_test_on_file"

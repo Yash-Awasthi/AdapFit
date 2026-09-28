@@ -14,7 +14,7 @@ router = APIRouter()
 
 
 class InviteRequest(BaseModel):
-    invitee_id: str = Field(min_length=1)
+    invitee: str = Field(min_length=3, max_length=254, description="Their email or username")
     relationship: str = Field(default="custom", description="parent, child, spouse, sibling, caregiver, dependent, custom")
     message: str = Field(default="", max_length=500)
 
@@ -41,10 +41,15 @@ class CheckPermissionRequest(BaseModel):
 
 @router.post("/invite")
 async def send_invite(request: InviteRequest, user: dict = Depends(require_user)):
-    """Send a family connection invite."""
-    return family_network_service.send_invite(
-        user["id"], request.invitee_id, request.relationship, request.message
-    )
+    """Invite by email or username. The reply is the same whether or not the account exists."""
+    from app.core.auth import user_manager
+
+    await user_manager._ensure_loaded()
+    key = request.invitee.strip().lower()
+    invitee_id = user_manager._email_index.get(key) or user_manager._username_index.get(key)
+    if invitee_id and invitee_id != user["id"]:
+        family_network_service.send_invite(user["id"], invitee_id, request.relationship, request.message, in_app=True)
+    return {"sent": True, "message": "If that person has an AdapFit account, they will see your invite."}
 
 
 @router.post("/invite/accept")
@@ -131,3 +136,27 @@ async def revoke_connection(connection_id: str, user: dict = Depends(require_use
 async def get_audit_history(user: dict = Depends(require_user), limit: int = 50):
     """Get audit history of all sharing actions."""
     return {"audit": family_network_service.get_audit_history(user["id"], limit)}
+
+
+@router.get("/member/{connection_id}")
+async def member_summary(connection_id: str, user: dict = Depends(require_user)):
+    """What a family member has chosen to share with you, and nothing else."""
+    from app.core.storage import storage
+    from app.services.emergency_sos import emergency_sos_service
+    from app.services.sleep_tracker import sleep_journal
+
+    conn = next((c for c in family_network_service.get_connections(user["id"]) if c["connection_id"] == connection_id), None)
+    if not conn:
+        return {"error": "Not connected"}
+    other, shared = conn["other_user_id"], conn["they_share"]
+    out: dict = {"relationship": conn["relationship"], "shared": [k for k, v in shared.items() if v]}
+    if shared.get("view_recovery"):
+        logs = await storage.get_recovery_logs(other, 1)
+        out["recovery"] = {k: logs[-1].get(k) for k in ("log_date", "recovery_score", "readiness_state")} if logs else None
+    if shared.get("view_sleep"):
+        out["sleep"] = sleep_journal.instance_for(other).latest_summary()
+    if shared.get("view_workouts"):
+        out["workouts_last_7_days"] = len(await storage.get_workout_logs(other, 7))
+    if shared.get("view_emergency"):
+        out["emergency"] = emergency_sos_service.instance_for(other).get_medical_info(other)
+    return out

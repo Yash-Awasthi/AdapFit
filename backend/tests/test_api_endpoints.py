@@ -378,3 +378,11 @@ def test_metrics_endpoint():
 def test_metrics_summary():
     d = get_json("/metrics/summary").json()
     assert "http_requests" in d and "workouts_generated" in d
+
+
+def test_body_trend_ignores_entries_without_the_measure():
+    uid = "body-trend"
+    post_json(f"/api/v1/body/measurements?user_id={uid}", json={"waist_cm": 90})
+    post_json(f"/api/v1/body/measurements?user_id={uid}", json={"weight_kg": 80, "waist_cm": 88})
+    t = get_json(f"/api/v1/body/trends?user_id={uid}").json()["30d"]
+    assert t["weight_change"] is None and t["waist_change"] == -2.0
