@@ -1,0 +1,28 @@
+# Free staging on Render (render.com > New > Blueprint > this repository).
+# The database is a free Neon Postgres (neon.tech); paste its connection string
+# into DATABASE_URL when Render asks. Free instances sleep after 15 idle minutes.
+services:
+  - type: web
+    name: adapfit-staging
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DATA_ENCRYPTION_KEYS
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: METRICS_TOKEN
+        generateValue: true

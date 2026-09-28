@@ -124,9 +124,8 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Falls back to the debug key when keystore.properties is absent
-            // (e.g. a fresh checkout) so the build still runs.
-            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            // Without keystore.properties the release build comes out unsigned, never debug-signed.
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : null
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

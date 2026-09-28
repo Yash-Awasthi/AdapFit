@@ -23,11 +23,10 @@ asyncpg>=0.30.0
 pgvector>=0.3.0
 
 # ML/AI (optional - app works without these via rule-based fallbacks)
-torch>=2.0.0
 xgboost>=2.0.0
 numpy>=1.24.0,<2.0.0
 scikit-learn>=1.3.0
-mediapipe==0.10.21
+mediapipe==1.0.1
 opencv-contrib-python<4.10
 Pillow>=10.0.0
 
@@ -40,6 +39,9 @@ Pillow>=10.0.0
 
 # Structured logging
 structlog>=23.0.0
+
+# Error tracking, active only when SENTRY_DSN is set
+sentry-sdk[fastapi]>=2.0.0
 
 # Testing
 pytest>=8.0.0

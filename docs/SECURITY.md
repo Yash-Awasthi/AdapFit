@@ -56,10 +56,10 @@ only trusts when `FORWARDED_ALLOW_IPS` allows the proxy (the Dockerfiles set
 1. As an admin, `POST /api/v1/encryption/master-key/generate` (or
    `python -c "from app.core.crypto import new_key; print('k2:' + new_key())"`).
 2. Put the new key first in `DATA_ENCRYPTION_KEYS`, keep the old one after it,
-   and restart.
-3. As an admin, `POST /api/v1/encryption/key/rotate`: every row not under the
-   new key is re-encrypted.
-4. Remove the old key and restart.
+   and restart. Startup re-encrypts every row not under the new key (and seals
+   any row written before encryption was enabled). `POST
+   /api/v1/encryption/key/rotate` does the same without a restart.
+3. Remove the old key and restart.
 
 Losing every key loses the data; keep `DATA_ENCRYPTION_KEYS` in the
 platform's secret store and a copy in the company password manager.
@@ -94,10 +94,14 @@ short-lived.
 
 ## Dependency scan (2026-09-29)
 
-- `pip-audit -r backend/requirements.txt`: protobuf 4.25.9 (PYSEC-2026-1805),
-  held below 5 by `mediapipe==0.10.21`. The app does not parse untrusted
-  protobuf; upgrade with mediapipe.
-- `npm audit --omit=dev` (mobile): 14 moderate, all from two packages:
+CI (`.github/workflows/ci.yml`) runs `pip-audit`, `npm audit --omit=dev
+--audit-level=high` and a Trivy scan of the image (high and critical with a
+fix available); any finding fails the build.
+
+- `pip-audit -r backend/requirements.txt`: clean. mediapipe 1.0.1 (Tasks API)
+  no longer needs protobuf; torch was removed (nothing used it).
+- Trivy on the image: no high or critical findings with a fix.
+- `npm audit --omit=dev` (mobile): 15 moderate, all from two packages:
   `uuid@7` inside the build-time `xcode` tool (bug only with a caller-supplied
   buffer) and `decode-uri-component@0.2.2` under `expo-router`'s
   `query-string` (a crafted deep link can stall the app's own URL parsing).
@@ -105,7 +109,7 @@ short-lived.
 
 ## Not done yet
 
-- Container image scanning and a third-party penetration test (Phase 8 and 10).
+- A third-party penetration test (Phase 10).
 - Rotated-token memory and the "sessions ended at" cut-off are in process
   memory; a restart forgets them, bounded by the 15-minute access token.
   Persist them before running more than one worker.

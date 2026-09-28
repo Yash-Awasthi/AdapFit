@@ -156,7 +156,11 @@ async def cancel_delete_account(authorization: Optional[str] = Header(None)):
     user = await _extract_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return {"cancelled": privacy.cancel_deletion(user["id"])}
+    cancelled = privacy.cancel_deletion(user["id"])
+    if cancelled:
+        # A restore replays erasure requests from the log, so it must also see the cancellation.
+        await audit.record("deletion_cancelled", user_id=user["id"])
+    return {"cancelled": cancelled}
 
 
 @router.post("/forgot-password")

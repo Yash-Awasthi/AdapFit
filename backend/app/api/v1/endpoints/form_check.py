@@ -7,6 +7,7 @@ scorer in app.services.pose_estimation.
 from __future__ import annotations
 import base64
 import io
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -20,9 +21,13 @@ from app.services.pose_estimation import (
 
 router = APIRouter()
 
+# The Dockerfile downloads the model here; without it form check reports model_available false.
+POSE_MODEL = Path(__file__).resolve().parents[3] / "data" / "pose_landmarker_full.task"
 try:
     import mediapipe as mp
-    _pose_model = mp.solutions.pose.Pose(static_image_mode=True, model_complexity=1)
+    from mediapipe.tasks.python import BaseOptions, vision
+    _pose_model = vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=str(POSE_MODEL)), running_mode=vision.RunningMode.IMAGE))
 except Exception:
     _pose_model = None
 
@@ -123,13 +128,12 @@ def _decode_landmarks(image_bytes: bytes) -> Optional[dict[str, Landmark]]:
     if _pose_model is None:
         return None
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    frame = np.array(img)
-    result = _pose_model.process(frame)
+    result = _pose_model.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.asarray(img)))
     if not result.pose_landmarks:
         return None
     out = {}
     for name, idx in LANDMARKS.items():
-        lm = result.pose_landmarks.landmark[idx]
+        lm = result.pose_landmarks[0][idx]
         out[name] = Landmark(x=lm.x, y=lm.y, z=lm.z, visibility=lm.visibility)
     return out
 

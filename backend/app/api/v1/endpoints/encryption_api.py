@@ -110,7 +110,7 @@ async def generate_master_key(admin: dict = Depends(require_admin)):
     key_id = f"k{int(time.time())}"
     await audit.record("encryption_key_generated", actor_id=admin["id"], key_id=key_id)
     return {"key": f"{key_id}:{crypto.new_key()}", "active_key_id": crypto.active_key_id(),
-            "next_steps": "Prepend to DATA_ENCRYPTION_KEYS, restart, call POST /encryption/key/rotate, "
+            "next_steps": "Prepend to DATA_ENCRYPTION_KEYS and restart (startup re-encrypts every row), "
                           "then remove the old key."}
 
 

@@ -129,14 +129,11 @@ npx expo start
 # → Scan QR code with Expo Go
 ```
 
-### Docker (Full Stack)
+### Docker
 
 ```bash
-docker-compose up -d
-# Backend: http://localhost:8000
-# PostgreSQL (pgvector): localhost:5432
-# Redis: localhost:6379
-# Nginx reverse proxy: localhost:80
+docker compose up --build
+# API on http://localhost:8010, on Postgres; see docs/DEPLOYMENT.md
 ```
 
 ### Environment Variables
@@ -707,11 +704,9 @@ ZFIT/
 │       ├── theme/                     # Design tokens
 │       └── utils/                     # Performance, accessibility helpers
 ├── web/                               # Landing page + admin dashboard
-├── monitoring/                        # Observability configs
-├── nginx/                             # Reverse proxy config
-├── docker-compose.yml                 # Full stack orchestration
-├── Dockerfile                         # Multi-stage build
-└── railway.toml                       # Railway deployment config
+├── docker-compose.yml                 # Local stack: API and Postgres
+├── Dockerfile                         # The one API image
+└── render.yaml                        # Free staging on Render
 ```
 
 ---

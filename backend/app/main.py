@@ -5,6 +5,7 @@ Entry point. Endpoint routers are auto-discovered by app/core/registry.py.
 Add a new endpoint: drop a file in app/api/v1/endpoints/, export `router`.
 """
 import asyncio
+import os
 import sys
 from pathlib import Path as _Path
 # Ensure the ZFIT project root is on sys.path so that `src.*` modules
@@ -34,6 +35,20 @@ setup_logging()
 logger = get_logger("adapfit.main")
 
 
+def scrub_error_report(event, hint):
+    # Health data must not leave in error reports: keep method and path, drop query, headers and body.
+    if req := event.get("request"):
+        event["request"] = {"method": req.get("method"), "url": req.get("url")}
+    return event
+
+
+if os.getenv("SENTRY_DSN"):
+    import sentry_sdk
+    sentry_sdk.init(dsn=os.environ["SENTRY_DSN"], environment=settings.ENVIRONMENT, release=settings.VERSION,
+                    send_default_pii=False, max_request_body_size="never", traces_sample_rate=0.0,
+                    before_send=scrub_error_report)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("AdapFit starting up...")
@@ -57,6 +72,8 @@ async def lifespan(app: FastAPI):
     # Same rule as accounts: serving requests on empty state would save it over the real data.
     from app.core import durable
     logger.info("Feature state restored: %s", await durable.load_all())
+    # Seals rows written before encryption or under a retired key, so a deploy or key change needs no manual call.
+    logger.info("Feature state rows resealed: %d", await durable.reseal_all())
     # ── Initialize services ───────────────────────────────────────────────
     try:
         from app.services.exercise_service import exercise_service

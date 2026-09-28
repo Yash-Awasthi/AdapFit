@@ -39,3 +39,4 @@ Thumbs.db
 backend/scratch/
 .sb-pentest-context.json
 .sb-pentest-audit.log
+backend/app/data/pose_landmarker_full.task
