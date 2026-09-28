@@ -1,145 +1,128 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+/**
+ * Achievements — level, streaks and badges, all computed on the server from
+ * what was logged. There is nothing here to tap for points.
+ */
+import React from 'react';
 import {
-  CheckCircle, Flame, Trophy, Heart, Star, Brain, Smile, Bookmark, MessageCircle,
-} from 'lucide-react-native';
-import { LoadingScreen, EmptyState } from '../../src/components';
-import { API_BASE_URL } from '../../src/services/config';
-import { useUserStore } from '../../src/stores';
-import { useTheme } from '../../src/services/theme';
-import { authHeader } from '../../src/services/authToken';
+  View, Text, ScrollView, StyleSheet, StatusBar, ActivityIndicator, RefreshControl, TouchableOpacity,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { colors, spacing } from '../../src/theme';
+import { GlassCard, ScoreRing, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { useApis } from '../../src/hooks/useApi';
+import { asArray } from '../../src/services/http';
 
-const API = API_BASE_URL;
-
-interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  unlocked: boolean;
-  progress: number;
-  target: number;
-}
-
-const ICON_MAP: Record<string, any> = {
-  'check-circle': CheckCircle,
-  'flame': Flame,
-  'trophy': Trophy,
-  'heart': Heart,
-  'star': Star,
-  'brain': Brain,
-  'smile': Smile,
-  'bookmark': Bookmark,
-  'message-circle': MessageCircle,
+const TINT = '#EAB308';
+const TIER_COLORS: Record<string, string> = { bronze: '#CD7F32', silver: '#94A3B8', gold: '#F59E0B', platinum: '#A78BFA' };
+const CATEGORY_TITLES: Record<string, string> = {
+  milestone: 'Milestones', consistency: 'Consistency', recovery: 'Recovery', sleep: 'Sleep', mind: 'Mind',
 };
 
+interface Badge {
+  id: string; name: string; description: string; icon: string; tier: string;
+  category: string; xp: number; progress: number; target: number; unlocked: boolean;
+}
+interface Summary {
+  points: number; level: number; level_progress: number; points_to_next_level: number;
+  earned: number; total: number; current_streak: number; best_streak: number;
+}
+
 export default function AchievementsScreen() {
-  const { theme } = useTheme();
-  const userId = useUserStore((s) => s.userId);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const { data, loading, refresh, refreshing } = useApis<{ badges: Badge[]; summary: Summary }>({
+    badges: '/achievements',
+    summary: '/achievements/summary',
+  });
+  const badges = asArray<Badge>(data.badges);
+  const summary = data.summary;
+  const categories = Object.keys(CATEGORY_TITLES).filter((c) => badges.some((b) => b.category === c));
 
-  useEffect(() => {
-    fetchAchievements();
-  }, []);
-
-  async function fetchAchievements() {
-    try {
-      const res = await fetch(`${API}/api/v1/achievements?user_id=${userId}`, { headers: authHeader() });
-      if (res.ok) {
-        setAchievements(await res.json());
-      }
-    } catch {}
-    setLoading(false);
+  if (loading) {
+    return <View style={[styles.container, styles.center]}><ActivityIndicator size="large" color={TINT} /></View>;
   }
 
-  const unlocked = achievements.filter((a) => a.unlocked).length;
-  const total = achievements.length;
-
-  if (loading) return <LoadingScreen />;
-
-  const s = makeStyles(theme);
-
   return (
-    <View style={s.container}>
-      <View style={s.header}>
-        <Text style={s.title}>Achievements</Text>
-        <Text style={s.count}>
-          {unlocked}/{total} unlocked
-        </Text>
-      </View>
-
-      <View style={s.progressBar}>
-        <View style={[s.progressFill, { width: `${(unlocked / total) * 100}%` }]} />
-      </View>
-
-      <FlatList
-        data={achievements}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          const Icon = ICON_MAP[item.icon] || Star;
-          return (
-            <View style={[s.card, item.unlocked && s.cardUnlocked]}>
-              <View style={[s.iconContainer, item.unlocked && s.iconUnlocked]}>
-                <Icon size={24} color={item.unlocked ? theme.text : theme.textMuted} />
-              </View>
-              <View style={s.info}>
-                <Text style={[s.name, item.unlocked && s.nameUnlocked]}>
-                  {item.name}
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <ScrollView contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={TINT} />}>
+        <LinearGradient colors={[TINT, '#B45309', colors.bg.deep]} style={styles.hero}>
+          <Text style={styles.heroMuted}>Achievements</Text>
+          {summary ? (
+            <View style={styles.heroRow}>
+              <ScoreRing score={Math.round(summary.level_progress * 100)} size={112} strokeWidth={9} color="#fff" label={`LEVEL ${summary.level}`} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.heroValue}>{summary.points} XP</Text>
+                <Text style={styles.heroMuted}>{summary.points_to_next_level} XP to level {summary.level + 1}</Text>
+                <Text style={[styles.heroMuted, { marginTop: 8 }]}>
+                  {summary.earned} of {summary.total} badges · streak {summary.current_streak} (best {summary.best_streak})
                 </Text>
-                <Text style={s.description}>{item.description}</Text>
-                {!item.unlocked && (
-                  <View style={s.progressRow}>
-                    <View style={s.miniProgress}>
-                      <View
-                        style={[
-                          s.miniProgressFill,
-                          { width: `${(item.progress / item.target) * 100}%` },
-                        ]}
-                      />
-                    </View>
-                    <Text style={s.progressText}>
-                      {item.progress}/{item.target}
-                    </Text>
-                  </View>
-                )}
               </View>
             </View>
-          );
-        }}
-        contentContainerStyle={s.list}
-      />
+          ) : (
+            <Text style={styles.heroMuted}>Could not load your progress. Pull to retry.</Text>
+          )}
+        </LinearGradient>
+
+        <View style={styles.section}>
+          <TouchableOpacity onPress={() => router.push('/community' as any)}>
+            <GlassCard style={styles.linkCard}>
+              <Ionicons name="podium" size={20} color={TINT} />
+              <Text style={styles.linkText}>See the leaderboard</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
+            </GlassCard>
+          </TouchableOpacity>
+        </View>
+
+        {categories.map((cat) => (
+          <View key={cat} style={styles.section}>
+            <SectionHeaderPremium title={CATEGORY_TITLES[cat]} icon="ribbon" iconColor={TINT} />
+            {badges.filter((b) => b.category === cat).map((b) => {
+              const tier = TIER_COLORS[b.tier] ?? TINT;
+              return (
+                <GlassCard key={b.id} style={[styles.badgeCard, !b.unlocked && styles.locked]}>
+                  <View style={[styles.badgeIcon, { backgroundColor: tier + (b.unlocked ? '30' : '12') }]}>
+                    <Ionicons name={(b.unlocked ? b.icon : 'lock-closed') as any} size={22} color={b.unlocked ? tier : colors.text.muted} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.badgeName}>{b.name}</Text>
+                    <Text style={styles.badgeDesc}>{b.description}</Text>
+                    {!b.unlocked && (
+                      <View style={styles.barBg}>
+                        <View style={[styles.barFill, { width: `${(b.progress / b.target) * 100}%`, backgroundColor: tier }]} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.xp, { color: tier }]}>{b.unlocked ? `+${b.xp}` : `${b.progress}/${b.target}`}</Text>
+                </GlassCard>
+              );
+            })}
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background, padding: 20 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 48, marginBottom: 12 },
-    title: { fontSize: 28, fontWeight: '700', color: theme.text },
-    count: { fontSize: 14, color: theme.textMuted },
-    progressBar: { height: 6, backgroundColor: theme.surface, borderRadius: 3, marginBottom: 20 },
-    progressFill: { height: 6, backgroundColor: theme.primary, borderRadius: 3 },
-    list: { paddingBottom: 40 },
-    card: {
-      flexDirection: 'row', backgroundColor: theme.surface, borderRadius: 12,
-      padding: 16, marginBottom: 8, alignItems: 'center',
-    },
-    cardUnlocked: { backgroundColor: 'rgba(99, 102, 241, 0.15)', borderWidth: 1, borderColor: theme.primary },
-    iconContainer: {
-      width: 48, height: 48, borderRadius: 24,
-      backgroundColor: theme.surfaceHover, alignItems: 'center', justifyContent: 'center',
-      marginRight: 12,
-    },
-    iconUnlocked: { backgroundColor: theme.primary },
-    info: { flex: 1 },
-    name: { fontSize: 15, fontWeight: '600', color: theme.textSecondary },
-    nameUnlocked: { color: theme.text },
-    description: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
-    progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-    miniProgress: { flex: 1, height: 4, backgroundColor: theme.surfaceHover, borderRadius: 2 },
-    miniProgressFill: { height: 4, backgroundColor: theme.primaryLight, borderRadius: 2 },
-    progressText: { fontSize: 11, color: theme.textMuted },
-  });
-}
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg.deep },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  scrollContent: { paddingBottom: 100 },
+  hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 12 },
+  heroValue: { color: '#fff', fontSize: 30, fontWeight: '800' },
+  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
+  linkCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  linkText: { flex: 1, color: colors.text.primary, fontWeight: '600' },
+  badgeCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  locked: { opacity: 0.75 },
+  badgeIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  badgeName: { color: colors.text.primary, fontSize: 15, fontWeight: '700' },
+  badgeDesc: { color: colors.text.muted, fontSize: 12, marginTop: 2 },
+  barBg: { height: 5, borderRadius: 3, backgroundColor: colors.bg.card, marginTop: 6 },
+  barFill: { height: 5, borderRadius: 3 },
+  xp: { fontSize: 13, fontWeight: '700' },
+});

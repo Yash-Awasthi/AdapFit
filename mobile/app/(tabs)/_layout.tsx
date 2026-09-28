@@ -21,7 +21,7 @@ const TABS = [
 
 const HIDDEN_SCREENS = [
   "dashboard", "health-hub", "trends",
-  "telemedicine", "forums", "analytics", "vital-signs", "gamification",
+  "telemedicine", "forums", "analytics", "vital-signs",
   "family", "health-calendar", "recipes", "exercises", "wellness", "sleep",
   "nutrition", "health", "stats", "social", "periodization",
   "achievements", "settings", "personal-info", "dev-tools",

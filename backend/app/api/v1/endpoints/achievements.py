@@ -1,116 +1,140 @@
 """
-AdapFit Achievements System
-Gamification with badges, streaks, and milestones.
-"""
-from typing import List, Optional
-from fastapi import APIRouter
-from pydantic import BaseModel
+Achievements, XP and levels, derived from what the user actually logged.
 
+Nothing here can be granted by a request. Every badge is recomputed from
+workout, recovery, sleep and mood records, so points and the leaderboard can
+only move when the underlying activity does.
+"""
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, Query
+
+from app.core.per_user import current_user_id
 from app.core.storage import storage
+from app.services.gamification import calculate_user_level
+from app.services.sleep_tracker import sleep_journal
 
 router = APIRouter()
 
+TIER_XP = {"bronze": 10, "silver": 50, "gold": 200, "platinum": 500}
+ALL_TIME_DAYS = 3650
 
-class Achievement(BaseModel):
-    id: str
-    name: str
-    description: str
-    icon: str
-    unlocked: bool
-    progress: Optional[int] = None
-    target: Optional[int] = None
-
-
-ACHIEVEMENTS_CATALOG = [
-    {"id": "first_workout", "name": "First Steps", "description": "Complete your first workout", "icon": "check-circle", "target": 1},
-    {"id": "workout_streak_3", "name": "Building Momentum", "description": "3-day workout streak", "icon": "flame", "target": 3},
-    {"id": "workout_streak_7", "name": "Week Warrior", "description": "7-day workout streak", "icon": "flame", "target": 7},
-    {"id": "workout_streak_30", "name": "Monthly Master", "description": "30-day workout streak", "icon": "trophy", "target": 30},
-    {"id": "recovery_optimal", "name": "Green Zone", "description": "Achieve OPTIMAL recovery state", "icon": "heart", "target": 1},
-    {"id": "recovery_90", "name": "Peak Performance", "description": "Recovery score of 90+", "icon": "star", "target": 1},
-    {"id": "feedback_10", "name": "AI Student", "description": "Provide 10 workout feedbacks", "icon": "brain", "target": 10},
-    {"id": "mood_logged_5", "name": "Mindful Athlete", "description": "Log mood 5 times", "icon": "smile", "target": 5},
-    {"id": "exercise_bookmark", "name": "Collector", "description": "Bookmark 5 exercises", "icon": "bookmark", "target": 5},
-    {"id": "chat_10", "name": "Coach's Favorite", "description": "Chat with AI coach 10 times", "icon": "message-circle", "target": 10},
+# (id, name, description, icon, tier, category, metric, target)
+CATALOG = [
+    ("first_workout", "First Steps", "Complete your first workout", "checkmark-circle", "bronze", "milestone", "workouts", 1),
+    ("ten_workouts", "Getting Serious", "Complete 10 workouts", "barbell", "silver", "milestone", "workouts", 10),
+    ("fifty_workouts", "Dedicated", "Complete 50 workouts", "medal", "gold", "milestone", "workouts", 50),
+    ("hundred_workouts", "Century Club", "Complete 100 workouts", "trophy", "platinum", "milestone", "workouts", 100),
+    ("streak_3", "Building Momentum", "Work out 3 days in a row", "flame", "bronze", "consistency", "best_streak", 3),
+    ("streak_7", "Week Warrior", "Work out 7 days in a row", "flame", "silver", "consistency", "best_streak", 7),
+    ("streak_30", "Monthly Master", "Work out 30 days in a row", "flame", "gold", "consistency", "best_streak", 30),
+    ("streak_100", "Iron Will", "Work out 100 days in a row", "flame", "platinum", "consistency", "best_streak", 100),
+    ("optimal_recovery", "Green Zone", "Reach an OPTIMAL recovery state", "heart", "bronze", "recovery", "optimal_days", 1),
+    ("recovery_90", "Peak Performance", "Score 90+ on recovery", "star", "silver", "recovery", "recovery_90_days", 1),
+    ("checkins_30", "Know Thyself", "Complete 30 daily check-ins", "clipboard", "gold", "recovery", "checkins", 30),
+    ("sleep_7", "Sleep Tracker", "Log 7 nights of sleep", "moon", "bronze", "sleep", "nights", 7),
+    ("sleep_efficient", "Sleep Champion", "Record a night at 90%+ sleep efficiency", "moon", "silver", "sleep", "efficient_nights", 1),
+    ("mood_5", "Mindful Athlete", "Log your mood 5 times", "happy", "bronze", "mind", "moods", 5),
+    ("feedback_10", "Coachable", "Leave feedback on 10 workouts", "chatbubble", "silver", "mind", "feedback", 10),
 ]
 
 
-@router.get("", response_model=List[Achievement])
-async def get_achievements(user_id: str):
-    """Get all achievements with unlock status."""
+def _day_streaks(dates: list[str]) -> tuple[int, int]:
+    """(current streak ending today or yesterday, best streak ever) in consecutive days."""
+    days = sorted({datetime.strptime(d, "%Y-%m-%d").date() for d in dates if len(d) == 10})
+    if not days:
+        return 0, 0
+    best = run = 1
+    for prev, cur in zip(days, days[1:]):
+        run = run + 1 if (cur - prev).days == 1 else 1
+        best = max(best, run)
+    today = datetime.now().date()
+    current = run if (today - days[-1]).days <= 1 else 0
+    return current, best
+
+
+async def _metrics(user_id: str) -> dict:
+    workouts = await storage.get_workout_logs(user_id, ALL_TIME_DAYS)
+    recovery = await storage.get_recovery_logs(user_id, ALL_TIME_DAYS)
     memory = await storage.get_agent_memory(user_id)
-    workout_logs = await storage.get_workout_logs(user_id, 30)
-    recovery_logs = await storage.get_recovery_logs(user_id, 30)
-    mood_logs = memory.get("mood_logs", [])
-    chat_count = memory.get("chat_count", 0)
-
-    achievements = []
-    for ach in ACHIEVEMENTS_CATALOG:
-        unlocked = False
-        progress = 0
-
-        if ach["id"] == "first_workout":
-            progress = len(workout_logs)
-            unlocked = progress >= 1
-        elif ach["id"] == "workout_streak_3":
-            progress = _calculate_streak(workout_logs)
-            unlocked = progress >= 3
-        elif ach["id"] == "workout_streak_7":
-            progress = _calculate_streak(workout_logs)
-            unlocked = progress >= 7
-        elif ach["id"] == "workout_streak_30":
-            progress = _calculate_streak(workout_logs)
-            unlocked = progress >= 30
-        elif ach["id"] == "recovery_optimal":
-            progress = sum(1 for r in recovery_logs if r.get("readiness_state") == "OPTIMAL")
-            unlocked = progress >= 1
-        elif ach["id"] == "recovery_90":
-            progress = sum(1 for r in recovery_logs if r.get("recovery_score", 0) >= 90)
-            unlocked = progress >= 1
-        elif ach["id"] == "feedback_10":
-            progress = len([w for w in workout_logs if w.get("user_feedback_notes")])
-            unlocked = progress >= 10
-        elif ach["id"] == "mood_logged_5":
-            progress = len(mood_logs)
-            unlocked = progress >= 5
-        elif ach["id"] == "chat_10":
-            progress = chat_count
-            unlocked = progress >= 10
-
-        achievements.append(Achievement(
-            id=ach["id"],
-            name=ach["name"],
-            description=ach["description"],
-            icon=ach["icon"],
-            unlocked=unlocked,
-            progress=min(progress, ach["target"]),
-            target=ach["target"],
-        ))
-
-    return achievements
+    journal = sleep_journal.instance_for(user_id)
+    nights = journal.nights(ALL_TIME_DAYS)
+    dates = [(w.get("completed_at") or w.get("created_at") or "")[:10] for w in workouts]
+    current, best = _day_streaks(dates)
+    return {
+        "workouts": len(workouts),
+        "current_streak": current,
+        "best_streak": best,
+        "optimal_days": sum(1 for r in recovery if r.get("readiness_state") == "OPTIMAL"),
+        "recovery_90_days": sum(1 for r in recovery if (r.get("recovery_score") or 0) >= 90),
+        "checkins": len(recovery),
+        "nights": len(nights),
+        "efficient_nights": sum(1 for n in nights if (n.get("efficiency_pct") or 0) >= 90),
+        "moods": len(memory.get("mood_logs", [])),
+        "feedback": sum(1 for w in workouts if w.get("user_feedback_notes")),
+    }
 
 
-def _calculate_streak(workout_logs: list) -> int:
-    """Calculate current workout streak in days."""
-    if not workout_logs:
-        return 0
-    
-    dates = sorted(set(w.get("completed_at", "")[:10] for w in workout_logs if w.get("completed_at")), reverse=True)
-    if not dates:
-        return 0
-    
-    streak = 1
-    for i in range(1, len(dates)):
-        # Simple check: if consecutive dates differ by 1 day
-        from datetime import datetime, timedelta
-        try:
-            d1 = datetime.strptime(dates[i - 1], "%Y-%m-%d")
-            d2 = datetime.strptime(dates[i], "%Y-%m-%d")
-            if (d1 - d2).days == 1:
-                streak += 1
-            else:
-                break
-        except ValueError:
-            break
-    
-    return streak
+def _badges(metrics: dict) -> list[dict]:
+    out = []
+    for bid, name, desc, icon, tier, category, metric, target in CATALOG:
+        value = metrics[metric]
+        out.append({
+            "id": bid, "name": name, "description": desc, "icon": icon, "tier": tier,
+            "category": category, "xp": TIER_XP[tier], "progress": min(value, target),
+            "target": target, "unlocked": value >= target,
+        })
+    return out
+
+
+def _summary(metrics: dict, badges: list[dict]) -> dict:
+    points = sum(b["xp"] for b in badges if b["unlocked"])
+    level, progress = calculate_user_level(points)
+    return {
+        "points": points, "level": level, "level_progress": round(progress, 3),
+        "points_to_next_level": 100 * (2 ** (level + 1) - 1) - points,
+        "earned": sum(1 for b in badges if b["unlocked"]), "total": len(badges),
+        "current_streak": metrics["current_streak"], "best_streak": metrics["best_streak"],
+    }
+
+
+@router.get("")
+async def get_achievements():
+    """Every badge with progress toward it."""
+    return _badges(await _metrics(current_user_id()))
+
+
+@router.get("/summary")
+async def get_summary():
+    """Points, level and streaks."""
+    metrics = await _metrics(current_user_id())
+    return _summary(metrics, _badges(metrics))
+
+
+@router.get("/leaderboard")
+async def get_leaderboard(limit: int = Query(20, ge=1, le=100)):
+    """Points ranking. Other users appear only by rank; the caller sees their own place."""
+    from app.core.auth import user_manager
+
+    me = current_user_id()
+    # ponytail: scores every account per request; cache or precompute past a few thousand users.
+    accounts = await user_manager.list_users(limit=500)
+    rows = []
+    for account in accounts:
+        uid = account.get("id")
+        if not uid:
+            continue
+        metrics = await _metrics(uid)
+        rows.append({"user_id": uid, "points": _summary(metrics, _badges(metrics))["points"]})
+    rows.sort(key=lambda r: -r["points"])
+    board: list[dict] = []
+    mine: Optional[dict] = None
+    for rank, row in enumerate(rows, start=1):
+        entry = {"rank": rank, "points": row["points"], "is_you": row["user_id"] == me,
+                 "name": "You" if row["user_id"] == me else f"Athlete {rank}"}
+        if entry["is_you"]:
+            mine = entry
+        if rank <= limit:
+            board.append(entry)
+    return {"leaderboard": board, "you": mine, "participants": len(rows)}
