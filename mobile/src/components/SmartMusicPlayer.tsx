@@ -19,6 +19,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
 import { useTheme } from '../services/theme';
+import { authedFetch } from '../services/authToken';
 
 interface Track {
   title: string;
@@ -106,7 +107,7 @@ export function SmartMusicPlayer({
 
   async function fetchPlaylist() {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/music-playlists/generate`, {
+      const res = await authedFetch(`${API_BASE_URL}/api/v1/music-playlists/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

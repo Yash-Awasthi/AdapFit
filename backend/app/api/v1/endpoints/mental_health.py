@@ -3,7 +3,7 @@ AdapFit Mental Health Module
 Mood tracking, breathing exercises, stress visualization.
 """
 import uuid
-from typing import Optional, List
+from typing import List, Literal, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -203,3 +203,72 @@ async def get_breathing_exercise(exercise_id: str):
         if ex.id == exercise_id:
             return ex
     raise HTTPException(status_code=404, detail=f"Exercise {exercise_id} not found")
+
+
+# --- Questionnaires (PHQ-9, GAD-7, WHO-5) ---
+
+from app.services import mental_health as questionnaires  # noqa: E402
+
+QuestionnaireId = Literal["phq9", "gad7", "who5"]
+
+
+class AnswersRequest(BaseModel):
+    user_id: str
+    answers: List[int] = Field(min_length=5, max_length=9)
+
+
+@router.get("/questionnaires/{qid}")
+async def get_questionnaire(qid: QuestionnaireId):
+    return questionnaires.questionnaire(qid)
+
+
+@router.post("/questionnaires/{qid}", status_code=201)
+async def submit_questionnaire(qid: QuestionnaireId, req: AnswersRequest):
+    try:
+        result = questionnaires.score(qid, req.answers)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result["taken_at"] = datetime.now(timezone.utc).isoformat()
+    memory = await storage.get_agent_memory(req.user_id)
+    history = (memory.get("questionnaires", []) + [{k: v for k, v in result.items() if k != "crisis"}])[-60:]
+    await storage.update_agent_memory(req.user_id, {"questionnaires": history})
+    return result
+
+
+@router.get("/questionnaires")
+async def questionnaire_history(user_id: str):
+    """Latest result per questionnaire, and the full history."""
+    history = (await storage.get_agent_memory(user_id)).get("questionnaires", [])
+    latest = {}
+    for entry in history:
+        latest[entry["questionnaire"]] = entry
+    return {"latest": latest, "history": history}
+
+
+# --- CBT thought records ---
+
+class ThoughtRecordRequest(BaseModel):
+    user_id: str
+    situation: str = Field(min_length=1, max_length=500)
+    thought: str = Field(min_length=1, max_length=500)
+    emotion: str = Field(min_length=1, max_length=60)
+    intensity_before: int = Field(ge=0, le=100)
+    evidence_for: str = Field("", max_length=1000)
+    evidence_against: str = Field("", max_length=1000)
+    balanced_thought: str = Field("", max_length=500)
+    intensity_after: int = Field(ge=0, le=100)
+
+
+@router.post("/thought-records", status_code=201)
+async def add_thought_record(req: ThoughtRecordRequest):
+    record = {"id": str(uuid.uuid4()), **req.model_dump(exclude={"user_id"}),
+              "created_at": datetime.now(timezone.utc).isoformat()}
+    memory = await storage.get_agent_memory(req.user_id)
+    records = (memory.get("thought_records", []) + [record])[-200:]
+    await storage.update_agent_memory(req.user_id, {"thought_records": records})
+    return {**record, "change": req.intensity_before - req.intensity_after}
+
+
+@router.get("/thought-records")
+async def list_thought_records(user_id: str, limit: int = 20):
+    return list(reversed((await storage.get_agent_memory(user_id)).get("thought_records", [])))[:limit]

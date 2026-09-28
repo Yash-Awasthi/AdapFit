@@ -1,226 +1,285 @@
 /**
- * Mental Health — Premium Mental Wellness Dashboard
- * Mood tracker, PHQ-9/GAD-7 assessments, journal, crisis resources
+ * Mind — mood check-ins, a journal, validated questionnaires (WHO-5, PHQ-9,
+ * GAD-7) and crisis lines. Scores are screening results with a next step,
+ * never a diagnosis.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Dimensions, Animated,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, TextInput,
+  ActivityIndicator, RefreshControl, Alert, Linking,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radius, glass } from '../../src/theme';
-import {
-  ScoreRing, GlassCard, SectionHeaderPremium, ProgressBarPremium, QuickAction,
-} from '../../src/components/PremiumComponents';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { colors, spacing } from '../../src/theme';
+import { GlassCard, ScoreRing, SectionHeaderPremium } from '../../src/components/PremiumComponents';
+import { useApis } from '../../src/hooks/useApi';
+import { asArray, getJson, postJson } from '../../src/services/http';
+import { useUserStore } from '../../src/stores';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-import { API_V1 as API } from '../../src/services/config';
-import { SCREEN_HEADER_TOP } from '../../src/theme/layout';
-// 1-10 mood value maps to a face on a filled-happy -> outline-happy -> neutral -> outline-sad -> filled-sad gradient.
-const moodFace = (value: number) =>
-  value >= 8 ? 'happy' : value >= 6 ? 'happy-outline' : value === 5 ? 'remove-outline' : value >= 4 ? 'sad-outline' : 'sad';
-
-const MOOD_EMOJIS = [
-  { label: 'Happy', value: 8, color: '#22C55E' },
-  { label: 'Calm', value: 7, color: '#06B6D4' },
-  { label: 'Neutral', value: 5, color: '#F59E0B' },
-  { label: 'Sad', value: 3, color: '#6366F1' },
-  { label: 'Anxious', value: 2, color: '#EF4444' },
-  { label: 'Angry', value: 2, color: '#F97316' },
-  { label: 'Tired', value: 4, color: '#8B5CF6' },
-  { label: 'Excited', value: 9, color: '#EC4899' },
+const TINT = '#8B5CF6';
+const TAGS = ['work', 'sleep', 'exercise', 'family', 'friends', 'health', 'money', 'weather'];
+const CRISIS = [
+  { name: 'Tele-MANAS (free, 24/7)', phone: '14416' },
+  { name: 'iCall (TISS)', phone: '9152987821' },
+  { name: 'Emergency', phone: '112' },
 ];
+const QUESTIONNAIRES = [
+  { id: 'who5', title: 'WHO-5 Wellbeing', about: '5 questions · 1 min', icon: 'sunny' },
+  { id: 'phq9', title: 'PHQ-9 Mood', about: '9 questions · 2 min', icon: 'cloudy' },
+  { id: 'gad7', title: 'GAD-7 Worry & anxiety', about: '7 questions · 2 min', icon: 'pulse' },
+] as const;
 
-const ASSESSMENTS = [
-  { id: 'phq9', title: 'PHQ-9 Depression', description: 'Standard depression screening', icon: 'heart-half', color: '#6366F1', questions: 9 },
-  { id: 'gad7', title: 'GAD-7 Anxiety', description: 'Generalized anxiety assessment', icon: 'brain', color: '#EF4444', questions: 7 },
-  { id: 'audit', title: 'AUDIT Alcohol', description: 'Alcohol use screening', icon: 'wine', color: '#F97316', questions: 10 },
-];
+interface MoodEntry { id: string; mood: number; energy: number; anxiety: number; notes?: string; tags: string[]; logged_at: string }
+interface MoodTrend { entries: MoodEntry[]; avg_mood: number; avg_energy: number; avg_anxiety: number; mood_trend: string; count: number }
+interface QResult { questionnaire: string; title: string; score: number; max_score: number; range: string; next_step: string; taken_at: string; crisis?: { message: string } }
+interface Questionnaire { id: string; title: string; prompt: string; options: string[]; questions: string[] }
 
-const JOURNAL_ENTRIES = [
-  { date: 'Today', mood: 7, entry: 'Had a great workout this morning. Feeling accomplished.' },
-  { date: 'Yesterday', mood: 5, entry: 'Busy day at work, need to manage stress better.' },
-  { date: '2 days ago', mood: 8, entry: 'Meditation session was amazing. Clear mind.' },
-];
+function Scale({ label, value, onChange, low, high }: { label: string; value: number; onChange: (v: number) => void; low: string; high: string }) {
+  return (
+    <View style={{ marginTop: 12 }}>
+      <Text style={styles.fieldLabel}>{label}: {value}/10</Text>
+      <View style={styles.scaleRow}>
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
+          <TouchableOpacity key={v} onPress={() => onChange(v)} style={[styles.scaleDot, v <= value && { backgroundColor: TINT }]}
+            accessibilityLabel={`${label} ${v}`} />
+        ))}
+      </View>
+      <View style={styles.scaleEnds}><Text style={styles.muted}>{low}</Text><Text style={styles.muted}>{high}</Text></View>
+    </View>
+  );
+}
 
-const CRISIS_RESOURCES = [
-  { name: 'Tele-MANAS (free, 24/7)', phone: '14416', icon: 'call', color: '#EF4444' },
-  { name: 'iCall (TISS)', phone: '9152987821', icon: 'chatbubble', color: '#6366F1' },
-  { name: 'Emergency', phone: '112', icon: 'medical', color: '#22C55E' },
-];
+export default function MindScreen() {
+  const router = useRouter();
+  const userId = useUserStore((s) => s.userId);
+  const [mood, setMood] = useState(6);
+  const [energy, setEnergy] = useState(6);
+  const [anxiety, setAnxiety] = useState(3);
+  const [tags, setTags] = useState<string[]>([]);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [active, setActive] = useState<Questionnaire | null>(null);
+  const [answers, setAnswers] = useState<number[]>([]);
+  const [lastResult, setLastResult] = useState<QResult | null>(null);
 
-export default function MentalHealthScreen() {
-  const [selectedMood, setSelectedMood] = useState<number | null>(null);
-  const [wellbeingScore, setWellbeingScore] = useState(72);
-  const [fadeAnim] = useState(new Animated.Value(0));
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, []);
+  const { data, loading, refresh, refreshing, reload } = useApis<{
+    trend: MoodTrend;
+    results: { latest: Record<string, QResult> };
+  }>({
+    trend: `/mental-health?user_id=${userId}&days=14`,
+    results: `/mental-health/questionnaires?user_id=${userId}`,
+  });
+  const trend = data.trend;
+  const latest = data.results?.latest ?? {};
+  const who5 = latest.who5;
 
   const logMood = async () => {
-    if (selectedMood === null) return;
-    try {
-      await fetch(`${API}/mental-health/mood`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mood_score: selectedMood, notes: '' }),
-      });
-    } catch {}
+    setBusy(true);
+    const r = await postJson('/mental-health', { user_id: userId, mood, energy, anxiety, notes: note.trim() || undefined, tags });
+    setBusy(false);
+    if (!r) return Alert.alert('Not saved', 'Your check-in could not be saved.');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setNote('');
+    setTags([]);
+    await reload();
   };
 
+  const start = async (id: string) => {
+    const q = await getJson<Questionnaire>(`/mental-health/questionnaires/${id}`);
+    if (!q) return Alert.alert('Unavailable', 'The questionnaire could not be loaded.');
+    setLastResult(null);
+    setAnswers([]);
+    setActive(q);
+  };
+
+  const answer = async (value: number) => {
+    if (!active) return;
+    const next = [...answers, value];
+    if (next.length < active.questions.length) return setAnswers(next);
+    const r = await postJson<QResult>(`/mental-health/questionnaires/${active.id}`, { user_id: userId, answers: next });
+    setActive(null);
+    setAnswers([]);
+    if (!r) return Alert.alert('Not saved', 'Your answers could not be scored.');
+    setLastResult(r);
+    await reload();
+  };
+
+  if (loading) {
+    return <View style={[styles.container, styles.center]}><ActivityIndicator size="large" color={TINT} /></View>;
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <LinearGradient colors={['#8B5CF6', '#A78BFA']} style={styles.header}>
-        <Text style={styles.headerTitle}>Mental Health</Text>
-        <Text style={styles.headerSubtitle}>Your emotional wellness companion</Text>
-      </LinearGradient>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <ScrollView contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={TINT} />}>
+        <LinearGradient colors={[TINT, '#6D28D9', colors.bg.deep]} style={styles.hero}>
+          <Text style={styles.heroMuted}>Mind</Text>
+          <View style={styles.heroRow}>
+            {who5 ? (
+              <ScoreRing score={who5.score} size={112} strokeWidth={9} color="#fff" label="WELLBEING" sublabel={who5.range} />
+            ) : (
+              <TouchableOpacity onPress={() => start('who5')} style={styles.heroCta}>
+                <Ionicons name="sunny" size={22} color="#fff" />
+                <Text style={styles.heroCtaText}>Measure your wellbeing</Text>
+              </TouchableOpacity>
+            )}
+            <View style={{ flex: 1 }}>
+              {trend && trend.count > 0 ? (
+                <>
+                  <Text style={styles.heroValue}>{trend.avg_mood}/10</Text>
+                  <Text style={styles.heroMuted}>average mood over {trend.count} check-ins</Text>
+                  {trend.mood_trend !== 'insufficient_data' && <Text style={[styles.heroMuted, { marginTop: 4 }]}>Trend: {trend.mood_trend}</Text>}
+                </>
+              ) : (
+                <Text style={styles.heroMuted}>Check in below to start tracking your mood.</Text>
+              )}
+            </View>
+          </View>
+        </LinearGradient>
 
-      {/* Wellbeing Score */}
-      <View style={styles.scoreSection}>
-        <ScoreRing score={wellbeingScore} size={130} strokeWidth={8} color={colors.health.mental} label="WELLBEING" sublabel="Good" />
-      </View>
+        {active && (
+          <View style={styles.section}>
+            <GlassCard>
+              <Text style={styles.muted}>{active.title} · question {answers.length + 1} of {active.questions.length}</Text>
+              <Text style={styles.qPrompt}>{active.prompt}</Text>
+              <Text style={styles.qText}>{active.questions[answers.length]}</Text>
+              {active.options.map((opt, i) => (
+                <TouchableOpacity key={opt} style={styles.option} onPress={() => answer(i)}>
+                  <Text style={styles.optionText}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity onPress={() => setActive(null)}><Text style={[styles.muted, { marginTop: 10 }]}>Cancel</Text></TouchableOpacity>
+            </GlassCard>
+          </View>
+        )}
 
-      {/* Mood Check-in */}
-      <SectionHeaderPremium icon="happy" iconColor={colors.health.mental} title="How are you feeling?" />
-      <GlassCard variant="light" style={styles.sectionCard}>
-        <View style={styles.moodGrid}>
-          {MOOD_EMOJIS.map((mood, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[styles.moodBtn, selectedMood === mood.value && { backgroundColor: mood.color + '25', borderColor: mood.color + '50', transform: [{ scale: 1.1 }] }]}
-              onPress={() => setSelectedMood(mood.value)}
-            >
-              <Ionicons name={moodFace(mood.value) as any} size={28} color={mood.color} />
-              <Text style={[styles.moodLabel, selectedMood === mood.value && { color: mood.color }]}>{mood.label}</Text>
+        {lastResult && (
+          <View style={styles.section}>
+            <GlassCard style={{ borderLeftWidth: 3, borderLeftColor: lastResult.crisis ? '#EF4444' : TINT }}>
+              <Text style={styles.cardTitle}>{lastResult.title}: {lastResult.score}/{lastResult.max_score} ({lastResult.range})</Text>
+              <Text style={styles.body}>{lastResult.next_step}</Text>
+              {lastResult.crisis && <Text style={[styles.body, { color: '#EF4444' }]}>{lastResult.crisis.message}</Text>}
+              <Text style={styles.muted}>A screening score, not a diagnosis.</Text>
+            </GlassCard>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Check In" icon="happy" iconColor={TINT} />
+          <GlassCard>
+            <Scale label="Mood" value={mood} onChange={setMood} low="very low" high="great" />
+            <Scale label="Energy" value={energy} onChange={setEnergy} low="exhausted" high="energised" />
+            <Scale label="Anxiety" value={anxiety} onChange={setAnxiety} low="calm" high="very anxious" />
+            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>What is affecting you? (optional)</Text>
+            <View style={styles.chipRow}>
+              {TAGS.map((t) => (
+                <TouchableOpacity key={t} style={[styles.chip, tags.includes(t) && styles.chipActive]}
+                  onPress={() => setTags(tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t])}>
+                  <Text style={[styles.chipText, tags.includes(t) && styles.chipTextActive]}>{t}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput style={styles.input} placeholder="Journal note (optional)" placeholderTextColor={colors.text.muted}
+              value={note} onChangeText={setNote} multiline maxLength={500} />
+            <TouchableOpacity style={styles.primaryBtn} onPress={logMood} disabled={busy}>
+              <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Save check-in'}</Text>
+            </TouchableOpacity>
+          </GlassCard>
+        </View>
+
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Questionnaires" subtitle="Validated, 1-2 minutes each" icon="clipboard" iconColor={TINT} />
+          {QUESTIONNAIRES.map((q) => {
+            const r = latest[q.id];
+            return (
+              <TouchableOpacity key={q.id} onPress={() => start(q.id)}>
+                <GlassCard style={styles.qCard}>
+                  <Ionicons name={q.icon as any} size={22} color={TINT} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{q.title}</Text>
+                    <Text style={styles.muted}>{r ? `Last: ${r.score}/${r.max_score}, ${r.range} · ${r.taken_at.slice(0, 10)}` : q.about}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
+                </GlassCard>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {trend && trend.count > 0 && (
+          <View style={styles.section}>
+            <SectionHeaderPremium title="Journal" icon="book" iconColor={TINT} />
+            {asArray<MoodEntry>(trend.entries).slice().reverse().slice(0, 10).map((e) => (
+              <GlassCard key={e.id} style={styles.gap}>
+                <Text style={styles.cardTitle}>Mood {e.mood} · energy {e.energy} · anxiety {e.anxiety}</Text>
+                <Text style={styles.muted}>{e.logged_at.slice(0, 16).replace('T', ' ')}{e.tags.length ? ` · ${e.tags.join(', ')}` : ''}</Text>
+                {e.notes ? <Text style={styles.body}>{e.notes}</Text> : null}
+              </GlassCard>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <TouchableOpacity onPress={() => router.push('/hrv' as any)}>
+            <GlassCard style={styles.qCard}>
+              <Ionicons name="leaf" size={22} color="#10B981" />
+              <Text style={[styles.cardTitle, { flex: 1 }]}>Calm down now: breathing coach</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
+            </GlassCard>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <SectionHeaderPremium title="Talk To Someone" icon="call" iconColor="#EF4444" />
+          {CRISIS.map((c) => (
+            <TouchableOpacity key={c.phone} onPress={() => Linking.openURL(`tel:${c.phone}`)}>
+              <GlassCard style={[styles.qCard, styles.gap]}>
+                <Ionicons name="call" size={20} color="#EF4444" />
+                <Text style={[styles.cardTitle, { flex: 1 }]}>{c.name}</Text>
+                <Text style={styles.phone}>{c.phone}</Text>
+              </GlassCard>
             </TouchableOpacity>
           ))}
         </View>
-        {selectedMood !== null && (
-          <TouchableOpacity style={styles.logMoodBtn} onPress={logMood}>
-            <Ionicons name="checkmark-circle" size={18} color="#FFF" />
-            <Text style={styles.logMoodBtnText}>Log Mood</Text>
-          </TouchableOpacity>
-        )}
-      </GlassCard>
-
-      {/* Quick Actions */}
-      <View style={styles.quickActionsRow}>
-        <QuickAction icon="book" label="Journal" color={colors.health.mental} onPress={() => {}} />
-        <QuickAction icon="meditate" label="Meditate" color={colors.health.calm} onPress={() => {}} />
-        <QuickAction icon="phone" label="Crisis Help" color={colors.health.heart} onPress={() => {}} />
-        <QuickAction icon="analytics" label="Trends" color="#F59E0B" onPress={() => {}} />
-      </View>
-
-      {/* Assessments */}
-      <SectionHeaderPremium icon="clipboard" iconColor="#6366F1" title="Screening Assessments" />
-      {ASSESSMENTS.map((assessment, i) => (
-        <GlassCard key={i} variant="light" style={styles.assessmentCard}>
-          <View style={styles.assessmentRow}>
-            <View style={[styles.assessmentIcon, { backgroundColor: assessment.color + '15' }]}>
-              <Ionicons name={assessment.icon as any} size={20} color={assessment.color} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.assessmentTitle}>{assessment.title}</Text>
-              <Text style={styles.assessmentDesc}>{assessment.description}</Text>
-              <Text style={styles.assessmentQuestions}>{assessment.questions} questions • ~3 min</Text>
-            </View>
-            <TouchableOpacity style={[styles.assessmentBtn, { backgroundColor: assessment.color + '15' }]}>
-              <Text style={[styles.assessmentBtnText, { color: assessment.color }]}>Start</Text>
-            </TouchableOpacity>
-          </View>
-        </GlassCard>
-      ))}
-
-      {/* Journal Entries */}
-      <SectionHeaderPremium icon="book" iconColor="#EC4899" title="Recent Journal Entries" />
-      {JOURNAL_ENTRIES.map((entry, i) => (
-        <GlassCard key={i} variant="light" style={styles.journalCard}>
-          <View style={styles.journalHeader}>
-            <Text style={styles.journalDate}>{entry.date}</Text>
-            <View style={styles.journalMoodRow}>
-              <Ionicons name={moodFace(entry.mood) as any} size={14} color={colors.health.mental} />
-              <Text style={styles.journalMood}>{entry.mood}/10</Text>
-            </View>
-          </View>
-          <Text style={styles.journalEntry}>{entry.entry}</Text>
-        </GlassCard>
-      ))}
-
-      {/* Crisis Resources */}
-      <SectionHeaderPremium icon="alert-circle" iconColor={colors.health.heart} title="Crisis Resources" />
-      {CRISIS_RESOURCES.map((resource, i) => (
-        <TouchableOpacity key={i} style={styles.crisisCard}>
-          <View style={[styles.crisisIcon, { backgroundColor: resource.color + '15' }]}>
-            <Ionicons name={resource.icon as any} size={18} color={resource.color} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.crisisName}>{resource.name}</Text>
-            <Text style={styles.crisisPhone}>{resource.phone}</Text>
-          </View>
-          <Ionicons name="call" size={20} color={resource.color} />
-        </TouchableOpacity>
-      ))}
-
-      <View style={{ height: 100 }} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
-  contentContainer: { paddingBottom: 100 },
-
-  // Header
-  header: { paddingTop: SCREEN_HEADER_TOP, paddingBottom: spacing.xl, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
-
-  // Score
-  scoreSection: { alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.lg },
-
-  // Mood
-  sectionCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.lg },
-  moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
-  moodBtn: { alignItems: 'center', width: 72, padding: spacing.sm, borderRadius: radius.lg, backgroundColor: colors.bg.input, borderWidth: 1, borderColor: colors.surface.border },
-  moodLabel: { fontSize: 10, fontWeight: '600', color: colors.text.muted, marginTop: 4 },
-  logMoodBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-    backgroundColor: colors.health.sleep, paddingVertical: spacing.md, borderRadius: radius.button, marginTop: spacing.lg,
-  },
-  logMoodBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
-
-  // Quick Actions
-  quickActionsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: spacing.screenPadding, marginBottom: spacing.xl },
-
-  // Assessments
-  assessmentCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm },
-  assessmentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  assessmentIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  assessmentTitle: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
-  assessmentDesc: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
-  assessmentQuestions: { fontSize: 11, color: colors.text.muted, marginTop: 4 },
-  assessmentBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  assessmentBtnText: { fontSize: 13, fontWeight: '700' },
-
-  // Journal
-  journalCard: { marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm },
-  journalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
-  journalDate: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
-  journalMoodRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  journalMood: { fontSize: 13, fontWeight: '600', color: colors.health.mental },
-  journalEntry: { fontSize: 14, color: colors.text.secondary, lineHeight: 20 },
-
-  // Crisis
-  crisisCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    marginHorizontal: spacing.screenPadding, marginBottom: spacing.sm,
-    backgroundColor: colors.bg.card, padding: spacing.lg, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.health.danger + '20',
-  },
-  crisisIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  crisisName: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
-  crisisPhone: { fontSize: 12, color: colors.health.danger, marginTop: 2 },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  scrollContent: { paddingBottom: 100 },
+  hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 12 },
+  heroValue: { color: '#fff', fontSize: 30, fontWeight: '800' },
+  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroCta: { width: 112, height: 112, borderRadius: 56, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)', alignItems: 'center', justifyContent: 'center', padding: 8 },
+  heroCtaText: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+  section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
+  fieldLabel: { color: colors.text.secondary, fontSize: 13, fontWeight: '600' },
+  scaleRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  scaleDot: { flex: 1, height: 22, borderRadius: 6, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border },
+  scaleEnds: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  muted: { color: colors.text.muted, fontSize: 12, marginTop: 2 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.surface.border },
+  chipActive: { backgroundColor: TINT + '25', borderColor: TINT },
+  chipText: { color: colors.text.muted, fontSize: 12, textTransform: 'capitalize' },
+  chipTextActive: { color: TINT, fontWeight: '700' },
+  input: { backgroundColor: colors.bg.card, borderRadius: 12, padding: 12, color: colors.text.primary, borderWidth: 1, borderColor: colors.surface.border, marginTop: 12, minHeight: 60 },
+  primaryBtn: { backgroundColor: TINT, borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 14 },
+  primaryBtnText: { color: '#fff', fontWeight: '700' },
+  qCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  qPrompt: { color: colors.text.secondary, fontSize: 13, marginTop: 8 },
+  qText: { color: colors.text.primary, fontSize: 17, fontWeight: '700', marginTop: 6, marginBottom: 10 },
+  option: { borderWidth: 1, borderColor: TINT + '60', borderRadius: 12, padding: 12, marginTop: 8 },
+  optionText: { color: colors.text.primary, fontSize: 14 },
+  cardTitle: { color: colors.text.primary, fontSize: 15, fontWeight: '700' },
+  body: { color: colors.text.secondary, fontSize: 14, marginTop: 6, lineHeight: 20 },
+  gap: { marginBottom: 10 },
+  phone: { color: '#EF4444', fontWeight: '700' },
 });

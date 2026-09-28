@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
 import { useUserStore } from '../stores';
 import { useTheme } from '../services/theme';
+import { authedFetch } from '../services/authToken';
 
 const API = API_BASE_URL;
 
@@ -47,8 +48,8 @@ export function NotificationSetup() {
     setLoading(true);
     try {
       const [nRes, pRes] = await Promise.all([
-        fetch(`${API}/api/v1/notifications?user_id=${userId}`),
-        fetch(`${API}/api/v1/notifications/preferences?user_id=${userId}`),
+        authedFetch(`${API}/api/v1/notifications?user_id=${userId}`),
+        authedFetch(`${API}/api/v1/notifications/preferences?user_id=${userId}`),
       ]);
       if (nRes.ok) setNotifications(await nRes.json());
       if (pRes.ok) setPrefs(await pRes.json());
@@ -59,7 +60,7 @@ export function NotificationSetup() {
   async function setupDefaults() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     try {
-      const res = await fetch(`${API}/api/v1/notifications/setup-defaults?user_id=${userId}`, { method: 'POST' });
+      const res = await authedFetch(`${API}/api/v1/notifications/setup-defaults?user_id=${userId}`, { method: 'POST' });
       if (res.ok) fetchData();
     } catch {}
   }
@@ -67,7 +68,7 @@ export function NotificationSetup() {
   async function deleteNotification(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      await fetch(`${API}/api/v1/notifications/${id}?user_id=${userId}`, { method: 'DELETE' });
+      await authedFetch(`${API}/api/v1/notifications/${id}?user_id=${userId}`, { method: 'DELETE' });
       fetchData();
     } catch {}
   }
@@ -75,7 +76,7 @@ export function NotificationSetup() {
   async function updatePref(key: string, value: boolean) {
     Haptics.selectionAsync();
     try {
-      const res = await fetch(`${API}/api/v1/notifications/preferences?user_id=${userId}`, {
+      const res = await authedFetch(`${API}/api/v1/notifications/preferences?user_id=${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [key]: value }),

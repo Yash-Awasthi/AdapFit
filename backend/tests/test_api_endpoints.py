@@ -418,18 +418,6 @@ def test_nl_workout_parse():
     assert len(r["parsed_exercises"]) >= 1 and r["parse_confidence"] >= 0.5
 
 
-# ── Recommendations ──────────────────────────────────────────────────────────
-
-def test_recommendations():
-    uid = "rec_u2"
-    rec = post_json(f"/api/v1/recommend?user_id={uid}", json={
-        "recovery_score": 75, "readiness_state": "MODERATE", "primary_goal": "hypertrophy", "acwr": 1.0}).json()
-    assert rec["workout_type"] in ("strength", "hypertrophy", "endurance", "mobility", "rest")
-    assert rec["confidence"] > 0
-    rest = post_json(f"/api/v1/recommend?user_id={uid}", json={"recovery_score": 20, "readiness_state": "DEPLETED"}).json()
-    assert rest["workout_type"] == "rest" and rest["confidence"] >= 0.9
-
-
 # ── Dashboard ────────────────────────────────────────────────────────────────
 
 def test_body_dashboard():

@@ -8,6 +8,7 @@ import { API_BASE_URL } from '../src/services/config';
 import { useUserStore } from '../src/stores';
 import { useTheme } from '../src/services/theme';
 import { GENDER_OPTIONS } from '../src/services/gender';
+import { authedFetch } from '../src/services/authToken';
 
 const API = API_BASE_URL;
 
@@ -42,7 +43,7 @@ export default function OnboardingScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/users`, {
+      const res = await authedFetch(`${API_BASE_URL}/api/v1/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

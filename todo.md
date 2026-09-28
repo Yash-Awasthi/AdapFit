@@ -41,12 +41,18 @@ Measured at start: 229 route modules, 281 services, 93 services unreachable
 - [x] Export: one `/export` over the real stores; `/export/all` includes every
       per-user service's state. `-v2` returned a sample export, `/data-export`
       was a second copy. Export screen saves real files.
-- [ ] Leftover `-v2` prefixes: injury-risk, recommendations.
+- [x] Sixteen mobile files called the API without the auth token; one
+      `authedFetch` helper now covers them.
+- [x] Leftover duplicates: `/injury-risk-v2`, `/recommendations-v2`, `/recommend`.
 - [ ] Wire the unreachable unique services (smart alarm is done), API and screen.
-- [ ] Mental health screen: hard-coded journal and wellbeing score of 72;
-      PHQ-9/GAD-7 service exists but has no route.
-- [ ] Extend `test_no_random_measurements.py` to route modules, not just services.
-- [ ] Make route registration idempotent; one owner per prefix.
+- [x] Mind screen: mood check-ins, journal, WHO-5/PHQ-9/GAD-7 with safe next
+      steps (no medication advice), CBT thought records API, tap-to-call crisis
+      lines. The old screen was fake and its mood button posted to a missing route.
+- [ ] CBT thought records have an API but no screen yet.
+- [x] `test_no_random_measurements.py` now sweeps route modules too; the
+      simulator is closed in production.
+- [x] Route ownership test: one module per prefix except named companions, no
+      duplicate method+path, registration repeatable.
 
 ## Phase 2b — Clinical modules built for real
 

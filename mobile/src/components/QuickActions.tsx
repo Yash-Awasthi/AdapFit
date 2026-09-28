@@ -13,9 +13,10 @@ import { colors, spacing, radius } from '../theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { API_V1 as API } from '../services/config';
+import { authedFetch } from '../services/authToken';
 const api = async (path: string, opts?: RequestInit) => {
   try {
-    const r = await fetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
+    const r = await authedFetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
     return r.ok ? await r.json() : null;
   } catch { return null; }
 };

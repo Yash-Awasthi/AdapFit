@@ -50,7 +50,7 @@ class AlternativesInput(BaseModel):
     exercises: list[ExerciseInput] = []
 
 
-@router.post("/adaptive")
+@router.post("/generate")
 async def adaptive_workout(req: WorkoutSelectInput):
     """Select exercises adapted to user's fitness level and limitations."""
     exercises = [Exercise(**e.model_dump()) for e in req.exercises]

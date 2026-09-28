@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets, glass } from '../../src/theme';
 
 import { API_V1 as API } from '../../src/services/config';
+import { authedFetch } from '../../src/services/authToken';
 export default function HealthCalendarScreen() {
   const [predictions, setPredictions] = useState<any>({});
   const [summary, setSummary] = useState<any>({});
@@ -15,10 +16,10 @@ export default function HealthCalendarScreen() {
   const [tab, setTab] = useState<'cycle' | 'appointments' | 'medications'>('cycle');
 
   useEffect(() => {
-    fetch(`${API}/calendar/cycle/predictions`).then(r => r.ok ? r.json() : null).then(setPredictions).catch(() => {});
-    fetch(`${API}/calendar/cycle/summary`).then(r => r.ok ? r.json() : null).then(setSummary).catch(() => {});
-    fetch(`${API}/calendar/appointments/upcoming`).then(r => r.ok ? r.json() : null).then(d => setAppointments(d?.appointments || [])).catch(() => {});
-    fetch(`${API}/calendar/medications`).then(r => r.ok ? r.json() : null).then(d => setMedications(d?.medications || [])).catch(() => {});
+    authedFetch(`${API}/calendar/cycle/predictions`).then(r => r.ok ? r.json() : null).then(setPredictions).catch(() => {});
+    authedFetch(`${API}/calendar/cycle/summary`).then(r => r.ok ? r.json() : null).then(setSummary).catch(() => {});
+    authedFetch(`${API}/calendar/appointments/upcoming`).then(r => r.ok ? r.json() : null).then(d => setAppointments(d?.appointments || [])).catch(() => {});
+    authedFetch(`${API}/calendar/medications`).then(r => r.ok ? r.json() : null).then(d => setMedications(d?.medications || [])).catch(() => {});
   }, []);
 
   return (

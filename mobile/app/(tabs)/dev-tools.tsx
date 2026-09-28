@@ -84,7 +84,7 @@ export default function DevToolsScreen() {
     try {
       let ids: string[] = [];
       if (provider === 'gemini') {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey.trim()}`);
+        const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models", { headers: { "x-goog-api-key": apiKey.trim() } });
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
         ids = (json.models || [])
