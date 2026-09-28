@@ -239,4 +239,6 @@ class ECGInterpreterService:
         return "stable"
 
 
-ecg_interpreter_service = ECGInterpreterService()
+from app.core.durable import shared  # noqa: E402
+
+ecg_interpreter_service = shared("app.services.ecg_interpreter.ecg_interpreter_service", ECGInterpreterService())

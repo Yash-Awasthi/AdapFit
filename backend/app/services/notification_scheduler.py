@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from pydantic import BaseModel, Field
 from enum import Enum
+from app.core.durable import durable_dict
 
 
 class NotificationType(str, Enum):
@@ -51,8 +52,8 @@ class NotificationPreference(BaseModel):
 
 
 # In-memory storage
-scheduled_notifications: dict = {}  # user_id -> list of ScheduledNotification
-notification_preferences: dict = {}  # user_id -> NotificationPreference
+scheduled_notifications = durable_dict("app.services.notification_scheduler.scheduled_notifications")  # user_id -> list of ScheduledNotification
+notification_preferences = durable_dict("app.services.notification_scheduler.notification_preferences")  # user_id -> NotificationPreference
 
 
 def _now_iso() -> str:

@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from datetime import datetime, timezone
 import json
+from app.core.durable import durable_dict
 
 
 @dataclass
@@ -53,7 +54,7 @@ class PersonalizationProfile:
 
 
 # In-memory profiles
-_profiles: dict[str, PersonalizationProfile] = {}
+_profiles = durable_dict("app.services.evolution_engine._profiles")
 
 
 def get_profile(user_id: str) -> PersonalizationProfile:

@@ -7,11 +7,12 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.core.storage import storage
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
 # In-memory PR storage
-_pr_records: dict[str, list[dict]] = {}  # user_id -> list of PR records
+_pr_records = durable_dict("app.api.v1.endpoints.personal_bests._pr_records")  # user_id -> list of PR records
 
 
 class PRLogRequest(BaseModel):

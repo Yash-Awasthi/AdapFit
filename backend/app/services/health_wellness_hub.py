@@ -120,4 +120,6 @@ class WellnessHub:
         return {"days": days, "total_entries": len(recent), "daily_data": {d: {"count": len(entries), "avg_value": round(sum(e["value"] for e in entries) / len(entries), 1)} for d, entries in daily.items()}}
 
 
-wellness_hub = WellnessHub()
+from app.core.durable import shared  # noqa: E402
+
+wellness_hub = shared("app.services.health_wellness_hub.wellness_hub", WellnessHub())

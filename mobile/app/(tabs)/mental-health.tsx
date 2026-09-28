@@ -51,6 +51,75 @@ function Scale({ label, value, onChange, low, high }: { label: string; value: nu
   );
 }
 
+interface ThoughtRecord { id: string; situation: string; thought: string; emotion: string; intensity_before: number; balanced_thought: string; intensity_after: number; created_at: string }
+
+const TR_STEPS = [
+  { key: 'situation', label: 'What happened?', placeholder: 'Where were you, what was going on' },
+  { key: 'thought', label: 'What went through your mind?', placeholder: 'The automatic thought, word for word' },
+  { key: 'emotion', label: 'What did you feel?', placeholder: 'e.g. anxious, angry, ashamed' },
+  { key: 'evidence_for', label: 'What supports that thought?', placeholder: 'Facts only' },
+  { key: 'evidence_against', label: 'What does not fit it?', placeholder: 'Facts only' },
+  { key: 'balanced_thought', label: 'A more balanced thought', placeholder: 'What would you tell a friend?' },
+] as const;
+
+function ThoughtRecords({ userId }: { userId: string }) {
+  const [open, setOpen] = useState(false);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [before, setBefore] = useState(70);
+  const [after, setAfter] = useState(40);
+  const { data, reload } = useApis<{ records: ThoughtRecord[] }>({ records: `/mental-health/thought-records?user_id=${userId}&limit=5` });
+  const save = async () => {
+    if (!fields.situation?.trim() || !fields.thought?.trim() || !fields.emotion?.trim()) {
+      return Alert.alert('Almost there', 'Fill in what happened, the thought and the feeling.');
+    }
+    const r = await postJson<{ change: number }>('/mental-health/thought-records', {
+      user_id: userId, ...fields, intensity_before: before, intensity_after: after,
+    });
+    if (!r) return Alert.alert('Not saved', 'The record could not be saved.');
+    setFields({});
+    setOpen(false);
+    reload();
+  };
+  const step = (v: number, d: number) => Math.max(0, Math.min(100, v + d));
+  return (
+    <View style={styles.section}>
+      <SectionHeaderPremium title="Thought Record" subtitle="A CBT exercise for a thought that keeps coming back" icon="git-compare" iconColor={TINT} />
+      {!open ? (
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => setOpen(true)}>
+          <Text style={styles.primaryBtnText}>Work through a thought</Text>
+        </TouchableOpacity>
+      ) : (
+        <GlassCard>
+          {TR_STEPS.map((f) => (
+            <View key={f.key}>
+              <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{f.label}</Text>
+              <TextInput style={styles.input} placeholder={f.placeholder} placeholderTextColor={colors.text.muted} multiline
+                value={fields[f.key] ?? ''} onChangeText={(t) => setFields((x) => ({ ...x, [f.key]: t }))} maxLength={500} />
+            </View>
+          ))}
+          {[['How strong was the feeling before?', before, setBefore], ['And now?', after, setAfter]].map(([label, v, set]: any) => (
+            <View key={label} style={styles.qCard}>
+              <Text style={[styles.fieldLabel, { flex: 1 }]}>{label}</Text>
+              <TouchableOpacity onPress={() => set(step(v, -10))}><Ionicons name="remove-circle-outline" size={24} color={colors.text.secondary} /></TouchableOpacity>
+              <Text style={styles.cardTitle}>{v}%</Text>
+              <TouchableOpacity onPress={() => set(step(v, 10))}><Ionicons name="add-circle-outline" size={24} color={colors.text.secondary} /></TouchableOpacity>
+            </View>
+          ))}
+          <TouchableOpacity style={styles.primaryBtn} onPress={save}><Text style={styles.primaryBtnText}>Save record</Text></TouchableOpacity>
+        </GlassCard>
+      )}
+      {asArray<ThoughtRecord>(data.records).map((r) => (
+        <GlassCard key={r.id} style={[styles.gap, { marginTop: 10 }]}>
+          <Text style={styles.cardTitle}>{r.emotion}: {r.intensity_before}% to {r.intensity_after}%</Text>
+          <Text style={styles.body}>"{r.thought}"</Text>
+          {r.balanced_thought ? <Text style={[styles.body, { color: TINT }]}>{r.balanced_thought}</Text> : null}
+          <Text style={styles.muted}>{r.created_at.slice(0, 10)}</Text>
+        </GlassCard>
+      ))}
+    </View>
+  );
+}
+
 export default function MindScreen() {
   const router = useRouter();
   const userId = useUserStore((s) => s.userId);
@@ -221,6 +290,8 @@ export default function MindScreen() {
             ))}
           </View>
         )}
+
+        <ThoughtRecords userId={userId} />
 
         <View style={styles.section}>
           <TouchableOpacity onPress={() => router.push('/hrv' as any)}>

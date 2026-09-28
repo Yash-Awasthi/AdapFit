@@ -8,10 +8,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from typing import Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
-_schedules: dict[str, dict] = {}
+_schedules = durable_dict("app.api.v1.endpoints.schedule._schedules")
 
 
 class ScheduleRequest(BaseModel):

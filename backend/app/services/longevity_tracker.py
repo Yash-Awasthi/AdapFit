@@ -358,4 +358,6 @@ class LongevityTrackerService:
             return min(99, max(1, int(50 + diff * 3)))
 
 
-longevity_tracker_service = LongevityTrackerService()
+from app.core.durable import shared  # noqa: E402
+
+longevity_tracker_service = shared("app.services.longevity_tracker.longevity_tracker_service", LongevityTrackerService())

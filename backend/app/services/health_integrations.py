@@ -75,4 +75,6 @@ class HealthIntegrations:
         return [{"key": k, **v} for k, v in self.AVAILABLE_INTEGRATIONS.items()]
 
 
-health_integrations = HealthIntegrations()
+from app.core.durable import shared  # noqa: E402
+
+health_integrations = shared("app.services.health_integrations.health_integrations", HealthIntegrations())

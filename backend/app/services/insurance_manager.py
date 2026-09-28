@@ -133,4 +133,6 @@ class InsuranceManagerService:
         }
 
 
-insurance_manager_service = InsuranceManagerService()
+from app.core.durable import shared  # noqa: E402
+
+insurance_manager_service = shared("app.services.insurance_manager.insurance_manager_service", InsuranceManagerService())

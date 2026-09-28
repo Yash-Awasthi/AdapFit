@@ -206,4 +206,6 @@ class VoiceDiaryService:
             return "You've been struggling lately. Consider reaching out to a support network or professional."
 
 
-voice_diary_service = VoiceDiaryService()
+from app.core.durable import shared  # noqa: E402
+
+voice_diary_service = shared("app.services.voice_diary.voice_diary_service", VoiceDiaryService())

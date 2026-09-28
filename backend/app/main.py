@@ -52,6 +52,10 @@ async def lifespan(app: FastAPI):
     from app.core.auth import user_manager
     await user_manager.load()
     logger.info("Accounts loaded: %d", len(user_manager._users))
+    # ── Restore feature data ──────────────────────────────────────────────
+    # Same rule as accounts: serving requests on empty state would save it over the real data.
+    from app.core import durable
+    logger.info("Feature state restored: %s", await durable.load_all())
     # ── Initialize services ───────────────────────────────────────────────
     try:
         from app.services.exercise_service import exercise_service
@@ -61,6 +65,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Vector store init failed: {e}")
     yield
+    await durable.flush()
     logger.info("AdapFit shutting down")
 
 
@@ -120,6 +125,8 @@ app.add_middleware(
 async def add_request_id(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())[:8]
     response = await call_next(request)
+    from app.core import durable
+    await durable.flush()
     response.headers["X-Request-ID"] = request_id
     response.headers["X-API-Version"] = settings.VERSION
     return response

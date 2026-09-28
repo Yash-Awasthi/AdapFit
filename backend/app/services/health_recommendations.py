@@ -159,4 +159,6 @@ class HealthRecommendationsEngine:
         return {"dismissed": True}
 
 
-recommendations_engine = HealthRecommendationsEngine()
+from app.core.durable import shared  # noqa: E402
+
+recommendations_engine = shared("app.services.health_recommendations.recommendations_engine", HealthRecommendationsEngine())

@@ -63,12 +63,25 @@ class HabitCoachService:
         habit = next((h for h in HABIT_DATABASE if h["id"] == habit_id), None)
         if not habit:
             return {"error": "Habit not found"}
+        return self._track(user_id, habit_id, habit["name"], habit["category"], self._get_stacking_tip(habit))
+
+    def add_custom_habit(self, user_id: str, name: str, category: str = "other", cue: str = "") -> dict:
+        habit_id = f"c_{abs(hash((user_id, name.lower()))) % 10**8}"
+        tip = f"Stack it: {cue} -> {name}." if cue else "Tie it to something you already do every day."
+        return self._track(user_id, habit_id, name, category, tip)
+
+    def _track(self, user_id: str, habit_id: str, name: str, category: str, tip: str) -> dict:
         user_habits = self._user_habits.setdefault(user_id, [])
         if any(h["habit_id"] == habit_id for h in user_habits):
-            return {"already_tracking": True}
-        entry = {"habit_id": habit_id, "name": habit["name"], "category": habit["category"], "started_at": time.time(), "current_streak": 0, "best_streak": 0, "total_completions": 0, "completed_today": False}
-        user_habits.append(entry)
-        return {"added": True, "habit": habit["name"], "stacking_tip": self._get_stacking_tip(habit)}
+            return {"already_tracking": True, "habit_id": habit_id}
+        user_habits.append({"habit_id": habit_id, "name": name, "category": category, "started_at": time.time(),
+                            "dates": []})
+        return {"added": True, "habit_id": habit_id, "habit": name, "stacking_tip": tip}
+
+    def remove_habit(self, user_id: str, habit_id: str) -> bool:
+        before = len(self._user_habits.get(user_id, []))
+        self._user_habits[user_id] = [h for h in self._user_habits.get(user_id, []) if h["habit_id"] != habit_id]
+        return len(self._user_habits[user_id]) < before
 
     def _get_stacking_tip(self, habit: dict) -> str:
         tips = [
@@ -78,32 +91,51 @@ class HabitCoachService:
         ]
         return random.choice(tips)
 
+    @staticmethod
+    def _streaks(dates: list[str]) -> tuple[int, int]:
+        """(current, best) runs of consecutive days; current counts only if it reaches today or yesterday."""
+        from datetime import date, timedelta
+
+        days = sorted({date.fromisoformat(d) for d in dates})
+        if not days:
+            return 0, 0
+        best = run = 1
+        for prev, cur in zip(days, days[1:]):
+            run = run + 1 if cur - prev == timedelta(days=1) else 1
+            best = max(best, run)
+        current = run if (date.today() - days[-1]).days <= 1 else 0
+        return current, best
+
+    def _view(self, h: dict) -> dict:
+        current, best = self._streaks(h["dates"])
+        return {"habit_id": h["habit_id"], "name": h["name"], "category": h["category"],
+                "current_streak": current, "best_streak": best, "total_completions": len(h["dates"]),
+                "completed_today": time.strftime("%Y-%m-%d") in h["dates"]}
+
     def log_habit_completion(self, user_id: str, habit_id: str) -> dict:
-        user_habits = self._user_habits.get(user_id, [])
-        for uh in user_habits:
+        today = time.strftime("%Y-%m-%d")
+        for uh in self._user_habits.get(user_id, []):
             if uh["habit_id"] == habit_id:
-                uh["total_completions"] += 1
-                uh["completed_today"] = True
-                uh["current_streak"] += 1
-                uh["best_streak"] = max(uh["best_streak"], uh["current_streak"])
-                self._habit_log.setdefault(user_id, []).append({"habit_id": habit_id, "date": time.strftime("%Y-%m-%d"), "timestamp": time.time()})
-                return {"completed": True, "streak": uh["current_streak"], "total": uh["total_completions"], "message": f"Great! {uh['current_streak']}-day streak!"}
+                if today not in uh["dates"]:
+                    uh["dates"].append(today)
+                view = self._view(uh)
+                return {"completed": True, "streak": view["current_streak"], "total": view["total_completions"],
+                        "message": f"{view['current_streak']}-day streak."}
         return {"error": "Habit not found"}
 
     def get_user_habits(self, user_id: str) -> list[dict]:
-        return self._user_habits.get(user_id, [])
+        return [self._view(h) for h in self._user_habits.get(user_id, [])]
 
     def get_habit_stats(self, user_id: str) -> dict:
-        habits = self._user_habits.get(user_id, [])
+        habits = self.get_user_habits(user_id)
         if not habits:
             return {"total_habits": 0}
-        total_completions = sum(h["total_completions"] for h in habits)
-        avg_streak = sum(h["current_streak"] for h in habits) / max(1, len(habits))
         return {
-            "total_habits": len(habits), "total_completions": total_completions,
-            "average_streak": round(avg_streak, 1),
-            "best_streak": max((h["best_streak"] for h in habits), default=0),
-            "habits_today": sum(1 for h in habits if h.get("completed_today")),
+            "total_habits": len(habits),
+            "total_completions": sum(h["total_completions"] for h in habits),
+            "average_streak": round(sum(h["current_streak"] for h in habits) / len(habits), 1),
+            "best_streak": max(h["best_streak"] for h in habits),
+            "habits_today": sum(1 for h in habits if h["completed_today"]),
         }
 
     COM_B_QUESTIONS = {
@@ -147,14 +179,13 @@ class HabitCoachService:
         return {"assessment": assessment, "overall_score": round(total, 1), "barrier": barrier}
 
     def get_nudge(self, user_id: str) -> dict:
-        habits = self._user_habits.get(user_id, [])
-        uncompleted = [h for h in habits if not h.get("completed_today")]
+        habits = self.get_user_habits(user_id)
+        uncompleted = [h for h in habits if not h["completed_today"]]
         if not uncompleted:
             return {"message": "All habits completed today! Great job! 🎉", "type": "celebration"}
         habit = random.choice(uncompleted)
         nudge_types = [
             {"type": "implementation_intention", "message": f"It's time for {habit['name']}. Remember: After your trigger, just start for 2 minutes."},
-            {"type": "social_proof", "message": f"87% of people who track {habit['name']} report feeling better. You're on day {habit['current_streak'] + 1}!"},
             {"type": "temptation_bundling", "message": f"Pair {habit['name']} with something you enjoy — like your favorite podcast or music."},
             {"type": "loss_aversion", "message": f"Don't break your {habit['current_streak']}-day streak on {habit['name']}! One more day counts."},
             {"type": "micro_habit", "message": f"Too busy? Just do {habit['name'].lower()} for 2 minutes. Any progress counts!"},
@@ -170,8 +201,10 @@ class HabitCoachService:
                 "Celebrate small wins to maintain motivation.",
                 "If motivation drops, reduce the habit to its minimum viable version.",
             ],
-            "reminder": "Relapse is normal. 80% of successful habit-changers experienced setbacks.",
+            "reminder": "Setbacks are normal. Getting back to it the next day matters more than a perfect record.",
         }
 
 
-habit_coach_service = HabitCoachService()
+from app.core.durable import shared  # noqa: E402
+
+habit_coach_service = shared("app.services.habit_coach.habit_coach_service", HabitCoachService())

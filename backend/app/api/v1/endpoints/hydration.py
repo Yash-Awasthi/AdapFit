@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -51,8 +52,8 @@ class HydrationStats(BaseModel):
 
 
 # In-memory storage
-hydration_logs: dict = {}  # user_id -> list of logs
-hydration_goals: dict = {}  # user_id -> {daily_goal_ml, reminder_interval_minutes}
+hydration_logs = durable_dict("app.api.v1.endpoints.hydration.hydration_logs")  # user_id -> list of logs
+hydration_goals = durable_dict("app.api.v1.endpoints.hydration.hydration_goals")  # user_id -> {daily_goal_ml, reminder_interval_minutes}
 
 
 def _today() -> str:

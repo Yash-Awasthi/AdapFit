@@ -201,4 +201,6 @@ class TelemedicineService:
         return [{"id": a.id, "doctor": self._doctors.get(a.doctor_id, {}).get("name", "Unknown"), "date": a.date, "notes": a.notes, "prescription": a.prescription, "rating": a.rating} for a in sorted(completed, key=lambda x: x.created_at, reverse=True)]
 
 
-telemedicine_service = TelemedicineService()
+from app.core.durable import shared  # noqa: E402
+
+telemedicine_service = shared("app.services.telemedicine.telemedicine_service", TelemedicineService())

@@ -25,7 +25,7 @@ const HIDDEN_SCREENS = [
   "family", "health-calendar", "recipes", "exercises", "wellness", "sleep",
   "nutrition", "health", "stats", "periodization",
   "achievements", "settings", "personal-info", "dev-tools",
-  "hrv", "mental-health", "medication", "emergency",
+  "hrv", "habits", "mental-health", "medication", "emergency",
   "community", "workouts", "devices", "coach", "voice-health", "longevity",
   "ambient", "data-export", "diabetes", "chronic-pain",
   "accessibility-settings",

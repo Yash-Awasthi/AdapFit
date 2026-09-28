@@ -122,4 +122,6 @@ class FamilyModeService:
         }
 
 
-family_mode_service = FamilyModeService()
+from app.core.durable import shared  # noqa: E402
+
+family_mode_service = shared("app.services.family_mode.family_mode_service", FamilyModeService())

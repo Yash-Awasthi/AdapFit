@@ -6,11 +6,12 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from typing import Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
 # In-memory check-in storage
-_checkins: dict[str, list[dict]] = {}
+_checkins = durable_dict("app.api.v1.endpoints.daily_checkin._checkins")
 
 
 class CheckinRequest(BaseModel):

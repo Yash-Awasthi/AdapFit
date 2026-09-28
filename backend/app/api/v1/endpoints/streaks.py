@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from typing import List
 from app.core.storage import storage
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -31,7 +32,7 @@ class HeatmapData(BaseModel):
 
 
 # In-memory: user_id -> list of ISO date strings
-workout_dates: dict = {}
+workout_dates = durable_dict("app.api.v1.endpoints.streaks.workout_dates")
 
 
 def _compute_streaks(dates: list[str]) -> tuple[int, int]:

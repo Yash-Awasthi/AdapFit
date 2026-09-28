@@ -167,4 +167,6 @@ class MedicalIDService:
         return {"updated": True, "last_updated": profile["last_updated"]}
 
 
-medical_id_service = MedicalIDService()
+from app.core.durable import shared  # noqa: E402
+
+medical_id_service = shared("app.services.medical_id.medical_id_service", MedicalIDService())

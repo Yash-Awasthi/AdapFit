@@ -16,10 +16,11 @@ from app.core.storage import storage
 from app.services.garmin_import import import_sleep_records, import_workouts
 from app.services.sleep_tracker import sleep_journal
 from app.services.strava_import import import_activities
+from app.core.durable import durable_dict
 
 router = APIRouter()
 MAX_GPX_BYTES = 5_000_000
-_import_log: dict[str, list[dict]] = {}
+_import_log = durable_dict("app.api.v1.endpoints.wearable_api._import_log")
 
 
 class GarminImportInput(BaseModel):

@@ -298,4 +298,6 @@ class GenomicsInsightsService:
         return max(20, min(100, int(100 - avg_risk * 100)))
 
 
-genomics_insights_service = GenomicsInsightsService()
+from app.core.durable import shared  # noqa: E402
+
+genomics_insights_service = shared("app.services.genomics_insights.genomics_insights_service", GenomicsInsightsService())

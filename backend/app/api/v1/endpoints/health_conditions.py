@@ -12,15 +12,16 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from typing import Optional
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
 # In-memory storage
-_profiles: dict[str, dict] = {}  # user_id -> health profile
-_medications: dict[str, list[dict]] = {}
-_conditions: dict[str, list[dict]] = {}
-_physio_plans: dict[str, list[dict]] = {}
-_episodes: dict[str, list[dict]] = {}  # fever, illness episodes
+_profiles = durable_dict("app.api.v1.endpoints.health_conditions._profiles")  # user_id -> health profile
+_medications = durable_dict("app.api.v1.endpoints.health_conditions._medications")
+_conditions = durable_dict("app.api.v1.endpoints.health_conditions._conditions")
+_physio_plans = durable_dict("app.api.v1.endpoints.health_conditions._physio_plans")
+_episodes = durable_dict("app.api.v1.endpoints.health_conditions._episodes")  # fever, illness episodes
 
 
 # === ENUMS & CONSTANTS ===

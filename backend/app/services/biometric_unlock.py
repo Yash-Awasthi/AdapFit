@@ -82,4 +82,6 @@ class BiometricDataUnlock:
         return {"total_shares": len(shares), "active_shares": len(self.get_active_shares(user_id)), "total_accesses": sum(s["access_count"] for s in shares), "by_type": {t: sum(1 for s in shares if s["share_type"] == t) for t in set(s["share_type"] for s in shares) if shares}}
 
 
-biometric_unlock = BiometricDataUnlock()
+from app.core.durable import shared  # noqa: E402
+
+biometric_unlock = shared("app.services.biometric_unlock.biometric_unlock", BiometricDataUnlock())

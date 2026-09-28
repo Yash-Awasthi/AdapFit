@@ -135,4 +135,6 @@ class SymptomCheckerService:
         return [{"symptom": a["assessment"]["symptom"], "severity": a["assessment"]["severity"], "triage": a["assessment"]["triage"]["level"], "timestamp": a["timestamp"]} for a in user_assessments[-limit:]]
 
 
-symptom_checker_service = SymptomCheckerService()
+from app.core.durable import shared  # noqa: E402
+
+symptom_checker_service = shared("app.services.symptom_checker.symptom_checker_service", SymptomCheckerService())

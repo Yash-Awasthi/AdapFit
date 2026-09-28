@@ -518,6 +518,8 @@ class UserManager:
         self._username_index.pop(user.username, None)
         del self._users[user_id]
         await account_store.delete(user_id)
+        from app.core import durable
+        await durable.erase_user(user_id)
         return {"deleted": True}
 
 

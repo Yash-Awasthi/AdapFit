@@ -169,4 +169,6 @@ class ForumsService:
         return self._reports[:limit]
 
 
-forums_service = ForumsService()
+from app.core.durable import shared  # noqa: E402
+
+forums_service = shared("app.services.forums.forums_service", ForumsService())

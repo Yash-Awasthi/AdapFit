@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
+from app.core.durable import durable_dict
 
 router = APIRouter()
 
@@ -34,8 +35,8 @@ class ExportedPlanSummary(BaseModel):
 
 
 # In-memory exported plans
-exported_plans: dict = {}  # plan_id -> plan data
-import_history: dict = {}  # user_id -> list of imports
+exported_plans = durable_dict("app.api.v1.endpoints.workout_import_export.exported_plans")  # plan_id -> plan data
+import_history = durable_dict("app.api.v1.endpoints.workout_import_export.import_history")  # user_id -> list of imports
 
 
 @router.post("/export", response_model=WorkoutPlanExport)

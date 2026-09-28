@@ -113,4 +113,6 @@ class RecipeGeneratorService:
         return list(self._recipes.values())
 
 
-recipe_generator_service = RecipeGeneratorService()
+from app.core.durable import shared  # noqa: E402
+
+recipe_generator_service = shared("app.services.recipe_generator.recipe_generator_service", RecipeGeneratorService())

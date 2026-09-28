@@ -188,4 +188,6 @@ class VoiceBiomarkerService:
                 )
 
 
-voice_biomarker_service = VoiceBiomarkerService()
+from app.core.durable import shared  # noqa: E402
+
+voice_biomarker_service = shared("app.services.voice_biomarker.voice_biomarker_service", VoiceBiomarkerService())
