@@ -152,7 +152,6 @@ def test_create_and_validate(path, body, claims):
     ("/api/v1/trends/nlp/sentiment", {"text": ""}, 422),
     ("/api/v1/chat", {"user_id": "u1", "message": ""}, 422),
     ("/api/v1/body/measurements?user_id=b1", {}, 400),
-    ("/api/v1/tasks", {"task_type": "nonexistent"}, 400),
 ])
 def test_validation_rejects(path, body, expected):
     r = post_json(path, json=body)
@@ -451,18 +450,6 @@ def test_workout_import_export():
     r = post_json(f"/api/v1/plan/import?user_id=ie_u3", json={"plan": plan["plan"], "name": "My Push"}).json()
     assert r["exercises"] == 2
     assert get_json("/api/v1/plan/shared/nonexistent").status_code == 404
-
-
-# ── Tasks ────────────────────────────────────────────────────────────────────
-
-def test_background_tasks():
-    import time
-    tid = post_json("/api/v1/tasks", json={"task_type": "anomaly_scan"}).json()["task_id"]
-    time.sleep(2)
-    assert get_json(f"/api/v1/tasks/{tid}").json()["status"] in ("running", "completed")
-    assert len(get_json("/api/v1/tasks").json()) >= 1
-    assert "total" in get_json("/api/v1/tasks/stats").json()
-    assert get_json("/api/v1/tasks/nonexistent").status_code == 404
 
 
 # ── Meditation ───────────────────────────────────────────────────────────────

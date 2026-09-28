@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 import math
 
-from pydantic import BaseModel, Field
 
 
 class SleepStage:
@@ -33,69 +32,71 @@ class SleepAnalyzer:
     def calculate_sleep_score(
         self,
         duration_hours: float,
-        deep_minutes: float,
-        rem_minutes: float,
-        awake_minutes: float,
-        interruptions: int,
-        bedtime_consistency_std: float,
+        deep_minutes: Optional[float] = None,
+        rem_minutes: Optional[float] = None,
+        awake_minutes: Optional[float] = None,
+        interruptions: Optional[int] = None,
+        bedtime_consistency_std: Optional[float] = None,
+        efficiency_pct: Optional[float] = None,
     ) -> dict:
-        """Calculate comprehensive sleep score (0-100)."""
-        # Duration score: optimal is 7-9 hours
+        """Score 0-100 from whatever was measured.
+
+        A component with no measurement is left out and the remaining weights
+        are rescaled, so a manual log without stages is not scored as if its
+        deep and REM sleep were zero or average.
+        """
+        components: dict[str, float] = {}
+
         if 7 <= duration_hours <= 9:
-            duration_score = 100
+            components["duration"] = 100
         elif 6 <= duration_hours < 7:
-            duration_score = 70 + (duration_hours - 6) * 30
+            components["duration"] = 70 + (duration_hours - 6) * 30
         elif 9 < duration_hours <= 10:
-            duration_score = 100 - (duration_hours - 9) * 30
+            components["duration"] = 100 - (duration_hours - 9) * 30
         elif duration_hours < 6:
-            duration_score = max(0, duration_hours * 11.67)
+            components["duration"] = max(0, duration_hours * 11.67)
         else:
-            duration_score = max(0, 100 - (duration_hours - 10) * 40)
+            components["duration"] = max(0, 100 - (duration_hours - 10) * 40)
 
-        # Efficiency: percentage of time asleep
         total_minutes = duration_hours * 60
-        time_asleep = total_minutes - awake_minutes
-        efficiency = (time_asleep / max(total_minutes, 1)) * 100
+        efficiency = efficiency_pct
+        if efficiency is None and awake_minutes is not None:
+            efficiency = (total_minutes - awake_minutes) / max(total_minutes, 1) * 100
+        if efficiency is not None:
+            components["efficiency"] = max(0.0, min(100.0, efficiency))
 
-        # Deep sleep: should be 13-23% of total
-        deep_pct = (deep_minutes / max(total_minutes, 1)) * 100
-        if 13 <= deep_pct <= 23:
-            deep_score = 100
-        elif deep_pct < 13:
-            deep_score = max(0, deep_pct * (100 / 13))
-        else:
-            deep_score = max(0, 100 - (deep_pct - 23) * 10)
+        deep_pct = rem_pct = None
+        if deep_minutes is not None:
+            deep_pct = deep_minutes / max(total_minutes, 1) * 100
+            if 13 <= deep_pct <= 23:
+                components["deep_sleep"] = 100
+            elif deep_pct < 13:
+                components["deep_sleep"] = max(0, deep_pct * (100 / 13))
+            else:
+                components["deep_sleep"] = max(0, 100 - (deep_pct - 23) * 10)
 
-        # REM sleep: should be 20-25% of total
-        rem_pct = (rem_minutes / max(total_minutes, 1)) * 100
-        if 20 <= rem_pct <= 25:
-            rem_score = 100
-        elif rem_pct < 20:
-            rem_score = max(0, rem_pct * (100 / 20))
-        else:
-            rem_score = max(0, 100 - (rem_pct - 25) * 10)
+        if rem_minutes is not None:
+            rem_pct = rem_minutes / max(total_minutes, 1) * 100
+            if 20 <= rem_pct <= 25:
+                components["rem_sleep"] = 100
+            elif rem_pct < 20:
+                components["rem_sleep"] = max(0, rem_pct * (100 / 20))
+            else:
+                components["rem_sleep"] = max(0, 100 - (rem_pct - 25) * 10)
 
-        # Consistency: lower std = better (ideal < 30 min)
-        consistency_score = max(0, 100 - bedtime_consistency_std * 2)
+        if bedtime_consistency_std is not None:
+            components["consistency"] = max(0, 100 - bedtime_consistency_std * 2)
 
-        # Interruptions: 0-1 ideal, 2-3 okay, >5 bad
-        if interruptions <= 1:
-            interruption_score = 100
-        elif interruptions <= 3:
-            interruption_score = 70 - (interruptions - 1) * 10
-        else:
-            interruption_score = max(0, 50 - (interruptions - 3) * 15)
+        if interruptions is not None:
+            if interruptions <= 1:
+                components["interruptions"] = 100
+            elif interruptions <= 3:
+                components["interruptions"] = 70 - (interruptions - 1) * 10
+            else:
+                components["interruptions"] = max(0, 50 - (interruptions - 3) * 15)
 
-        # Weighted composite
-        total_score = (
-            self.WEIGHTS["duration"] * duration_score
-            + self.WEIGHTS["efficiency"] * efficiency
-            + self.WEIGHTS["deep_sleep"] * deep_score
-            + self.WEIGHTS["rem_sleep"] * rem_score
-            + self.WEIGHTS["consistency"] * consistency_score
-            + self.WEIGHTS["interruptions"] * interruption_score
-        )
-
+        weight_sum = sum(self.WEIGHTS[k] for k in components)
+        total_score = sum(self.WEIGHTS[k] * v for k, v in components.items()) / weight_sum
         total_score = round(min(100, max(0, total_score)), 1)
 
         # Determine quality label
@@ -114,18 +115,14 @@ class SleepAnalyzer:
             "sleep_score": total_score,
             "quality_label": label,
             "breakdown": {
-                "duration": {"score": round(duration_score, 1), "weight": self.WEIGHTS["duration"]},
-                "efficiency": {"score": round(efficiency, 1), "weight": self.WEIGHTS["efficiency"]},
-                "deep_sleep": {"score": round(deep_score, 1), "weight": self.WEIGHTS["deep_sleep"]},
-                "rem_sleep": {"score": round(rem_score, 1), "weight": self.WEIGHTS["rem_sleep"]},
-                "consistency": {"score": round(consistency_score, 1), "weight": self.WEIGHTS["consistency"]},
-                "interruptions": {"score": round(interruption_score, 1), "weight": self.WEIGHTS["interruptions"]},
+                k: {"score": round(v, 1), "weight": self.WEIGHTS[k]} for k, v in components.items()
             },
+            "measured": sorted(components),
             "metrics": {
                 "duration_hours": duration_hours,
-                "deep_pct": round(deep_pct, 1),
-                "rem_pct": round(rem_pct, 1),
-                "efficiency_pct": round(efficiency, 1),
+                "deep_pct": round(deep_pct, 1) if deep_pct is not None else None,
+                "rem_pct": round(rem_pct, 1) if rem_pct is not None else None,
+                "efficiency_pct": round(efficiency, 1) if efficiency is not None else None,
                 "interruptions": interruptions,
             },
         }
@@ -270,52 +267,17 @@ class SleepAnalyzer:
         }
 
 
-# ── Endpoint-facing models ───────────────────────────────────────────────────
-# SleepAnalyzer works on one night's numbers. The log/analysis endpoints work
-# on a list of nights, so the models below are the wire format and the
-# function below is the single entry point that spans several nights.
-
-class StageMinutes(BaseModel):
-    """Minutes spent in one sleep stage."""
-    name: str
-    minutes: float
-    percentage: float
-
-
-class SleepEntry(BaseModel):
-    """One night of logged sleep."""
-    date: str
-    bedtime: str
-    wake_time: str
-    total_minutes: int
-    efficiency_pct: float
-    stages: list[StageMinutes] = Field(default_factory=list)
-    interruptions: int = 0
-
-
-class SleepAnalysis(BaseModel):
-    """Aggregate analysis across the logged nights."""
-    score: float
-    grade: str
-    avg_duration_hours: float
-    avg_efficiency_pct: float
-    stage_breakdown: list[StageMinutes]
-    nights_analyzed: int
-    quality_label: str
-    recommendations: list[dict] = Field(default_factory=list)
-
-
 GRADE_THRESHOLDS = [(90, "A"), (80, "B"), (70, "C"), (60, "D")]
 
 
-def _grade_for(score: float) -> str:
+def grade_for(score: float) -> str:
     for threshold, grade in GRADE_THRESHOLDS:
         if score >= threshold:
             return grade
     return "F"
 
 
-def _bedtime_consistency_std(bedtimes: list[str]) -> float:
+def bedtime_consistency_std(bedtimes: list[str]) -> float:
     """Standard deviation of bedtimes in minutes, wrapping over midnight.
 
     A 23:30 bedtime and a 00:30 bedtime differ by an hour, not by 23. Linear
@@ -347,65 +309,67 @@ def _bedtime_consistency_std(bedtimes: list[str]) -> float:
     return circular_std * 1440 / (2 * math.pi)
 
 
-def analyze_sleep(entries: list[SleepEntry]) -> SleepAnalysis:
-    """Analyse a run of logged nights into a single scored summary."""
-    if not entries:
-        return SleepAnalysis(
-            score=0.0,
-            grade="F",
-            avg_duration_hours=0.0,
-            avg_efficiency_pct=0.0,
-            stage_breakdown=[],
-            nights_analyzed=0,
-            quality_label="insufficient_data",
-            recommendations=[{
-                "category": "general",
-                "priority": "low",
-                "title": "Log Some Sleep",
-                "description": "No sleep has been logged yet, so there is nothing to score.",
-                "tips": ["Log last night's bedtime, wake time and total sleep."],
-            }],
-        )
+def analyze_oximetry(readings: list[float], timestamps: list[datetime]) -> dict:
+    """Overnight SpO2 summary: average, lowest, time under 90%, and dips per hour.
 
-    analyzer = SleepAnalyzer()
+    A dip is a fall of 3 points or more below the mean of the preceding two
+    minutes, counted once until the reading recovers. Counting every low
+    sample instead turns one long dip into dozens.
+    """
+    if len(readings) != len(timestamps) or len(readings) < 2:
+        raise ValueError("Need matching SpO2 readings and timestamps, at least two")
+    pairs = sorted(zip(timestamps, readings))
+    ts = [t for t, _ in pairs]
+    vals = [v for _, v in pairs]
 
-    nights = len(entries)
-    avg_total_minutes = sum(e.total_minutes for e in entries) / nights
-    duration_hours = avg_total_minutes / 60
-    avg_efficiency = sum(e.efficiency_pct for e in entries) / nights
-    avg_interruptions = sum(e.interruptions for e in entries) / nights
-
-    stage_totals: dict[str, float] = {}
-    for entry in entries:
-        for stage in entry.stages:
-            stage_totals[stage.name] = stage_totals.get(stage.name, 0.0) + stage.minutes
-
-    breakdown = [
-        StageMinutes(
-            name=name,
-            minutes=round(minutes / nights, 1),
-            percentage=round(minutes / nights / max(avg_total_minutes, 1) * 100, 1),
-        )
-        for name, minutes in stage_totals.items()
-    ]
-
-    scored = analyzer.calculate_sleep_score(
-        duration_hours=duration_hours,
-        deep_minutes=stage_totals.get(SleepStage.DEEP, 0.0) / nights,
-        rem_minutes=stage_totals.get(SleepStage.REM, 0.0) / nights,
-        awake_minutes=stage_totals.get(SleepStage.AWAKE, 0.0) / nights,
-        interruptions=round(avg_interruptions),
-        bedtime_consistency_std=_bedtime_consistency_std([e.bedtime for e in entries]),
+    minutes_below_90 = sum(
+        (ts[i + 1] - ts[i]).total_seconds() / 60 for i in range(len(vals) - 1) if vals[i] < 90
     )
+    dips, in_dip, start = 0, False, 0
+    for i in range(1, len(vals)):
+        while (ts[i] - ts[start]).total_seconds() > 120:
+            start += 1
+        window = vals[start:i] or [vals[i - 1]]
+        baseline = sum(window) / len(window)
+        if not in_dip and vals[i] <= baseline - 3:
+            dips, in_dip = dips + 1, True
+        elif in_dip and vals[i] > baseline - 3:
+            in_dip = False
 
-    score = scored["sleep_score"]
-    return SleepAnalysis(
-        score=score,
-        grade=_grade_for(score),
-        avg_duration_hours=round(duration_hours, 2),
-        avg_efficiency_pct=round(avg_efficiency, 1),
-        stage_breakdown=breakdown,
-        nights_analyzed=nights,
-        quality_label=scored["quality_label"],
-        recommendations=analyzer.get_recommendations(scored),
-    )
+    hours = max((ts[-1] - ts[0]).total_seconds() / 3600, 1 / 60)
+    dips_per_hour = round(dips / hours, 1)
+    result = {
+        "avg_spo2": round(sum(vals) / len(vals), 1),
+        "min_spo2": round(min(vals), 1),
+        "minutes_below_90": round(minutes_below_90, 1),
+        "dips": dips,
+        "dips_per_hour": dips_per_hour,
+        "recording_hours": round(hours, 2),
+    }
+    if dips_per_hour >= 5 or minutes_below_90 >= 5:
+        result["next_step"] = (
+            "Your oxygen dipped repeatedly overnight. Share this recording with a doctor; "
+            "a sleep study is how the cause is found."
+        )
+    return result
+
+
+def analyze_pap_therapy(events_per_hour: float, leak_rate: float, pressure: float,
+                        usage_hours: float, regime: str = "CPAP") -> dict:
+    """Nightly PAP therapy summary from the machine's own report."""
+    steps = []
+    if usage_hours < 4:
+        steps.append("Aim for at least 4 hours of use a night; comfort fixes with your provider help most.")
+    if leak_rate > 24:
+        steps.append("Leak is above 24 L/min. Refit the mask or ask your provider about a different size.")
+    if events_per_hour >= 5:
+        steps.append("The machine still records 5 or more events an hour. Tell your sleep doctor.")
+    return {
+        "regime": regime,
+        "events_per_hour": round(events_per_hour, 1),
+        "leak_rate": round(leak_rate, 1),
+        "pressure": round(pressure, 1),
+        "usage_hours": round(usage_hours, 1),
+        "meets_usage_target": usage_hours >= 4,
+        "next_steps": steps,
+    }

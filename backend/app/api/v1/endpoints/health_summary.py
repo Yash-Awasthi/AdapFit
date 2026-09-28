@@ -6,7 +6,7 @@ from app.services.camera_vitals import camera_vitals_service
 from app.services.stress_engine import stress_engine
 from app.services.digital_wellbeing import digital_wellbeing_service
 from app.services.location_tracker import location_tracker_service
-from app.services.sleep_tracker import sleep_tracker_service
+from app.services.sleep_tracker import sleep_journal
 from app.services.nutrition_logger import nutrition_logger_service
 from app.services.health_goals import health_goals_service
 from app.services.personalization_engine import personalization_engine
@@ -25,7 +25,7 @@ async def get_health_summary():
     stress = stress_engine._stress_entries[-1] if stress_engine._stress_entries else None
     wellbeing = digital_wellbeing_service.get_screen_time_report()
     walk = location_tracker_service.get_daily_summary()
-    sleep = sleep_tracker_service.get_sleep_score()
+    sleep = sleep_journal.latest_summary()
     nutrition = nutrition_logger_service.get_daily_summary()
     goals = health_goals_service.get_gamification_stats()
     checklist = health_goals_service.get_daily_checklist()
@@ -53,9 +53,9 @@ async def get_health_summary():
             "active_minutes": walk.total_active_minutes,
         },
         "sleep": {
-            "score": sleep.get("score", 0),
+            "score": sleep.get("score"),
             "quality": sleep.get("quality", "no_data"),
-            "last_sleep_hours": sleep.get("total_sleep_hours", 0),
+            "last_sleep_hours": sleep.get("total_sleep_hours"),
         },
         "nutrition": {
             "calories": nutrition.get("totals", {}).get("calories", 0),
@@ -79,7 +79,7 @@ def _generate_quick_actions(stress, sleep_score, wellbeing) -> list[dict]:
     actions = []
     if stress and stress.stress_level > 60:
         actions.append({"icon": "leaf", "label": "Breathing Exercise", "reason": "Stress is elevated"})
-    if sleep_score and sleep_score.get("score", 100) < 60:
+    if sleep_score and (sleep_score.get("score") or 100) < 60:
         actions.append({"icon": "moon", "label": "Sleep Tips", "reason": "Sleep quality needs improvement"})
     if wellbeing.total_screen_time_minutes > 240:
         actions.append({"icon": "phone-portrait", "label": "Take a Break", "reason": "High screen time today"})
