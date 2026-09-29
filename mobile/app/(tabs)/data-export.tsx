@@ -14,6 +14,7 @@ import { useApi } from '../../src/hooks/useApi';
 import { asArray } from '../../src/services/http';
 import { API_V1 } from '../../src/services/config';
 import { authedFetch } from '../../src/services/authToken';
+import { localDay } from '../../src/utils/date';
 
 const TINT = '#22C55E';
 
@@ -46,7 +47,7 @@ export default function DataExportScreen() {
       const res = await authedFetch(`${API_V1}/export/${id}${all ? '' : '?format=csv'}`);
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const text = await res.text();
-      const date = new Date().toISOString().slice(0, 10);
+      const date = localDay();
       const saved = await saveFile(`adapfit-${id}-${date}.${all ? 'json' : 'csv'}`, all ? 'application/json' : 'text/csv', text);
       if (saved) Alert.alert('Saved', all ? 'Your complete data file is saved.' : 'The CSV file is saved.');
     } catch (e: any) {

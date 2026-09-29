@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Trophy, Send, ArrowRight, Share2 } from 'lucide-react-native';
 import { Share } from 'react-native';
@@ -37,7 +37,7 @@ export default function WorkoutComplete() {
       }, {})
     );
 
-    const workoutId = activeWorkout?.workout_id || 'adhoc';
+    const workoutId = activeWorkout?.workout_id || (activeWorkout as any)?.id || 'adhoc';
     const payload = {
       user_id: userId,
       actual_duration_minutes: durationMinutes,
@@ -49,7 +49,12 @@ export default function WorkoutComplete() {
 
     try {
       await api.completeWorkout(workoutId, payload);
-    } catch {
+    } catch (err: any) {
+      // The server answered and refused: retrying the same payload later would fail the same way.
+      if (String(err?.message).startsWith('API error')) {
+        Alert.alert('Workout not saved', 'The server could not record this workout. Please try again.');
+        return;
+      }
       // Offline or server unreachable — queue for the background sync daemon.
       await addSyncMutation({
         table_name: 'workouts',
@@ -127,6 +132,9 @@ export default function WorkoutComplete() {
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
           <TouchableOpacity
             key={v}
+            accessibilityRole="radio"
+            accessibilityLabel={`Session effort ${v} of 10`}
+            accessibilityState={{ selected: rpe === v }}
             style={[s.ratingDot, rpe === v && s.ratingDotActive]}
             onPress={() => {
               Haptics.selectionAsync();
@@ -145,6 +153,9 @@ export default function WorkoutComplete() {
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
           <TouchableOpacity
             key={v}
+            accessibilityRole="radio"
+            accessibilityLabel={`Enjoyment ${v} of 10`}
+            accessibilityState={{ selected: enj === v }}
             style={[s.ratingDot, enj === v && s.ratingDotActive]}
             onPress={() => {
               Haptics.selectionAsync();
@@ -183,8 +194,9 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     subtitle: { fontSize: 14, color: theme.textMuted, marginBottom: 24 },
     label: { fontSize: 14, fontWeight: '600', color: theme.textSecondary, marginBottom: 8, marginTop: 16 },
     ratingRow: { flexDirection: 'row', gap: 6 },
+    // Ten dots share the row width, so they fit narrow phones and large text.
     ratingDot: {
-      width: 36, height: 36, borderRadius: 18,
+      flex: 1, aspectRatio: 1, maxWidth: 44, borderRadius: 22,
       backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center',
       borderWidth: 1, borderColor: theme.border,
     },

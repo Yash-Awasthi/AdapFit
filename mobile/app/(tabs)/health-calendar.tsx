@@ -127,7 +127,7 @@ export default function HealthCalendarScreen() {
                 <Text style={[typography.label.sm as any]}>{m.name}</Text>
                 <Text style={typography.body.xs as any}>{m.dosage} — {m.times?.join(', ')}</Text>
               </View>
-              <TouchableOpacity style={ns.takeButton}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Mark done" style={ns.takeButton}>
                 <Ionicons name="checkmark" size={16} color="#FFF" />
               </TouchableOpacity>
             </View>

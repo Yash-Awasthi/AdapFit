@@ -28,6 +28,7 @@ everything: `docker compose down -v`.
 | `JWT_SECRET_KEY` | yes | 32+ random characters |
 | `PUBLIC_BASE_URL` | yes, https | Used in password-reset and guardian links |
 | `GROQ_API_KEY` or `GEMINI_API_KEY` | one of them | Both have free tiers |
+| `LLM_DAILY_CALLS` | no | Model calls per account per day, default 60 |
 | `SENTRY_DSN` | no | Error reports without request bodies, headers or query strings |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | for reset and guardian mail | Without them the links are only logged |
 | `METRICS_TOKEN` | no | Bearer token for `/metrics` |

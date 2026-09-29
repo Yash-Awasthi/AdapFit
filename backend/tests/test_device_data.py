@@ -36,6 +36,19 @@ def test_records_are_deduplicated_and_summarised_by_local_day():
     assert "weight_kg" not in row  # nothing synced, nothing invented
 
 
+def test_records_deleted_on_the_phone_leave_the_server():
+    recs = [
+        {"id": "del-s", "type": "steps", "start": _ts(3, 9), "end": _ts(3, 10), "value": 500},
+        {"id": "del-g", "type": "blood_glucose", "start": _ts(3, 7), "end": _ts(3, 7), "value": 180},
+    ]
+    c.post("/api/v1/device-data/import", json={"records": recs})
+    out = c.post("/api/v1/device-data/delete", json={"record_ids": ["del-s", "del-g", "never-synced"]}).json()
+    assert out["deleted"] == 2
+    assert c.post("/api/v1/device-data/delete", json={"record_ids": ["del-s"]}).json()["deleted"] == 0
+    from app.services.diabetes_manager import diabetes_manager_service
+    assert all(r["timestamp"] != recs[1]["start"] for r in diabetes_manager_service._glucose_readings)
+
+
 def test_unknown_types_are_refused():
     r = c.post("/api/v1/device-data/import", json={"records": [
         {"id": "x", "type": "made_up", "start": time.time(), "end": time.time()}]})

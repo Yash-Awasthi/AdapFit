@@ -3,7 +3,7 @@
  * Modern glassmorphism design with animated elements, health metrics, quick actions.
  * Uses Reanimated worklets for all animations (UI thread).
  */
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   RefreshControl, useWindowDimensions,
@@ -11,7 +11,7 @@ import {
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../src/theme';
 import { useGrid } from '../../src/theme/layout';
@@ -26,6 +26,7 @@ import { FloatingActionButton } from '../../src/components/NavigationHelpers';
 import { TodayDecision } from '../../src/components/TodayDecision';
 
 import { useApis } from '../../src/hooks/useApi';
+import { localDay } from '../../src/utils/date';
 import { asArray, asNumber, postJson } from '../../src/services/http';
 
 // ===== Greeting based on time of day =====
@@ -45,6 +46,7 @@ function getScoreLabel(score: number): string {
 }
 
 interface RecoveryLog {
+  log_date?: string;
   recovery_score?: number | null;
   hrv_rmssd?: number | null;
   resting_heart_rate?: number | null;
@@ -77,8 +79,11 @@ export default function HomeScreen() {
     recovery: '/recovery-logs?days=1',
     hydration: '/hydration/today',
   });
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
-  const latest: RecoveryLog | null = asArray<RecoveryLog>(data.recovery?.items).slice(-1)[0] ?? null;
+  // Only today's check-in describes today; an older one would show yesterday's numbers as today's.
+  const last = asArray<RecoveryLog>(data.recovery?.items).slice(-1)[0];
+  const latest: RecoveryLog | null = last && String(last.log_date ?? '').slice(0, 10) === localDay() ? last : null;
   const healthScore = typeof latest?.recovery_score === 'number' ? Math.round(latest.recovery_score) : null;
   const bpm = typeof latest?.resting_heart_rate === 'number' ? latest.resting_heart_rate : null;
   const sleepScore = typeof latest?.sleep_score === 'number' ? Math.round(latest.sleep_score) : null;
@@ -144,7 +149,7 @@ export default function HomeScreen() {
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </Text>
             </View>
-            <TouchableOpacity style={styles.heroAvatar} onPress={() => router.push('/menu' as any)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open menu" style={styles.heroAvatar} onPress={() => router.push('/menu' as any)}>
               <Ionicons name="person" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
@@ -152,7 +157,7 @@ export default function HomeScreen() {
           {/* Health Score Ring */}
           <View style={styles.heroScoreRow}>
             <ScoreRing
-              score={healthScore ?? 0}
+              score={healthScore}
               size={110}
               strokeWidth={8}
               color="#FFF"

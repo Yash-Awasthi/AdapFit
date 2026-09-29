@@ -17,6 +17,8 @@ type HC = typeof import('react-native-health-connect');
 export type HealthConnectState = 'unsupported' | 'not-installed' | 'update-required' | 'ready';
 
 const LAST_SYNC_KEY = 'adapfit.hc.last_sync';
+// Changes token for deletions, stored with the record types it was issued for.
+const CHANGES_KEY = 'adapfit.hc.changes';
 const FIRST_SYNC_DAYS = 30;
 // Health Connect keeps edits for a while; re-reading two days catches late writes from watches.
 const OVERLAP_MS = 2 * 86400_000;
@@ -93,7 +95,32 @@ export async function readAll(type: HcType, startMs: number, endMs: number): Pro
   return out;
 }
 
-export type SyncResult = { sent: number; added: number; types: number } | { error: string };
+/**
+ * Record ids deleted in Health Connect since the stored token. The first call only takes a
+ * token; an expired one (30 days unsynced) starts over, since those deletions can no longer be listed.
+ */
+async function deletedSinceLastSync(types: Set<HcType>): Promise<{ ids: string[]; commit: () => Promise<void> }> {
+  const m = hc();
+  if (!m) return { ids: [], commit: async () => {} };
+  const sig = [...types].sort().join(',');
+  const stored = JSON.parse((await AsyncStorage.getItem(CHANGES_KEY)) || 'null') as { sig: string; token: string } | null;
+  let token = stored?.sig === sig ? stored.token : undefined;
+  const deleted: string[] = [];
+  for (;;) {
+    const res: any = await m.getChanges(token ? { changesToken: token } : { recordTypes: [...types] as any });
+    if (res.changesTokenExpired) {
+      token = undefined;
+      continue;
+    }
+    for (const d of res.deletionChanges ?? []) deleted.push(d.recordId);
+    token = res.nextChangesToken;
+    if (!res.hasMore) break;
+  }
+  // Saved only once the server has the deletions, so a failed upload lists them again next time.
+  return { ids: deleted, commit: () => AsyncStorage.setItem(CHANGES_KEY, JSON.stringify({ sig, token })) };
+}
+
+export type SyncResult = { sent: number; added: number; types: number; deleted?: number } | { error: string };
 
 /** Read everything new since the last sync (30 days the first time) and post it. */
 export async function syncHealthConnect(): Promise<SyncResult> {
@@ -121,8 +148,20 @@ export async function syncHealthConnect(): Promise<SyncResult> {
     if (!res) return { error: 'server' };
     added += res.added;
   }
+  let deleted = 0;
+  try {
+    const { ids, commit } = await deletedSinceLastSync(types);
+    for (let i = 0; i < ids.length; i += 5000) {
+      const res = await postJson<{ deleted: number }>('/device-data/delete', { record_ids: ids.slice(i, i + 5000) });
+      if (!res) return { error: 'server' };
+      deleted += res.deleted;
+    }
+    await commit();
+  } catch {
+    /* an older Health Connect without the changes API still syncs additions */
+  }
   await AsyncStorage.setItem(LAST_SYNC_KEY, String(now));
-  return { sent: records.length, added, types: types.size };
+  return { sent: records.length, added, types: types.size, deleted };
 }
 
 /** Background-friendly sync on app open: silent, at most once an hour, only when access was already given. */
@@ -134,6 +173,6 @@ export async function syncHealthConnectIfDue(): Promise<void> {
 
 /** Forget the sync position, so the next sync re-reads 30 days (after sign-out or a new account). */
 export async function resetHealthSync(): Promise<void> {
-  await AsyncStorage.removeItem(LAST_SYNC_KEY);
+  await AsyncStorage.multiRemove([LAST_SYNC_KEY, CHANGES_KEY]);
 }
 

@@ -44,7 +44,7 @@ interface Restrictions {
 interface ProfileSummary {
   active_conditions: number;
   active_medications: number;
-  risk_level: string;
+  risk_level: string | null;
   conditions: string[];
   medications: string[];
   needs_doctor_clearance: boolean;
@@ -171,7 +171,7 @@ export default function HealthScreen() {
     }
   };
 
-  const riskColor = profile?.risk_level === "high" ? theme.danger : profile?.risk_level === "moderate" ? theme.warning : theme.success;
+  const riskColor = profile?.risk_level === "high" ? theme.danger : profile?.risk_level === "moderate" ? theme.warning : profile?.risk_level ? theme.success : theme.textMuted;
 
   return (
     <View style={s.container}>
@@ -218,9 +218,9 @@ export default function HealthScreen() {
           </View>
           <View style={[s.summaryCard, { borderLeftColor: riskColor }]}>
             <Text style={[s.summaryNum, { color: riskColor }]}>
-              {(profile?.risk_level || "low").toUpperCase()}
+              {profile?.risk_level ? profile.risk_level.toUpperCase() : "—"}
             </Text>
-            <Text style={s.summaryLabel}>Risk Level</Text>
+            <Text style={s.summaryLabel}>Exercise caution</Text>
           </View>
         </View>
 

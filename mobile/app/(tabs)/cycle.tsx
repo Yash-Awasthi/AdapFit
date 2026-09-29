@@ -18,6 +18,7 @@ import { colors, spacing, radius } from '../../src/theme';
 import { useTabBarHeight } from '../../src/theme/layout';
 import { getJson, postJson, asArray } from '../../src/services/http';
 import { useUserStore } from '../../src/stores';
+import { localDay } from '../../src/utils/date';
 
 const PHASES = {
   menstrual: { label: 'Menstrual', color: '#EF4444', icon: 'water' },
@@ -43,7 +44,7 @@ interface CurrentCycle {
 interface CalendarDay { date: string; phase: PhaseName; day_in_cycle: number }
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDay();
 }
 
 function PhaseLegend() {

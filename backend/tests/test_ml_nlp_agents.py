@@ -4,9 +4,7 @@ import pytest
 from app.services.ml_engine import ml_engine
 from app.services.nlp_pipeline import nlp_pipeline
 from app.services.vector_store import VectorStore
-from app.services.agent.supervisor import supervisor_agent
 from app.services.agent.evolution_engine import evolution_engine
-from app.services.spark_processor import spark_analytics
 from core_engine import (
     compute_hrv_zscore, compute_ewma, compute_acwr,
     detect_anomalies, detect_injury_risk,
@@ -37,13 +35,6 @@ def test_injury_risk_extremes():
 
 # --- ML engine ---
 
-def test_readiness_prediction():
-    f = [50.0] * 7 + [7.5] * 7 + [70, 70, 70] + [1.0, 7.0]
-    r = ml_engine.predict_readiness(f)
-    assert r["predicted_state"] in ("OPTIMAL", "MODERATE", "REDUCED", "DEPLETED")
-    assert 0 <= r["confidence"] <= 1.0
-
-
 def test_hrv_forecast_trend():
     r = ml_engine.forecast_hrv([45, 48, 50, 52, 55, 58, 60], 7)
     assert r["trend"] == "improving" and len(r["forecast"]) == 7
@@ -53,10 +44,6 @@ def test_anomaly_detection_values():
     r = ml_engine.detect_anomalies([70, 72, 68, 71, 69, 30, 73])
     assert r["anomaly_count"] >= 1
 
-
-def test_injury_risk_score():
-    r = ml_engine.compute_injury_risk(1.6, -2.5, 4.0, 5)
-    assert r["risk_level"] in ("LOW", "MODERATE", "ELEVATED", "CRITICAL")
 
 
 # --- NLP pipeline ---
@@ -102,23 +89,6 @@ def test_semantic_search():
 
 # --- Agent ---
 
-def test_supervisor_optimal():
-    r = supervisor_agent.synthesize_recommendation(
-        recovery_assessment={"recovery_score": 90, "readiness_state": "OPTIMAL"},
-        workout_plan={}, acwr_status={"acwr_status": "SWEET_SPOT"},
-        ml_predictions={"is_trained": False})
-    assert r["readiness_state"] == "OPTIMAL" and len(r["actions"]) > 0
-
-
-def test_supervisor_safety_override():
-    r = supervisor_agent.resolve_conflict(
-        workout_suggestion={}, acwr_warning=True,
-        injury_risk={"risk_level": "CRITICAL"})
-    assert r["resolution"] == "safety_override"
-
-
-# --- Evolution engine ---
-
 def test_evolution_record_and_report():
     uid = "test-evo-" + str(id(evolution_engine))
     asyncio.run(evolution_engine.record_workout_accepted(uid, [{"exercise_id": "bench"}]))
@@ -131,9 +101,3 @@ def test_evolution_record_and_report():
 # --- Workflow ---
 
 # --- Spark baselines ---
-
-def test_rolling_baselines():
-    logs = [{"hrv_rmssd": 50 + i, "resting_heart_rate": 65 - i,
-             "sleep_duration_hours": 7.5, "recovery_score": 70 + i} for i in range(14)]
-    b = spark_analytics.compute_rolling_baselines(logs)
-    assert b["hrv_mean_rmssd"] > 0 and b["hrv_std_rmssd"] > 0

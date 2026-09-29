@@ -10,7 +10,7 @@ export function ScreenHeader({ title, right }: { title: string; right?: React.Re
   const { theme } = useTheme();
   return (
     <View style={styles.header}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
         <ChevronLeft size={22} color={theme.text} />
       </TouchableOpacity>
       <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>

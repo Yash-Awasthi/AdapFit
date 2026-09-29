@@ -23,7 +23,7 @@ def test_dashboard_score_is_the_checkin_score():
     for day in range(1, 5):
         _checkin("rt-user", day, 50 + day)
     score = _checkin("rt-user", 5, 60).json()["recovery_score"]
-    today = c.get("/api/v1/recovery-logs/today?user_id=rt-user").json()
+    today = c.get("/api/v1/recovery-logs/today?user_id=rt-user&day=2026-05-05").json()
     assert today["overall_score"] == score
     hrv = next(d for d in today["domains"] if d["name"] == "hrv")
     assert hrv["data_available"] and "your normal" in hrv["insight"]

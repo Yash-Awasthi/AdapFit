@@ -129,7 +129,7 @@ export default function DevToolsScreen() {
       <ScreenHeader
         title="Dev Tools"
         right={
-          <TouchableOpacity onPress={handleSave} hitSlop={10}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save" onPress={handleSave} hitSlop={10}>
             <Check size={22} color={theme.primaryLight} />
           </TouchableOpacity>
         }
@@ -217,7 +217,7 @@ export default function DevToolsScreen() {
           <View style={[styles.modalSheet, { backgroundColor: theme.background }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>Choose a model</Text>
-              <TouchableOpacity onPress={() => setModelPickerOpen(false)} hitSlop={10}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setModelPickerOpen(false)} hitSlop={10}>
                 <X size={22} color={theme.textMuted} />
               </TouchableOpacity>
             </View>

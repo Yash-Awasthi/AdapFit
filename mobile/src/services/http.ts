@@ -8,6 +8,21 @@
 import { API_V1 } from './config';
 import { authedFetch } from './authToken';
 
+// Whether the server answered the last request; a failed one would otherwise look like an empty screen.
+type Reachability = (reachable: boolean) => void;
+const listeners = new Set<Reachability>();
+let reachable = true;
+function report(ok: boolean) {
+  if (ok === reachable) return;
+  reachable = ok;
+  listeners.forEach((l) => l(ok));
+}
+export function onReachabilityChange(listener: Reachability): () => void {
+  listeners.add(listener);
+  listener(reachable);
+  return () => listeners.delete(listener);
+}
+
 /** GET that returns null instead of throwing or handing back an error body. */
 export async function getJson<T>(path: string): Promise<T | null> {
   return sendJson<T>(path, 'GET');
@@ -47,9 +62,11 @@ async function sendJson<T>(path: string, method: string, body?: unknown): Promis
       headers: { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    report(res.status < 500);
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
+    report(false);
     return null;
   }
 }

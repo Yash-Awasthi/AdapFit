@@ -29,7 +29,9 @@ def _ensure_hf_pipeline():
 
 from app.core.config import settings
 from app.core.gemini import gemini_endpoint
-from app.core.privacy import allowed
+from app.core.gemini import extract_text
+from app.services.safety_policy import screen_reply
+from app.core.llm_quota import ai_call_allowed
 
 
 class NLPPipeline:
@@ -132,7 +134,7 @@ class NLPPipeline:
     
     async def parse_goals_from_text(self, text: str) -> Dict[str, Any]:
         """Use LLM to parse fitness goals from free-text input."""
-        if not settings.GEMINI_API_KEY or not allowed("ai"):
+        if not settings.GEMINI_API_KEY or not ai_call_allowed():
             return self._rule_based_goal_parse(text)
         
         try:
@@ -194,7 +196,7 @@ User input: "{text}"
     
     async def generate_weekly_summary(self, user_data: dict, recovery_logs: list, workout_logs: list) -> str:
         """Generate a natural language weekly progress summary."""
-        if settings.GEMINI_API_KEY and allowed("ai"):
+        if settings.GEMINI_API_KEY and ai_call_allowed():
             return await self._generate_summary_llm(user_data, recovery_logs, workout_logs)
         return self._generate_summary_rule_based(recovery_logs, workout_logs)
     
@@ -202,14 +204,19 @@ User input: "{text}"
         if not settings.GEMINI_API_KEY:
             return self._generate_summary_rule_based(recovery_logs, workout_logs)
         try:
-            avg_score = sum(r.get("recovery_score", 70) for r in recovery_logs) / max(len(recovery_logs), 1) if recovery_logs else 70
+            scores = [r["recovery_score"] for r in recovery_logs if r.get("recovery_score") is not None]
+            if not scores:
+                return self._generate_summary_rule_based(recovery_logs, workout_logs)
             url = gemini_endpoint(settings.GEMINI_API_KEY)[0]
-            prompt = f"You are AdapFit AI coach. Avg recovery: {avg_score:.0f}/100. Workouts: {len(workout_logs)}. Write 2-3 sentence summary."
+            prompt = (f"You are AdapFit AI coach. Avg recovery: {sum(scores) / len(scores):.0f}/100 over {len(scores)} "
+                      f"check-ins. Workouts: {len(workout_logs)}. Write 2-3 sentence summary.")
             payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.5, "maxOutputTokens": 800}}
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(url, json=payload)
                 if resp.status_code == 200:
-                    return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    text = screen_reply(extract_text(resp.json()))
+                    if text:
+                        return text
         except Exception:
             pass
         return self._generate_summary_rule_based(recovery_logs, workout_logs)
@@ -217,7 +224,10 @@ User input: "{text}"
     def _generate_summary_rule_based(self, recovery_logs, workout_logs):
         if not recovery_logs and not workout_logs:
             return "No data yet. Start logging to see insights!"
-        avg_score = sum(r.get("recovery_score", 70) for r in recovery_logs) / max(len(recovery_logs), 1) if recovery_logs else 70
+        scores = [r["recovery_score"] for r in recovery_logs if r.get("recovery_score") is not None]
+        if not scores:
+            return f"No check-ins yet this week. {len(workout_logs)} workout(s) completed."
+        avg_score = sum(scores) / len(scores)
         trend = "excellent" if avg_score >= 80 else ("steady" if avg_score >= 65 else "below average")
         return f"Recovery has been {trend} (avg {avg_score:.0f}/100). {len(workout_logs)} workout(s) completed."
     

@@ -117,7 +117,7 @@ export function SearchInput({ value, onChangeText, placeholder = "Search..." }: 
         onBlur={() => setFocused(false)}
       />
       {value.length > 0 && (
-        <TouchableOpacity onPress={() => onChangeText("")}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear text" onPress={() => onChangeText("")}>
           <MaterialCommunityIcons name="close-circle" size={18} color={COLORS.textMuted} />
         </TouchableOpacity>
       )}

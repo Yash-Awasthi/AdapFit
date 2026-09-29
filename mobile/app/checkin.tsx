@@ -9,6 +9,7 @@ import { useUserStore } from '../src/stores';
 import { useTheme } from '../src/services/theme';
 import { fetchHealthData, HealthBiometrics } from '../src/services/healthBridge';
 import { authedFetch } from '../src/services/authToken';
+import { localDay } from '../src/utils/date';
 
 const API = API_BASE_URL;
 
@@ -26,7 +27,7 @@ function SliderField({
   accessibilityHint,
 }: {
   label: string;
-  value: number;
+  value: number | null;
   onChange: (v: number) => void;
   icon: any;
   min?: number;
@@ -41,11 +42,11 @@ function SliderField({
   const s = makeSliderStyles(theme);
   const values = Array.from({ length: max - min + 1 }, (_, i) => min + i);
   return (
-    <View style={s.container} accessible accessibilityLabel={accessibilityLabel} accessibilityHint={accessibilityHint}>
+    <View style={s.container} accessibilityLabel={accessibilityLabel} accessibilityHint={accessibilityHint}>
       <View style={s.header}>
         <Icon size={18} color={color} />
         <Text style={s.label}>{label}</Text>
-        <Text style={[s.value, { color }]}>{value}</Text>
+        <Text style={[s.value, { color }]}>{value ?? '—'}</Text>
       </View>
       <View style={s.row}>
         <Text style={s.endLabel}>{leftLabel}</Text>
@@ -53,6 +54,9 @@ function SliderField({
           {values.map((v) => (
             <TouchableOpacity
               key={v}
+              accessibilityRole="radio"
+              accessibilityLabel={`${label} ${v}`}
+              accessibilityState={{ selected: value === v }}
               style={[
                 s.dot,
                 value === v && [s.dotActive, { backgroundColor: color }],
@@ -84,6 +88,8 @@ export default function CheckinScreen() {
   const s = makeStyles(theme);
   const userId = useUserStore((s) => s.userId);
   const [sleep, setSleep] = useState(8);
+  // Sleep is sent only once the user moves the slider or a device reported it; the starting 8 is not a reading.
+  const [sleepSet, setSleepSet] = useState(false);
   const [soreness, setSoreness] = useState(5);
   const [fatigue, setFatigue] = useState(5);
   const [stress, setStress] = useState(5);
@@ -96,11 +102,14 @@ export default function CheckinScreen() {
       setHealth(data);
       // Seed the slider only from a real device reading; sleepHours is absent
       // when the health source is unavailable.
-      if (data.source !== 'simulated' && typeof data.sleepHours === 'number') {
+      if ((data.source === 'healthconnect' || data.source === 'healthkit') && typeof data.sleepHours === 'number') {
         setSleep(Math.round(data.sleepHours));
+        setSleepSet(true);
       }
     });
   }, []);
+
+  const synced = health?.source === 'healthconnect' || health?.source === 'healthkit';
 
   async function handleSubmit() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -111,7 +120,7 @@ export default function CheckinScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: userId,
-          log_date: new Date().toISOString().split('T')[0],
+          log_date: localDay(),
           subjective_checkin: {
             soreness,
             fatigue,
@@ -119,12 +128,12 @@ export default function CheckinScreen() {
             sore_muscle_groups: [],
           },
           wearable_data: {
-            sleep_duration_hours: sleep,
-            sleep_efficiency_pct: health?.source !== 'simulated' ? health?.sleepEfficiency : undefined,
-            hrv_rmssd: health?.source !== 'simulated' ? health?.hrvRmssd : undefined,
-            resting_heart_rate: health?.source !== 'simulated' ? health?.restingHeartRate : undefined,
-            steps: health?.source !== 'simulated' ? health?.steps : undefined,
-            active_calories: health?.source !== 'simulated' ? health?.activeCalories : undefined,
+            sleep_duration_hours: sleepSet ? sleep : undefined,
+            sleep_efficiency_pct: synced ? health?.sleepEfficiency : undefined,
+            hrv_rmssd: synced ? health?.hrvRmssd : undefined,
+            resting_heart_rate: synced ? health?.restingHeartRate : undefined,
+            steps: synced ? health?.steps : undefined,
+            active_calories: synced ? health?.activeCalories : undefined,
           },
         }),
       });
@@ -146,7 +155,7 @@ export default function CheckinScreen() {
       <Text style={s.title} accessibilityRole="header">Morning Check-in</Text>
       <Text style={s.subtitle}>Rate how you're feeling right now</Text>
 
-      {health && health.source !== 'simulated' && (
+      {synced && health && (
         <View style={s.syncBadge}>
           <Watch size={14} color={theme.success} />
           <Text style={[s.syncBadgeText, { color: theme.success }]}>
@@ -158,15 +167,15 @@ export default function CheckinScreen() {
 
       <SliderField
         label="Sleep Hours"
-        value={sleep}
-        onChange={setSleep}
+        value={sleepSet ? sleep : null}
+        onChange={(v) => { setSleep(v); setSleepSet(true); }}
         icon={Moon}
         min={3}
         max={12}
         leftLabel="3h"
         rightLabel="12h"
         color={theme.primaryLight}
-        accessibilityLabel={`Sleep hours: ${sleep}`}
+        accessibilityLabel={sleepSet ? `Sleep hours: ${sleep}` : 'Sleep hours: not set'}
         accessibilityHint="Slider from 3 to 12 hours"
       />
 

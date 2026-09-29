@@ -14,7 +14,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from app.core.storage import storage
-from app.core.workout_metrics import _first_number, session_duration_minutes
+from app.core.workout_metrics import session_duration_minutes, session_rpe
 from app.services.cycling_fueling_planner import RideType, generate_fueling_plan
 from app.services.endurance_coaching import DailyTrainingLoad, calculate_ctl_atl, classify_tsb
 from app.services.training_intensity import classify_distribution
@@ -28,15 +28,14 @@ def _day(log: dict) -> str | None:
 
 
 def _measured_sessions(logs: list[dict]) -> tuple[list[tuple[str, float, float]], int]:
-    """(day, rpe, minutes) for sessions with a recorded RPE, and how many were skipped."""
+    """(day, rpe, minutes) for sessions with a recorded RPE and duration, and how many were skipped."""
     out, skipped = [], 0
     for log in logs:
-        rpe = _first_number(log, ("session_rpe", "rpe"))
-        day = _day(log)
-        if rpe is None or day is None:
+        rpe, minutes, day = session_rpe(log), session_duration_minutes(log), _day(log)
+        if rpe is None or minutes is None or day is None:
             skipped += 1
             continue
-        out.append((day, max(1.0, min(10.0, rpe)), session_duration_minutes(log)))
+        out.append((day, rpe, minutes))
     return out, skipped
 
 

@@ -66,7 +66,17 @@ def main() -> int:
         assert bp.status_code == 201, bp.text
         print("logged a blood pressure reading (feature_state)")
 
-        decision = client.get("/api/v1/decision/today", headers=headers)
+        generated = client.post("/api/v1/workouts", headers=headers,
+                                json={"user_id": "", "target_date": "2026-05-07", "target_duration_minutes": 30})
+        assert generated.status_code == 201, generated.text
+        workout_id = generated.json()["workout_id"]
+        listed = client.get("/api/v1/workouts?days=14", headers=headers).json()
+        listed = listed.get("items", listed) if isinstance(listed, dict) else listed
+        same = [w for w in listed if w["workout_id"] == workout_id]
+        assert same and all(ex["name"] for ex in same[0]["exercises"]), "workout shape differs on Postgres"
+        print("generated workout listed under the same id with exercise names")
+
+        decision = client.get("/api/v1/decision/today?day=2026-05-07", headers=headers)
         assert decision.status_code == 200, decision.text
         assert decision.json()["user_id"] == user_id, "identity was not bound"
         print("decision:", decision.json()["decision"], "-", decision.json()["headline"])

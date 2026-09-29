@@ -50,7 +50,7 @@ function buildTheme(isDark: boolean, accent: AccentName) {
         border: '#E2DFD5',
         text: '#25291F',
         textSecondary: '#585B4F',
-        textMuted: '#8A8D80',
+        textMuted: '#696C60',
         primary: a.primary,
         primaryLight: a.primaryLight,
         primaryBg: `${a.primary}1A`,

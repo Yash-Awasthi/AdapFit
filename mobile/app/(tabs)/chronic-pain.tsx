@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useApis } from '../../src/hooks/useApi';
 import { postJson, asArray } from '../../src/services/http';
 import { useUserStore } from '../../src/stores';
+import { localDay } from '../../src/utils/date';
 
 type Tab = 'diary' | 'triggers' | 'treatments' | 'cbt';
 
@@ -67,9 +68,9 @@ function painColor(level: number): string {
 }
 
 function relativeDay(date: string): string {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDay();
   if (date === today) return 'Today';
-  const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+  const yesterday = localDay(new Date(Date.now() - 86400_000));
   if (date === yesterday) return 'Yesterday';
   return date;
 }

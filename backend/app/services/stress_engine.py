@@ -132,35 +132,32 @@ class StressEngine:
         """
         category_scores = {}
         
-        # 1. HRV-based stress
-        hrv = data.get("hRV_rmssd", self._baseline_hrv)
-        hrv_stress = max(0, min(100, (1 - hrv / 80) * 100 * self._stress_sensitivity))
-        category_scores["physiological"] = hrv_stress
-        
-        # 2. Sleep impact
-        sleep_quality = data.get("sleep_quality", 70)
-        sleep_hours = data.get("sleep_hours", 7)
-        sleep_debt = max(0, (7 - sleep_hours) * 15)
-        sleep_stress = max(0, min(100, (100 - sleep_quality) * 0.6 + sleep_debt * 0.4))
-        category_scores["sleep_related"] = sleep_stress
-        
-        # 3. Activity level (low activity = higher stress)
-        activity_min = data.get("activity_minutes_today", 0)
-        activity_stress = max(0, min(100, max(0, 60 - activity_min) * 1.67))
-        category_scores["physical"] = activity_stress
-        
-        # 4. Mood & emotional state
-        mood = data.get("mood_score", 5)
-        energy = data.get("energy_level", 5)
-        emotional_stress = max(0, min(100, (10 - mood) * 10 * 0.6 + (10 - energy) * 10 * 0.4))
-        category_scores["emotional"] = emotional_stress
-        
-        # 5. Work/screen stress
-        screen_time = data.get("screen_time_hours", 0)
-        meeting_hours = data.get("meeting_hours", 0)
-        work_stress = max(0, min(100, screen_time * 8 + meeting_hours * 12))
-        category_scores["work"] = work_stress
-        
+        # Each category is scored only from inputs the user gave; a missing one is left out, not assumed.
+        hrv = data.get("hrv_rmssd")
+        if hrv is not None:
+            category_scores["physiological"] = max(0, min(100, (1 - hrv / 80) * 100 * self._stress_sensitivity))
+
+        sleep_quality, sleep_hours = data.get("sleep_quality"), data.get("sleep_hours")
+        if sleep_quality is not None or sleep_hours is not None:
+            parts = []
+            if sleep_quality is not None:
+                parts.append((100 - sleep_quality) * 0.6 / (0.6 if sleep_hours is None else 1))
+            if sleep_hours is not None:
+                parts.append(max(0, (7 - sleep_hours) * 15) * 0.4 / (0.4 if sleep_quality is None else 1))
+            category_scores["sleep_related"] = max(0, min(100, sum(parts)))
+
+        activity_min = data.get("activity_minutes_today")
+        if activity_min is not None:
+            category_scores["physical"] = max(0, min(100, max(0, 60 - activity_min) * 1.67))
+
+        mood, energy = data.get("mood_score"), data.get("energy_level")
+        if mood is not None and energy is not None:
+            category_scores["emotional"] = max(0, min(100, (10 - mood) * 10 * 0.6 + (10 - energy) * 10 * 0.4))
+
+        screen_time, meeting_hours = data.get("screen_time_hours"), data.get("meeting_hours")
+        if screen_time is not None or meeting_hours is not None:
+            category_scores["work"] = max(0, min(100, (screen_time or 0) * 8 + (meeting_hours or 0) * 12))
+
         # 6. Self-reported (if available)
         self_report = data.get("self_reported_stress")
         if self_report is not None:
@@ -177,10 +174,9 @@ class StressEngine:
         }
         
         total_weight = sum(weights.get(k, 0) for k in category_scores)
-        if total_weight > 0:
-            overall = sum(category_scores.get(k, 0) * weights.get(k, 0) for k in category_scores) / total_weight
-        else:
-            overall = 50.0
+        if total_weight == 0:
+            raise ValueError("no stress inputs")
+        overall = sum(category_scores.get(k, 0) * weights.get(k, 0) for k in category_scores) / total_weight
         
         # Find primary category
         primary_cat = max(category_scores, key=category_scores.get)

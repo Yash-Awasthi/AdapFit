@@ -14,6 +14,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { colors, spacing, radius } from '../src/theme';
 import { postJson } from '../src/services/http';
 import { SleepSoundDetector } from '../src/services/sleepSoundDetector';
+import { localDay } from '../src/utils/date';
 
 const PENDING_FILE_KEY = 'adapfit.sleepAudio.file';
 const KEEP_AWAKE_TAG = 'sleep-sounds';
@@ -121,7 +122,7 @@ export default function SleepSoundsScreen() {
       return;
     }
     const today = new Date();
-    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const date = localDay(today);
     const r = await postJson<{ data: Result }>('/sleep-audio/analyze', { user_id: 'me', audio_data: { ...report, date } });
     setBusy(false);
     setResult(r?.data ?? { status: 'error', message: `The server could not be reached. Heard ${report.duration_minutes} min, ${report.snoring_events.length} snoring stretches.` });

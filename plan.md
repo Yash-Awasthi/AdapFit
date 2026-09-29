@@ -1798,3 +1798,167 @@ four `*.check.ts` pass.
 Left: staging, Sentry DSN, uptime monitor and an LLM key need the owner's free
 accounts; remote push needs Firebase and a reason to push; iOS deferred; Expo
 upgrade past 55.
+
+## Part 18 — AI and data quality (todo.md Phase 7)
+
+Measured at the start. Training load: `session_load` assumed 45 minutes and
+RPE 5 for sessions without them; the acute:chronic ratio was an EWMA over the
+list of sessions rather than calendar days, so rest days did not count and
+the first session scored exactly 1.0; with no history `/trends/acwr`
+reported 480 over 500 ("sweet spot"). On Postgres, workout logs and workload
+history came back newest first while every caller read `[-1]` as the latest,
+so the stored ACWR and "latest workout" were the oldest ones there (memory
+mode was right, so tests passed). The LangGraph pipeline (`graph.py`,
+`orchestrator.py`, `supervisor.py`) was never called and filled HRV 70,
+sleep 70 and chronic load 500 when missing. `ml_engine` padded features with
+HRV 50, sleep 7.5, score 70 and RPE 5 and returned a "readiness prediction"
+at 50% confidence that the Trends screen showed; its fatigue forecast assumed
+200 load units a day of future training. Correlations paired logs by list
+position, not date. The server rPPG reported "HRV" from smoothed BPM windows
+and a constant signal quality of 0.8; its stress indication said "moderate"
+with no data. The stress assessment filled HRV 45, sleep 70 and mood 5 when
+missing and read HRV from a misspelt key, so the physiological part was a
+constant. Workout generation told the model "Recovery Score 75/100" when
+there was no check-in and did not check AI consent; the websocket chat's Groq
+path skipped consent too. Chat accepted a caller-supplied base URL and key in
+production. The home screen showed the most recent check-in as today's (and
+a ring reading 0 with none); the decision card said "Train, but reduce
+intensity" with no data. Seven screens stamped dates with the UTC day,
+yesterday in India before 05:30.
+
+- `workout_metrics`: RPE, duration and load return None when not recorded; a
+  plan's target duration is not a measurement. `acwr()` is the daily EWMA of
+  Williams et al. 2017 (λ = 2/(N+1), N = 7 and 28, rest days zero) and is None
+  until the first measured session is 28 days old. Workout completion, the
+  recovery check-in, `/trends/acwr`, `/trends/alerts`, chat context, the daily
+  decision, volume capacity and injury risk all use it; injury risk answers
+  "insufficient data" until then.
+- Postgres history reads return oldest first, like memory mode.
+- Deleted the unused agent pipeline, `ml_engine`'s readiness predictor,
+  feature padding, injury score and fatigue forecaster, the performance
+  predictor's unused XGBoost path, `spark_processor`, and xgboost and
+  scikit-learn from requirements. `/trends/ml-insights` reports the latest
+  check-in's readiness with its date; `/trends/fatigue-forecast` is the
+  Banister fatigue from sessions with an RPE; correlations pair by day and
+  skip missing values.
+- rPPG: HRV and breathing rate are None (they need beat intervals), quality is
+  the mean of per-frame quality, stress is "not measured", and facial fatigue
+  needs every landmark value. Stress assessment scores only the categories
+  given and refuses an empty request.
+- Home: only today's check-in counts; the ring shows a dash without one.
+  `/decision/today` and `/recovery-logs/today` take the phone's date and
+  answer "Check in to see today's plan" without today's check-in; the card
+  offers the check-in. All dates the app sends use the local day.
+- Workout generation says "No check-in for this day, so this is a standard
+  session" and tells the model no score; it needs AI consent.
+- `safety_policy.screen_reply()` drops generated sentences that diagnose or
+  change a medicine and adds who to ask; applied to chat, websocket chat, the
+  misinformation explanation, the weekly summary and the workout rationale.
+  The developer LLM override is ignored in production. `docs/LLM_CALLS.md`
+  lists every call with purpose, limits, filters, fallback and cost.
+- Health Connect deletions: the app keeps a changes token per set of granted
+  types and posts deleted record ids to `POST /device-data/delete`, which
+  also removes the CGM copy of a deleted glucose reading. The token is saved
+  only after the server accepts, so a failed upload retries.
+- The meal photo call runs off the event loop and refuses to log a meal it
+  could not read.
+- Reference tests: RMSSD and SDNN (Task Force 1996), HRV z-score, Banister
+  CTL/ATL, and ACWR behaviour (steady load near 1, spike above 1.5, rest days
+  drain the acute side).
+
+1,064 backend tests pass; typecheck clean; pip-audit clean.
+
+Left: skin-spot calibration needs the owner's photos; non-English reply
+screening; Health Connect deletion and the no-check-in home screen still to
+be seen on a device.
+
+## Part 19 — User experience and quality (todo.md Phase 9)
+
+Measured at the start by walking the core journey on the emulator (debug
+build, real Postgres, real auth) and opening every screen by deep link.
+
+Defects found and fixed:
+
+- Nobody could sign up: `/privacy/consent/purposes` needed a token, so the
+  sign-up screen had no consent switches and every attempt ended at
+  "Consent needed". Now public.
+- Onboarding never ran. On Postgres the account row is the profile row, so a
+  profile "existed" from sign-up with column defaults (intermediate,
+  barbell); the app also stored a local stub profile after sign-up and
+  sign-in. Migration 010 adds `users.onboarded_at`, set by `POST /users`;
+  `GET /users/{id}` answers 404 until then, and the store loads the server
+  profile instead of the stub.
+- "Generate Workout" posted to `/workouts/generate` (405) and swallowed the
+  error; "Start Workout" never told the store which workout, so the active
+  screen bounced straight back; completion then posted to `/workouts/adhoc`
+  with a 422 (Postgres workouts had `id`, not `workout_id`, and exercises had
+  no name) and a 4xx was queued as "offline" while the app said "Workout
+  Complete". The repository now returns the same shape as memory mode and
+  keeps the app's workout id; a refused save says so.
+- With `AUTH_DISABLED` on (the local `.env`), an expired token was served as
+  the dev user instead of 401, so after 15 minutes the app read and wrote
+  another account's data. A token that is sent is now always checked.
+- The check-in said "Synced from Apple Health" on Android with nothing synced
+  (`'unavailable'` was treated as a source) and submitted the slider's
+  starting 8 hours as measured sleep; sleep is now sent only once set. Its
+  sliders were one accessibility node, so a screen reader could not pick a
+  value.
+- Home and the decision card did not refresh after a check-in; both reload on
+  focus. Sign-up's password meter called the strongest password "Very Weak"
+  (off by one). Android forms left a light band under the keyboard
+  (`KeyboardAvoidingView` "height" on top of `adjustResize`).
+- A "Low risk level" was shown with no conditions logged; it is now "—" and
+  labelled "Exercise caution". Settings had three notification switches
+  that changed nothing (the real ones are in `NotificationSetup`); deleted.
+  The "Synced" pill covered screen headers; it now shows only when something
+  is pending or failed.
+
+Built:
+
+- expo/expo#50364: when an Activity attaches to a process the task service
+  started headless, `RNHeadlessAppLoader.invalidateApp` does not destroy the
+  host but still reported success, so `TaskService` dropped the live task
+  manager and location events stopped reaching JS. Patched (patch-package,
+  `mobile/patches/`) to report "not invalidated" in that case. Verified on
+  the emulator: run started, process crashed with the foreground service
+  running, jobs restarted before JS, app opened: 41 jobs, 41 finished over a
+  minute, points uploaded.
+- Exact alarms: `SCHEDULE_EXACT_ALARM` declared; expo-notifications already
+  schedules exactly when it is granted. The medication screen explains the
+  one-hour window and opens the setting, rebuilding reminders on return.
+- Change password in Settings (fresh token pair stored; other devices signed
+  out); server reasons shown.
+- A connection banner when the server cannot be reached, so empty screens
+  are not read as "no data"; a render error shows "Try again" (Part 17).
+- Accessibility: labels and roles on about 55 icon-only or unlabeled controls,
+  radio roles on rating dots, light-theme muted text darkened to 4.75:1
+  (`src/theme/contrast.check.ts` checks every text token, in CI), rating rows
+  that fit large text.
+- `mobile/e2e` deleted (no runner, never ran). `test_mobile_api_paths.py`
+  reads nested and multi-line generics and now checks the HTTP method too;
+  it catches the `/workouts/generate` bug.
+
+Verified on the emulator: sign-up with consent, onboarding, home with no
+check-in, check-in, decision "Train as planned", workout generated, started,
+set logged, completed; all 66 screens reachable by deep link opened with
+no render error; token refresh after expiry; the run relaunch case above.
+
+Left: phone checks (camera heart rate, BLE strap, Health Connect deletion),
+the dev-only text console error, onboarding depth, localisation, and
+automated end-to-end tests.
+
+## Part 20 — Monetisation (todo.md Phase 6)
+
+Decided with the owner: every feature free at launch, no paid tiers yet, no
+Play Console yet. Entitlements and store billing would gate nothing, so they
+are not built; they wait for prices.
+
+What free use needs is a bound on the one variable cost, the language
+models. `app/core/llm_quota.py`: every call site now asks
+`ai_call_allowed()`, which is the AI consent check plus one unit of the
+account's daily allowance (`LLM_DAILY_CALLS`, default 60, stored in feature
+state so a restart does not reset it, UTC days). Over the cap each call site
+takes its existing fallback; the chat tells the user their AI replies return
+tomorrow. `docs/LLM_CALLS.md` gives the token sizes behind the cap.
+
+1,068 backend tests pass.

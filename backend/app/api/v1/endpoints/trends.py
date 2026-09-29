@@ -4,11 +4,9 @@ from app.services.recovery_engine import RecoveryEngine
 from app.services.ml_engine import ml_engine
 from app.services.nlp_pipeline import nlp_pipeline
 from app.services.agent.evolution_engine import evolution_engine
-from app.services.agent.orchestrator import agent_orchestrator
-from app.services.spark_processor import spark_analytics
 from app.services.vector_store import vector_store
 from app.models.schemas import SentimentRequest, GoalParsingRequest, NLPFeedbackRequest
-from app.core.config import settings
+from app.core import workout_metrics
 from app.core.storage import storage
 from app.core.background import task_manager
 from core_engine import is_rust_available
@@ -18,29 +16,18 @@ limiter = make_limiter()
 
 @router.get("/acwr")
 async def get_acwr_status(user_id: str):
-    history = await storage.get_workload_history(user_id, 28)
-    loads = [h.get("session_load", 0) for h in history]
-
-    if loads:
-        from core_engine import compute_ewma
-        acute_ewma = compute_ewma(loads[-7:], 7)
-        chronic_ewma = compute_ewma(loads[-28:], 28)
-        acute = acute_ewma[-1] if acute_ewma else 500
-        chronic = chronic_ewma[-1] if chronic_ewma else 500
-    else:
-        acute = 480.0
-        chronic = settings.DEFAULT_CHRONIC_LOAD
-
+    history = await storage.get_workload_history(user_id, workout_metrics.HISTORY_ENTRIES)
+    acute, chronic = workout_metrics.acwr(history)
     acwr_val, acwr_status, penalty = RecoveryEngine.evaluate_acwr(acute, chronic)
-
     return {
         "user_id": user_id,
-        "acute_workload_7d": round(acute, 1),
-        "chronic_workload_28d": round(chronic, 1),
+        "acute_workload_7d": acute,
+        "chronic_workload_28d": chronic,
         "acwr": acwr_val,
-        "acwr_status": acwr_status,
+        "acwr_status": acwr_status if acwr_val is not None else None,
         "recovery_penalty": penalty,
         "history_count": len(history),
+        "message": None if acwr_val is not None else "Training load needs 4 weeks of workouts logged with effort (RPE).",
     }
 
 @router.get("/hrv")
@@ -68,20 +55,19 @@ async def get_sleep_trend(user_id: str, days: int = 28):
 @router.get("/ml-insights")
 async def get_ml_insights(user_id: str):
     recovery_logs = await storage.get_recovery_logs(user_id, 28)
-    workout_logs = await storage.get_workout_logs(user_id, 28)
+    latest = recovery_logs[-1] if recovery_logs else None
 
-    features = ml_engine.extract_features(recovery_logs, workout_logs)
-    predictions = ml_engine.predict_readiness(features)
-
-    hrv_values = [r.get("hrv_rmssd", 50) for r in recovery_logs if r.get("hrv_rmssd")]
+    hrv_values = [r["hrv_rmssd"] for r in recovery_logs if r.get("hrv_rmssd")]
     hrv_forecast = ml_engine.forecast_hrv(hrv_values) if hrv_values else {"trend": "no_data"}
 
-    recovery_scores = [r.get("recovery_score", 70) for r in recovery_logs]
+    recovery_scores = [r["recovery_score"] for r in recovery_logs if r.get("recovery_score") is not None]
     anomalies = ml_engine.detect_anomalies(recovery_scores) if len(recovery_scores) >= 3 else {"anomalies": []}
 
     return {
         "user_id": user_id,
-        "readiness_prediction": predictions,
+        # The readiness of the latest check-in, with its date; there is no separate prediction model.
+        "readiness_prediction": {"predicted_state": latest["readiness_state"], "log_date": latest.get("log_date")}
+        if latest and latest.get("readiness_state") else None,
         "hrv_forecast": hrv_forecast,
         "recovery_anomalies": anomalies,
         "model_status": ml_engine.get_status(),
@@ -97,7 +83,7 @@ async def get_anomaly_alerts(user_id: str):
     alerts = []
 
     # Check recovery score anomalies
-    recovery_scores = [r.get("recovery_score", 70) for r in recovery_logs]
+    recovery_scores = [r["recovery_score"] for r in recovery_logs if r.get("recovery_score") is not None]
     if len(recovery_scores) >= 3:
         r_anomalies = ml_engine.detect_anomalies(recovery_scores)
         for a in r_anomalies.get("anomalies", []):
@@ -111,9 +97,8 @@ async def get_anomaly_alerts(user_id: str):
             alerts.append({"type": "hrv", "severity": "high", "detail": f"HRV {a['value']}ms (z={a['z_score']}) is anomalous"})
 
     # Check ACWR danger
-    if workout_logs:
-        last_log = workout_logs[-1]
-        acwr = last_log.get("acwr", 1.0)
+    acwr = workout_metrics.acwr_ratio(await storage.get_workload_history(user_id, workout_metrics.HISTORY_ENTRIES))
+    if acwr is not None:
         if acwr > 1.5:
             alerts.append({"type": "acwr", "severity": "critical", "detail": f"ACWR {acwr:.2f} exceeds danger threshold (1.5). Deload recommended."})
         elif acwr > 1.3:
@@ -129,7 +114,7 @@ async def get_anomaly_alerts(user_id: str):
     # Check consecutive high RPE
     high_rpe_count = 0
     for wl in reversed(workout_logs):
-        if wl.get("session_rpe", 0) >= 7:
+        if (workout_metrics.session_rpe(wl) or 0) >= 7:
             high_rpe_count += 1
         else:
             break
@@ -155,8 +140,6 @@ async def get_background_tasks():
 @router.get("/agent-status")
 async def get_agent_status():
     return {
-        "orchestrator": agent_orchestrator.get_status(),
-        "spark": spark_analytics.get_status(),
         "vector_store": vector_store.get_status(),
         "nlp": nlp_pipeline.get_status(),
         "ml_engine": ml_engine.get_status(),
@@ -216,29 +199,40 @@ async def get_metric_correlations(user_id: str):
 
 @router.get("/fatigue-forecast/{user_id}")
 async def get_fatigue_forecast(user_id: str):
-    """Forecast fatigue trajectory and suggest deload timing."""
-    workout_logs = await storage.get_workout_logs(user_id, 28)
-    recovery_logs = await storage.get_recovery_logs(user_id, 28)
+    """Fatigue as the Banister model's 7-day load (training_api /form), from sessions with a recorded RPE."""
+    from app.api.v1.endpoints.training_api import fitness_fatigue_form
 
-    result = ml_engine.fatigue_forecaster.forecast_fatigue_trajectory(workout_logs, recovery_logs)
-    result["user_id"] = user_id
-    return result
+    form = await fitness_fatigue_form(user_id, 28)
+    if not form["today"]:
+        return {"user_id": user_id, "trajectory": "insufficient_data", "current_fatigue": None,
+                "recommendation": form["message"]}
+    today = form["today"]
+    return {
+        "user_id": user_id,
+        "trajectory": "measured",
+        "current_fatigue": today["fatigue"],
+        "fitness": today["fitness"],
+        "form": today["form"],
+        "status": today["zone"],
+        "recent_fatigue": [d["fatigue"] for d in form["series"][-7:]],
+        "recommendation": today["recommendation"],
+        "units": form["units"],
+    }
 
 
 @router.get("/volume-capacity/{user_id}")
 async def get_volume_capacity(user_id: str):
     """Estimate today's training volume capacity based on recovery state."""
-    recovery_logs = await storage.get_recovery_logs(user_id, 28)
-    workout_logs = await storage.get_workout_logs(user_id, 14)
-
-    recovery_score = recovery_logs[-1].get("recovery_score", 70) if recovery_logs else 70
-    acwr = workout_logs[-1].get("acwr", 1.0) if workout_logs else 1.0
-    sleep_hours = recovery_logs[-1].get("sleep_duration_hours", 7) if recovery_logs else 7
-
-    avg_volume = 0
-    if workout_logs:
-        volumes = [w.get("session_load", 500) for w in workout_logs[-7:]]
-        avg_volume = sum(volumes) / max(len(volumes), 1)
+    recovery_logs = await storage.get_recovery_logs(user_id, 1)
+    latest = recovery_logs[-1] if recovery_logs else {}
+    history = await storage.get_workload_history(user_id, workout_metrics.HISTORY_ENTRIES)
+    recovery_score, sleep_hours = latest.get("recovery_score"), latest.get("sleep_duration_hours")
+    acwr = workout_metrics.acwr_ratio(history)
+    loads = [x for x in (workout_metrics.session_load(w) for w in history[-7:]) if x is not None]
+    if recovery_score is None or sleep_hours is None or acwr is None or not loads:
+        return {"user_id": user_id, "status": "insufficient_data",
+                "message": "Needs today's check-in with sleep, and 4 weeks of workouts logged with effort."}
+    avg_volume = sum(loads) / len(loads)
 
     result = ml_engine.performance_predictor.predict_volume_capacity(
         recovery_score, avg_volume, acwr, sleep_hours

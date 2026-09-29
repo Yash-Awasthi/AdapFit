@@ -94,7 +94,7 @@ class RPPGProcessor:
         self.sample_buffer: deque = deque(maxlen=fps * 30)  # 30 seconds max
         self.rgb_buffer: deque = deque(maxlen=fps * 10)  # raw RGB for CHROM
         self.bpm_history: deque = deque(maxlen=10)
-        self.ibi_history: deque = deque(maxlen=100)  # inter-beat intervals
+        self.quality_history: deque = deque(maxlen=fps * 10)
 
         # Bandpass filter params (Butterworth 2nd order approximation)
         self.low_cutoff = 0.7   # Hz (42 BPM minimum)
@@ -103,6 +103,11 @@ class RPPGProcessor:
         # Signal quality thresholds
         self.min_samples = 150  # 5 seconds at 30fps
         self.min_snr = 1.5
+
+    def __setstate__(self, state):
+        # Stored state from before quality_history existed must still load.
+        self.__dict__.update(state)
+        self.__dict__.setdefault("quality_history", deque(maxlen=self.fps * 10 if hasattr(self, "fps") else 300))
 
     def feed_frame(self, r: float, g: float, b: float, face_confidence: float = 1.0) -> dict:
         """Process a single RGB frame through the rPPG pipeline."""
@@ -124,6 +129,7 @@ class RPPGProcessor:
         # Compute signal quality
         snr = self._estimate_snr()
         quality = min(1.0, max(0.0, face_confidence * 0.5 + snr / 10 * 0.5))
+        self.quality_history.append(quality)
 
         result = {
             "status": "collecting",
@@ -140,25 +146,24 @@ class RPPGProcessor:
                 result["current_bpm"] = round(bpm, 1)
                 result["status"] = "ready"
 
-                # Compute IBI for HRV
-                self._compute_ibi(bpm)
-
         return result
 
     def get_reading(self) -> tuple[float, float, float, Optional[float], Optional[float]]:
-        """Returns (bpm, confidence, quality, hrv, respiratory_rate)."""
+        """Returns (bpm, confidence, quality, hrv, respiratory_rate).
+
+        HRV and breathing rate are None: they need beat-to-beat intervals, and
+        this pipeline only estimates rate over windows of frames.
+        """
         bpm = self._smoothed_bpm()
         confidence = min(0.95, len(self.sample_buffer) / 300 * 0.7 + 0.3)
-        quality = self._avg_quality()
-        hrv = self._compute_rmssd() if len(self.ibi_history) >= 5 else None
-        rr = self._estimate_respiratory_rate() if len(self.ibi_history) >= 30 else None
-        return bpm, confidence, quality, hrv, rr
+        quality = statistics.mean(self.quality_history) if self.quality_history else 0.0
+        return bpm, confidence, quality, None, None
 
     def reset(self):
         self.sample_buffer.clear()
         self.rgb_buffer.clear()
         self.bpm_history.clear()
-        self.ibi_history.clear()
+        self.quality_history.clear()
 
     # === Internal signal processing ===
 
@@ -233,42 +238,6 @@ class RPPGProcessor:
 
         return magnitude
 
-    def _compute_ibi(self, current_bpm: float):
-        """Compute inter-beat intervals from BPM for HRV."""
-        if current_bpm > 0:
-            ibi = 60.0 / current_bpm  # seconds between beats
-            if self.ibi_history:
-                prev_ibi = self.ibi_history[-1]
-                # Only add if reasonable change (not noise spike)
-                if 0.3 < ibi < 2.0 and abs(ibi - prev_ibi) < 0.3:
-                    self.ibi_history.append(ibi)
-            else:
-                self.ibi_history.append(ibi)
-
-    def _compute_rmssd(self) -> float:
-        """Compute RMSSD (Root Mean Square of Successive Differences) for HRV."""
-        if len(self.ibi_history) < 2:
-            return 0.0
-        ibis = list(self.ibi_history)
-        diffs = [(ibis[i] - ibis[i-1]) ** 2 for i in range(1, len(ibis))]
-        return math.sqrt(statistics.mean(diffs)) * 1000  # convert to ms
-
-    def _estimate_respiratory_rate(self) -> Optional[float]:
-        """Estimate respiratory rate from IBI modulation (RSA)."""
-        if len(self.ibi_history) < 30:
-            return None
-        # Respiratory sinus arrhythmia modulates HR at breathing frequency
-        ibis = list(self.ibi_history)[-60:]
-        # Count zero crossings as rough frequency estimate
-        mean_ibi = statistics.mean(ibis)
-        crossings = sum(1 for i in range(1, len(ibis))
-                       if (ibis[i] - mean_ibi) * (ibis[i-1] - mean_ibi) < 0)
-        duration_sec = len(ibis) * statistics.mean(ibis)
-        if duration_sec > 0:
-            rr = (crossings / 2) / (duration_sec / 60)
-            return round(min(30, max(8, rr)), 1)
-        return None
-
     def _smoothed_bpm(self) -> float:
         """Get smoothed BPM from recent history."""
         if not self.bpm_history:
@@ -284,11 +253,6 @@ class RPPGProcessor:
         std = statistics.stdev(values) if len(values) > 1 else 1.0
         mean = abs(statistics.mean(values)) + 1e-6
         return std / mean * 10
-
-    def _avg_quality(self) -> float:
-        if not self.sample_buffer:
-            return 0.0
-        return 0.8  # placeholder
 
 
 class CameraVitalsService:
@@ -399,19 +363,8 @@ class CameraVitalsService:
         return result
 
     def get_stress_indication(self) -> dict:
-        ibis = list(self._rppg.ibi_history)
-        if len(ibis) < 10:
-            return {"indication": "moderate", "confidence": 0.3, "message": "Need more data"}
-        rmssd = self._rppg._compute_rmssd()
-        if rmssd > 50:
-            indication, msg = "low", "Low stress. Well-balanced autonomic system."
-        elif rmssd > 30:
-            indication, msg = "moderate", "Moderate stress. Consider breathing exercises."
-        elif rmssd > 15:
-            indication, msg = "high", "Elevated stress. Try 4-7-8 breathing."
-        else:
-            indication, msg = "very_high", "Very high stress! Guided meditation recommended."
-        return {"indication": indication, "rmssd": round(rmssd, 2), "confidence": min(0.95, len(ibis) / 50), "message": msg}
+        # Stress from HRV needs beat-to-beat intervals; this pipeline only estimates rate over frame windows.
+        return {"indication": None, "message": "Not measured: camera readings here give heart rate only, not HRV."}
 
     def get_measurement_history(self) -> list[dict]:
         return [{"bpm": s.bpm, "timestamp": s.timestamp, "confidence": s.confidence, "signal_quality": s.signal_quality} for s in self._samples[-100:]]

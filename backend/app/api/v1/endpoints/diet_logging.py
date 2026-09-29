@@ -7,6 +7,7 @@ Supports: quick-add, text description, barcode-style lookup, and photo-based log
 """
 
 from __future__ import annotations
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
@@ -16,6 +17,7 @@ from typing import Optional
 from app.core.config import settings
 from app.services.food_vision import analyze_food_from_gemini_vision
 from app.core.durable import durable_dict
+from app.core.llm_quota import ai_call_allowed
 
 router = APIRouter()
 
@@ -91,13 +93,15 @@ async def log_meal(req: MealLogRequest, user_id: str = Query("default")):
 @router.post("/photo-log")
 async def photo_log_meal(req: PhotoLogRequest, user_id: str = Query("default")):
     """Analyze a meal photo with Gemini Vision and log the result as today's meal."""
-    from app.core.privacy import allowed
     # Without analysis the record would be a zero-calorie meal nobody measured.
-    if not allowed("ai"):
+    if not ai_call_allowed():
         raise HTTPException(status_code=403, detail="Photo logging sends the photo to an AI service; turn on AI features in Privacy settings, or log the meal by hand")
     if not settings.GEMINI_API_KEY:
         raise HTTPException(status_code=503, detail="Photo analysis is not available right now; log the meal by hand")
-    analysis = analyze_food_from_gemini_vision(req.image_base64, settings.GEMINI_API_KEY)
+    # The vision call is a blocking HTTP request; off the event loop it cannot stall every other request.
+    analysis = await asyncio.to_thread(analyze_food_from_gemini_vision, req.image_base64, settings.GEMINI_API_KEY)
+    if not analysis.foods:
+        raise HTTPException(status_code=502, detail="Could not read the meal in this photo; try again or log it by hand")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     record = {
         "name": ", ".join(f.name for f in analysis.foods) or "Photo meal",

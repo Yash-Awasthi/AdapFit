@@ -1,7 +1,7 @@
 """
 Stress Management API — Assessment, Breathing, PMR & Interventions
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.services.stress_engine import stress_engine
@@ -10,13 +10,13 @@ router = APIRouter()
 
 
 class StressAssessRequest(BaseModel):
-    hrv_rmssd: Optional[float] = 45.0
-    resting_hr: Optional[float] = 65.0
-    sleep_quality: Optional[float] = 70.0
-    sleep_hours: Optional[float] = 7.0
-    activity_minutes_today: Optional[int] = 30
-    mood_score: Optional[float] = 5.0
-    energy_level: Optional[float] = 5.0
+    hrv_rmssd: Optional[float] = None
+    resting_hr: Optional[float] = None
+    sleep_quality: Optional[float] = None
+    sleep_hours: Optional[float] = None
+    activity_minutes_today: Optional[int] = None
+    mood_score: Optional[float] = None
+    energy_level: Optional[float] = None
     self_reported_stress: Optional[float] = None
     screen_time_hours: Optional[float] = None
     meeting_hours: Optional[float] = None
@@ -33,7 +33,11 @@ class StressLogRequest(BaseModel):
 @router.post("/evaluations", status_code=201)
 async def create_stress_evaluation(request: StressAssessRequest):
     """Multi-factor stress assessment using biometric and behavioral data."""
-    result = stress_engine.assess_stress(request.model_dump(exclude_none=True))
+    try:
+        result = stress_engine.assess_stress(request.model_dump(exclude_none=True))
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Give HRV, sleep, activity, mood and energy, screen time, "
+                                                    "or your own stress rating to assess stress.")
     return {
         "overall_score": result.overall_score,
         "category_scores": result.category_scores,

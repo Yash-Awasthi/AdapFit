@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException, status
+from datetime import date
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query, status
 from app.models.schemas import RecoveryCalculationRequest, RecoveryCalculationResponse
 from app.services.recovery_engine import RecoveryEngine
 from app.services import personal_baseline
+from app.core import workout_metrics
 from app.core.storage import storage
+from app.core.workout_metrics import HISTORY_ENTRIES, acwr_ratio
 
 router = APIRouter()
 
@@ -17,12 +22,7 @@ async def _loads(user_id: str, acute: float | None, chronic: float | None) -> tu
     """
     if acute is not None and chronic is not None:
         return acute, chronic
-    history = await storage.get_workload_history(user_id, 28)
-    latest = history[-1] if history else {}
-    return (
-        acute if acute is not None else latest.get("acute_load"),
-        chronic if chronic is not None else latest.get("chronic_load"),
-    )
+    return workout_metrics.acwr(await storage.get_workload_history(user_id, workout_metrics.HISTORY_ENTRIES))
 
 
 @router.post("", response_model=RecoveryCalculationResponse, status_code=status.HTTP_201_CREATED)
@@ -42,15 +42,6 @@ async def create_recovery_log(req: RecoveryCalculationRequest):
             acute_load=acute_load,
             chronic_load=chronic_load,
         )
-
-        from app.services.ml_engine import ml_engine
-        recovery_logs = await storage.get_recovery_logs(req.user_id, 28)
-        workout_logs = await storage.get_workout_logs(req.user_id, 28)
-        features = ml_engine.extract_features(recovery_logs, workout_logs)
-        ml_insights = ml_engine.predict_readiness(features)
-
-        acwr = response.metrics_breakdown.acwr
-        injury_risk = ml_engine.compute_injury_risk(acwr, 0.0, 0.0, 0) if acwr is not None else None
 
         wd = req.wearable_data
         sc = req.subjective_checkin
@@ -87,8 +78,6 @@ async def create_recovery_log(req: RecoveryCalculationRequest):
             readiness_state=response.readiness_state,
             metrics_breakdown=response.metrics_breakdown,
             recommendation_directive=response.recommendation_directive,
-            ml_insights=ml_insights,
-            injury_risk=injury_risk,
         )
     except HTTPException:
         raise
@@ -111,7 +100,7 @@ def _domain(name: str, score, insight: str) -> dict:
 
 
 @router.get("/today")
-async def recovery_today(user_id: str):
+async def recovery_today(user_id: str, day: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$")):
     """
     Today's check-in explained: each domain against the user's own baseline,
     and the training decision with its reasons. Same score as the check-in.
@@ -119,20 +108,19 @@ async def recovery_today(user_id: str):
     from app.services.daily_decision import decide, signals_from_logs
 
     logs = await storage.get_recovery_logs(user_id, 1)
-    if not logs:
+    if not logs or str(logs[-1].get("log_date", ""))[:10] != (day or date.today().isoformat()):
         return {"overall_score": None, "recovery_level": "no_data", "domains": [], "cross_domain_insights": [],
                 "recommendations": [], "training_recommendation": "Complete a morning check-in to get today's recovery.",
                 "confidence": "low", "data_completeness": 0, "calculated_at": None}
     log = logs[-1]
     history = await storage.get_recovery_logs(user_id, personal_baseline.WINDOW_DAYS)
-    workload = await storage.get_workload_history(user_id, 28)
+    workload = await storage.get_workload_history(user_id, HISTORY_ENTRIES)
     base = personal_baseline.compute(history, workload)
-    latest_load = workload[-1] if workload else None
-    result = decide(signals_from_logs(log, None, latest_load, await storage.get_workout_logs(user_id, 7)))
+    acwr = acwr_ratio(workload)
+    result = decide(signals_from_logs(log, None, acwr, await storage.get_workout_logs(user_id, 7)))
 
     hrv, z = log.get("hrv_rmssd"), log.get("hrv_z_score")
     rhr, rhr_delta = log.get("resting_heart_rate"), log.get("resting_hr_delta")
-    acwr = latest_load.get("acwr") if latest_load else None
     domains = [
         _domain("hrv", None if z is None else max(0, min(100, 60 + z * 20)),
                 f"HRV {hrv:.0f} ms, {z:+.1f} SD from your normal of {base['hrv_mean_rmssd']:.0f} ms."

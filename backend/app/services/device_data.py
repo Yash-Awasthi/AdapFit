@@ -57,6 +57,18 @@ class DeviceDataService:
             result["glucose"] = diabetes_manager_service.import_readings(glucose)
         return result
 
+    def delete_records(self, record_ids: List[str]) -> dict:
+        """Remove records deleted on the phone (Health Connect changes API), with the CGM copies of glucose ones."""
+        ids = set(record_ids)
+        gone = [k for k, r in self.records.items() if r["id"] in ids]
+        glucose_times = {self.records[k]["start"] for k in gone if self.records[k]["type"] == "blood_glucose"}
+        for k in gone:
+            del self.records[k]
+        if glucose_times:
+            from app.services.diabetes_manager import diabetes_manager_service
+            diabetes_manager_service.remove_cgm_readings(glucose_times)
+        return {"deleted": len(gone), "stored": len(self.records)}
+
     def _day(self, ts: float) -> str:
         return (datetime.fromtimestamp(ts, tz=timezone.utc) + timedelta(minutes=self.tz_offset_min)).strftime("%Y-%m-%d")
 

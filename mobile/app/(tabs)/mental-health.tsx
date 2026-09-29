@@ -100,9 +100,9 @@ function ThoughtRecords({ userId }: { userId: string }) {
           {[['How strong was the feeling before?', before, setBefore], ['And now?', after, setAfter]].map(([label, v, set]: any) => (
             <View key={label} style={styles.qCard}>
               <Text style={[styles.fieldLabel, { flex: 1 }]}>{label}</Text>
-              <TouchableOpacity onPress={() => set(step(v, -10))}><Ionicons name="remove-circle-outline" size={24} color={colors.text.secondary} /></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease" onPress={() => set(step(v, -10))}><Ionicons name="remove-circle-outline" size={24} color={colors.text.secondary} /></TouchableOpacity>
               <Text style={styles.cardTitle}>{v}%</Text>
-              <TouchableOpacity onPress={() => set(step(v, 10))}><Ionicons name="add-circle-outline" size={24} color={colors.text.secondary} /></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase" onPress={() => set(step(v, 10))}><Ionicons name="add-circle-outline" size={24} color={colors.text.secondary} /></TouchableOpacity>
             </View>
           ))}
           <TouchableOpacity style={styles.primaryBtn} onPress={save}><Text style={styles.primaryBtnText}>Save record</Text></TouchableOpacity>

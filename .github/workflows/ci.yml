@@ -38,7 +38,7 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
-      - run: for f in src/services/*.check.ts; do node "$f" || exit 1; done
+      - run: for f in src/services/*.check.ts src/theme/*.check.ts; do node "$f" || exit 1; done
       # The accepted moderate advisories ship inside Expo 55 (docs/SECURITY.md).
       - run: npm audit --omit=dev --audit-level=high
 

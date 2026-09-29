@@ -4,8 +4,11 @@ Decided 2026-09-28. Every later phase in `todo.md` works inside these limits.
 
 ## Positioning
 
-AdapFit is a consumer wellness app sold by subscription, launching in India
-first. Every feature ships. None of them diagnoses.
+AdapFit is a consumer wellness app, launching in India first. Every feature
+ships. None of them diagnoses. At launch every feature is free (decided
+2026-09-29); the only limit is a daily number of AI replies per account, which
+keeps the model bill bounded. Paid tiers and store billing come later, once
+prices are chosen.
 
 The app measures, tracks and explains the user's own data against their own
 baseline, and suggests safe next steps. When something needs a professional,

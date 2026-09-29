@@ -270,6 +270,8 @@ export default function MenuScreen() {
             {ACCENT_ORDER.map((name) => (
               <TouchableOpacity
                 key={name}
+                accessibilityRole="radio"
+                accessibilityLabel={`${name} accent`}
                 onPress={() => { Haptics.selectionAsync(); setAccent(name); }}
                 style={[
                   styles.swatch,

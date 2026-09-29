@@ -1,5 +1,6 @@
 import { cache } from './cache';
 import { API_BASE_URL } from './config';
+import { localDay } from '../utils/date';
 import { authedFetch } from './authToken';
 
 const API = API_BASE_URL;
@@ -100,7 +101,7 @@ export const api = {
       confidence: string;
       data_completeness: number;
       calculated_at: string;
-    }>(`/api/v1/recovery-logs/today?user_id=${userId}`),
+    }>(`/api/v1/recovery-logs/today?user_id=${userId}&day=${localDay()}`),
 
   // Workouts
   getWorkouts: (userId: string, days = 14) =>

@@ -166,6 +166,8 @@ export default function ExercisesScreen() {
                 </View>
               </View>
               <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Bookmark exercise"
                 style={s.bookmarkButton}
                 onPress={() => {
                   Haptics.selectionAsync();
@@ -193,7 +195,7 @@ export default function ExercisesScreen() {
                 <Text style={s.modalTitle} numberOfLines={1}>
                   {selectedExercise.name}
                 </Text>
-                <TouchableOpacity onPress={() => setSelectedExercise(null)}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setSelectedExercise(null)}>
                   <X size={22} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>

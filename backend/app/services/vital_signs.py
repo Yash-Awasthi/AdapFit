@@ -121,9 +121,9 @@ class VitalSignsService:
         ]
 
     def analyze_rhythm(self, readings: list[dict]) -> dict:
-        if not readings:
+        hrs = [r["heart_rate"] for r in readings[-10:] if r.get("heart_rate") is not None]
+        if not hrs:
             return {"status": "no_data"}
-        hrs = [r.get("heart_rate", 70) for r in readings[-10:]]
         avg_hr = sum(hrs) / len(hrs)
         variability = max(hrs) - min(hrs)
         if avg_hr < 60:

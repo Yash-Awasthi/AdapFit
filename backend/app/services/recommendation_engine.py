@@ -3,6 +3,7 @@ import uuid
 import httpx
 from typing import Optional, Dict, Any, List
 from app.core.config import settings
+from app.services.safety_policy import screen_reply
 from app.models.schemas import (
     WorkoutGenerateRequest,
     WorkoutGenerateResponse,
@@ -12,6 +13,7 @@ from app.models.schemas import (
 )
 from app.services.exercise_service import exercise_service
 from app.core.gemini import gemini_endpoint
+from app.core.llm_quota import ai_call_allowed
 
 class RecommendationEngine:
     """
@@ -25,7 +27,7 @@ class RecommendationEngine:
         user_id: str,
         target_date: str,
         readiness_state: ReadinessState,
-        recovery_score: int,
+        recovery_score: Optional[int],
         sore_muscles: Optional[List[str]] = None,
         equipment_access: Optional[List[str]] = None,
         target_duration: int = 45,
@@ -36,7 +38,7 @@ class RecommendationEngine:
         eq = equipment_access or ["bodyweight", "dumbbells"]
 
         # 1. Attempt Gemini 2.0 Flash / Groq LLM Generation if API Key is configured
-        if settings.GEMINI_API_KEY:
+        if settings.GEMINI_API_KEY and ai_call_allowed():
             try:
                 llm_result = await cls._generate_via_gemini(
                     readiness_state=readiness_state,
@@ -51,7 +53,7 @@ class RecommendationEngine:
                         workout_id=workout_id,
                         title=llm_result.get("title", f"Adaptive Workout ({readiness_state.value})"),
                         readiness_state=readiness_state,
-                        adaptation_rationale=llm_result.get("adaptation_rationale", f"Scaled for {readiness_state.value} recovery."),
+                        adaptation_rationale=screen_reply(llm_result.get("adaptation_rationale")) or f"Scaled for {readiness_state.value} recovery.",
                         target_duration_minutes=llm_result.get("target_duration_minutes", target_duration),
                         warmup=[WarmupCooldownItem(**w) for w in llm_result.get("warmup", [])],
                         exercises=[PrescribedExercise(**e) for e in llm_result.get("exercises", [])],
@@ -82,7 +84,7 @@ class RecommendationEngine:
     async def _generate_via_gemini(
         cls,
         readiness_state: ReadinessState,
-        recovery_score: int,
+        recovery_score: Optional[int],
         sore_muscles: List[str],
         equipment: List[str],
         duration: int,
@@ -96,11 +98,12 @@ class RecommendationEngine:
         system_instruction = (
             "You are AdapFit's Biometric Exercise Physiologist. Generate an adaptive workout routine "
             "strictly customized to the user's recovery score and muscle soreness. "
+            "Never state a recovery score or biometric the prompt does not give. "
             "Output valid JSON matching the exact schema."
         )
 
         prompt = f"""
-        User Recovery Score: {recovery_score}/100 ({readiness_state.value})
+        User Recovery Score: {f"{recovery_score}/100 ({readiness_state.value})" if recovery_score is not None else "no check-in today; plan a standard moderate session"}
         User Goal: {goal}
         Sore/Fatigued Muscles to Avoid: {', '.join(sore_muscles) if sore_muscles else 'None'}
         Available Equipment: {', '.join(equipment)}

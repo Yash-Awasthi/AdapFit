@@ -110,7 +110,7 @@ const ToastItem: React.FC<{
           </TouchableOpacity>
         )}
         {t.dismissible !== false && (
-          <TouchableOpacity onPress={onDismiss} style={styles.toastDismiss}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss" onPress={onDismiss} style={styles.toastDismiss}>
             <Ionicons name="close" size={16} color={colors.text.muted} />
           </TouchableOpacity>
         )}

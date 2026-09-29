@@ -270,7 +270,7 @@ export default function NutritionScreen() {
           <Plus size={16} color="#fff" />
           <Text style={s.addBtnText}>Log Meal</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.cameraBtn} onPress={photoLog} disabled={analyzingPhoto}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Log a meal from a photo" style={s.cameraBtn} onPress={photoLog} disabled={analyzingPhoto}>
           {analyzingPhoto ? <ActivityIndicator size="small" color="#fff" /> : <Camera size={18} color="#fff" />}
         </TouchableOpacity>
       </View>
@@ -340,7 +340,7 @@ export default function NutritionScreen() {
                 {item.calories} kcal · P{item.protein_g}g · C{item.carbs_g}g · F{item.fat_g}g
               </Text>
             </View>
-            <TouchableOpacity onPress={() => deleteMeal(item.id)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete meal" onPress={() => deleteMeal(item.id)}>
               <Trash2 size={16} color={theme.danger} />
             </TouchableOpacity>
           </View>

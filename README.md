@@ -23,7 +23,6 @@ Not a dashboard of raw numbers. Every screen answers: *What should I do today, a
 | Domain | Features |
 |--------|----------|
 | 🧠 **AI Health Coach** | Intent-classified chat with RAG knowledge retrieval, conversational memory, and multi-turn context |
-| 🗺️ **LangGraph Agent Pipeline** | Recovery → ML → NLP → Preference → Decision → Recommendation → LLM phrasing |
 | 💪 **Smart Workouts** | Auto-generated plans based on recovery, goals, ACWR, and periodization |
 | 😴 **Sleep Analysis** | Smart alarm, stage breakdown, sleep debt tracking, chronotype analysis, sleep architecture scoring |
 | 🫀 **Recovery Engine** | 6-domain scoring (HRV Z-score, Hooper-Mackinnon, sleep, subjective, ACWR, nutrition) |
@@ -56,56 +55,20 @@ Not a dashboard of raw numbers. Every screen answers: *What should I do today, a
 │  290+ endpoints · 300+ services · 228+ tests            │
 ├─────────────────────────────────────────────────────────┤
 │              DATA & INTELLIGENCE LAYER                   │
-│  LangGraph Agent Pipeline                               │
-│  ├── Recovery Analysis Node                             │
-│  ├── ML Analytics Node (XGBoost/PyTorch)                │
-│  ├── NLP Sentiment & Feedback Node                      │
-│  ├── Self-Evolving Preference Engine                    │
-│  ├── Daily Decision Engine (4-state routing)            │
-│  ├── Supervisor Agent (conflict resolution)             │
-│  └── LLM Phrasing Node (Gemini/Groq)                   │
+│  Recovery engine (personal baseline) · Daily decision   │
+│  NLP sentiment · Preference learning · LLM (Groq/Gemini)│
 │  RAG Knowledge System · Vector Store · Health Validation │
 ├─────────────────────────────────────────────────────────┤
-│  Rust Core Engine (PyO3) · PostgreSQL · Redis · Docker   │
+│  Rust Core Engine (PyO3, optional) · PostgreSQL · Docker │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Agent Pipeline Flow
+### Daily decision
 
-```
-User Biometrics + Check-in
-        ↓
-┌───────────────────┐
-│ Recovery Analysis  │  HRV Z-score, sleep score, subjective score, ACWR
-└────────┬──────────┘
-         ↓
-┌───────────────────┐
-│   ML Analytics     │  Readiness prediction, HRV forecast, anomaly detection
-└────────┬──────────┘
-         ↓
-┌───────────────────┐
-│   NLP Analysis     │  Sentiment, feedback extraction, muscle mentions
-└────────┬──────────┘
-         ↓
-┌───────────────────┐
-│  Preference Learn  │  Self-evolving exercise preferences, pain flags
-└────────┬──────────┘
-         ↓
-┌───────────────────┐
-│  Signal Assembly   │  Aggregate all signals into decision context
-└────────┬──────────┘
-         ↓
-┌───────────────────┐
-│  Daily Decision    │  TRAIN / REDUCE / RECOVER / REST
-└────────┬──────────┘
-         ↓ (conditional)
-┌───────────────────┐         ┌───────────────────┐
-│  Recommendation    │ ──────→ │  LLM Phrasing     │
-│  (Supervisor)      │         │  (Gemini/Groq)    │
-└───────────────────┘         └────────┬──────────┘
-                                       ↓
-                              Personalized Response
-```
+A check-in is scored against the user's own baseline (HRV z-score, sleep,
+soreness, fatigue, stress, and training load once 28 days of sessions exist).
+`daily_decision.decide()` turns the signals into TRAIN, REDUCE, RECOVER or
+REST with the reasons; a language model may only reword that decision.
 
 ---
 
@@ -672,12 +635,8 @@ ZFIT/
 │   │   │   └── daily_decision.py      # 4-state training decision engine
 │   │   ├── api/v1/endpoints/          # 290+ endpoint modules (auto-discovered)
 │   │   ├── services/                  # 300+ business logic modules
-│   │   │   ├── agent/                 # LangGraph pipeline
-│   │   │   │   ├── graph.py           # StateGraph definition
-│   │   │   │   ├── orchestrator.py    # Node implementations
-│   │   │   │   ├── supervisor.py      # Conflict resolution
-│   │   │   │   └── evolution_engine.py # Self-evolving preferences
-│   │   │   ├── ml_engine.py           # XGBoost/PyTorch ML
+│   │   │   ├── agent/evolution_engine.py # Preference learning
+│   │   │   ├── ml_engine.py           # Trends, forecasts, anomalies
 │   │   │   ├── nlp_pipeline.py        # Sentiment, goal parsing
 │   │   │   ├── rag_knowledge.py       # Fitness science knowledge base
 │   │   │   └── ...                    # 290+ service modules

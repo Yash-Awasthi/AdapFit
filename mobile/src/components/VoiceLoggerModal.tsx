@@ -227,7 +227,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
               <Mic size={20} color={theme.primaryLight} />
               <Text style={[styles.title, { color: theme.text }]}>Voice Workout Logger</Text>
             </View>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>
               <X size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -246,7 +246,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
           {/* Recording Button */}
           <View style={styles.recordRow}>
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Start or stop recording"
                 style={[
                   styles.recordBtn,
                   { backgroundColor: theme.primary },
@@ -334,6 +334,8 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
               <View style={styles.resultHeaderRow}>
                 <Text style={[styles.resultHeader, { color: theme.text }]}>Parsed Set:</Text>
                 <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Read the logged set aloud"
                   style={styles.playBtn}
                   onPress={() => {
                     const ps = parsedResult.parsed_set;

@@ -125,7 +125,7 @@ export default function WorkoutDetailScreen() {
   if (!workout) {
     return (
       <View style={s.container}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()}>
           <ArrowLeft size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={s.loadingText}>Workout not found</Text>

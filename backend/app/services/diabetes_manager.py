@@ -124,6 +124,12 @@ class DiabetesManagerService:
             added += 1
         return {"imported": added, "skipped_duplicates": len(readings) - added}
 
+    def remove_cgm_readings(self, timestamps: set) -> int:
+        before = len(self._glucose_readings)
+        self._glucose_readings = [r for r in self._glucose_readings
+                                  if not (r.get("source") == "cgm" and r["timestamp"] in timestamps)]
+        return before - len(self._glucose_readings)
+
     def log_insulin(self, insulin_type: str, units: float, site: str = "abdomen", notes: str = "") -> dict:
         entry = {"type": insulin_type, "units": units, "site": site, "notes": notes, "timestamp": time.time()}
         self._insulin_logs.append(entry)

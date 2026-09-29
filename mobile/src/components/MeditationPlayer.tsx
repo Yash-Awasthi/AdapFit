@@ -100,7 +100,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Close button */}
-      <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={styles.closeBtn} onPress={onClose}>
         <X size={24} color={theme.textSecondary} />
       </TouchableOpacity>
 
@@ -150,7 +150,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
           <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>Skip</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
           style={[styles.playBtn, { backgroundColor: theme.primary }]}
           onPress={() => setIsPlaying(!isPlaying)}
         >

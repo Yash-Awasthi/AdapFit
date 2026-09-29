@@ -5,7 +5,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
-  ScrollView, Animated, ActivityIndicator, KeyboardAvoidingView, Platform,
+  ScrollView, Animated, ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,9 +17,11 @@ import {
   GlassCard, SectionHeaderPremium, QuickAction,
 } from '../../src/components/PremiumComponents';
 import { api } from '../../src/services/api';
-import { useUserStore } from '../../src/stores';
+import { useUserStore, useWorkoutStore } from '../../src/stores';
 import { API_V1 as API } from '../../src/services/config';
 import { authedFetch } from '../../src/services/authToken';
+import { localDay } from '../../src/utils/date';
+import { postJson } from '../../src/services/http';
 interface Exercise {
   exercise_id: string;
   name: string;
@@ -97,22 +99,11 @@ export default function WorkoutScreen() {
 
   const generateWorkout = async () => {
     setGenerating(true);
-    try {
-      const res = await authedFetch(`${API}/workouts/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: 'default',
-          target_date: new Date().toISOString().split('T')[0],
-          target_duration_minutes: 45,
-        }),
-      });
-      if (res.ok) {
-        const workout = await res.json();
-        setWorkouts(prev => [workout, ...prev]);
-      }
-    } catch {}
+    // The server binds the workout to the signed-in account; user_id in the body is ignored.
+    const workout = await postJson<any>('/workouts', { user_id: '', target_date: localDay(), target_duration_minutes: 45 });
     setGenerating(false);
+    if (workout) setWorkouts((prev) => [workout, ...prev]);
+    else Alert.alert('No workout', 'The workout could not be generated. Check your connection and try again.');
   };
 
   const filteredWorkouts = selectedMuscle === 'All'
@@ -199,7 +190,7 @@ export default function WorkoutScreen() {
             <View style={styles.suggestionHeader}>
               <Ionicons name="sparkles" size={14} color={colors.primaryLight} />
               <Text style={styles.suggestionLabel}>Coach suggestion</Text>
-              <TouchableOpacity onPress={() => setSuggestion(null)} hitSlop={10}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss suggestion" onPress={() => setSuggestion(null)} hitSlop={10}>
                 <Ionicons name="close" size={16} color={colors.text.muted} />
               </TouchableOpacity>
             </View>
@@ -318,7 +309,11 @@ export default function WorkoutScreen() {
               {/* Start Button */}
               <TouchableOpacity
                 style={styles.startBtn}
-                onPress={() => router.push('/workout-active' as any)}
+                accessibilityRole="button"
+                onPress={() => {
+                  useWorkoutStore.getState().startWorkout(workout as any);
+                  router.push('/workout-active' as any);
+                }}
               >
                 <Ionicons name="play" size={18} color="#FFF" />
                 <Text style={styles.startBtnText}>Start Workout</Text>

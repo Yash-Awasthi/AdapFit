@@ -100,6 +100,7 @@ class StorageEngine:
             uid = user_data.get("id", str(uuid.uuid4()))
             user_data["id"] = uid
             user_data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+            user_data.setdefault("onboarded_at", user_data["created_at"])
             self.users[uid] = user_data
             await self._save()
             return user_data
@@ -239,8 +240,8 @@ class StorageEngine:
             if user_id not in self.workload_history:
                 self.workload_history[user_id] = []
             self.workload_history[user_id].append(entry)
-            if len(self.workload_history[user_id]) > 60:
-                self.workload_history[user_id] = self.workload_history[user_id][-60:]
+            if len(self.workload_history[user_id]) > 400:
+                self.workload_history[user_id] = self.workload_history[user_id][-400:]
             await self._save()
             return entry
 

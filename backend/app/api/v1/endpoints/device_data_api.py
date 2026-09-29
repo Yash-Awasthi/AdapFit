@@ -36,6 +36,16 @@ async def import_records(body: DeviceImport):
     return device_data_service.import_records([r.model_dump() for r in body.records], body.tz_offset_min)
 
 
+class DeviceDeletions(BaseModel):
+    record_ids: List[str] = Field(max_length=20000)
+
+
+@router.post("/delete")
+async def delete_records(body: DeviceDeletions):
+    """Records the user deleted in Health Connect leave the server too."""
+    return device_data_service.delete_records(body.record_ids)
+
+
 @router.get("/daily")
 async def daily(days: int = Query(14, ge=1, le=90)):
     return {"days": device_data_service.daily_summary(days)}
