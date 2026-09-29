@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 POLICY_VERSION = "2026-09-29"
 ADULT_AGE = 18
+# Under 13 would put the app under Google Play's Families policy and needs a design for children.
+MIN_AGE = 13
 GUARDIAN_LINK_HOURS = 72
 DELETION_GRACE_SECONDS = 30 * 60
 # Retention: a child's account nobody consented for, and an account unused for years, are erased.
@@ -43,7 +45,7 @@ PURPOSES: Dict[str, dict] = {
     "ai": {
         "required": False,
         "title": "AI features",
-        "detail": "Your message and the records it needs are sent to Google Gemini or Groq to write coach "
+        "detail": "Your message and the records it needs are sent to an AI provider (Google Gemini, Groq or TokenHarbor) to write coach "
                   "replies, read meal photos and parse goals. Without this the app uses its built-in rules.",
     },
     "sharing": {
@@ -89,9 +91,12 @@ def age_from(birth_date: str, today: Optional[date] = None) -> int:
 def validate_signup(birth_date: str, choices: dict, guardian_email: Optional[str], own_email: str) -> bool:
     """Checks a signup's privacy fields before the account exists. Returns whether the user is a minor."""
     try:
-        minor = age_from(birth_date) < ADULT_AGE
+        age = age_from(birth_date)
     except (TypeError, ValueError):
         raise ValueError("Enter your date of birth as YYYY-MM-DD")
+    if age < MIN_AGE:
+        raise ValueError(f"AdapFit is for people aged {MIN_AGE} and over")
+    minor = age < ADULT_AGE
     if minor:
         email = (guardian_email or "").strip().lower()
         if "@" not in email or email == own_email.strip().lower():

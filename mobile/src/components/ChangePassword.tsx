@@ -60,7 +60,7 @@ export function ChangePassword() {
         autoComplete="new-password" value={next} onChangeText={setNext} accessibilityLabel="New password" />
       <TextInput style={input} placeholder="Repeat new password" placeholderTextColor={theme.textMuted} secureTextEntry
         autoComplete="new-password" value={confirm} onChangeText={setConfirm} accessibilityLabel="Repeat new password" />
-      {message && (
+      {!!message && (
         <Text accessibilityLiveRegion="polite" style={{ color: message.ok ? theme.success : theme.danger, marginBottom: 8 }}>
           {message.text}
         </Text>

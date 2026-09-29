@@ -146,7 +146,7 @@ export default function FertilityScreen() {
           )}
         </LinearGradient>
 
-        {needsProfile && (
+        {!!needsProfile && (
           <View style={styles.section}>
             <SectionHeaderPremium title="Set Up Cycle" icon="sync" iconColor="#EC4899" />
             <GlassCard>
@@ -215,7 +215,7 @@ export default function FertilityScreen() {
           </View>
         )}
 
-        {hasPrediction && (
+        {!!hasPrediction && (
           <View style={styles.section}>
             <SectionHeaderPremium title="Predictions" icon="calendar" iconColor="#EC4899" />
             <GlassCard>
@@ -246,12 +246,12 @@ export default function FertilityScreen() {
               <Text style={[typography.body.md, { color: colors.text.primary }]}>
                 Regularity: {insights.cycle_regularity?.regular === null ? 'Not enough cycles yet' : insights.cycle_regularity?.assessment}
               </Text>
-              {insights.bbt_analysis && (
+              {!!insights.bbt_analysis && (
                 <Text style={[typography.body.sm, { color: colors.text.muted, marginTop: 6 }]}>
                   BBT avg {insights.bbt_analysis.average}°C · {insights.bbt_analysis.interpretation}
                 </Text>
               )}
-              {insights.cervical_mucus && (
+              {!!insights.cervical_mucus && (
                 <Text style={[typography.body.sm, { color: colors.text.muted, marginTop: 6 }]}>
                   Cervical mucus: {insights.cervical_mucus.pattern.replace('_', ' ')}
                 </Text>

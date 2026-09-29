@@ -101,6 +101,7 @@ export default function PersonalInfoScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScreenHeader
+        backable={false}
         title="Personal Info"
         right={
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save" onPress={handleSave} disabled={saving} hitSlop={10}>

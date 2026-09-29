@@ -77,19 +77,34 @@ class WorkoutEngineService:
         if not e: return None
         return {"id": e.id, "name": e.name, "muscle_groups": e.muscle_groups, "difficulty": e.difficulty, "equipment": e.equipment, "type": e.exercise_type, "instructions": e.instructions, "tips": e.tips, "calories_per_min": e.calories_per_min, "video_url": e.video_url, "gif_url": e.gif_url}
 
+    # When you hit the top of a rep range, this is the next session's nudge.
+    _PROGRESSION = {
+        "strength": "Add 2.5 kg once you complete every set at the top of the range.",
+        "muscle_gain": "Add a rep each session; once you reach the top of the range on all sets, add 2.5 kg and drop back to the bottom.",
+        "weight_loss": "Keep rest short; add a round or shorten rest as it gets easier.",
+        "cardio": "Add 2-3 minutes or a small pace increase each week.",
+    }
+    # Six-day push/pull/legs split; days_per_week slices into it, so 5-6 days are real plans.
+    _SPLIT = [["chest", "triceps"], ["back", "biceps"], ["quads", "glutes", "core"],
+              ["shoulders", "forearms"], ["chest", "back"], ["quads", "hamstrings", "calves"]]
+
     def generate_workout_plan(self, goal: str, fitness_level: str, available_equipment: list[str], duration_minutes: int = 45, days_per_week: int = 3) -> dict:
         suitable = [e for e in self._exercises if e.difficulty in (fitness_level, "beginner" if fitness_level == "beginner" else "intermediate")]
         if available_equipment: suitable = [e for e in suitable if e.equipment in available_equipment or e.equipment in ("bodyweight", "none")]
+        # One exercise per ~8 minutes of session time, so duration_minutes shapes the workout.
+        per_day = max(3, min(8, duration_minutes // 8))
+        progression = self._PROGRESSION.get(goal, self._PROGRESSION["muscle_gain"])
         plan_exercises = []
         if goal in ("muscle_gain", "strength"):
-            muscle_split = [["chest", "triceps"], ["back", "biceps"], ["quads", "glutes", "core"], ["shoulders", "forearms"]]
-            for day_muscles in muscle_split[:min(days_per_week, 4)]:
-                day_exs = [e for e in suitable if any(m in e.muscle_groups for m in day_muscles)][:4]
-                plan_exercises.append({"day": f"Day {len(plan_exercises) + 1}", "focus": ", ".join(day_muscles), "exercises": [{"name": e.name, "sets": 4 if e.exercise_type == "compound" else 3, "reps": "8-12" if goal == "muscle_gain" else "4-6", "rest_seconds": 90 if e.exercise_type == "compound" else 60} for e in day_exs]})
+            days = max(1, min(days_per_week, len(self._SPLIT)))
+            for day_muscles in self._SPLIT[:days]:
+                day_exs = [e for e in suitable if any(m in e.muscle_groups for m in day_muscles)][:per_day]
+                plan_exercises.append({"day": f"Day {len(plan_exercises) + 1}", "focus": ", ".join(day_muscles), "progression": progression, "exercises": [{"name": e.name, "sets": 4 if e.exercise_type == "compound" else 3, "reps": "8-12" if goal == "muscle_gain" else "4-6", "rest_seconds": 90 if e.exercise_type == "compound" else 60} for e in day_exs]})
         else:
-            day_exs = suitable[:6]
-            plan_exercises.append({"day": "Full Body", "focus": "cardio + strength", "exercises": [{"name": e.name, "sets": 3, "reps": "12-15", "rest_seconds": 45} for e in day_exs]})
-        return {"plan_name": f"{goal.replace('_', ' ').title()} Plan", "goal": goal, "level": fitness_level, "duration_minutes": duration_minutes, "days_per_week": days_per_week, "weekly_structure": plan_exercises, "exercises_count": sum(len(d["exercises"]) for d in plan_exercises)}
+            day_exs = suitable[:per_day]
+            plan_exercises.append({"day": "Full Body", "focus": "cardio + strength", "progression": progression, "exercises": [{"name": e.name, "sets": 3, "reps": "12-15", "rest_seconds": 45} for e in day_exs]})
+        est_cal = round(duration_minutes * (sum(e.calories_per_min for e in suitable) / len(suitable) if suitable else 6.0))
+        return {"plan_name": f"{goal.replace('_', ' ').title()} Plan", "goal": goal, "level": fitness_level, "duration_minutes": duration_minutes, "days_per_week": days_per_week, "progression": progression, "est_calories_per_session": est_cal, "weekly_structure": plan_exercises, "exercises_count": sum(len(d["exercises"]) for d in plan_exercises)}
 
     def start_session(self, plan_id: str = "custom") -> dict:
         session = WorkoutSession(id=f"ws_{int(time.time())}", plan_id=plan_id, start_time=time.time())

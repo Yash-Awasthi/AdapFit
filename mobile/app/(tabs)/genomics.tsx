@@ -82,7 +82,7 @@ export default function GenomicsScreen() {
         </TouchableOpacity>
       </GlassCard>
 
-      {ok && (
+      {!!ok && (
         <>
           <SectionHeaderPremium icon="medkit" iconColor={TINT} title="Medicines and your genes" />
           {asArray<Pgx>(report!.pharmacogenomics).map((p) => (
@@ -90,7 +90,7 @@ export default function GenomicsScreen() {
               <Text style={styles.name}>{p.gene}{p.phenotype ? ` · ${p.phenotype}` : ''}</Text>
               <Text style={styles.body}>{p.note}</Text>
               {p.status === 'not_in_file' && <Text style={styles.muted}>Not in your file.</Text>}
-              {p.action && <Text style={styles.muted}>{p.action}</Text>}
+              {!!p.action && <Text style={styles.muted}>{p.action}</Text>}
             </GlassCard>
           ))}
           <GlassCard variant="light" style={styles.card}>
@@ -100,7 +100,7 @@ export default function GenomicsScreen() {
             <TouchableOpacity style={styles.btn} onPress={checkDrugs} accessibilityRole="button">
               <Text style={styles.btnText}>Check</Text>
             </TouchableOpacity>
-            {drugResults && (drugResults.length === 0
+            {!!drugResults && (drugResults.length === 0
               ? <Text style={styles.muted}>None of these is affected by the genes read from your file.</Text>
               : drugResults.map((r) => <Text key={r.drug + r.gene} style={styles.body}>{r.drug}: {r.message}</Text>))}
           </GlassCard>

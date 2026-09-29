@@ -206,7 +206,7 @@ export default function DiabetesScreen() {
               <View style={[styles.glucoseRing, { borderColor: latest ? glucoseColor(latest.value) : '#334155' }]}>
                 <Text style={styles.glucoseValue}>{latest ? latest.value : '—'}</Text>
                 <Text style={styles.glucoseUnit}>mg/dL</Text>
-                {latest && (
+                {!!latest && (
                   <Text style={[styles.glucoseStatus, { color: glucoseColor(latest.value) }]}>
                     {glucoseLabel(latest.value)}
                   </Text>

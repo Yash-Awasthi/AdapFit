@@ -33,3 +33,11 @@ def test_standing_still_adds_no_distance():
     jitter = [_pt(i * 5, 12.97 + (i % 2) * 0.0003, 77.59, acc=40) for i in range(20)]
     stats = c.post(f"/api/v1/gps/{rid}/points", json={"coordinates": jitter}).json()["live_stats"]
     assert stats["distance_m"] == 0
+
+
+def test_a_route_under_fifty_metres_is_not_saved():
+    rid = c.post("/api/v1/gps/start", json={"workout_type": "running"}).json()["route_id"]
+    short = [_pt(i * 10, 12.9700 + i * 0.00002, 77.5900) for i in range(6)]  # ~11 m in a minute
+    c.post(f"/api/v1/gps/{rid}/points", json={"coordinates": short})
+    done = c.post(f"/api/v1/gps/{rid}/finish").json()
+    assert 0 < done["stats"]["distance_m"] < 50 and done["saved_to_history"] is False

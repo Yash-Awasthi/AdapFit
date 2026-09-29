@@ -37,7 +37,7 @@ export function StatCard({ value, label, icon, color = COLORS.accent, trend, tre
     <View style={[styles.statCard, { borderLeftColor: color }]}>
       <View style={styles.statHeader}>
         {icon}
-        {trend && (
+        {!!trend && (
           <Text style={[styles.trend, { color: trend === "up" ? COLORS.success : trend === "down" ? COLORS.danger : COLORS.textMuted }]}>
             {trend === "up" ? "↑" : trend === "down" ? "↓" : "→"} {trendValue}
           </Text>
@@ -85,10 +85,10 @@ interface ListItemProps {
 export function ListItem({ icon, title, subtitle, right, onPress }: ListItemProps) {
   const content = (
     <View style={styles.listItem}>
-      {icon && <View style={styles.listIcon}>{icon}</View>}
+      {!!icon && <View style={styles.listIcon}>{icon}</View>}
       <View style={styles.listContent}>
         <Text style={styles.listTitle}>{title}</Text>
-        {subtitle && <Text style={styles.listSubtitle}>{subtitle}</Text>}
+        {!!subtitle && <Text style={styles.listSubtitle}>{subtitle}</Text>}
       </View>
       {right}
     </View>

@@ -323,7 +323,7 @@ export const Pulse: React.FC<PulseProps> = ({ color = colors.primary, size = 100
           },
         ]}
       />
-      {children && <View style={styles.pulseContent}>{children}</View>}
+      {!!children && <View style={styles.pulseContent}>{children}</View>}
     </View>
   );
 };
@@ -447,7 +447,7 @@ export const FloatingLabelInput: React.FC<FloatingLabelProps> = ({
 
   return (
     <View style={styles.floatingInputContainer}>
-      {icon && <Ionicons name={icon as any} size={18} color={focused ? colors.primary : colors.text.muted} style={styles.floatingInputIcon} />}
+      {!!icon && <Ionicons name={icon as any} size={18} color={focused ? colors.primary : colors.text.muted} style={styles.floatingInputIcon} />}
       <View style={[styles.floatingInputWrapper, focused && styles.floatingInputFocused]}>
         <Animated.Text style={[styles.floatingInputLabel, labelStyle]}>{label}</Animated.Text>
         <Animated.View

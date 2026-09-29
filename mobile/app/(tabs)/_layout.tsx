@@ -78,7 +78,7 @@ export default function TabLayout() {
       screenOptions={{
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: "rgba(12, 17, 28, 0.94)",
+          backgroundColor: "rgb(12, 17, 28)",
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.surface.border,
           height: 58 + bottomInset,

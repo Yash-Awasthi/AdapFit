@@ -209,7 +209,7 @@ export default function MindScreen() {
           </View>
         </LinearGradient>
 
-        {active && (
+        {!!active && (
           <View style={styles.section}>
             <GlassCard>
               <Text style={styles.muted}>{active.title} · question {answers.length + 1} of {active.questions.length}</Text>
@@ -225,12 +225,12 @@ export default function MindScreen() {
           </View>
         )}
 
-        {lastResult && (
+        {!!lastResult && (
           <View style={styles.section}>
             <GlassCard style={{ borderLeftWidth: 3, borderLeftColor: lastResult.crisis ? '#EF4444' : TINT }}>
               <Text style={styles.cardTitle}>{lastResult.title}: {lastResult.score}/{lastResult.max_score} ({lastResult.range})</Text>
               <Text style={styles.body}>{lastResult.next_step}</Text>
-              {lastResult.crisis && <Text style={[styles.body, { color: '#EF4444' }]}>{lastResult.crisis.message}</Text>}
+              {!!lastResult.crisis && <Text style={[styles.body, { color: '#EF4444' }]}>{lastResult.crisis.message}</Text>}
               <Text style={styles.muted}>A screening score, not a diagnosis.</Text>
             </GlassCard>
           </View>
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 12 },
   heroValue: { color: '#fff', fontSize: 30, fontWeight: '800' },
-  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroMuted: { paddingLeft: 40, color: 'rgba(255,255,255,0.8)', fontSize: 13 },
   heroCta: { width: 112, height: 112, borderRadius: 56, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)', alignItems: 'center', justifyContent: 'center', padding: 8 },
   heroCtaText: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 4 },
   section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },

@@ -247,7 +247,7 @@ export default function EmergencyScreen() {
         <Text style={styles.sosHint}>
           {alert_ ? 'Tap again to cancel this alert' : 'Tap to alert your emergency contacts'}
         </Text>
-        {alert_ && (
+        {!!alert_ && (
           <View style={styles.sosActiveBanner}>
             <Ionicons name="warning" size={16} color="#EF4444" />
             <Text style={styles.sosActiveText}>

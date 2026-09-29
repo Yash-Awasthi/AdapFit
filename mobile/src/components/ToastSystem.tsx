@@ -102,9 +102,9 @@ const ToastItem: React.FC<{
         </View>
         <View style={styles.toastContent}>
           <Text style={styles.toastTitle}>{t.title}</Text>
-          {t.message && <Text style={styles.toastMessage}>{t.message}</Text>}
+          {!!t.message && <Text style={styles.toastMessage}>{t.message}</Text>}
         </View>
-        {t.action && (
+        {!!t.action && (
           <TouchableOpacity onPress={t.action.onPress} style={styles.toastAction}>
             <Text style={[styles.toastActionText, { color: config.color }]}>{t.action.label}</Text>
           </TouchableOpacity>
@@ -191,9 +191,9 @@ export const QuickAlert: React.FC<QuickAlertProps> = ({
           <Ionicons name={config.icon as any} size={32} color={config.color} />
         </View>
         <Text style={styles.quickAlertTitle}>{title}</Text>
-        {message && <Text style={styles.quickAlertMessage}>{message}</Text>}
+        {!!message && <Text style={styles.quickAlertMessage}>{message}</Text>}
         <View style={styles.quickAlertButtons}>
-          {onCancel && (
+          {!!onCancel && (
             <TouchableOpacity style={styles.quickAlertCancelBtn} onPress={onCancel}>
               <Text style={styles.quickAlertCancelText}>{cancelLabel}</Text>
             </TouchableOpacity>

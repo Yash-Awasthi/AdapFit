@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 12 },
   heroValue: { color: '#fff', fontSize: 30, fontWeight: '800' },
-  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroMuted: { paddingLeft: 40, color: 'rgba(255,255,255,0.8)', fontSize: 13 },
   section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
   linkCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   linkText: { flex: 1, color: colors.text.primary, fontWeight: '600' },

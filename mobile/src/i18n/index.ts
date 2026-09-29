@@ -1,6 +1,6 @@
 /**
  * AdapFit Internationalization (i18n)
- * Supports: English, Spanish, French, German, Chinese, Japanese, Korean, Arabic, Hindi, Portuguese
+ * Holds English, Spanish and French strings, but no screen calls t() yet: the app renders English only.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import en from './en.json';

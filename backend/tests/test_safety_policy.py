@@ -51,3 +51,36 @@ def test_chat_endpoint_short_circuits_on_a_red_flag():
     body = resp.json()
     assert body["safety"]["category"] == "medical_emergency"
     assert "112" in body["reply"]
+
+
+def test_client_llm_hands_back_a_prompt_then_screens_the_phones_reply():
+    client = TestClient(app)
+    ask = client.post("/api/v1/chat", json={"user_id": "u1", "message": "how do I warm up", "client_llm": True}).json()
+    assert ask["llm_prompt"] and ask["llm_system"] and ask["reply"] == ""
+    done = client.post("/api/v1/chat", json={
+        "user_id": "u1", "message": "how do I warm up", "client_reply": "Five minutes of easy cardio, then mobility.",
+    }).json()
+    assert done["reply"].startswith("Five minutes") and not done["llm_prompt"]
+
+
+@pytest.mark.parametrize("message,category", [
+    ("मुझे सीने में दर्द हो रहा है", "medical_emergency"),
+    ("meri saans nahi aa rahi", "medical_emergency"),
+    ("wo behosh ho gaya", "medical_emergency"),
+    ("मैं आत्महत्या के बारे में सोच रहा हूँ", "self_harm"),
+    ("mujhe marna chahta hoon", "self_harm"),
+])
+def test_hindi_and_hinglish_red_flags_get_the_fixed_reply(message, category):
+    from app.services.safety_policy import triage
+    result = triage(message)
+    assert result["category"] == category
+    assert "112" in result["reply"] or "14416" in result["reply"]
+    assert any("ऀ" <= ch <= "ॿ" for ch in result["reply"])
+
+
+def test_hindi_replies_are_screened_for_diagnosis_and_dose_changes():
+    from app.services.safety_policy import screen_reply
+    out = screen_reply("आज हल्की सैर करें। आपको मधुमेह हो सकता है। इंसुलिन की खुराक बढ़ा दें। पानी पिएँ।")
+    assert "मधुमेह" not in out and "खुराक" not in out
+    assert "आज हल्की सैर करें।" in out and "पानी पिएँ।" in out and "डॉक्टर" in out
+    assert screen_reply("आज हल्की सैर करें।") == "आज हल्की सैर करें।"

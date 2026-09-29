@@ -2,6 +2,7 @@
 from collections import defaultdict
 
 from app.main import app
+from tests.conftest import iter_api_routes
 
 
 # Modules that extend one feature under its prefix without overlapping paths.
@@ -16,9 +17,7 @@ COMPANIONS = {
 
 def test_no_two_modules_share_a_prefix():
     owners = defaultdict(set)
-    for route in app.routes:
-        endpoint = getattr(route, "endpoint", None)
-        path = getattr(route, "path", "")
+    for path, _methods, endpoint in iter_api_routes(app):
         if not endpoint or not path.startswith("/api/v1/"):
             continue
         segment = path.split("/")[3]
@@ -31,9 +30,9 @@ def test_no_two_modules_share_a_prefix():
 def test_no_method_and_path_is_registered_twice():
     seen = set()
     dupes = []
-    for route in app.routes:
-        for method in getattr(route, "methods", None) or ():
-            key = (method, getattr(route, "path", ""))
+    for path, methods, _endpoint in iter_api_routes(app):
+        for method in methods:
+            key = (method, path)
             if key in seen:
                 dupes.append(key)
             seen.add(key)
@@ -48,4 +47,5 @@ def test_registering_twice_gives_the_same_routes():
     first, second = FastAPI(), FastAPI()
     assert register_endpoints(first)["errors"] == 0
     register_endpoints(second)
-    assert sorted(r.path for r in first.routes) == sorted(r.path for r in second.routes)
+    paths = lambda a: sorted(p for p, _m, _e in iter_api_routes(a))
+    assert paths(first) == paths(second)

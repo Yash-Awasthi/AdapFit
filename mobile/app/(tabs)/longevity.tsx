@@ -141,7 +141,7 @@ export default function LongevityScreen() {
         ? { icon: 'create', onPress: () => setEditing(true) }
         : undefined}
     >
-      {editing && (
+      {!!editing && (
         <>
           <SectionHeaderPremium
             icon="clipboard"
@@ -234,7 +234,7 @@ export default function LongevityScreen() {
             </GlassCard>
           )}
 
-          {blueZones && (
+          {!!blueZones && (
             <>
               <SectionHeaderPremium
                 icon="globe"

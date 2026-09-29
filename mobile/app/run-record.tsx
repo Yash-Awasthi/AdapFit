@@ -117,7 +117,15 @@ export default function RunRecordScreen() {
         </View>
       )}
 
-      {run && (
+      {!run && !result && (
+        <View style={s.explain}>
+          <Text style={s.explainText}>Pick an activity and tap Start. AdapFit records your route with GPS, even with the screen off.</Text>
+          <Text style={s.explainText}>The distance you see while moving is rough. The saved figure is recalculated when you finish, and anything under 50 m is not saved.</Text>
+          <Text style={s.explainText}>Location is used only while you record, and only for this route.</Text>
+        </View>
+      )}
+
+      {!!run && (
         <View style={s.stats}>
           <Text style={s.big}>{(meters / 1000).toFixed(2)}<Text style={s.unit}> km</Text></Text>
           <View style={s.row}>
@@ -128,15 +136,15 @@ export default function RunRecordScreen() {
         </View>
       )}
 
-      {result && (
+      {!!result && (
         <View style={s.stats}>
           <Text style={s.big}>{result.stats.distance_km.toFixed(2)}<Text style={s.unit}> km</Text></Text>
           <View style={s.row}>
             <View style={s.cell}><Text style={s.value}>{clock(result.stats.duration_seconds)}</Text><Text style={s.label}>Time</Text></View>
-            <View style={s.cell}><Text style={s.value}>{pace(result.stats.avg_pace_seconds_per_km)}</Text><Text style={s.label}>Average pace</Text></View>
+            <View style={s.cell}><Text style={s.value}>{pace(result.stats.distance_km >= 0.05 ? result.stats.avg_pace_seconds_per_km : 0)}</Text><Text style={s.label}>Average pace</Text></View>
             <View style={s.cell}><Text style={s.value}>{Math.round(result.stats.elevation_gain_m)} m</Text><Text style={s.label}>Climb</Text></View>
           </View>
-          <Text style={s.note}>{result.saved_to_history ? 'Saved to your workout history.' : 'Too few good GPS fixes to save a route.'}</Text>
+          <Text style={s.note}>{result.saved_to_history ? 'Saved to your workout history.' : 'Too short to save: under 50 m, or too few good GPS fixes.'}</Text>
         </View>
       )}
 
@@ -160,6 +168,8 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep, padding: spacing.lg, paddingTop: 56 },
   back: { position: 'absolute', top: 48, left: 12, padding: 8, zIndex: 1 },
   title: { fontSize: 26, fontWeight: '800', color: colors.text.primary, textAlign: 'center', marginBottom: spacing.xl },
+  explain: { marginTop: 32, paddingHorizontal: 24, gap: 14 },
+  explainText: { color: colors.text.secondary, fontSize: 14, lineHeight: 21, textAlign: 'center' },
   types: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
   type: { alignItems: 'center', gap: 4, paddingVertical: 12, paddingHorizontal: 16, borderRadius: radius.md, backgroundColor: colors.bg.card },
   typeOn: { backgroundColor: colors.primary },

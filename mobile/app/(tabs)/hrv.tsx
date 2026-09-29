@@ -183,7 +183,7 @@ export default function HrvScreen() {
               </Text>
             </>
           ) : (
-            <Text style={[typography.heading.h2, { color: '#fff', marginTop: 8 }]}>Add HRV to a check-in, or take a reading</Text>
+            <Text style={[typography.heading.h2, { color: '#fff', marginTop: 8, paddingLeft: 40 }]}>Add HRV to a check-in, or take a reading</Text>
           )}
         </LinearGradient>
 
@@ -223,12 +223,12 @@ export default function HrvScreen() {
                 <Text style={styles.primaryBtnText}>Start reading</Text>
               </TouchableOpacity>
             )}
-            {report && (
+            {!!report && (
               <View style={styles.reportGrid}>
                 <Metric label="RMSSD" value={`${Math.round(report.time_domain.rmssd)} ms`} />
                 <Metric label="SDNN" value={`${Math.round(report.time_domain.sdnn)} ms`} />
                 <Metric label="Heart rate" value={`${Math.round(report.time_domain.hr_mean)} bpm`} />
-                {report.frequency_domain && <Metric label="LF/HF" value={report.frequency_domain.lf_hf_ratio.toFixed(2)} />}
+                {!!report.frequency_domain && <Metric label="LF/HF" value={report.frequency_domain.lf_hf_ratio.toFixed(2)} />}
                 <Text style={styles.helperText}>
                   Signal quality {Math.round(report.quality_score)}/100 · {report.artifacts.found} irregular beats corrected. {report.interpretation}
                 </Text>
@@ -260,7 +260,7 @@ export default function HrvScreen() {
                 <Text style={styles.primaryBtnText}>Start 5-minute session</Text>
               </TouchableOpacity>
             )}
-            {coherence && (
+            {!!coherence && (
               <Text style={styles.bodyText}>
                 Coherence {Math.round(coherence.coherence_score * 100)}/100 ({coherence.coherence_level}) · you breathed at {coherence.breathing_rate_bpm} per minute.
               </Text>
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 100 },
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   heroValue: { color: '#fff', fontSize: 34, fontWeight: '800', marginTop: 6 },
-  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroMuted: { paddingLeft: 40, color: 'rgba(255,255,255,0.8)', fontSize: 13 },
   section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
   bars: { flexDirection: 'row', alignItems: 'flex-end', height: 96, gap: 4 },
   barCol: { flex: 1, justifyContent: 'flex-end' },
@@ -311,5 +311,5 @@ const styles = StyleSheet.create({
   chipTextActive: { color: TINT, fontWeight: '700' },
   pacerWrap: { height: 180, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
   pacer: { position: 'absolute', width: 150, height: 150, borderRadius: 75, backgroundColor: TINT + '40', borderWidth: 2, borderColor: TINT },
-  pacerText: { color: colors.text.primary, fontSize: 16, fontWeight: '700' },
+  pacerText: { color: colors.text.primary, fontSize: 14, fontWeight: '700', textAlign: 'center', maxWidth: 120 },
 });

@@ -48,7 +48,7 @@ async def format_confirmation(data: Dict[str, Any]):
     return {"confirmation": confirmation}
 
 
-@router.get("/prompts")
+@router.post("/prompts")
 async def get_voice_prompts(partial_parse: Dict[str, Any]):
     """Get follow-up voice prompts for missing data."""
     prompts = voice_workout_logger.generate_voice_prompts(partial_parse)

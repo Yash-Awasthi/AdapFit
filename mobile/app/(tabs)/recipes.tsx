@@ -66,7 +66,7 @@ export default function RecipesScreen() {
   return (
     <ScrollView style={ns.container}>
       <View style={ns.header}>
-        <Text style={typography.heading.h1 as any}>Recipes</Text>
+        <Text style={[typography.heading.h1 as any, { paddingLeft: 40 }]}>Recipes</Text>
         <Text style={typography.body.sm as any}>AI-powered meal planning</Text>
       </View>
 

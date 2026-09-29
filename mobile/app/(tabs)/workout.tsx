@@ -7,7 +7,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
   ScrollView, Animated, ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ import { API_V1 as API } from '../../src/services/config';
 import { authedFetch } from '../../src/services/authToken';
 import { localDay } from '../../src/utils/date';
 import { postJson } from '../../src/services/http';
+import { plural } from '../../src/utils/plural';
 interface Exercise {
   exercise_id: string;
   name: string;
@@ -54,8 +55,16 @@ const PROMPT_EXAMPLES = [
   'What should I train today?',
 ];
 
+/** Minutes asked for in the request box; 'short' or 'quick' means 20, otherwise 45. */
+function minutesFrom(text: string): number {
+  const m = text.match(/(\d{2,3})\s*(?:min|mins|minutes)\b/i);
+  if (m) return Math.min(120, Math.max(10, Number(m[1])));
+  return /\b(short|quick)\b/i.test(text) ? 20 : 45;
+}
+
 export default function WorkoutScreen() {
   const router = useRouter();
+  const { auto } = useLocalSearchParams<{ auto?: string }>();
   const insets = useSafeAreaInsets();
   const userId = useUserStore((s) => s.userId);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
@@ -86,6 +95,9 @@ export default function WorkoutScreen() {
     fetchWorkouts();
   }, []);
 
+  // Home's Start workout passes a fresh number each press, so it generates again even on an open tab.
+  useEffect(() => { if (auto) generateWorkout(); }, [auto]);
+
   const fetchWorkouts = async () => {
     try {
       const res = await authedFetch(`${API}/workouts?days=14`);
@@ -100,7 +112,7 @@ export default function WorkoutScreen() {
   const generateWorkout = async () => {
     setGenerating(true);
     // The server binds the workout to the signed-in account; user_id in the body is ignored.
-    const workout = await postJson<any>('/workouts', { user_id: '', target_date: localDay(), target_duration_minutes: 45 });
+    const workout = await postJson<any>('/workouts', { user_id: '', target_date: localDay(), target_duration_minutes: minutesFrom(prompt) });
     setGenerating(false);
     if (workout) setWorkouts((prev) => [workout, ...prev]);
     else Alert.alert('No workout', 'The workout could not be generated. Check your connection and try again.');
@@ -135,7 +147,7 @@ export default function WorkoutScreen() {
           </View>
           <View style={styles.workoutCount}>
             <Text style={styles.workoutCountNumber} {...fitText(1)}>{workouts.length}</Text>
-            <Text style={styles.workoutCountLabel}>sessions</Text>
+            <Text style={styles.workoutCountLabel}>{workouts.length === 1 ? 'session' : 'sessions'}</Text>
           </View>
         </View>
       </LinearGradient>
@@ -185,7 +197,7 @@ export default function WorkoutScreen() {
           </View>
         )}
 
-        {suggestion && (
+        {!!suggestion && (
           <GlassCard variant="primary" style={styles.suggestionCard}>
             <View style={styles.suggestionHeader}>
               <Ionicons name="sparkles" size={14} color={colors.primaryLight} />
@@ -243,7 +255,7 @@ export default function WorkoutScreen() {
         icon="list"
         iconColor={colors.primary}
         title="Recent Workouts"
-        subtitle={`${filteredWorkouts.length} workouts`}
+        subtitle={plural(filteredWorkouts.length, 'workout')}
       />
 
       {filteredWorkouts.length === 0 ? (
@@ -266,7 +278,7 @@ export default function WorkoutScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.workoutTitle}>{workout.title}</Text>
-                  {workout.created_at && (
+                  {!!workout.created_at && (
                     <View style={styles.workoutDate}>
                       <Ionicons name="calendar" size={10} color={colors.text.muted} />
                       <Text style={styles.workoutDateText}>{formatDate(workout.created_at)}</Text>
@@ -294,7 +306,7 @@ export default function WorkoutScreen() {
                         {ex.sets} sets × {ex.target_reps} • {ex.target_muscle}
                       </Text>
                     </View>
-                    {ex.target_rpe && (
+                    {!!ex.target_rpe && (
                       <View style={styles.rpeBadge}>
                         <Text style={styles.rpeText}>RPE {ex.target_rpe}</Text>
                       </View>

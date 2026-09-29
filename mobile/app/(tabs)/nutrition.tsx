@@ -199,7 +199,7 @@ export default function NutritionScreen() {
       <Text style={s.title}>Nutrition</Text>
       <Text style={s.subtitle}>Track your fuel</Text>
 
-      {summary && (
+      {!!summary && (
         <View style={s.ringContainer}>
           <View style={[s.ring, { borderColor: caloriePct >= 100 ? theme.danger : theme.primary }]}>
             <Text style={s.ringNum}>{summary.total_calories}</Text>
@@ -213,7 +213,7 @@ export default function NutritionScreen() {
         </View>
       )}
 
-      {summary && (
+      {!!summary && (
         <View style={s.macroRow}>
           <MacroCard label="Protein" current={summary.total_protein} target={summary.protein_target} color={theme.success} />
           <MacroCard label="Carbs" current={summary.total_carbs} target={targets?.carbs_g ?? null} color={theme.primaryLight} />
@@ -234,7 +234,7 @@ export default function NutritionScreen() {
       </TouchableOpacity>
 
       {/* Generated Plan Preview Modal/Card */}
-      {generatedPlan && (
+      {!!generatedPlan && (
         <View style={s.planCard}>
           <View style={s.planHeader}>
             <ChefHat size={16} color={theme.success} />
@@ -245,7 +245,7 @@ export default function NutritionScreen() {
           <Text style={s.planDetails}>
             P: {generatedPlan.targets?.protein_g}g · C: {generatedPlan.targets?.carbs_g}g · F: {generatedPlan.targets?.fat_g}g
           </Text>
-          {generatedPlan.meals && (
+          {!!generatedPlan.meals && (
             <View style={s.planMealList}>
               {generatedPlan.meals.slice(0, 3).map((m: any, idx: number) => (
                 <Text key={idx} style={s.planMealItem}>
@@ -275,7 +275,7 @@ export default function NutritionScreen() {
         </TouchableOpacity>
       </View>
 
-      {showForm && (
+      {!!showForm && (
         <View style={s.form}>
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Meal name" placeholderTextColor={theme.textMuted} />
           <View style={s.formRow}>
@@ -353,7 +353,7 @@ export default function NutritionScreen() {
 function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, padding: 20 },
-    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 48 },
+    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 104 },
     subtitle: { fontSize: 14, color: theme.textMuted, marginBottom: 16 },
     ringContainer: { alignItems: 'center', marginBottom: 16 },
     ring: {

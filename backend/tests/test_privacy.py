@@ -109,7 +109,7 @@ def test_a_guardian_who_declines_deletes_the_account(monkeypatch):
         return True
 
     monkeypatch.setattr("app.core.mailer.send_mail", fake_send)
-    r = _signup("kid2@example.com", "kiduser2", birth_date=f"{time.gmtime().tm_year - 10}-06-01",
+    r = _signup("kid2@example.com", "kiduser2", birth_date=f"{time.gmtime().tm_year - 15}-06-01",
                 guardian_email="parent2@example.com")
     uid = r.json()["user"]["id"]
     token = re.search(r"/privacy/guardian/(\S+)", sent[-1]).group(1)
@@ -164,7 +164,7 @@ def test_retention_erases_unconfirmed_children_and_warns_the_long_inactive(monke
         return True
 
     monkeypatch.setattr("app.core.mailer.send_mail", fake_send)
-    kid = _signup("kid3@example.com", "kiduser3", birth_date=f"{time.gmtime().tm_year - 12}-01-01",
+    kid = _signup("kid3@example.com", "kiduser3", birth_date=f"{time.gmtime().tm_year - 15}-01-01",
                   guardian_email="parent3@example.com").json()["user"]["id"]
     idle = register_user("idle@example.com", "idleuser")["user"]["id"]
     user_manager._users[idle].created_at = time.time() - (privacy.INACTIVE_DAYS + 1) * 86400

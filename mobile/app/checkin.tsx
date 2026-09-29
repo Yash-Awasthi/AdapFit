@@ -49,7 +49,7 @@ function SliderField({
         <Text style={[s.value, { color }]}>{value ?? '—'}</Text>
       </View>
       <View style={s.row}>
-        <Text style={s.endLabel}>{leftLabel}</Text>
+        <Text style={s.endLabel} numberOfLines={1} adjustsFontSizeToFit>{leftLabel}</Text>
         <View style={s.dots}>
           {values.map((v) => (
             <TouchableOpacity
@@ -77,7 +77,7 @@ function SliderField({
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={s.endLabel}>{rightLabel}</Text>
+        <Text style={s.endLabel} numberOfLines={1} adjustsFontSizeToFit>{rightLabel}</Text>
       </View>
     </View>
   );

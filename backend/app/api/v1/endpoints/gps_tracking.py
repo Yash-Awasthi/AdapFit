@@ -106,7 +106,8 @@ async def finish_route(route_id: str, user_id: str = Query("default")):
     route["final_stats"] = stats
 
     saved = False
-    if first and stats["distance_m"] > 0:
+    # Under 50 m is GPS drift or a stationary phone, not a workout.
+    if first and stats["distance_m"] >= 50:
         from app.core.storage import storage
         await storage.add_workout_log(user_id, {
             "completed_at": route["started_at"], "actual_duration_minutes": stats["duration_minutes"],

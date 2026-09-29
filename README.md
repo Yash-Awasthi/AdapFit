@@ -696,6 +696,8 @@ ZFIT/
 
 ## 🗺️ Roadmap
 
+Current status and what comes next: [ROADMAP.md](ROADMAP.md). Android test build (arm64): see [Releases](https://github.com/Yash-Awasthi/adapfit/releases/latest).
+
 - [ ] Wearable BLE sync (Health Connect integration)
 - [ ] Real-time WebSocket updates for live coaching
 - [ ] Camera-based vitals (rPPG heart rate) — production hardening

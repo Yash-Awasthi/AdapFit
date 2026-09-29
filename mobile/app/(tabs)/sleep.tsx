@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   heroRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 16 },
   heroStats: { flex: 1 },
   heroValue: { color: '#fff', fontSize: 30, fontWeight: '800' },
-  heroMuted: { color: 'rgba(255,255,255,0.75)', fontSize: 13 },
+  heroMuted: { paddingLeft: 40, color: 'rgba(255,255,255,0.75)', fontSize: 13 },
   section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   stepper: { flex: 1 },

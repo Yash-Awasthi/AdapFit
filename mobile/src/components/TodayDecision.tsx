@@ -114,7 +114,7 @@ export function TodayDecision() {
         />
       </TouchableOpacity>
 
-      {showWhy && (
+      {!!showWhy && (
         <View style={styles.reasons}>
           {reasons.map((r) => (
             <View key={r} style={styles.reasonRow}>
@@ -136,7 +136,7 @@ export function TodayDecision() {
 
       <TouchableOpacity
         style={[styles.action, { backgroundColor: style.color }]}
-        onPress={() => router.push(style.route as any)}
+        onPress={() => router.push((data?.decision === 'TRAIN' ? `${style.route}?auto=${Date.now()}` : style.route) as any)}
         accessibilityRole="button"
       >
         <Text style={styles.actionText}>{style.action}</Text>

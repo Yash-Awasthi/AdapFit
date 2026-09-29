@@ -55,7 +55,7 @@ export default function PrivacyScreen() {
 
   const saveConsent = () => run(async () => {
     const next = await setConsent(draft);
-    if (!isBlocked(next)) router.replace('/(tabs)');
+    if (!isBlocked(next)) (router.canGoBack() ? router.back() : router.replace('/(tabs)'));
   });
 
   const confirmDeletion = () => {
@@ -103,7 +103,7 @@ export default function PrivacyScreen() {
       )}
       <Text style={ns.title}>Privacy</Text>
 
-      {due && (
+      {!!due && (
         <View style={ns.notice}>
           <Text style={ns.noticeTitle}>Account deletion scheduled</Text>
           <Text style={ns.body}>Everything will be erased at {due.toLocaleTimeString()}.</Text>
@@ -114,7 +114,7 @@ export default function PrivacyScreen() {
         </View>
       )}
 
-      {state.guardian_pending && (
+      {!!state.guardian_pending && (
         <View style={ns.notice}>
           <Text style={ns.noticeTitle}>Waiting for your parent or guardian</Text>
           <Text style={ns.body}>
@@ -127,14 +127,14 @@ export default function PrivacyScreen() {
         </View>
       )}
 
-      {state.guardian && (
+      {!!state.guardian && (
         <Text style={ns.muted}>Consent given by {state.guardian.name} ({state.guardian.relationship}).</Text>
       )}
 
       {!state.guardian_pending && (
         <>
           <Text style={ns.section}>What you allow</Text>
-          {state.needs_consent && (
+          {!!state.needs_consent && (
             <Text style={ns.body}>Please review how AdapFit uses your data (policy {state.policy_version}).</Text>
           )}
           {purposes.map((id) => {
@@ -145,7 +145,7 @@ export default function PrivacyScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={ns.cardTitle}>{p.title}{p.required ? ' (needed)' : ''}</Text>
                   <Text style={ns.muted}>{p.detail}</Text>
-                  {childLocked && <Text style={ns.muted}>Only your parent or guardian can turn this on.</Text>}
+                  {!!childLocked && <Text style={ns.muted}>Only your parent or guardian can turn this on.</Text>}
                 </View>
                 <Switch
                   value={!!draft[id]}

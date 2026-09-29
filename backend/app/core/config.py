@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     # Groq retires model ids without notice; a retired id answers 404.
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    # Comma-separated models tried in order after GROQ_MODEL fails or returns nothing.
+    GROQ_FALLBACK_MODELS: str = os.getenv("GROQ_FALLBACK_MODELS", "")
+    GROQ_BASE_URL: str = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
     
     # Postgres (asyncpg pool; empty keeps the in-memory fallback active)
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")

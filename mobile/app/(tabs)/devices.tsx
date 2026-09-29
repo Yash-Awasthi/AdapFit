@@ -17,6 +17,7 @@ import {
   HealthConnectState, healthConnectState, grantedTypes, requestHealthAccess, syncHealthConnect, openHealthConnectSettings,
   HC_RECORD_TYPES,
 } from '../../src/services/healthConnect';
+import { plural } from '../../src/utils/plural';
 
 const TINT = '#64748B';
 
@@ -27,11 +28,33 @@ interface Rhythm { status: string; days: number; interdaily_stability?: number; 
 
 const hour = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
+type Day = Record<string, any> & { date: string };
+// What each synced type shows as; a day lists only what a device actually recorded.
+const DAY_FIELDS: [string, string, (v: any) => string][] = [
+  ['steps', 'Steps', (v) => v.toLocaleString()],
+  ['sleep_hours', 'Sleep', (v) => `${v} h`],
+  ['resting_heart_rate', 'Resting HR', (v) => `${Math.round(v)} bpm`],
+  ['avg_heart_rate', 'Avg HR', (v) => `${Math.round(v)} bpm`],
+  ['hrv_rmssd', 'HRV', (v) => `${Math.round(v)} ms`],
+  ['weight_kg', 'Weight', (v) => `${v} kg`],
+  ['body_fat_pct', 'Body fat', (v) => `${v}%`],
+  ['active_calories', 'Active', (v) => `${Math.round(v)} kcal`],
+  ['distance_m', 'Distance', (v) => `${(v / 1000).toFixed(1)} km`],
+  ['exercise_minutes', 'Exercise', (v) => `${v} min`],
+  ['blood_pressure', 'BP', (v) => `${v.systolic}/${v.diastolic}`],
+  ['spo2_pct', 'SpO2', (v) => `${Math.round(v)}%`],
+  ['body_temperature_c', 'Temp', (v) => `${v} °C`],
+  ['nutrition_kcal', 'Food', (v) => `${Math.round(v)} kcal`],
+  ['glucose_mgdl_avg', 'Glucose', (v) => `${Math.round(v)} mg/dL`],
+  ['menstruation_flow', 'Period', () => 'logged'],
+];
+
 function HealthConnectCard() {
   const [state, setState] = useState<HealthConnectState | null>(null);
   const [granted, setGranted] = useState(0);
   const [server, setServer] = useState<DeviceStatus | null>(null);
   const [rhythm, setRhythm] = useState<Rhythm | null>(null);
+  const [days, setDays] = useState<Day[]>([]);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -39,6 +62,7 @@ function HealthConnectCard() {
     setGranted((await grantedTypes()).size);
     setServer(await getJson<DeviceStatus>('/device-data/status'));
     setRhythm(await getJson<Rhythm>('/device-data/rest-activity?days=14'));
+    setDays((await getJson<{ days: Day[] }>('/device-data/daily?days=7'))?.days ?? []);
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -78,7 +102,7 @@ function HealthConnectCard() {
       <Text style={styles.title}>Health Connect</Text>
       <Text style={styles.sub}>
         {granted ? `Reading ${granted} of ${HC_RECORD_TYPES.length} data types.` : 'Steps, sleep, heart rate, HRV, weight, glucose, blood pressure, SpO2, temperature, food and cycle from your watch, scale and other apps.'}
-        {server?.last_sync ? ` Last sync ${new Date(server.last_sync * 1000).toLocaleString()} · ${total} records stored.` : ''}
+        {server?.last_sync ? ` Last sync ${new Date(server.last_sync * 1000).toLocaleString()} · ${plural(total, 'record')} stored.` : ''}
       </Text>
       <View style={styles.buttons}>
         {granted ? (
@@ -106,6 +130,15 @@ function HealthConnectCard() {
       ) : granted ? (
         <Text style={[styles.sub, { marginTop: 8 }]}>Your daily rhythm appears after 3 full days of step data.</Text>
       ) : null}
+      {days.some((d) => DAY_FIELDS.some(([k]) => d[k] != null)) && (
+        <View style={{ marginTop: 12 }}>
+          <Text style={styles.title}>Last 7 days from Health Connect</Text>
+          {[...days].reverse().map((d) => {
+            const parts = DAY_FIELDS.filter(([k]) => d[k] != null).map(([k, label, fmt]) => `${label} ${fmt(d[k])}`);
+            return parts.length ? <Text key={d.date} style={styles.sub}>{d.date}: {parts.join(' · ')}</Text> : null;
+          })}
+        </View>
+      )}
     </GlassCard>
   );
 }
@@ -150,7 +183,7 @@ export default function DevicesScreen() {
     setBusy(null);
     if (!r) return Alert.alert('Not imported', 'The file could not be read.');
     const nights = r.nights_saved ? `, ${r.nights_saved} nights` : '';
-    Alert.alert('Imported', `${r.workouts_saved ?? 0} workouts${nights}. ${r.skipped_duplicates ?? 0} already imported.`);
+    Alert.alert('Imported', `${plural(r.workouts_saved ?? 0, 'workout')}${nights}. ${r.skipped_duplicates ?? 0} already imported.`);
     load();
   };
 
@@ -203,7 +236,7 @@ export default function DevicesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroMuted: { paddingLeft: 40, color: 'rgba(255,255,255,0.8)', fontSize: 13 },
   heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
   section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },

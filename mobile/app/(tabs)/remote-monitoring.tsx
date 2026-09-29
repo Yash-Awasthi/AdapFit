@@ -133,7 +133,7 @@ export default function RemoteMonitoringScreen() {
           </GlassCard>
         </View>
 
-        {hasDevices && (
+        {!!hasDevices && (
           <>
             <View style={styles.section}>
               <SectionHeaderPremium title="Submit a Reading" icon="pulse" iconColor="#EF4444" />

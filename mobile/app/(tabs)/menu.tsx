@@ -164,7 +164,7 @@ function SystemRow({ icon: Icon, label, sub, color, onPress, right, theme }: any
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.sysLabel, { color: theme.text }]}>{label}</Text>
-        {sub && <Text style={[styles.sysSub, { color: theme.textMuted }]}>{sub}</Text>}
+        {!!sub && <Text style={[styles.sysSub, { color: theme.textMuted }]}>{sub}</Text>}
       </View>
       {right}
     </TouchableOpacity>
@@ -289,18 +289,9 @@ export default function MenuScreen() {
         <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Account</Text>
         <View style={[styles.list, CARD_SHADOW, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <SystemRow icon={Ruler} label="Body & measurements" sub="Age, height, training preferences" color="#38BDF8" theme={theme} onPress={() => router.push('/personal-info' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />
-          <SystemRow icon={Wrench} label="Dev Tools" sub="Your own AI key, reduce motion" color="#94A3B8" theme={theme} onPress={() => router.push('/dev-tools' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />
+          {__DEV__ && <SystemRow icon={Wrench} label="Dev Tools" sub="Your own AI key, reduce motion" color="#94A3B8" theme={theme} onPress={() => router.push('/dev-tools' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />}
           <SystemRow icon={SettingsIcon} label="App preferences" sub="Notifications, reminders" color="#818CF8" theme={theme} onPress={() => router.push('/settings' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />
           <SystemRow icon={Bell} label="Notifications" sub="Manage alerts" color="#F59E0B" theme={theme} onPress={() => router.push('/settings' as any)} right={<ChevronRight size={16} color={theme.textMuted} />} />
-          <SystemRow
-            icon={Download}
-            label="Export my data"
-            sub="JSON download"
-            color="#22C55E"
-            theme={theme}
-            onPress={() => Alert.alert('Export started', 'Your data export will be ready shortly.')}
-            right={<ChevronRight size={16} color={theme.textMuted} />}
-          />
           <SystemRow icon={Info} label="About AdapFit" sub="v2.0 — AI-powered adaptive fitness" color="#06B6D4" theme={theme} />
         </View>
       </View>

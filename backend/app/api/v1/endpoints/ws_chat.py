@@ -55,7 +55,7 @@ async def _stream_groq(prompt: str, history: list[dict]) -> str:
 
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
+            f"{settings.GROQ_BASE_URL}/chat/completions",
             headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
             json={"model": settings.GROQ_MODEL, "messages": messages, "max_tokens": 1024},
         )

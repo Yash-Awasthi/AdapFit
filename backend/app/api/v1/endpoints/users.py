@@ -16,6 +16,7 @@ async def create_user(profile: UserProfileCreate, account: dict = Depends(requir
     """Create or complete the signed-in account's profile. The id is always the account's own."""
     user_data = profile.model_dump()
     user_data["email"] = account.get("email") or user_data["email"]
+    user_data["name"] = user_data.get("name") or account.get("display_name") or account.get("username")
     user_data["onboarded_at"] = datetime.now(timezone.utc)
     existing = await storage.get_user(account["id"])
     if existing:

@@ -28,7 +28,7 @@ Telemedicine links, care-nearby results and doctor registration checks point to 
 
 ## 6. Subscriptions
 
-[To be completed with pricing, trial, renewal, cancellation and refund terms before paid plans launch. Purchases made through Google Play or the App Store follow that store's billing and refund rules.]
+AdapFit is free to use; we take no payment. A daily limit applies to AI coach replies. [Before any paid plan launches, add pricing, trial, renewal, cancellation and refund terms. Purchases made through Google Play or the App Store follow that store's billing and refund rules.]
 
 ## 7. Availability and changes
 

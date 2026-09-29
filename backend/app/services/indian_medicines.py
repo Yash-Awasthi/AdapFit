@@ -13,6 +13,8 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
+from app.services import banned_fdc
+
 DATA = Path(__file__).resolve().parent.parent / "data" / "indian_medicines.tsv.gz"
 SOURCE = "Indian Medicine Dataset (retail listings). Check the name and strength on your strip or with your pharmacist."
 
@@ -47,8 +49,9 @@ def search(query: str, limit: int = 20) -> list[dict]:
         if not keys[i].startswith(q):
             break
         brand, maker, pack, comp = rows[i]
+        parts = generics(comp)
         out.append({"brand": brand, "manufacturer": maker, "pack": pack, "composition": comp,
-                    "generics": generics(comp)})
+                    "generics": parts, "prohibited_fdc": banned_fdc.check(parts, f"{brand} {pack}")})
         if len(out) >= limit:
             break
     return out

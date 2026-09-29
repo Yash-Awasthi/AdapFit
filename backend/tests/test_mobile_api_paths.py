@@ -9,6 +9,7 @@ import re
 import pytest
 
 from app.main import app
+from tests.conftest import iter_api_routes
 
 MOBILE = pathlib.Path(__file__).resolve().parents[2] / "mobile"
 CALLER = re.compile(r"\b(getJson|postJson|patchJson|putJson|deleteJson|request|authedFetch|fetch|api|get|post)\s*(?=[<(])")
@@ -96,8 +97,8 @@ def test_calls_with_nested_and_multiline_generics_are_seen():
 
 @pytest.mark.skipif(not MOBILE.exists(), reason="mobile app not in this checkout")
 def test_every_mobile_api_call_has_a_route():
-    routes = [(re.compile("^" + re.sub(r"\{[^}]+\}", "[^/]+", r.path) + "$"), getattr(r, "methods", None) or set())
-              for r in app.routes if getattr(r, "path", "").startswith("/api/v1")]
+    routes = [(re.compile("^" + re.sub(r"\{[^}]+\}", "[^/]+", path) + "$"), methods)
+              for path, methods, _e in iter_api_routes(app) if path.startswith("/api/v1")]
     missing = sorted({f"{f}: {raw}" for f, raw, p, method in _called_paths()
                       if p not in KNOWN and not any(rx.match(p) and method in methods for rx, methods in routes)})
     assert missing == [], "Mobile calls with no server route for that method:\n  " + "\n  ".join(missing)

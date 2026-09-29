@@ -97,6 +97,10 @@ export default function FormCheckerScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [autoCounting, setAutoCounting] = useState(false);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
+  // Front camera first so you can see yourself; the timer gives you time to get into position.
+  const [facing, setFacing] = useState<'front' | 'back'>('front');
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const COUNTDOWN_SECONDS = 5;
   const repMachine = useRef(new RepCounterStateMachine());
   const autoTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const frameBuffer = useRef<string[]>([]);
@@ -178,6 +182,24 @@ export default function FormCheckerScreen() {
     autoTimer.current = setInterval(captureForAutoCount, 1200);
   }
 
+  function withCountdown(action: () => void) {
+    if (countdown !== null) return;
+    let left = COUNTDOWN_SECONDS;
+    setCountdown(left);
+    const tick = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(tick);
+        setCountdown(null);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        action();
+      } else {
+        setCountdown(left);
+        Haptics.selectionAsync();
+      }
+    }, 1000);
+  }
+
   async function checkForm() {
     if (!selectedExercise || !cameraRef.current || analyzing) return;
     setAnalyzing(true);
@@ -233,7 +255,16 @@ export default function FormCheckerScreen() {
         </View>
 
         <View style={s.cameraWrap}>
-          <CameraView ref={cameraRef} style={s.camera} facing="back" />
+          <CameraView ref={cameraRef} style={s.camera} facing={facing} />
+          {countdown !== null && (
+            <View style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 96, fontWeight: '800', color: '#fff' }}>{countdown}</Text>
+            </View>
+          )}
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Switch camera" onPress={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
+            style={{ position: 'absolute', top: 10, right: 10, padding: 10, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>{facing === 'front' ? 'Front' : 'Back'}</Text>
+          </TouchableOpacity>
         </View>
 
         <Animated.View style={[s.repDisplay, { transform: [{ scale: pulseAnim }] }]}>
@@ -241,7 +272,7 @@ export default function FormCheckerScreen() {
           <Text style={s.repLabel}>Reps</Text>
         </Animated.View>
 
-        {grade && (
+        {!!grade && (
           <View style={s.gradeRow}>
             <View style={[s.gradePill, { borderColor: GRADE_COLOR[grade] }]}>
               <Text style={[s.gradePillText, { color: GRADE_COLOR[grade] }]}>Grade {grade}</Text>
@@ -249,7 +280,7 @@ export default function FormCheckerScreen() {
           </View>
         )}
 
-        {lastMessage && (
+        {!!lastMessage && (
           <View style={s.messageBox}>
             <AlertTriangle size={14} color={theme.warning} />
             <Text style={s.messageText}>{lastMessage}</Text>
@@ -276,14 +307,14 @@ export default function FormCheckerScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={s.simulateBtn} onPress={checkForm} disabled={analyzing || autoCounting}>
+        <TouchableOpacity style={s.simulateBtn} onPress={() => withCountdown(checkForm)} disabled={analyzing || autoCounting || countdown !== null}>
           <CameraIcon size={16} color="#CBD5E1" />
-          <Text style={s.simulateBtnText}>{analyzing ? 'Analyzing…' : 'Check Form'}</Text>
+          <Text style={s.simulateBtnText}>{analyzing ? 'Analyzing…' : countdown !== null ? `Starting in ${countdown}…` : 'Check Form (5 s timer)'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[s.endBtn, autoCounting && { backgroundColor: theme.danger }]}
-          onPress={autoCounting ? stopAutoCount : startAutoCount}
+          onPress={autoCounting ? stopAutoCount : () => withCountdown(startAutoCount)}
         >
           <Text style={s.endBtnText}>{autoCounting ? 'Stop Auto-Count' : 'Start Auto-Count'}</Text>
         </TouchableOpacity>

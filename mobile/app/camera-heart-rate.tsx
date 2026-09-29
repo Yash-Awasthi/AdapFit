@@ -73,7 +73,10 @@ export default function CameraHeartRateScreen() {
       const mean = last30.reduce((a, s) => a + s, 0) / last30.length;
       const variance = last30.reduce((sum, s) => sum + (s - mean) ** 2, 0) / last30.length;
       const cv = Math.sqrt(variance) / mean;
-      if (cv > 0.01) setSignalQuality('good');
+      // A fingertip over the flash makes the picture mostly red; an uncovered lens is not a signal however much it moves.
+      const covered = r > 120 && r > g * 1.6 && r > b * 1.6;
+      if (!covered) setSignalQuality('poor');
+      else if (cv > 0.01) setSignalQuality('good');
       else if (cv > 0.003) setSignalQuality('fair');
       else setSignalQuality('poor');
     }
@@ -297,6 +300,9 @@ export default function CameraHeartRateScreen() {
                 <Text style={[typography.body.md, { color: 'rgba(255,255,255,0.7)', marginTop: 8, textAlign: 'center', paddingHorizontal: 32 }]}>
                   Cover the rear camera and flash with your fingertip. Stay still for 30 seconds.
                 </Text>
+                <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.6)', marginTop: 12, textAlign: 'center', paddingHorizontal: 32 }]}>
+                  Why the camera? Blood pulsing through your fingertip changes its colour very slightly. The camera and flash read that colour change to find your pulse. No photo or video is saved or sent, only brightness numbers.
+                </Text>
                 <TouchableOpacity style={styles.startButton} onPress={startMeasurement}>
                   <Ionicons name="play" size={24} color="#FFF" />
                   <Text style={[typography.label.lg, { color: '#FFF' }]}>Start Measurement</Text>
@@ -338,7 +344,7 @@ export default function CameraHeartRateScreen() {
                       signalQuality === 'fair' ? '#F59E0B' : '#EF4444'
                   }]} />
                   <Text style={[typography.body.sm, { color: '#FFF' }]}>
-                    Signal: {signalQuality.charAt(0).toUpperCase() + signalQuality.slice(1)}
+                    {signalQuality === 'poor' ? 'Cover the camera and flash with your fingertip' : `Signal: ${signalQuality.charAt(0).toUpperCase() + signalQuality.slice(1)}`}
                   </Text>
                 </View>
 

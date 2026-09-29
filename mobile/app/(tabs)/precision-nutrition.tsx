@@ -141,7 +141,7 @@ export default function PrecisionNutritionScreen() {
           </View>
         )}
 
-        {hasProfile && (
+        {!!hasProfile && (
           <>
             <View style={styles.section}>
               <SectionHeaderPremium title="Log a Meal" icon="restaurant" iconColor="#F59E0B" />
@@ -153,7 +153,7 @@ export default function PrecisionNutritionScreen() {
                   <Text style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Log meal'}</Text>
                 </TouchableOpacity>
               </GlassCard>
-              {daily && (
+              {!!daily && (
                 <Text style={[styles.helperText, { marginTop: 8 }]}>
                   Today: {daily.total_calories} cal across {daily.meals_logged} meal{daily.meals_logged === 1 ? '' : 's'}
                 </Text>

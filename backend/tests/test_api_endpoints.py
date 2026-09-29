@@ -373,3 +373,19 @@ def test_body_trend_ignores_entries_without_the_measure():
     post_json(f"/api/v1/body/measurements?user_id={uid}", json={"weight_kg": 80, "waist_cm": 88})
     t = get_json(f"/api/v1/body/trends?user_id={uid}").json()["30d"]
     assert t["weight_change"] is None and t["waist_change"] == -2.0
+
+
+def test_modules_health_reports_each_module_instead_of_failing_validation():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    resp = TestClient(app).get("/api/v1/modules-health/health")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] in ("healthy", "degraded") and isinstance(body["modules"], dict)
+
+
+def test_no_get_route_expects_a_request_body():
+    """A GET cannot carry a body from the app, so such a route is unreachable."""
+    from app.main import app
+    bodies = [p for p, ops in app.openapi()["paths"].items() if "requestBody" in ops.get("get", {})]
+    assert bodies == []

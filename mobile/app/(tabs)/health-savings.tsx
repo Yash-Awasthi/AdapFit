@@ -139,7 +139,7 @@ export default function HealthSavingsScreen() {
           </View>
         )}
 
-        {hasAccount && (
+        {!!hasAccount && (
           <>
             <View style={styles.section}>
               <SectionHeaderPremium title="Contribute" icon="add-circle" iconColor="#22C55E" />

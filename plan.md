@@ -1962,3 +1962,143 @@ takes its existing fallback; the chat tells the user their AI replies return
 tomorrow. `docs/LLM_CALLS.md` gives the token sizes behind the cap.
 
 1,068 backend tests pass.
+
+## Part 21 — Launch readiness, code parts (todo.md Phase 10)
+
+- Prohibited fixed dose combinations: `scripts/build_cdsco_fdc.py` downloads
+  four government sources (CDSCO list as on 22.11.2021 with its court-status
+  footnotes, Lok Sabha USQ 2632 for the 2023 notifications, Goa FDA's copy of
+  the 02.08.2024 notifications, PIB release 2275595 for 20.06.2026) and writes
+  609 combinations to `app/data/cdsco_prohibited_fdc.tsv`, each with its
+  notification number and status (prohibited, under review after the
+  Supreme Court order, quashed by the Delhi High Court, stayed).
+  `app/services/banned_fdc.py` matches a product's exact ingredient set and,
+  where the listing names a form (SR, injection, suspension, dispersible,
+  syrup...), requires the product's name to show it: the first version
+  flagged ordinary Aceclofenac + Paracetamol tablets, when only the SR form is
+  banned. Strength-specific listings are skipped. Every medicine search
+  result carries the finding; the medication screen shows it with "ask your
+  doctor or pharmacist", never "stop taking".
+- `docs/STORE_LISTING.md` and `docs/HEALTH_CONNECT_DECLARATION.md`: wellness
+  wording, per-permission purposes, data safety answers, reviewer notes, with
+  the owner's items in brackets. Writing the declaration showed that most
+  synced Health Connect types were stored but shown nowhere, which Play
+  rejects; the Devices screen now lists the last 7 days of every synced type.
+  It also showed that community and forum posts have no report or block,
+  which Play requires (left in todo.md).
+- Legal: the terms say the app is free and takes no payment; production
+  startup warns while `[COMPANY LEGAL NAME]` placeholders remain.
+1,074 backend tests pass.
+
+## Part 22 — Release build
+
+`npm run release:apk` (arm64-v8a) produced `app-release.apk`, 64 MB, signed
+with the AdapFit release key (CN=AdapFit), with `SCHEDULE_EXACT_ALARM` and
+without `SYSTEM_ALERT_WINDOW`. Two fixes were needed:
+
+- The release native build looped on "build.ninja still dirty": the CMake
+  tree of `react-native-vision-camera-worklets` under
+  `node_modules/.../.cxx/RelWithDebInfo/...` put prefab files at 255 to 262
+  characters, past Windows' 260, so ninja could not see them. The root
+  `android/build.gradle` now stages every native module's CMake build under
+  `%SystemDrive%/cxx/` on Windows.
+- Release builds refuse plain HTTP. `network_security_config.xml` allows it
+  to `localhost` only, so a release APK can reach a development server
+  through `adb reverse`; every other host stays HTTPS. Android backup of app
+  data is off (`allowBackup=false`) for a health app.
+
+Not yet done: installing it on the owner's phone and walking the journey
+there (needs the owner present).
+
+## Part 23 — Report, block and a minimum age
+
+Google Play requires reporting and blocking wherever users post. Community
+and forum posts and replies now have a "Report or block" action: a report
+(spam, abusive, harmful health advice) hides the post from the reporter at
+once, is written to the security audit log, and hides the post from everyone
+after three reports; a reported reply is hidden from its reporter. Blocking
+hides everything the author posts or replies, for the blocker only. Sign-up
+refuses anyone under 13 (Play's Families policy would otherwise apply); 13 to
+17 still need a guardian. 1,077 backend tests pass; typecheck clean.
+
+## Part 24 — Onboarding depth
+
+The four-step onboarding (goals, about you, devices, activity level and
+sleep target) existed in `app/onboarding.tsx` but nothing led to it: the
+welcome screen went straight to Home, so every plan ran on column defaults.
+The welcome screen now continues into it (starting at goals, 4 steps). Walking
+it on the emulator found that its save failed on Postgres: the API's goal
+`general_fitness` broke the `users` CHECK constraint, which still allowed
+only `general` (migration 011). `scripts/verify_postgres.py` now saves every
+goal and level the API accepts. Verified on the emulator: sign-in, welcome,
+goals, about you, devices, activity and sleep target, profile and sleep
+baseline saved, Home.
+
+## Part 25 — Stray text renders
+
+`{value && <View/>}` renders the value itself when it is `""` or `0`, which
+React Native reports as "Text strings must be rendered within a <Text>
+component" (and shows a stray "0" on screen). 187 such sites in 68 screens
+read server strings or numbers (`desc`, `next_step`, `target_rpe`,
+`encouragement`...); all now use `{!!value && ...}`, identical for booleans.
+The onboarding's "Sedentary" icon name was invalid (`-bed`).
+
+## Part 26 — Staging, the first walk on the owner's phone, and what it found
+
+**Staging.** Created with the owner's tokens through each service's API: a Neon
+project (`adapfit-staging`, Singapore), a Render web service (`adapfit-staging`,
+free plan, autodeploys the branch) and a Sentry project (`adapfit-api`).
+`https://adapfit-staging.onrender.com/health` is healthy on Neon with pgvector;
+Sentry accepts events from its DSN. The release APK now defaults to that URL.
+
+**The walk** (release APK, Realme RMX5061, fresh install): sign-up, consent,
+onboarding, check-in, workout (generate, set, rest timer, finish, feedback), run
+recording, sleep sounds and the Health Connect permission and sync all work.
+
+Findings and fixes:
+
+- The consent switches never appeared: the APK had been built without
+  `EXPO_PUBLIC_API_URL` inlined and fell back to a dead Railway host. The default
+  is now staging.
+- Chat answered a workout request with a micronutrient paragraph. Three causes:
+  the 12 s / 300-token fallback call was too small for the free reasoning models
+  (8-20 s, they spend tokens thinking); TokenHarbor answers 403 to Render's
+  datacenter IPs, and the code swallowed that; and the no-LLM fallback dumped a
+  loosely matched knowledge entry. Fixes: longer call with logged failures,
+  models tried in order, and an unclassified message takes the rule-based reply.
+- The phone now calls the model itself (`EXPO_PUBLIC_LLM_*`, key in the bundle by
+  the owner's choice): the server returns `llm_prompt`/`llm_system` for
+  `client_llm`, and screens the phone's `client_reply`. Consent and the daily
+  quota still apply on the server.
+- Home's Start workout only opened the Train tab; it now generates the day's
+  workout. Generate Workout reads the duration from the request box.
+- Strain was soreness plus fatigue, not activity: relabelled Body load. Home's
+  score bands (80/60/40) disagreed with the server's readiness states
+  (85/65/45): Home said Excellent while the workout said Moderate.
+- A 0.00 km run was saved with a pace of 458:16 /km: routes under 50 m are no
+  longer saved or given a pace.
+- Plural counts ("1 workouts"), the "Energized" label wrap, the AI consent text
+  naming only Gemini and Groq, Dev Tools shown in a release build, a fake
+  "Export started" row, header labels under the back arrow, a translucent tab
+  bar showing content through it, Privacy's Save leaving for Home.
+- Safety screening now covers Hindi (Devanagari) and Hinglish red flags with
+  Hindi safe-steps replies, and screens Hindi model output.
+- `i18n` holds en/es/fr strings but no screen calls `t()`: the app is English
+  only, and the header no longer claims ten languages.
+- Expo: SDK 56 keeps the same vulnerable transitive packages (npm's only "fix"
+  is a downgrade) and needs React Native 0.85, so it was not taken. `uuid` is
+  pinned through `overrides` (15 moderate advisories down to 4).
+- Server-side Health Connect deletion works live on staging (import 2 records,
+  delete 1, 1 left). Deletion detection on the phone was not verified: the
+  owner could not delete the phone's one steps record.
+
+`e2e/core-journey.yaml` (Maestro) drives sign-up to a finished workout on a
+device. 1,085 backend tests pass; typecheck clean.
+
+A sweep of all 437 read endpoints on staging (410 normal, the rest expected
+refusals or needing real ids) found two faults, both fixed: `modules-health/health`
+returned 500 (its return type rejected its own nested response), and
+`voice/prompts` was a GET that required a request body. `docs/FEATURE_STATUS.md`
+lists every feature with how it was checked. Onboarding now asks each question
+once: the welcome screen is gone and the profile is created at the end using the
+sign-up name. 1,088 backend tests pass.

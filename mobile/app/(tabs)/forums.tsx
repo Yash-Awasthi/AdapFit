@@ -15,12 +15,14 @@ import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius } from '../../src/theme';
 import { useTabBarHeight } from '../../src/theme/layout';
 import { getJson, postJson, asArray } from '../../src/services/http';
+import { openModeration } from '../../src/services/moderation';
 import { useUserStore } from '../../src/stores';
 
 const CATEGORIES = ['all', 'fitness', 'nutrition', 'mental health', 'sleep', 'general'];
 
 interface Post {
   id: string;
+  user_id: string;
   user_name: string;
   title: string;
   caption: string;
@@ -32,6 +34,7 @@ interface Post {
 
 interface Comment {
   id: string;
+  user_id: string;
   user_name: string;
   text: string;
   created_at: string;
@@ -65,10 +68,10 @@ function ThreadModal({ post, userId, onClose, onChanged }: {
   const [posting, setPosting] = useState(false);
 
   const load = useCallback(async () => {
-    const data = await getJson<Comment[]>(`/community/${post.id}/comments`);
+    const data = await getJson<Comment[]>(`/community/${post.id}/comments?user_id=${userId}`);
     setComments(asArray<Comment>(data));
     setLoading(false);
-  }, [post.id]);
+  }, [post.id, userId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -111,6 +114,11 @@ function ThreadModal({ post, userId, onClose, onChanged }: {
                   <Text style={styles.postAuthor}>{post.user_name}</Text>
                   <Text style={styles.postMeta}>{relativeTime(post.shared_at)}</Text>
                 </View>
+                <TouchableOpacity hitSlop={12} accessibilityRole="button" accessibilityLabel="Report or block"
+                  onPress={() => openModeration({ shareId: post.id, authorId: post.user_id, authorName: post.user_name, userId },
+                    () => { onChanged(); onClose(); })}>
+                  <Ionicons name="ellipsis-horizontal" size={20} color={colors.text.muted} />
+                </TouchableOpacity>
               </View>
               <Text style={styles.threadTitle}>{post.title}</Text>
               {!!post.caption && <Text style={styles.threadBody}>{post.caption}</Text>}
@@ -126,6 +134,11 @@ function ThreadModal({ post, userId, onClose, onChanged }: {
                 <View style={styles.commentTop}>
                   <Text style={styles.postAuthor}>{item.user_name}</Text>
                   <Text style={styles.postMeta}>{relativeTime(item.created_at)}</Text>
+                  <TouchableOpacity hitSlop={12} accessibilityRole="button" accessibilityLabel="Report or block"
+                    onPress={() => openModeration({ shareId: post.id, authorId: item.user_id, authorName: item.user_name,
+                      commentId: item.id, userId }, load)}>
+                    <Ionicons name="ellipsis-horizontal" size={16} color={colors.text.muted} />
+                  </TouchableOpacity>
                 </View>
                 <Text style={styles.commentText}>{item.text}</Text>
               </View>
@@ -385,7 +398,7 @@ export default function ForumsScreen() {
         />
       )}
 
-      {openPost && (
+      {!!openPost && (
         <ThreadModal
           post={openPost}
           userId={userId}
@@ -393,7 +406,7 @@ export default function ForumsScreen() {
           onChanged={load}
         />
       )}
-      {composing && (
+      {!!composing && (
         <ComposeModal userId={userId} onClose={() => setComposing(false)} onCreated={load} />
       )}
     </View>
@@ -407,7 +420,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md,
     paddingHorizontal: spacing.screenPadding, paddingBottom: spacing.lg,
   },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
+  headerTitle: { paddingLeft: 40, fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
   headerSubtitle: { fontSize: 14, color: colors.text.muted, marginTop: 4 },
   newButton: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary,

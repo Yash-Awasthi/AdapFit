@@ -101,11 +101,11 @@ fix available); any finding fails the build.
 - `pip-audit -r backend/requirements.txt`: clean. mediapipe 1.0.1 (Tasks API)
   no longer needs protobuf; torch was removed (nothing used it).
 - Trivy on the image: no high or critical findings with a fix.
-- `npm audit --omit=dev` (mobile): 15 moderate, all from two packages:
-  `uuid@7` inside the build-time `xcode` tool (bug only with a caller-supplied
-  buffer) and `decode-uri-component@0.2.2` under `expo-router`'s
-  `query-string` (a crafted deep link can stall the app's own URL parsing).
-  Both come with Expo 55; take the fix with the next Expo upgrade.
+- `npm audit --omit=dev` (mobile): 4 moderate, all `decode-uri-component@0.2.2` under
+  `expo-router`'s `query-string` (a crafted deep link can stall the app's own URL parsing).
+  No patched release exists, and Expo SDK 56 still depends on it, so upgrading Expo does not
+  clear it. `uuid@7` inside the build-time `xcode` tool is pinned to 11.1.1 through an
+  `overrides` entry in `mobile/package.json`.
 
 ## Not done yet
 

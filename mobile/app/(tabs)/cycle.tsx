@@ -241,7 +241,7 @@ export default function CycleScreen() {
           <Text style={styles.headerTitle}>Cycle</Text>
           <Text style={styles.headerSubtitle}>Phases, fertility window, and training fit</Text>
         </View>
-        {hasData && (
+        {!!hasData && (
           <TouchableOpacity
             style={styles.editButton}
             onPress={() => setEditing(true)}
@@ -277,7 +277,7 @@ export default function CycleScreen() {
                 </View>
               </View>
               <Text style={styles.phaseNote}>{current.current_phase.performance_note}</Text>
-              {current.next_period_date && (
+              {!!current.next_period_date && (
                 <View style={styles.nextRow}>
                   <Ionicons name="calendar-outline" size={14} color={colors.text.muted} />
                   <Text style={styles.nextText}>
@@ -317,7 +317,7 @@ export default function CycleScreen() {
             <PhaseLegend />
           </View>
 
-          {current?.training_recommendation && (
+          {!!current?.training_recommendation && (
             <View style={styles.card}>
               <View style={styles.sectionRow}>
                 <Ionicons name="barbell-outline" size={18} color={colors.health.heart} />
@@ -349,7 +349,7 @@ export default function CycleScreen() {
             </View>
           )}
 
-          {current?.nutrition_recommendation && (
+          {!!current?.nutrition_recommendation && (
             <View style={styles.card}>
               <View style={styles.sectionRow}>
                 <Ionicons name="restaurant-outline" size={18} color={colors.health.nutrition} />
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md,
     paddingHorizontal: spacing.screenPadding, paddingBottom: spacing.lg,
   },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
+  headerTitle: { paddingLeft: 40, fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
   headerSubtitle: { fontSize: 14, color: colors.text.muted, marginTop: 4 },
   editButton: {
     width: 40, height: 40, borderRadius: 20, backgroundColor: colors.bg.card,

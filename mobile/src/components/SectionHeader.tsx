@@ -19,7 +19,7 @@ export function SectionHeader({ title, action, onAction, icon }: Props) {
         {icon}
         <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
       </View>
-      {action && (
+      {!!action && (
         <Text style={[styles.action, { color: theme.primary }]} onPress={onAction}>
           {action}
         </Text>

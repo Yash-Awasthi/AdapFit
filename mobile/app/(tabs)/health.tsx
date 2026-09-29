@@ -197,7 +197,7 @@ export default function HealthScreen() {
 
       <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         {/* Risk Banner */}
-        {profile?.needs_doctor_clearance && (
+        {!!profile?.needs_doctor_clearance && (
           <View style={[s.banner, { backgroundColor: "#7F1D1D" }]}>
             <AlertTriangle size={18} color="#FCA5A5" />
             <Text style={s.bannerText}>
@@ -271,7 +271,7 @@ export default function HealthScreen() {
                   <Text style={s.medDetail}>
                     {m.dosage} • {m.frequency} • {m.time_of_day.join(", ")}
                   </Text>
-                  {m.interacts_with_exercise && (
+                  {!!m.interacts_with_exercise && (
                     <View style={s.warningBadge}>
                       <AlertTriangle size={12} color={theme.warning} />
                       <Text style={s.warningText}>Exercise caution: {m.exercise_notes}</Text>
@@ -284,7 +284,7 @@ export default function HealthScreen() {
         </View>
 
         {/* Exercise Restrictions */}
-        {restrictions && (
+        {!!restrictions && (
           <View style={s.section}>
             <View style={s.sectionHeader}>
               <Shield size={18} color={theme.success} />
@@ -324,7 +324,7 @@ export default function HealthScreen() {
       </ScrollView>
 
       {/* Add Condition Modal */}
-      {showAddCondition && (
+      {!!showAddCondition && (
         <View style={s.modal}>
           <View style={s.modalContent}>
             <Text style={s.modalTitle}>Add Condition</Text>
@@ -344,7 +344,7 @@ export default function HealthScreen() {
       )}
 
       {/* Add Medication Modal */}
-      {showAddMed && (
+      {!!showAddMed && (
         <View style={s.modal}>
           <View style={s.modalContent}>
             <Text style={s.modalTitle}>Add Medication</Text>
@@ -378,7 +378,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     container: { flex: 1, backgroundColor: theme.background },
     voiceBar: {
       flexDirection: "row", alignItems: "center", gap: 10,
-      paddingHorizontal: 16, paddingVertical: 10, backgroundColor: theme.surface,
+      paddingHorizontal: 16, paddingTop: 96, paddingBottom: 10, backgroundColor: theme.surface,
       borderBottomWidth: 1, borderBottomColor: theme.border,
     },
     voiceBtn: {
