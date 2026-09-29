@@ -89,7 +89,7 @@ function ThreadModal({ post, userId, onClose, onChanged }: {
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.modal}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={[styles.modalHeader, { paddingTop: insets.top + spacing.sm }]}>
           <TouchableOpacity onPress={onClose} hitSlop={12} accessibilityLabel="Close thread">
@@ -187,7 +187,7 @@ function ComposeModal({ userId, onClose, onCreated }: {
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.modal} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={styles.modal} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modalHeader, { paddingTop: insets.top + spacing.sm }]}>
           <TouchableOpacity onPress={onClose} hitSlop={12} accessibilityLabel="Cancel">
             <Ionicons name="close" size={24} color={colors.text.primary} />

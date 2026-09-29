@@ -223,7 +223,7 @@ export default function FormCheckerScreen() {
     return (
       <View style={s.container}>
         <View style={s.activeHeader}>
-          <TouchableOpacity onPress={endSession}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="End session" onPress={endSession}>
             <X size={24} color={theme.textSecondary} />
           </TouchableOpacity>
           <Text style={s.activeTitle}>{selectedExercise.name}</Text>
@@ -298,7 +298,7 @@ export default function FormCheckerScreen() {
   return (
     <View style={s.container}>
       <View style={s.topRow}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={s.backBtn}>
           <ChevronLeft size={22} color={theme.text} />
         </TouchableOpacity>
       </View>

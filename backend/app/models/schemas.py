@@ -197,10 +197,11 @@ class WorkoutCompleteRequest(BaseModel):
 class WorkoutCompleteResponse(BaseModel):
     log_id: str
     session_load: float
-    acute_load_7d: float
-    chronic_load_28d: float
-    acwr: float
-    acwr_status: ACWRStatus
+    # None until four weeks of sessions give a chronic load.
+    acute_load_7d: Optional[float] = None
+    chronic_load_28d: Optional[float] = None
+    acwr: Optional[float] = None
+    acwr_status: Optional[ACWRStatus] = None
     deload_recommended: bool
     message: str
     nlp_sentiment: Optional[Dict[str, Any]] = None

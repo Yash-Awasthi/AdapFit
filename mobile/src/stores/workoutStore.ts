@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../services/api';
+import { localDay } from '../utils/date';
 
 export interface Exercise {
   exercise_id: string;
@@ -69,7 +70,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     try {
       const workout = await api.generateWorkout({
         user_id: userId,
-        target_date: new Date().toISOString().split('T')[0],
+        target_date: localDay(),
         target_duration_minutes: duration,
       });
       set((state) => ({

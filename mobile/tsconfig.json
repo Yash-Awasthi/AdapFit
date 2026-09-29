@@ -23,6 +23,6 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ],
-  "exclude": ["node_modules", "**/*.check.ts", "e2e"],
+  "exclude": ["node_modules", "**/*.check.ts"],
   "extends": "expo/tsconfig.base"
 }

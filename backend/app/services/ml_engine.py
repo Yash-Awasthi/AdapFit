@@ -1,48 +1,7 @@
-"""
-AdapFit Advanced ML Analytics Engine v2
-Adds XGBoost/LightGBM ensemble, trend correlation analysis,
-workout performance prediction, and fatigue forecasting.
-"""
+"""Trend analytics over a user's measured logs. Nothing here fills in a missing value."""
 import math
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta, timezone
-from app.core.workout_metrics import session_duration_minutes, session_load, session_rpe
-
-# Lazy-loaded ML dependencies — loaded on first use
-_HAS_NUMPY = None  # None = not checked yet
-_HAS_XGBOOST = None
-_HAS_LIGHTGBM = None
-
-def _ensure_numpy():
-    global _HAS_NUMPY
-    if _HAS_NUMPY is not None:
-        return
-    try:
-        import numpy as np
-        _HAS_NUMPY = True
-    except ImportError:
-        _HAS_NUMPY = False
-
-def _ensure_xgboost():
-    global _HAS_XGBOOST
-    if _HAS_XGBOOST is not None:
-        return
-    try:
-        from xgboost import XGBRegressor, XGBClassifier
-        _HAS_XGBOOST = True
-    except ImportError:
-        _HAS_XGBOOST = False
-
-def _ensure_lightgbm():
-    global _HAS_LIGHTGBM
-    if _HAS_LIGHTGBM is not None:
-        return
-    try:
-        from lightgbm import LGBMRegressor
-        _HAS_LIGHTGBM = True
-    except ImportError:
-        _HAS_LIGHTGBM = False
-
+from typing import Any, Dict, List
+from app.core.workout_metrics import session_load
 
 class TrendCorrelationAnalyzer:
     """Analyzes correlations between health metrics over time."""
@@ -108,152 +67,57 @@ class TrendCorrelationAnalyzer:
             return "Negligible correlation"
 
     def analyze_metric_correlations(
-        self, recovery_logs: List[dict], workout_logs: List[dict]
+        self, recovery_logs: List[dict], workload_logs: List[dict]
     ) -> Dict[str, Any]:
-        """Analyze correlations between key fitness metrics."""
-        # Align logs by date
-        n = min(len(recovery_logs), len(workout_logs))
-        if n < 5:
-            return {"correlations": {}, "insights": ["Need more data (5+ days) for correlation analysis."]}
+        """Correlations between measured metrics, paired by calendar day; a missing value drops that day."""
+        by_day: Dict[str, dict] = {str(r.get("log_date", ""))[:10]: dict(r) for r in recovery_logs if r.get("log_date")}
+        for w in workload_logs:
+            load, day = session_load(w), str(w.get("recorded_at") or w.get("completed_at") or "")[:10]
+            if load is not None and day in by_day:
+                by_day[day]["_load"] = by_day[day].get("_load", 0.0) + load
+        days = sorted(by_day)
+        rows = [by_day[d] for d in days]
+        next_day = {days[i]: rows[i + 1] for i in range(len(days) - 1)}
 
-        recent_recovery = recovery_logs[-n:]
-        recent_workouts = workout_logs[-n:]
+        def series(xk, yk, lag=False):
+            pairs = []
+            for d, r in zip(days, rows):
+                y_row = next_day.get(d) if lag else r
+                if y_row is not None and r.get(xk) is not None and y_row.get(yk) is not None:
+                    pairs.append((float(r[xk]), float(y_row[yk])))
+            return [p[0] for p in pairs], [p[1] for p in pairs]
 
-        # Extract aligned series
-        hrv = [r.get("hrv_rmssd", 50) for r in recent_recovery]
-        sleep = [r.get("sleep_duration_hours", 7) for r in recent_recovery]
-        recovery_scores = [r.get("recovery_score", 70) for r in recent_recovery]
-        rpe = [session_rpe(w) for w in recent_workouts]
-        workout_load = [w.get("session_load", 500) for w in recent_workouts]
-        workout_duration = [session_duration_minutes(w) for w in recent_workouts]
-
-        # Calculate all pairwise correlations
-        pairs = [
-            ("hrv_vs_recovery", hrv, recovery_scores),
-            ("sleep_vs_recovery", sleep, recovery_scores),
-            ("hrv_vs_sleep", hrv, sleep),
-            ("rpe_vs_next_day_recovery", rpe[:-1], recovery_scores[1:]) if n > 1 else ("rpe_vs_recovery", rpe, recovery_scores),
-            ("workload_vs_acwr_trend", workout_load, [1.0] * n),  # placeholder
-            ("sleep_vs_hrv", sleep, hrv),
-            ("duration_vs_rpe", workout_duration, rpe),
+        specs = [
+            ("hrv_vs_recovery", "hrv_rmssd", "recovery_score", False),
+            ("sleep_vs_recovery", "sleep_duration_hours", "recovery_score", False),
+            ("sleep_vs_hrv", "sleep_duration_hours", "hrv_rmssd", False),
+            ("load_vs_next_day_recovery", "_load", "recovery_score", True),
         ]
-
-        correlations = {}
-        insights = []
-
-        for name, x, y in pairs:
-            if len(x) >= 3 and len(y) >= 3:
-                corr = self.pearson_correlation(x, y)
-                correlations[name] = corr
-
-                # Generate insights
-                if corr["significance"] in ("significant", "highly_significant"):
-                    if "sleep_vs_recovery" in name:
-                        insights.append(
-                            f"Sleep duration {'positively' if corr['r'] > 0 else 'negatively'} "
-                            f"correlates with recovery (r={corr['r']:.2f}). "
-                            f"{'Prioritize sleep to boost recovery.' if corr['r'] > 0 else 'Unexpected — investigate sleep quality.'}"
-                        )
-                    elif "hrv_vs_recovery" in name:
-                        insights.append(
-                            f"HRV {'tracks well' if corr['r'] > 0.5 else 'weakly correlates'} "
-                            f"with recovery score (r={corr['r']:.2f})."
-                        )
-                    elif "rpe_vs" in name:
-                        direction = "higher" if corr["r"] > 0 else "lower"
-                        insights.append(
-                            f"Higher session RPE tends to lead to {'worse' if corr['r'] > 0 else 'better'} "
-                            f"next-day recovery (r={corr['r']:.2f})."
-                        )
-
-        if not insights:
-            insights.append("No strong correlations found yet. Keep logging daily data for pattern detection.")
-
-        return {
-            "correlations": correlations,
-            "insights": insights,
-            "data_points": n,
-        }
+        correlations, insights = {}, []
+        for name, xk, yk, lag in specs:
+            x, y = series(xk, yk, lag)
+            if len(x) < 5:
+                continue
+            corr = self.pearson_correlation(x, y)
+            correlations[name] = corr
+            if corr["significance"] in ("significant", "highly_significant"):
+                if name == "sleep_vs_recovery":
+                    insights.append(f"On your nights with more sleep, your recovery score was "
+                                    f"{'higher' if corr['r'] > 0 else 'lower'} (r={corr['r']:.2f}, {corr['n']} days).")
+                elif name == "hrv_vs_recovery":
+                    insights.append(f"Your HRV tracks your recovery score (r={corr['r']:.2f}, {corr['n']} days).")
+                elif name == "load_vs_next_day_recovery":
+                    insights.append(f"Harder training days were followed by {'better' if corr['r'] > 0 else 'lower'} "
+                                    f"recovery the next morning (r={corr['r']:.2f}, {corr['n']} days).")
+        if not correlations:
+            insights.append("Need at least 5 days with both values logged to look for patterns.")
+        elif not insights:
+            insights.append("No clear pattern in your data yet. Keep logging.")
+        return {"correlations": correlations, "insights": insights, "data_points": len(days)}
 
 
 class WorkoutPerformancePredictor:
-    """Predicts workout performance metrics using gradient boosting."""
-
-    def __init__(self):
-        self._model = None
-        self._is_trained = False
-        self._training_data_x: List[List[float]] = []
-        self._training_data_y: List[float] = []
-
-    def extract_performance_features(self, recovery_log: dict, workout_log: dict) -> List[float]:
-        """Extract features for performance prediction."""
-        return [
-            recovery_log.get("hrv_rmssd", 50),
-            recovery_log.get("sleep_duration_hours", 7),
-            recovery_log.get("sleep_efficiency_pct", 85),
-            recovery_log.get("recovery_score", 70),
-            recovery_log.get("hrv_z_score", 0) or 0,
-            session_rpe(workout_log),
-            workout_log.get("session_load", 500),
-            session_duration_minutes(workout_log),
-            workout_log.get("total_volume_kg", 5000),
-            workout_log.get("acwr", 1.0),
-            # Day of week as cyclical
-            0.5,  # placeholder — in production use sin/cos encoding
-            # Historical averages
-            recovery_log.get("recovery_score", 70),  # placeholder for 7d avg
-        ]
-
-    def train(self, features_list: List[List[float]], labels: List[float]) -> Dict[str, Any]:
-        """Train the performance predictor."""
-        self._training_data_x.extend(features_list)
-        self._training_data_y.extend(labels)
-
-        if len(self._training_data_x) < 5:
-            return {"status": "insufficient_data", "samples": len(self._training_data_x)}
-
-        _ensure_xgboost()
-        if _HAS_XGBOOST:
-            try:
-                from xgboost import XGBRegressor
-                X = self._training_data_x[-200:]
-                y = self._training_data_y[-200:]
-
-                self._model = XGBRegressor(
-                    n_estimators=50, max_depth=4, learning_rate=0.1,
-                    random_state=42, verbosity=0
-                )
-                self._model.fit(X, y)
-                self._is_trained = True
-                return {"status": "trained", "model": "xgboost", "samples": len(self._training_data_x)}
-            except Exception as e:
-                return {"status": "error", "error": str(e)}
-
-        return {"status": "no_xgboost", "samples": len(self._training_data_x)}
-
-    def predict_next_rpe(self, features: List[float]) -> Dict[str, Any]:
-        """Predict expected RPE for tomorrow's workout."""
-        _ensure_xgboost()
-        if _HAS_XGBOOST and self._is_trained and self._model is not None:
-            try:
-                pred = self._model.predict([features])[0]
-                return {
-                    "predicted_rpe": round(max(1, min(10, float(pred))), 1),
-                    "model_type": "xgboost",
-                    "confidence": 0.75,
-                }
-            except Exception:
-                pass
-
-        # Fallback: weighted average of recent context
-        avg_rpe = sum(features[5:6]) / 1 if features[5:6] else 5.0
-        recovery_factor = features[3] / 100.0  # recovery score
-        adjusted_rpe = avg_rpe * (1.1 - 0.2 * recovery_factor)
-        return {
-            "predicted_rpe": round(max(1, min(10, adjusted_rpe)), 1),
-            "model_type": "heuristic_fallback",
-            "confidence": 0.4,
-        }
+    """Today's volume capacity from measured recovery, sleep and training load."""
 
     def predict_volume_capacity(
         self, recovery_score: float, recent_avg_volume: float,
@@ -293,174 +157,18 @@ class WorkoutPerformancePredictor:
         }
 
 
-class FatigueForecaster:
-    """Forecasts fatigue accumulation and optimal deload timing."""
-
-    def forecast_fatigue_trajectory(
-        self, workout_logs: List[dict], recovery_logs: List[dict]
-    ) -> Dict[str, Any]:
-        """Project fatigue trajectory and suggest deload timing."""
-        if len(workout_logs) < 7:
-            return {
-                "trajectory": "insufficient_data",
-                "days_to_deload": None,
-                "current_fatigue": 0,
-            }
-
-        # Calculate cumulative fatigue from recent sessions
-        fatigue_scores = []
-        cumulative = 0.0
-
-        for wl in workout_logs[-14:]:
-            load = session_load(wl)
-
-            # Fatigue accumulates faster than fitness
-            acute_fatigue = load * 0.3  # fast component
-            chronic_fitness = load * 0.1  # slow component
-            cumulative += (acute_fatigue - chronic_fitness)
-
-            # Recovery reduces fatigue
-            recovery_factor = 0.85  # 15% recovery per day baseline
-            cumulative *= recovery_factor
-
-            fatigue_scores.append(round(max(0, cumulative), 1))
-
-        current_fatigue = fatigue_scores[-1] if fatigue_scores else 0
-
-        # Find fatigue threshold (adaptive based on history)
-        threshold = max(500, sum(fatigue_scores) / len(fatigue_scores) * 2.5) if fatigue_scores else 750
-
-        # Forecast
-        future_fatigue = []
-        projected = current_fatigue
-        days_to_deload = None
-
-        for day in range(1, 14):
-            # Assume moderate training continues
-            projected = projected * 0.85 + 200  # ~200 fatigue/day moderate training
-            future_fatigue.append(round(projected, 1))
-
-            if projected >= threshold and days_to_deload is None:
-                days_to_deload = day
-
-        # Overall assessment
-        if current_fatigue >= threshold * 0.8:
-            status = "NEAR_DELOAD"
-        elif current_fatigue >= threshold * 0.5:
-            status = "ACCUMULATING"
-        else:
-            status = "MANAGEABLE"
-
-        return {
-            "current_fatigue": round(current_fatigue, 1),
-            "fatigue_threshold": round(threshold, 1),
-            "status": status,
-            "days_to_deload": days_to_deload,
-            "future_trajectory": future_fatigue[:7],  # Next 7 days
-            "recommendation": (
-                "Schedule deload this week" if status == "NEAR_DELOAD"
-                else f"Deload recommended in ~{days_to_deload} days" if days_to_deload
-                else "Fatigue is manageable — continue current training"
-            ),
-        }
-
-
 class AdvancedMLEngine:
-    """
-    Enterprise ML analytics engine v2.
-    Combines an XGBoost/LightGBM ensemble, trend correlation,
-    workout performance prediction, and fatigue forecasting.
-    """
+    """Trend correlation, HRV trend line, anomaly flags and volume capacity over measured data."""
 
     def __init__(self):
 
         # New sub-systems
         self.correlation = TrendCorrelationAnalyzer()
         self.performance_predictor = WorkoutPerformancePredictor()
-        self.fatigue_forecaster = FatigueForecaster()
-
-    def extract_features(self, recovery_logs: List[dict], workout_logs: List[dict]) -> List[float]:
-        """Extract ML features from user's recent history."""
-        features = []
-
-        hrvs = [r.get("hrv_rmssd") or 50.0 for r in recovery_logs[-7:]]
-        hrvs += [50.0] * (7 - len(hrvs))
-        features.extend(hrvs[:7])
-
-        sleeps = [r.get("sleep_duration_hours") or 7.5 for r in recovery_logs[-7:]]
-        sleeps += [7.5] * (7 - len(sleeps))
-        features.extend(sleeps[:7])
-
-        scores = [r.get("recovery_score", 70) for r in recovery_logs[-7:]]
-        scores += [70] * (7 - len(scores))
-        features.extend(scores[:3])
-
-        latest_acwr = 1.0
-        if workout_logs:
-            latest_acwr = workout_logs[-1].get("acwr", 1.0)
-        features.append(latest_acwr)
-
-        last_rpe = 5.0
-        if workout_logs:
-            last_rpe = session_rpe(workout_logs[-1])
-        features.append(last_rpe)
-
-        # Extended features for v2
-        # 7-day average recovery score
-        avg_recovery = sum(r.get("recovery_score", 70) for r in recovery_logs[-7:]) / max(len(recovery_logs[-7:]), 1)
-        features.append(avg_recovery)
-
-        # 7-day average RPE
-        avg_rpe = sum(session_rpe(w) for w in workout_logs[-7:]) / max(len(workout_logs[-7:]), 1) if workout_logs else 5.0
-        features.append(avg_rpe)
-
-        # Workout frequency (sessions per week in last 14 days)
-        features.append(min(7, len(workout_logs[-7:])))
-
-        # Sleep debt (target 8h minus actual over last 3 days)
-        recent_sleep = [r.get("sleep_duration_hours", 7) for r in recovery_logs[-3:]]
-        sleep_debt = sum(max(0, 8.0 - s) for s in recent_sleep)
-        features.append(min(12.0, sleep_debt))
-
-        return features
 
     def train_readiness_model(self, features_list: List[List[float]], labels: List[int]):
         # No trained model: a global net over every user's feedback is not personal, and it never ran.
         return {"status": "not_trained", "model_type": "rule_based"}
-
-    def predict_readiness(self, features: List[float]) -> Dict[str, Any]:
-        states = ["DEPLETED", "REDUCED", "MODERATE", "OPTIMAL"]
-        avg_hrv = sum(features[:7]) / 7 if features[:7] else 50.0
-        avg_sleep = sum(features[7:14]) / 7 if len(features) >= 14 else 7.5
-        last_score = features[14] if len(features) > 14 else 70
-        acwr = features[17] if len(features) > 17 else 1.0
-
-        score = 0.0
-        if avg_hrv > 55: score += 30
-        elif avg_hrv > 45: score += 20
-        else: score += 10
-
-        if avg_sleep >= 7.5: score += 25
-        elif avg_sleep >= 6.0: score += 15
-        else: score += 5
-
-        score += min(25, last_score * 0.25)
-
-        if 0.8 <= acwr <= 1.3: score += 20
-        elif acwr > 1.5: score -= 10
-
-        if score >= 80: state = "OPTIMAL"
-        elif score >= 60: state = "MODERATE"
-        elif score >= 40: state = "REDUCED"
-        else: state = "DEPLETED"
-
-        return {
-            "predicted_state": state,
-            "confidence": 0.5,
-            "probabilities": {s: (0.7 if s == state else 0.1) for s in states},
-            "model_type": "rule_based_fallback",
-            "is_trained": False,
-        }
 
     def forecast_hrv(self, hrv_history: List[float], days_ahead: int = 7) -> Dict[str, Any]:
         if len(hrv_history) < 3:
@@ -509,29 +217,10 @@ class AdvancedMLEngine:
                 anomalies.append({"index": i, "value": v, "z_score": round(z, 2)})
         return {"anomalies": anomalies, "anomaly_count": len(anomalies), "mean": round(mean, 1), "std": round(std, 1)}
 
-    def compute_injury_risk(self, acwr: float, hrv_trend_slope: float, sleep_debt: float, consecutive_high_days: int) -> Dict[str, Any]:
-        risk = 0.0
-        factors = []
-        if acwr > 1.5: risk += 35; factors.append({"factor": "ACWR Danger", "contribution": 35.0})
-        elif acwr > 1.3: risk += 20; factors.append({"factor": "ACWR Caution", "contribution": 20.0})
-        elif acwr < 0.8: risk += 10; factors.append({"factor": "Under-training", "contribution": 10.0})
-        if hrv_trend_slope < -2.0: risk += 25; factors.append({"factor": "HRV Declining Rapidly", "contribution": 25.0})
-        elif hrv_trend_slope < -1.0: risk += 15; factors.append({"factor": "HRV Declining", "contribution": 15.0})
-        if sleep_debt > 4.0: risk += 20; factors.append({"factor": "Severe Sleep Debt", "contribution": 20.0})
-        elif sleep_debt > 2.0: risk += 12; factors.append({"factor": "Moderate Sleep Debt", "contribution": 12.0})
-        if consecutive_high_days >= 5: risk += 20
-        elif consecutive_high_days >= 3: risk += 12
-        risk = max(0.0, min(100.0, risk))
-        level = "CRITICAL" if risk >= 70 else ("ELEVATED" if risk >= 40 else ("MODERATE" if risk >= 20 else "LOW"))
-        return {"risk_score": round(risk, 1), "risk_level": level, "contributing_factors": factors}
-
     def get_status(self):
         return {
-            "xgboost_available": _HAS_XGBOOST,
-            "lightgbm_available": _HAS_LIGHTGBM,
             "model_trained": False,
             "correlation_engine": "active",
-            "fatigue_forecaster": "active",
             "performance_predictor": "active",
         }
 

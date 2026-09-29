@@ -89,7 +89,6 @@ export default function RegisterScreen() {
       const data = await r.json();
       if (r.ok && data.tokens) {
         await setTokens(data.tokens);
-        // The root layout bounces to onboarding when the store has no profile.
         if (data.user?.id) {
           await setUser({
             id: data.user.id,
@@ -117,14 +116,15 @@ export default function RegisterScreen() {
     return score;
   };
 
-  const strength = passwordStrength(password);
+  // Score runs 0-5 while the labels run 0-4; 5 of 5 is "Very Strong", not an out-of-range fallback.
+  const strength = Math.max(0, passwordStrength(password) - 1);
   const strengthColors = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#10B981'];
   const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
 
   return (
-    <KeyboardAvoidingView style={ns.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView style={ns.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={ns.scrollContent} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={ns.backButton} onPress={() => router.back()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" style={ns.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
 
@@ -163,14 +163,14 @@ export default function RegisterScreen() {
             <View style={ns.inputRow}>
               <Ionicons name="lock-closed-outline" size={20} color={colors.text.muted} />
               <TextInput style={ns.input} value={password} onChangeText={setPassword} placeholder="Min 8 characters" placeholderTextColor={colors.text.muted} secureTextEntry={!showPassword} />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.text.muted} />
               </TouchableOpacity>
             </View>
             {password.length > 0 && (
               <View style={ns.strengthContainer}>
                 <View style={ns.strengthBar}>
-                  <View style={[ns.strengthFill, { width: `${(strength / 5) * 100}%`, backgroundColor: strengthColors[strength] || strengthColors[0] }]} />
+                  <View style={[ns.strengthFill, { width: `${((strength + 1) / 5) * 100}%`, backgroundColor: strengthColors[strength] || strengthColors[0] }]} />
                 </View>
                 <Text style={[ns.strengthText, { color: strengthColors[strength] || strengthColors[0] }]}>{strengthLabels[strength] || 'Very Weak'}</Text>
               </View>

@@ -17,6 +17,7 @@ import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumCom
 import { useApis } from '../../src/hooks/useApi';
 import { postJson } from '../../src/services/http';
 import { useUserStore } from '../../src/stores';
+import { localDay } from '../../src/utils/date';
 
 const CM_OPTIONS = ['dry', 'sticky', 'creamy', 'watery', 'egg_white'];
 
@@ -93,7 +94,7 @@ export default function FertilityScreen() {
     setBusy(true);
     const result = await postJson('/fertility/log', {
       user_id: userId,
-      date: new Date().toISOString().slice(0, 10),
+      date: localDay(),
       data: {
         bbt: bbt.trim() ? Number(bbt) : undefined,
         cervical_mucus: cm,

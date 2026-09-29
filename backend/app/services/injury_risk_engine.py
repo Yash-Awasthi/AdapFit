@@ -13,6 +13,7 @@ Patterns extracted:
 
 import math
 from typing import List, Dict, Optional, Tuple
+from app.core.workout_metrics import acwr_ratio, session_load
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -499,12 +500,9 @@ def _daily_metrics_from(workout_logs: List[Dict], recovery_logs: List[Dict]) -> 
         day = _log_day(log)
         if not day:
             continue
-        load = _as_float(log.get("session_load"))
+        load = session_load(log)
         if load is None:
-            # Older logs predate the EWMA pipeline and only carry duration and RPE.
-            duration = _as_float(log.get("actual_duration_minutes")) or 0.0
-            rpe = _as_float(log.get("session_rpe")) or 0.0
-            load = duration * rpe
+            continue
         loads_by_day[day] = loads_by_day.get(day, 0.0) + load
         rpe = _as_float(log.get("session_rpe"))
         if rpe is not None:
@@ -568,19 +566,16 @@ class _InjuryRiskFacade:
         injury_history: Optional[List[Dict]] = None,
     ) -> Dict:
         metrics = _daily_metrics_from(workout_logs, recovery_logs)
-        if not metrics:
+        # The estimate leans on the load ratio; without four weeks of measured sessions it would be a guess.
+        if not metrics or acwr_ratio(workout_logs) is None:
             return {
-                "risk_score": 0.0,
-                "risk_level": RiskLevel.LOW.value,
+                "risk_score": None,
+                "risk_level": None,
+                "status": "insufficient_data",
                 "risk_factors": [],
-                "acwr": 1.0,
-                "acwr_zone": ACWRZone.OPTIMAL.value,
-                "acute_load": 0.0,
-                "chronic_load": 0.0,
-                "load_trend": 0.0,
-                "hr_delta": 0.0,
-                "recommendations": ["Log training and recovery data to see an injury risk estimate."],
-                "days_analyzed": 0,
+                "acwr": None,
+                "recommendations": ["Log 4 weeks of workouts with effort (RPE) and daily check-ins to see an injury risk estimate."],
+                "days_analyzed": len(metrics),
             }
 
         history = injury_history or []

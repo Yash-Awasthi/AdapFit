@@ -226,11 +226,11 @@ export default function WorkoutActive() {
         <View style={s.adjuster}>
           <Text style={s.adjusterLabel}>Weight (kg)</Text>
           <View style={s.stepper}>
-            <TouchableOpacity onPress={() => setWeight((w) => Math.max(0, w - 2.5))} style={s.stepBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease weight by 2.5 kilograms" onPress={() => setWeight((w) => Math.max(0, w - 2.5))} style={s.stepBtn}>
               <Minus size={14} color={theme.text} />
             </TouchableOpacity>
             <Text style={s.stepValue}>{weight}</Text>
-            <TouchableOpacity onPress={() => setWeight((w) => w + 2.5)} style={s.stepBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase weight by 2.5 kilograms" onPress={() => setWeight((w) => w + 2.5)} style={s.stepBtn}>
               <Plus size={14} color={theme.text} />
             </TouchableOpacity>
           </View>
@@ -238,11 +238,11 @@ export default function WorkoutActive() {
         <View style={s.adjuster}>
           <Text style={s.adjusterLabel}>Reps</Text>
           <View style={s.stepper}>
-            <TouchableOpacity onPress={() => setReps((r) => Math.max(0, r - 1))} style={s.stepBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease reps" onPress={() => setReps((r) => Math.max(0, r - 1))} style={s.stepBtn}>
               <Minus size={14} color={theme.text} />
             </TouchableOpacity>
             <Text style={s.stepValue}>{reps}</Text>
-            <TouchableOpacity onPress={() => setReps((r) => r + 1)} style={s.stepBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase reps" onPress={() => setReps((r) => r + 1)} style={s.stepBtn}>
               <Plus size={14} color={theme.text} />
             </TouchableOpacity>
           </View>
@@ -250,11 +250,11 @@ export default function WorkoutActive() {
         <View style={s.adjuster}>
           <Text style={s.adjusterLabel}>RPE</Text>
           <View style={s.stepper}>
-            <TouchableOpacity onPress={() => setRpe((p) => Math.max(1, p - 0.5))} style={s.stepBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease effort (RPE)" onPress={() => setRpe((p) => Math.max(1, p - 0.5))} style={s.stepBtn}>
               <Minus size={14} color={theme.text} />
             </TouchableOpacity>
             <Text style={s.stepValue}>{rpe}</Text>
-            <TouchableOpacity onPress={() => setRpe((p) => Math.min(10, p + 0.5))} style={s.stepBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase effort (RPE)" onPress={() => setRpe((p) => Math.min(10, p + 0.5))} style={s.stepBtn}>
               <Plus size={14} color={theme.text} />
             </TouchableOpacity>
           </View>

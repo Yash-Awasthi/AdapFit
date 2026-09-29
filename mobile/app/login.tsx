@@ -71,7 +71,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={ns.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView style={ns.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={ns.header}>
         <View style={ns.logoContainer}>
           <Ionicons name="fitness" size={48} color="#FFF" />
@@ -110,7 +110,7 @@ export default function LoginScreen() {
               placeholderTextColor={colors.text.muted}
               secureTextEntry={!showPassword}
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword(!showPassword)}>
               <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.text.muted} />
             </TouchableOpacity>
           </View>

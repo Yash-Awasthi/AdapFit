@@ -57,12 +57,16 @@ def test_a_new_account_can_complete_the_whole_loop():
     score = r.json()["recovery_score"]
     assert 0 <= score <= 100
 
-    decision = c.get("/api/v1/decision/today", headers=headers)
+    decision = c.get("/api/v1/decision/today?day=2026-04-01", headers=headers)
     assert decision.status_code == 200, decision.text
     body = decision.json()
     assert body["user_id"] == user_id
     assert body["decision"] in {"TRAIN", "REDUCE", "RECOVER", "REST"}
     assert body["headline"]
+
+    # The next day, that check-in is stale: no decision until a new one.
+    stale = c.get("/api/v1/decision/today?day=2026-04-02", headers=headers).json()
+    assert stale["decision"] is None and stale["headline"] == "Check in to see today's plan"
 
     baseline = c.get(f"/api/v1/users/{user_id}/baselines", headers=headers)
     assert baseline.status_code == 200, baseline.text

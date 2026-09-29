@@ -33,6 +33,7 @@
         "BLUETOOTH_CONNECT",
         "ACCESS_FINE_LOCATION",
         "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM",
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_SLEEP",
         "android.permission.health.READ_HEART_RATE",

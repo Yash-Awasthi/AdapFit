@@ -16,11 +16,12 @@ class FrameData(BaseModel):
 
 
 class FacialLandmarks(BaseModel):
-    eye_aspect_ratio: float = 0.35
-    head_tilt_degrees: float = 5.0
-    blinks_per_minute: float = 15.0
-    yawn_duration: float = 0.0
-    gaze_variance: float = 0.5
+    # Required: a default here would be scored as a measured, alert face.
+    eye_aspect_ratio: float = Field(ge=0, le=1)
+    head_tilt_degrees: float = Field(ge=-90, le=90)
+    blinks_per_minute: float = Field(ge=0, le=120)
+    yawn_duration: float = Field(ge=0, le=30)
+    gaze_variance: float = Field(ge=0, le=1)
 
 
 class BPMStartRequest(BaseModel):
@@ -44,7 +45,7 @@ async def get_bpm_result():
     """Get the current BPM measurement result."""
     reading = camera_vitals_service.get_bpm_reading()
     return {
-        "bpm": reading.bpm,
+        "bpm": reading.bpm or None,
         "confidence": reading.confidence,
         "signal_quality": reading.signal_quality,
         "measurement_duration": round(reading.measurement_duration, 1),

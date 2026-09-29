@@ -103,7 +103,7 @@ export default function PersonalInfoScreen() {
       <ScreenHeader
         title="Personal Info"
         right={
-          <TouchableOpacity onPress={handleSave} disabled={saving} hitSlop={10}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save" onPress={handleSave} disabled={saving} hitSlop={10}>
             <Check size={22} color={theme.primaryLight} />
           </TouchableOpacity>
         }

@@ -277,7 +277,7 @@ export default function CameraHeartRateScreen() {
         >
           {/* Top Bar */}
           <View style={styles.topBar}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={styles.backButton}>
               <Ionicons name="chevron-back" size={24} color="#FFF" />
             </TouchableOpacity>
             <Text style={[typography.label.md, { color: '#FFF' }]}>Heart Rate</Text>

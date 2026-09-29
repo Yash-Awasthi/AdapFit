@@ -10,7 +10,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.services.safety_policy import SAFETY_RULES, triage
+from app.services.safety_policy import SAFETY_RULES, screen_reply, triage
 
 router = APIRouter()
 
@@ -49,6 +49,8 @@ def _parse(reply: str) -> Optional[dict]:
     try:
         data = json.loads(m.group(0))
         data["sources"] = [s for s in data.get("sources", []) if any(t.split(" (")[0] in s for t in TRUSTED)]
+        if isinstance(data.get("explanation"), str):
+            data["explanation"] = screen_reply(data["explanation"])
         return Verdict(**data).model_dump()
     except (ValueError, TypeError):
         return None

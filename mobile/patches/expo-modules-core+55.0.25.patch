@@ -1,0 +1,16 @@
+diff --git a/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt b/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
+index 9ba0bfb..00fa93c 100644
+--- a/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
++++ b/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
+@@ -57,6 +57,11 @@ class RNHeadlessAppLoader @DoNotStrip constructor() : HeadlessAppLoader {
+       val reactContext = appRecords[appScopeKey] ?: return false
+       val reactHost = (reactContext.applicationContext as ReactApplication).reactHost
+         ?: throw IllegalStateException("Your application does not have a valid reactHost")
++      // An Activity attached to the headless-started host owns it and it will not be destroyed, so report
++      // "not invalidated": TaskService then keeps the live task manager instead of dropping it (expo/expo#50364).
++      if (reactHost.lifecycleState != LifecycleState.BEFORE_CREATE) {
++        return false
++      }
+       android.os.Handler(reactContext.mainLooper).post {
+         // Only destroy the `ReactInstanceManager` if it does not bind with an Activity.
+         // And The Activity would take over the ownership of `ReactInstanceManager`.

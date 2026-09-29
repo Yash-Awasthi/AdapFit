@@ -254,7 +254,7 @@ export const SmartBanner: React.FC<SmartBannerProps> = ({
           <Text style={[styles.bannerActionText, { color: config.color }]}>{actionLabel}</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity onPress={onDismiss} style={styles.bannerDismiss}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss" onPress={onDismiss} style={styles.bannerDismiss}>
         <Ionicons name="close" size={16} color={colors.text.muted} />
       </TouchableOpacity>
     </Animated.View>

@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "release:apk": "cd android && gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a",
-    "release:aab": "cd android && gradlew bundleRelease"
+    "release:aab": "cd android && gradlew bundleRelease",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -66,6 +67,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@types/react": "~19.0.0",
+    "patch-package": "^8.0.1",
     "typescript": "~5.8.0"
   },
   "private": true,

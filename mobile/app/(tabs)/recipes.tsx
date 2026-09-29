@@ -84,7 +84,7 @@ export default function RecipesScreen() {
           {/* Search */}
           <View style={ns.searchRow}>
             <TextInput style={ns.searchInput} value={query} onChangeText={setQuery} placeholder="Search recipes..." placeholderTextColor={colors.text.muted} onSubmitEditing={searchRecipes} />
-            <TouchableOpacity style={ns.searchBtn} onPress={searchRecipes}><Ionicons name="search" size={18} color="#FFF" /></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Search recipes" style={ns.searchBtn} onPress={searchRecipes}><Ionicons name="search" size={18} color="#FFF" /></TouchableOpacity>
           </View>
 
           {/* Diet Filters */}

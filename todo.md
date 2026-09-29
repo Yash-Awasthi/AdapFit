@@ -9,32 +9,25 @@ wellness, India first, every feature kept, nothing diagnoses.
 
 ---
 
-## Phase 6 — Monetisation
+## Phase 6 — Monetisation (rest)
 
-- Subscription model and pricing tiers.
-- In-app purchase integration for both stores.
-- Server-side entitlements and feature gating.
-- Trials, restore purchases, refunds, receipts.
-- LLM cost per user and quotas that keep tiers profitable.
+Decided 2026-09-29: every feature free at launch. Done in plan.md Part 20:
+the per-account daily AI quota. Left for when paid tiers are wanted (owner's
+decisions): tiers, INR prices, trial length, what stays free; a Play Console
+and payments profile; then server-side entitlements, Google Play Billing,
+restore purchases, refunds and receipts.
 
-## Phase 7 — AI and data quality
+## Phase 7 — AI and data quality (rest)
 
-- `session_load` silently assumes 45 minutes and RPE 5 when a workout omits them;
-  the training routes exclude such sessions but ACWR and the recovery engine do not.
-- Audit for constant "sample" readings returned as user data. The random-number
-  guard cannot see these (device sync and the analytics dashboard were two).
+Done in plan.md Part 18. Left:
 
-- Every LLM call: purpose, prompt, safety filter, fallback, cost.
-- Health-advice guardrails and escalation wording.
-- Score and algorithm validation against references (recovery, HRV, sleep,
-  readiness).
-- Remaining places where values are defaulted or estimated without input.
-- The home recovery ring shows 0 when there is no check-in, and the "Train, but
-  reduce intensity" advice appears with no data behind it.
 - Photo measurement of skin spots (`lesion_measure.py`) is tested on synthetic
-  images only; calibrate on real phone photos of moles with a coin.
-- Health Connect sync adds and updates records but never learns of deletions;
-  use the changes API so a record deleted on the phone leaves the server too.
+  images only; calibrate on real phone photos of moles with a coin (needs the
+  owner's photos).
+- `screen_reply` only reads English; screen replies in Hindi and other
+  languages before the app offers them.
+- Verify on a device: Health Connect deletion reaching the server, and the
+  home screen with no check-in today.
 
 ## Phase 8 — Infrastructure and operations (rest)
 
@@ -48,38 +41,26 @@ Done in plan.md Part 17. Left:
 - iOS project, build profile, HealthKit entitlement and sync (deferred).
 - Expo past SDK 55 for the moderate advisories in `docs/SECURITY.md`.
 
-## Phase 9 — User experience and quality
+## Phase 9 — User experience and quality (rest)
+
+Done in plan.md Part 19. Left:
 
 - Stroke rehab, chronic disease management, hospital at home and wound
   assessment are API-only; design each with a clinician before giving it a screen.
 - Coach marketplace: rebuild only with verified, real practitioners.
-- `mobile/e2e` has no runner installed (no detox or jest) and is excluded from
-  the typecheck; install one or delete it.
-
 - API-only features still without a screen: peer support, vaccination records
   (health passport), accessible workout alternatives, the accessibility API.
-- `test_mobile_api_paths.py` misses calls whose generic type contains nested
-  `<...>` (for example `getJson<{ data: Record<string, any> }>(...)`); widen it.
-- 12 new hub and feature screens this phase have only been typechecked, never
-  run on a device.
-
-- With the user present, on their phone: camera heart rate, pose and sensors,
-  and a BLE heart-rate strap. Decide which wearables are worth keeping for launch.
-- Reminders are inexact alarms: Android gave a daily reminder a one-hour window.
-  Medication times may need exact alarms (`SCHEDULE_EXACT_ALARM`, user-granted).
-- Run recording hits expo/expo#50364: if the app is relaunched while a run's
-  location task is registered, fixes stop reaching JS (Finish now times out
-  instead of hanging). Patch expo-task-manager or move to a native service.
+- With the owner, on their phone: camera heart rate, pose and sensors, and a
+  BLE heart-rate strap; decide which wearables to keep for launch. Also a
+  Health Connect record deleted on the phone disappearing after a sync.
 - Sleep sounds stop listening if the screen turns off (JS timers pause); the
   screen stays on under a black overlay. Native metering would lift that.
-- Change-password screen (the API returns a fresh token pair; reset by email works).
-- Onboarding flow and first-run experience.
-- Navigation and information architecture for the reduced feature set.
-- Empty, loading and error states.
-- Accessibility (screen reader, contrast, text scaling).
-- Localisation completeness.
-- Performance and app size.
-- End-to-end tests for the core journeys.
+- A "Text strings must be rendered within a <Text>" console error appears in
+  development after some screen interactions; not yet traced to its screen.
+- Onboarding asks only name and gender; goal, level and equipment keep the
+  profile defaults until the user edits Personal Info.
+- Localisation completeness; performance and app size; end-to-end tests for
+  the core journeys (the adb walk in Part 19 is manual).
 
 ## Phase 10 — Launch readiness
 

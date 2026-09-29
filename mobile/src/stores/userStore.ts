@@ -77,7 +77,13 @@ export const useUserStore = create<UserStore>((set, get) => ({
 
   setUser: async (user: UserProfile) => {
     await AsyncStorage.setItem(STORAGE_KEY, user.id);
-    set({ userId: user.id, signedIn: true, profile: user });
+    // The account is not the profile: a new account, or one never onboarded, has no profile row and goes to onboarding.
+    set({ userId: user.id, signedIn: true, loading: true });
+    try {
+      set({ profile: (await api.getUser(user.id)) as UserProfile, loading: false });
+    } catch (err: any) {
+      set({ profile: String(err?.message).includes('404') ? null : user, loading: false });
+    }
   },
 
   refreshProfile: async () => {

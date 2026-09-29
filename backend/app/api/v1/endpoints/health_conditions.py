@@ -330,7 +330,9 @@ async def get_health_profile_summary(user_id: str = Query("default")):
     active_conditions = [c for c in conditions if c.get("is_active", True)]
     active_meds = [m for m in meds if not m.get("end_date")]
 
-    risk_level = "low"
+    # A count of logged conditions, used only to suggest checking with a doctor before hard exercise.
+    # With nothing logged there is nothing to assess, which is not the same as "low".
+    risk_level = None if not conditions else "low"
     if len(active_conditions) >= 3:
         risk_level = "high"
     elif len(active_conditions) >= 1:

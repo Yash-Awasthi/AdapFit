@@ -30,18 +30,18 @@ interface HrvResponse {
 }
 interface AcwrResponse {
   acwr: number | null;
-  acwr_status: string;
+  acwr_status: string | null;
   history_count: number;
 }
 interface FatigueResponse {
-  current_fatigue: number;
+  current_fatigue: number | null;
   status?: string;
   trajectory?: string;
-  future_trajectory?: number[];
+  recent_fatigue?: number[];
   recommendation?: string;
 }
 interface MlInsightsResponse {
-  readiness_prediction: { predicted_state: string; confidence: number };
+  readiness_prediction: { predicted_state: string; log_date?: string } | null;
 }
 
 interface MetricCard {
@@ -74,15 +74,12 @@ function buildMetrics(hrv: HrvResponse | null, acwr: AcwrResponse | null, fatigu
   const hrvHasData = hrvValues.length > 0;
   const hrvTrend = hrv?.forecast?.trend ?? 'no_data';
 
-  const acwrHasData = (acwr?.history_count ?? 0) > 0 && typeof acwr?.acwr === 'number';
+  const acwrHasData = typeof acwr?.acwr === 'number';
 
   const fatigueHasData = !!fatigue && fatigue.trajectory !== 'insufficient_data';
 
-  // predict_readiness always returns a confident state even from default
-  // features, so treat it as real only once some underlying history exists.
-  const hasAnyHistory = hrvHasData || (acwr?.history_count ?? 0) > 0;
   const readiness = ml?.readiness_prediction;
-  const readinessHasData = !!readiness && hasAnyHistory;
+  const readinessHasData = !!readiness;
 
   return [
     {
@@ -104,7 +101,7 @@ function buildMetrics(hrv: HrvResponse | null, acwr: AcwrResponse | null, fatigu
       color: colors.health.activity,
       value: acwrHasData ? acwr!.acwr!.toFixed(2) : '—',
       unit: '',
-      trendLabel: acwrHasData ? titleCase(acwr!.acwr_status) : 'No Data',
+      trendLabel: acwrHasData ? titleCase(acwr!.acwr_status ?? '') : 'No Data',
       direction: !acwrHasData ? 'flat' : acwr!.acwr_status === 'DANGER_ZONE' || acwr!.acwr_status === 'CAUTION' ? 'down' : acwr!.acwr_status === 'SWEET_SPOT' ? 'up' : 'flat',
       sparkline: [],
       hasData: acwrHasData,
@@ -114,11 +111,11 @@ function buildMetrics(hrv: HrvResponse | null, acwr: AcwrResponse | null, fatigu
       label: 'Fatigue',
       icon: 'flash',
       color: colors.health.stress,
-      value: fatigueHasData ? String(Math.round(fatigue!.current_fatigue)) : '—',
+      value: fatigueHasData && fatigue!.current_fatigue != null ? String(Math.round(fatigue!.current_fatigue)) : '—',
       unit: '',
       trendLabel: fatigueHasData && fatigue!.status ? titleCase(fatigue!.status) : 'No Data',
-      direction: !fatigueHasData ? 'flat' : fatigue!.status === 'NEAR_DELOAD' ? 'down' : fatigue!.status === 'MANAGEABLE' ? 'up' : 'flat',
-      sparkline: fatigueHasData ? asArray<number>(fatigue!.future_trajectory) : [],
+      direction: !fatigueHasData ? 'flat' : fatigue!.status === 'very_fatigued' || fatigue!.status === 'fatigued' ? 'down' : 'flat',
+      sparkline: fatigueHasData ? asArray<number>(fatigue!.recent_fatigue) : [],
       hasData: fatigueHasData,
     },
     {
@@ -128,7 +125,7 @@ function buildMetrics(hrv: HrvResponse | null, acwr: AcwrResponse | null, fatigu
       color: colors.health.calm,
       value: readinessHasData ? titleCase(readiness!.predicted_state) : '—',
       unit: '',
-      trendLabel: readinessHasData ? `${Math.round(readiness!.confidence * 100)}% conf.` : 'No Data',
+      trendLabel: readinessHasData ? (readiness!.log_date ? `Check-in ${readiness!.log_date}` : 'Latest check-in') : 'No Data',
       direction: !readinessHasData ? 'flat' : readiness!.predicted_state === 'OPTIMAL' ? 'up' : readiness!.predicted_state === 'DEPLETED' ? 'down' : 'flat',
       sparkline: [],
       hasData: readinessHasData,
@@ -151,7 +148,7 @@ function buildInsights(hrv: HrvResponse | null, acwr: AcwrResponse | null, fatig
     insights.push({ title: 'HRV Anomaly Detected', description: `${anomalyCount} unusual HRV reading${anomalyCount > 1 ? 's' : ''} in the recent window — worth a closer look.`, icon: 'alert-circle', color: colors.health.heart });
   }
 
-  if ((acwr?.history_count ?? 0) > 0) {
+  if (typeof acwr?.acwr === 'number') {
     if (acwr!.acwr_status === 'DANGER_ZONE') {
       insights.push({ title: 'Workload Danger Zone', description: `ACWR is ${acwr!.acwr}. Acute load is spiking well above chronic — a deload is recommended.`, icon: 'warning', color: colors.health.activity });
     } else if (acwr!.acwr_status === 'CAUTION') {
@@ -164,7 +161,7 @@ function buildInsights(hrv: HrvResponse | null, acwr: AcwrResponse | null, fatig
   }
 
   if (fatigue && fatigue.trajectory !== 'insufficient_data' && fatigue.recommendation) {
-    const title = fatigue.status === 'NEAR_DELOAD' ? 'Deload Recommended' : fatigue.status === 'ACCUMULATING' ? 'Fatigue Accumulating' : 'Fatigue Manageable';
+    const title = fatigue.status === 'very_fatigued' || fatigue.status === 'fatigued' ? 'Fatigue Building' : 'Fatigue';
     insights.push({ title, description: fatigue.recommendation, icon: 'flash', color: colors.health.stress });
   }
 

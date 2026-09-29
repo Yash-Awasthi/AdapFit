@@ -79,3 +79,27 @@ def triage(message: str) -> Optional[dict]:
             "resources": [c for c in CRISIS_LINES if c["number"] == EMERGENCY_NUMBER],
         }
     return None
+
+
+# Model output is checked too: the system prompt asks for rules 1 and 2, this enforces them.
+_MED_CHANGE_RE = re.compile(
+    r"\b(stop|start|increase|decrease|double|halve|skip|reduce|lower|raise|change|adjust|taper)\w*\b[^.!?\n]{0,50}"
+    r"\b(dose|dosage|medication|medicine|tablets?|pills?|insulin|metformin|statin|antidepressant)s?\b",
+    re.IGNORECASE)
+_DIAGNOSIS_RE = re.compile(
+    r"\byou (have|probably have|likely have|may have|might have|could have|are suffering from|suffer from)\b"
+    r"[^.!?\n]{0,50}\b(disease|disorder|syndrome|diabetes|cancer|infection|depression|anxiety disorder|"
+    r"hypertension|apno?ea|arrhythmia|a-?fib|atrial fibrillation|melanoma|pcos|thyroid)\b",
+    re.IGNORECASE)
+_ASK_DOCTOR = "For anything about a diagnosis or your medicines, please ask your doctor."
+
+
+def screen_reply(text: Optional[str]) -> Optional[str]:
+    """Drop generated sentences that diagnose or change medication, and say who to ask instead."""
+    if not text:
+        return text
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    kept = [s for s in sentences if not (_MED_CHANGE_RE.search(s) or _DIAGNOSIS_RE.search(s))]
+    if len(kept) == len(sentences):
+        return text
+    return " ".join(kept + [_ASK_DOCTOR]).strip()

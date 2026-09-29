@@ -9,6 +9,7 @@ import { DevSettingsProvider } from "../src/services/devSettings";
 import { useUserStore } from "../src/stores";
 import { useEffect } from "react";
 import { LoadingScreen, SyncStatusBadge } from "../src/components";
+import { ConnectionBanner } from "../src/components/ConnectionBanner";
 import { startSyncDaemon } from "../src/services/sync";
 import { getToken } from "../src/services/authToken";
 import { getConsent, isBlocked } from "../src/services/privacy";
@@ -104,6 +105,7 @@ function RootStack() {
         <Stack.Screen name="privacy" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="legal" options={{ headerShown: false }} />
       </Stack>
+      <ConnectionBanner />
       {profile && segments[0] !== "sleep-sounds" && (
         <View style={{ position: "absolute", top: 96, right: 12 }} pointerEvents="none">
           <SyncStatusBadge />

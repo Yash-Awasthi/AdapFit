@@ -154,7 +154,7 @@ class UserRepository:
     _COLUMNS = (
         "id", "email", "name", "age", "height_cm", "gender", "fitness_level", "primary_goal",
         "preferred_days_per_week", "equipment_access", "health_connect_enabled",
-        "work_start", "work_end", "created_at", "updated_at",
+        "work_start", "work_end", "created_at", "updated_at", "onboarded_at",
     )
 
     async def create(self, user_data: dict) -> dict:
@@ -234,6 +234,14 @@ class RecoveryLogRepository:
         return list(reversed(_rows(rows)))
 
 
+def _as_api_workout(w: dict) -> dict:
+    """The shape memory mode and the app use: `workout_id` and exercise `name`, whatever the columns are called."""
+    w["workout_id"] = str(w["id"])
+    for ex in w.get("exercises") or []:
+        ex["name"] = ex.get("name") or ex.get("exercise_name") or str(ex.get("exercise_id", "")).replace("-", " ").title()
+    return w
+
+
 class WorkoutRepository:
     _COLUMNS = (
         "user_id", "title", "target_date", "readiness_state", "recovery_score", "adaptation_rationale",
@@ -250,21 +258,22 @@ class WorkoutRepository:
         # here; in postgres/supabase mode those two fields are lost until a
         # migration adds them.
         exercises = workout.get("exercises") or []
-        workout = {**workout, "user_id": user_id}
+        # Keep the id the app was given, so completing it names the same row.
+        workout = {**workout, "user_id": user_id, "id": workout.get("workout_id") or workout.get("id")}
         pool = await _pool()
         async with pool.acquire() as conn:
             async with conn.transaction():
-                saved = await _insert(conn, "workouts", self._COLUMNS, workout)
+                saved = await _insert(conn, "workouts", ("id",) + self._COLUMNS if workout["id"] else self._COLUMNS, workout)
                 if exercises:
                     rows = [
-                        {**ex, "workout_id": saved["id"]}
-                        for ex in exercises
+                        {**ex, "workout_id": saved["id"], "exercise_name": ex.get("name"), "order_index": i}
+                        for i, ex in enumerate(exercises)
                         if isinstance(ex, dict)
                     ]
                     for ex in rows:
                         await _insert(conn, "workout_exercises", self._EXERCISE_COLUMNS, ex)
                     saved["exercises"] = rows
-        return saved
+        return _as_api_workout(saved)
 
     async def _attach_exercises(self, conn: asyncpg.Connection, workouts: List[dict]) -> List[dict]:
         for w in workouts:
@@ -272,7 +281,7 @@ class WorkoutRepository:
                 "SELECT * FROM workout_exercises WHERE workout_id = $1 ORDER BY order_index", w["id"]
             )
             w["exercises"] = _rows(rows)
-        return workouts
+        return [_as_api_workout(w) for w in workouts]
 
     async def get(self, user_id: str, days: int = 14) -> List[dict]:
         user_id = _to_pg("user_id", normalize_user_id(user_id))
@@ -320,7 +329,8 @@ class WorkoutLogRepository:
                 user_id, days,
             )
         out = []
-        for r in _rows(rows):
+        # Oldest first, like every other history here: callers read [-1] as the latest.
+        for r in reversed(_rows(rows)):
             r = _decode_json(r, self._JSON_KEYS)
             out.append({**r["data"], "id": r["id"], "completed_at": r["completed_at"]})
         return out
@@ -349,7 +359,7 @@ class WorkloadRepository:
                 user_id, days,
             )
         out = []
-        for r in _rows(rows):
+        for r in reversed(_rows(rows)):
             r = _decode_json(r, self._JSON_KEYS)
             out.append({**r["data"], "recorded_at": r["recorded_at"]})
         return out

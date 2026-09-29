@@ -99,14 +99,14 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
   if (compact) {
     return (
       <View style={[styles.compactBar, { backgroundColor: theme.surface }]}>
-        <TouchableOpacity onPress={togglePlay} style={[styles.compactPlay, { backgroundColor: theme.primary }]}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Play or pause" onPress={togglePlay} style={[styles.compactPlay, { backgroundColor: theme.primary }]}>
           {playing ? <Pause size={16} color={theme.text} /> : <Play size={16} color={theme.text} />}
         </TouchableOpacity>
         <View style={styles.compactInfo}>
           <Text style={[styles.compactTitle, { color: theme.text }]} numberOfLines={1}>{track.title}</Text>
           <Text style={[styles.compactArtist, { color: theme.textMuted }]}>{track.artist}{track.bpm ? ` · ${track.bpm} BPM` : ''}</Text>
         </View>
-        <TouchableOpacity onPress={nextTrack}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack}>
           <SkipForward size={18} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -124,13 +124,13 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
         {track.artist}{track.bpm ? ` · ${track.bpm} BPM` : ''}
       </Text>
       <View style={styles.controls}>
-        <TouchableOpacity onPress={nextTrack} style={styles.controlBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack} style={styles.controlBtn}>
           <SkipBack size={20} color={theme.textSecondary} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={togglePlay} style={[styles.playBtn, { backgroundColor: theme.primary }]}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Play or pause" onPress={togglePlay} style={[styles.playBtn, { backgroundColor: theme.primary }]}>
           {playing ? <Pause size={24} color={theme.text} /> : <Play size={24} color={theme.text} />}
         </TouchableOpacity>
-        <TouchableOpacity onPress={nextTrack} style={styles.controlBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack} style={styles.controlBtn}>
           <SkipForward size={20} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>

@@ -15,7 +15,6 @@ class Settings(BaseSettings):
 
     # AI / LLM Configuration
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GOOGLE_AI_API_KEY: str = os.getenv("GOOGLE_AI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     # Groq retires model ids without notice; a retired id answers 404.
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")

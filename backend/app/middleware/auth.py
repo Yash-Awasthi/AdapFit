@@ -40,6 +40,8 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/logout",
     # The app can crash before sign-in.
     "/api/v1/client-errors",
+    # Sign-up shows the consent purposes before an account exists.
+    "/api/v1/privacy/consent/purposes",
     # Health checks
     "/",
     "/health",
@@ -107,7 +109,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if is_public_endpoint(path):
             return await call_next(request)
 
-        if auth_bypass_active():
+        # The bypass only stands in for requests without a token: a token that is sent is always checked,
+        # so an expired one gets the 401 that makes the app refresh instead of silently becoming the dev user.
+        if auth_bypass_active() and not request.headers.get("Authorization"):
             request.state.user = {"sub": settings.DEV_USER_ID, "auth": "bypass"}
             request.state.user_id = settings.DEV_USER_ID
             return await call_next(request)

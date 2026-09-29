@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
-from app.core.workout_metrics import session_load
 
 
 class Decision(str, Enum):
@@ -203,18 +202,17 @@ def decide(signals: DecisionSignals) -> DailyDecision:
 def signals_from_logs(
     recovery_log: Optional[dict],
     checkin: Optional[dict],
-    workload: Optional[dict],
+    acwr: Optional[float],
     workout_logs: Optional[list[dict]] = None,
 ) -> DecisionSignals:
     """Assemble decision signals from whatever the stores actually hold."""
     recovery_log = recovery_log or {}
     checkin = checkin or {}
-    workload = workload or {}
     wearable = recovery_log.get("wearable_data") or {}
 
     signals = DecisionSignals(
         recovery_score=recovery_log.get("recovery_score"),
-        acwr=workload.get("acwr"),
+        acwr=acwr,
         sleep_hours=wearable.get("sleep_duration_hours") or recovery_log.get("sleep_duration_hours"),
         sleep_score=recovery_log.get("sleep_score"),
         hrv_z_score=recovery_log.get("hrv_z_score"),

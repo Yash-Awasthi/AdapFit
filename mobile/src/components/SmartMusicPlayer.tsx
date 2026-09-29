@@ -202,14 +202,14 @@ export function SmartMusicPlayer({
             <Text style={[styles.compactTitle, { color: theme.text }]} numberOfLines={1}>{track.title}</Text>
             <Text style={[styles.compactBpm, { color: theme.textMuted }]}>{track.bpm} BPM</Text>
           </View>
-          <TouchableOpacity onPress={() => setIsPlaying(!isPlaying)} style={styles.compactPlay}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={isPlaying ? 'Pause' : 'Play'} onPress={() => setIsPlaying(!isPlaying)} style={styles.compactPlay}>
             {isPlaying ? (
               <Pause size={14} color={theme.text} />
             ) : (
               <Play size={14} color={theme.text} />
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={nextTrack} style={styles.compactPlay}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack} style={styles.compactPlay}>
             <SkipForward size={14} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -263,10 +263,10 @@ export function SmartMusicPlayer({
 
       {/* Controls */}
       <View style={styles.controls}>
-        <TouchableOpacity onPress={prevTrack} style={styles.controlBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous track" onPress={prevTrack} style={styles.controlBtn}>
           <SkipBack size={20} color={theme.textSecondary} />
         </TouchableOpacity>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
           style={[styles.playBtn, { backgroundColor: phaseConfig.color }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -279,7 +279,7 @@ export function SmartMusicPlayer({
             <Play size={24} color="#fff" />
           )}
         </TouchableOpacity>
-        <TouchableOpacity onPress={nextTrack} style={styles.controlBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack} style={styles.controlBtn}>
           <SkipForward size={20} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>

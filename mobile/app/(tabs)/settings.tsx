@@ -1,9 +1,8 @@
 /**
- * Settings screen with API key management, notification preferences,
- * theme controls, data export, and app configuration.
+ * Settings: appearance, notification preferences, password, privacy and data export.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -13,34 +12,18 @@ import {
   StyleSheet,
 } from 'react-native';
 import {
-  Bell, Download, Shield, Moon, Sun, Globe, Heart,
+  Download, Shield, Moon, Sun, Globe,
   ChevronRight, Palette,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useTheme, AccentName } from '../../src/services/theme';
 import { NotificationSetup } from '../../src/components/NotificationSetup';
-
-interface SettingsState {
-  workoutReminders: boolean;
-  recoveryCheckins: boolean;
-  sleepReminders: boolean;
-}
+import { ChangePassword } from '../../src/components/ChangePassword';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { theme, isDark, toggle, accent, setAccent, accents } = useTheme();
-  const [settings, setSettings] = useState<SettingsState>({
-    workoutReminders: true,
-    recoveryCheckins: true,
-    sleepReminders: true,
-  });
-
-  function toggleSetting(key: keyof SettingsState) {
-    Haptics.selectionAsync();
-    setSettings((s) => ({ ...s, [key]: !s[key] }));
-  }
-
   function toggleDarkMode() {
     Haptics.selectionAsync();
     toggle();
@@ -86,6 +69,9 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 key={name}
                 onPress={() => pickAccent(name)}
+                accessibilityRole="radio"
+                accessibilityLabel={`${name} accent`}
+                accessibilityState={{ selected: accent === name }}
                 style={[
                   s.swatch,
                   { backgroundColor: accents[name].primary },
@@ -100,51 +86,13 @@ export default function SettingsScreen() {
       {/* Notifications */}
       <View style={s.section}>
         <Text style={s.sectionTitle}>Notifications</Text>
-        <View style={s.card}>
-          <Bell size={20} color={theme.warning} />
-          <View style={s.cardContent}>
-            <Text style={s.cardTitle}>Workout Reminders</Text>
-            <Text style={s.cardDesc}>Daily workout reminders</Text>
-          </View>
-          <Switch
-            value={settings.workoutReminders}
-            onValueChange={() => toggleSetting('workoutReminders')}
-            trackColor={{ false: theme.border, true: theme.primary }}
-            thumbColor="#fff"
-          />
-        </View>
-        <View style={s.card}>
-          <Heart size={20} color={theme.success} />
-          <View style={s.cardContent}>
-            <Text style={s.cardTitle}>Recovery Check-ins</Text>
-            <Text style={s.cardDesc}>Morning wellness reminders</Text>
-          </View>
-          <Switch
-            value={settings.recoveryCheckins}
-            onValueChange={() => toggleSetting('recoveryCheckins')}
-            trackColor={{ false: theme.border, true: theme.primary }}
-            thumbColor="#fff"
-          />
-        </View>
-        <View style={s.card}>
-          <Moon size={20} color={theme.primary} />
-          <View style={s.cardContent}>
-            <Text style={s.cardTitle}>Sleep Reminders</Text>
-            <Text style={s.cardDesc}>Bedtime reminders</Text>
-          </View>
-          <Switch
-            value={settings.sleepReminders}
-            onValueChange={() => toggleSetting('sleepReminders')}
-            trackColor={{ false: theme.border, true: theme.primary }}
-            thumbColor="#fff"
-          />
-        </View>
         <NotificationSetup />
       </View>
 
       {/* Privacy and data */}
       <View style={s.section}>
         <Text style={s.sectionTitle}>Privacy & Data</Text>
+        <ChangePassword />
         <TouchableOpacity style={s.exportBtn} onPress={() => router.push('/privacy' as any)}>
           <Shield size={18} color={theme.success} />
           <Text style={s.exportText}>Consent, sign out, delete account</Text>

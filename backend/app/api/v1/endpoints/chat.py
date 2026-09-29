@@ -14,18 +14,19 @@ from app.core.limiter import make_limiter
 from app.core.config import settings
 from app.core.gemini import DEFAULT_MODEL, extract_text, gemini_endpoint
 from app.core.storage import storage
-from app.core.privacy import allowed
 from app.services.nlp_pipeline import nlp_pipeline
 from app.services.recovery_engine import RecoveryEngine
 from app.services.intent_classifier import intent_classifier, entity_extractor
 from app.services.rag_knowledge import rag_retriever
 from app.services.coach_prompts import coach_prompts
-from app.services.safety_policy import triage
+from app.services.safety_policy import screen_reply, triage
 from app.services.chat_actions import maybe_execute_action
 from app.services.nl_workout_logger import nl_workout_logger
 from app.services.conversational_memory import conversational_memory
 from app.services.learning_loop import learning_loop
-from app.core.workout_metrics import session_duration_minutes, session_load, session_rpe
+from app.core.workout_metrics import HISTORY_ENTRIES, acwr_ratio, session_rpe
+from app.core import llm_quota
+from app.core.llm_quota import ai_call_allowed
 
 router = APIRouter()
 limiter = make_limiter()
@@ -66,7 +67,7 @@ class ChatResponse(BaseModel):
 async def _call_gemini(prompt: str, history: List[dict], system: str = "", api_key: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
     """Call Google Gemini API for chat response."""
     key = api_key or settings.GEMINI_API_KEY
-    if not key or not allowed("ai"):
+    if not key or not ai_call_allowed():
         return None
 
     url, headers = gemini_endpoint(key, model or DEFAULT_MODEL)
@@ -110,7 +111,7 @@ async def _call_gemini(prompt: str, history: List[dict], system: str = "", api_k
 async def _call_groq(prompt: str, system: str = "", api_key: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
     """Fallback to Groq Llama model when Gemini is unavailable."""
     key = api_key or settings.GROQ_API_KEY
-    if not key or not allowed("ai"):
+    if not key or not ai_call_allowed():
         return None
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -141,7 +142,7 @@ async def _call_groq(prompt: str, system: str = "", api_key: Optional[str] = Non
 
 async def _call_custom(prompt: str, system: str = "", api_key: str = "", base_url: str = "", model: str = "") -> Optional[str]:
     """Call a user-supplied OpenAI-compatible endpoint (local LLM, proxy, etc)."""
-    if not api_key or not base_url or not allowed("ai"):
+    if not api_key or not base_url or not ai_call_allowed():
         return None
 
     messages = []
@@ -303,11 +304,9 @@ async def chat(request: Request, req: ChatRequest):
         pass
 
     try:
-        workload = await storage.get_workload_history(req.user_id, 7)
-        if workload:
-            last_w = workload[-1]
-            context["acwr"] = last_w.get("acwr")
-            context["acwr_status"] = last_w.get("acwr_status")
+        acwr = acwr_ratio(await storage.get_workload_history(req.user_id, HISTORY_ENTRIES))
+        if acwr is not None:
+            context["acwr"] = acwr
     except Exception:
         pass
 
@@ -315,9 +314,9 @@ async def chat(request: Request, req: ChatRequest):
         recent_workouts = await storage.get_workout_logs(req.user_id, 7)
         if recent_workouts:
             context["session_count"] = len(recent_workouts)
-            context["avg_rpe"] = round(
-                sum(session_rpe(w) for w in recent_workouts) / len(recent_workouts), 1
-            )
+            rpes = [r for r in (session_rpe(w) for w in recent_workouts) if r is not None]
+            if rpes:
+                context["avg_rpe"] = round(sum(rpes) / len(rpes), 1)
     except Exception:
         pass
 
@@ -352,7 +351,8 @@ async def chat(request: Request, req: ChatRequest):
     #    Otherwise try server defaults in order: Gemini → Groq → Rule-based.
     reply = None
     llm_source = None
-    if req.llm_override:
+    if req.llm_override and settings.ENVIRONMENT != "production":
+        # Developer tool only: in production the server never calls a URL or key the caller supplies.
         ov = req.llm_override
         override_system = coach_prompts.MINIMAL_SYSTEM
         if ov.provider == "gemini":
@@ -370,12 +370,16 @@ async def chat(request: Request, req: ChatRequest):
             reply = await _call_groq(full_prompt, system=system_prompt)
             llm_source = "groq"
 
+    reply = screen_reply(reply)
     if not reply:
         if knowledge:
             reply = " ".join(f"{k['content']} (source: {k['source']})" for k in knowledge)
         else:
             reply, _ = _rule_based_reply(req.message, context, primary_intent)
         llm_source = "rule_based"
+        if llm_quota.remaining() <= 0:
+            reply += ("\n\nYou've used today's AI coach replies, so this answer comes from the built-in guide. "
+                      "Full replies return tomorrow.")
 
     # 9. NLP side-effects: pain detection
     nlp_result = nlp_pipeline.extract_exercise_feedback(req.message)

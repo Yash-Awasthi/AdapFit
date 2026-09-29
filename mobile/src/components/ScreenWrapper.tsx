@@ -144,7 +144,7 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             {backable && (
-              <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" style={styles.backBtn} onPress={handleBack}>
                 <Ionicons name="chevron-back" size={24} color={gradient ? '#FFF' : colors.text.primary} />
               </TouchableOpacity>
             )}
@@ -158,7 +158,7 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
             </Animated.View>
           </View>
           {rightAction && (
-            <TouchableOpacity onPress={rightAction.onPress} style={[styles.headerAction, gradient && { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={rightAction.icon.replace(/-/g, " ")} onPress={rightAction.onPress} style={[styles.headerAction, gradient && { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
               <Ionicons name={rightAction.icon as any} size={20} color={gradient ? '#FFF' : colors.primary} />
             </TouchableOpacity>
           )}

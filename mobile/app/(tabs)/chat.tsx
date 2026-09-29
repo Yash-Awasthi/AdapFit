@@ -199,7 +199,7 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {llmOverride && (
         <View style={styles.devBanner}>
@@ -235,6 +235,8 @@ export default function ChatScreen() {
 
       <View style={styles.inputBar}>
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Ask how I am doing today"
           style={styles.micButton}
           onPress={() => {
             Haptics.selectionAsync();
@@ -255,7 +257,7 @@ export default function ChatScreen() {
           accessibilityLabel="Chat message input"
           accessibilityHint="Type a message to your AI fitness coach"
         />
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send message"
           style={[styles.sendButton, (!input.trim() || loading) && styles.sendDisabled]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); sendMessage(input); }}
           disabled={!input.trim() || loading}

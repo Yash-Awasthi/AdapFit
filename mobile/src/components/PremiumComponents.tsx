@@ -56,7 +56,8 @@ function AnimatedPress({
 
 // ===== SCORE RING =====
 interface ScoreRingProps {
-  score: number;
+  /** null draws an empty ring with a dash: no data is not a score of 0. */
+  score: number | null;
   size?: number;
   strokeWidth?: number;
   color?: string;
@@ -76,17 +77,18 @@ export const ScoreRing: React.FC<ScoreRingProps> = ({
   animated = true,
   icon,
 }) => {
-  const progress = useSharedValue(animated ? 0 : score);
+  const value = score ?? 0;
+  const progress = useSharedValue(animated ? 0 : value);
 
   React.useEffect(() => {
     if (animated) {
-      progress.value = withTiming(score, { duration: 1200 });
+      progress.value = withTiming(value, { duration: 1200 });
     } else {
-      progress.value = score;
+      progress.value = value;
     }
-  }, [score, animated]);
+  }, [value, animated]);
 
-  const scoreColor = color || (score >= 80 ? colors.score.excellent : score >= 60 ? colors.score.good : score >= 40 ? colors.score.fair : colors.score.critical);
+  const scoreColor = color || (score === null ? colors.text.muted : score >= 80 ? colors.score.excellent : score >= 60 ? colors.score.good : score >= 40 ? colors.score.fair : colors.score.critical);
   const bgColor = scoreColor + '15';
   const trackColor = colors.surface.divider;
 
@@ -101,7 +103,7 @@ export const ScoreRing: React.FC<ScoreRingProps> = ({
       <View style={[styles.ringOuter, { width: size, height: size, borderRadius: size / 2, borderWidth: strokeWidth, borderColor: trackColor }]}>
         <View style={[styles.ringInner, { width: size - strokeWidth * 2, height: size - strokeWidth * 2, borderRadius: (size - strokeWidth * 2) / 2, backgroundColor: bgColor }]}>
           {icon && <Ionicons name={icon as any} size={size * 0.18} color={scoreColor} style={{ marginBottom: 2 }} />}
-          <Text style={[styles.ringScore, { fontSize: size * 0.3, color: scoreColor }]}>{Math.round(score)}</Text>
+          <Text style={[styles.ringScore, { fontSize: size * 0.3, color: scoreColor }]}>{score === null ? '—' : Math.round(score)}</Text>
           {label && <Text style={[styles.ringLabel, { fontSize: size * 0.09 }]}>{label}</Text>}
         </View>
       </View>
@@ -228,7 +230,7 @@ export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({ title, subtitle,
             {subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
           </View>
           {rightAction && (
-            <TouchableOpacity onPress={rightAction.onPress} style={styles.headerAction}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={rightAction.icon.replace(/-/g, " ")} onPress={rightAction.onPress} style={styles.headerAction}>
               <Ionicons name={rightAction.icon as any} size={22} color="#FFF" />
             </TouchableOpacity>
           )}
@@ -240,7 +242,7 @@ export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({ title, subtitle,
             {subtitle && <Text style={styles.headerSubtitlePlain}>{subtitle}</Text>}
           </View>
           {rightAction && (
-            <TouchableOpacity onPress={rightAction.onPress} style={styles.headerActionPlain}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={rightAction.icon.replace(/-/g, " ")} onPress={rightAction.onPress} style={styles.headerActionPlain}>
               <Ionicons name={rightAction.icon as any} size={22} color={colors.primary} />
             </TouchableOpacity>
           )}

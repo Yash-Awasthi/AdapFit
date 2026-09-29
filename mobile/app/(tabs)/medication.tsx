@@ -8,8 +8,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, Alert, Modal, TextInput,
+  ActivityIndicator, RefreshControl, Alert, Modal, TextInput, AppState, Linking, Platform,
 } from 'react-native';
+import { applyReminders } from '../../src/services/reminders';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -227,7 +228,7 @@ export default function MedicationScreen() {
 
       <View style={styles.scoreSection}>
         <ScoreRing
-          score={today?.adherence_pct ?? 0}
+          score={today?.total_doses ? today.adherence_pct : null}
           size={120}
           strokeWidth={8}
           color={colors.health.calm}
@@ -246,6 +247,30 @@ export default function MedicationScreen() {
       </View>
 
       <SectionHeaderPremium icon="calendar" iconColor="#F59E0B" title="Today's Schedule" />
+
+      {schedule.length > 0 && Platform.OS === 'android' && Number(Platform.Version) >= 31 && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityHint="Opens Android settings for alarms and reminders"
+          onPress={() => {
+            // Alarms already scheduled stay inexact; rebuild them when the user comes back from the setting.
+            const sub = AppState.addEventListener('change', (state) => {
+              if (state !== 'active') return;
+              sub.remove();
+              applyReminders(false);
+            });
+            Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM').catch(() => Linking.openSettings());
+          }}
+        >
+          <GlassCard variant="light" style={styles.medCard}>
+            <Text style={styles.emptyTitle}>On-time dose reminders</Text>
+            <Text style={styles.emptyBody}>
+              Android may delay reminders by up to an hour. Turn on "Alarms & reminders" for AdapFit so each dose
+              reminder rings at its time. Tap to open the setting.
+            </Text>
+          </GlassCard>
+        </TouchableOpacity>
+      )}
 
       {schedule.length === 0 && (
         <GlassCard variant="light" style={styles.medCard}>

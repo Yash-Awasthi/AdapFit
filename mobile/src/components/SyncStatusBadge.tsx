@@ -30,6 +30,8 @@ export function SyncStatusBadge() {
   }[state.status];
 
   const s = makeStyles(theme);
+  // Only worth a badge when something is pending or wrong; a permanent "Synced" pill covers screen headers.
+  if (state.status === 'synced') return null;
 
   return (
     <View style={s.container}>

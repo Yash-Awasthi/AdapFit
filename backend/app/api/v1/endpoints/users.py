@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +16,7 @@ async def create_user(profile: UserProfileCreate, account: dict = Depends(requir
     """Create or complete the signed-in account's profile. The id is always the account's own."""
     user_data = profile.model_dump()
     user_data["email"] = account.get("email") or user_data["email"]
+    user_data["onboarded_at"] = datetime.now(timezone.utc)
     existing = await storage.get_user(account["id"])
     if existing:
         return UserProfileResponse(**await storage.update_user(account["id"], user_data))
@@ -32,7 +34,8 @@ async def create_user(profile: UserProfileCreate, account: dict = Depends(requir
 @router.get("/{user_id}", response_model=UserProfileResponse)
 async def get_user(user_id: str):
     user = await storage.get_user(user_id)
-    if not user:
+    # On Postgres the account row exists from sign-up; it is a profile only once onboarding wrote it.
+    if not user or not user.get("onboarded_at"):
         raise HTTPException(status_code=404, detail=f"User {user_id} not found")
     return UserProfileResponse(**user)
 

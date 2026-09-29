@@ -130,7 +130,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   return (
     <Animated.View style={[styles.bottomSheetOverlay, { opacity: opacityAnim }]}>
-      <TouchableOpacity style={styles.bottomSheetBackdrop} onPress={onClose} activeOpacity={1} />
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={styles.bottomSheetBackdrop} onPress={onClose} activeOpacity={1} />
       <Animated.View style={[styles.bottomSheet, { height, transform: [{ translateY: slideAnim }] }]}>
         {/* Handle */}
         <View style={styles.bottomSheetHandle}>
@@ -139,7 +139,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         {title && (
           <View style={styles.bottomSheetHeader}>
             <Text style={styles.bottomSheetTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>
               <Ionicons name="close-circle" size={24} color={colors.text.muted} />
             </TouchableOpacity>
           </View>
