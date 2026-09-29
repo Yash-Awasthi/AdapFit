@@ -215,7 +215,7 @@ export default function WorkoutActive() {
         <Image source={{ uri: currentExercise.gif_url || FALLBACK_IMAGE }} style={s.exerciseGif} />
       </View>
 
-      {scaleTip && (
+      {!!scaleTip && (
         <TouchableOpacity style={s.scaleTip} onPress={() => setScaleTip(null)} accessibilityRole="alert">
           <Text style={s.scaleTipText}>{scaleTip}</Text>
         </TouchableOpacity>

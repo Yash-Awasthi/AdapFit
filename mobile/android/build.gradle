@@ -22,3 +22,13 @@ allprojects {
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
+
+// Windows keeps paths under 260 characters; a native module's CMake tree under
+// node_modules/<long name>/android/.cxx/RelWithDebInfo/... can pass that, and ninja then loops.
+if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+  subprojects { p ->
+    p.plugins.withId("com.android.library") {
+      p.android.externalNativeBuild.cmake.buildStagingDirectory = new File(System.getenv("SystemDrive") + "/cxx/${p.name.hashCode().abs()}")
+    }
+  }
+}

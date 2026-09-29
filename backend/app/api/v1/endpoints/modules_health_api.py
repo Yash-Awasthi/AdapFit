@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.get("/health", summary="Check that all extracted modules are importable")
-async def modules_health() -> dict[str, str]:
+async def modules_health() -> dict:
     modules = [
         "src.anomaly.detector",
         "src.biometrics.signals", "src.breathing.analyzer",

@@ -53,7 +53,8 @@
       ],
       "blockedPermissions": [
         "android.permission.ACCESS_BACKGROUND_LOCATION"
-      ]
+      ],
+      "allowBackup": false
     },
     "plugins": [
       "expo-router",

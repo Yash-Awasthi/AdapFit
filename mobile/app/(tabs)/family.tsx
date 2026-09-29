@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../src/theme';
 import { GlassCard, SectionHeaderPremium } from '../../src/components/PremiumComponents';
 import { asArray, getJson, postJson } from '../../src/services/http';
+import { plural } from '../../src/utils/plural';
 
 const TINT = '#EC4899';
 const RELATIONS = ['parent', 'child', 'spouse', 'sibling', 'caregiver', 'custom'];
@@ -94,10 +95,10 @@ export default function FamilyScreen() {
                 {open === c.connection_id && m && (
                   <View style={styles.box}>
                     {m.shared?.length === 0 && <Text style={styles.sub}>They have not shared anything yet.</Text>}
-                    {m.recovery && <Text style={styles.body}>Recovery {m.recovery.recovery_score ?? '--'} ({m.recovery.readiness_state ?? 'no check-in'}) on {m.recovery.log_date}</Text>}
-                    {m.sleep && <Text style={styles.body}>Last night: {m.sleep.total_sleep_hours ?? '--'} h sleep</Text>}
-                    {m.workouts_last_7_days !== undefined && <Text style={styles.body}>{m.workouts_last_7_days} workouts this week</Text>}
-                    {m.emergency && (
+                    {!!m.recovery && <Text style={styles.body}>Recovery {m.recovery.recovery_score ?? '--'} ({m.recovery.readiness_state ?? 'no check-in'}) on {m.recovery.log_date}</Text>}
+                    {!!m.sleep && <Text style={styles.body}>Last night: {m.sleep.total_sleep_hours ?? '--'} h sleep</Text>}
+                    {m.workouts_last_7_days !== undefined && <Text style={styles.body}>{plural(m.workouts_last_7_days, 'workout')} this week</Text>}
+                    {!!m.emergency && (
                       <Text style={styles.body}>Blood type {m.emergency.blood_type ?? '--'} · allergies {asArray<string>(m.emergency.allergies).join(', ') || 'none recorded'}</Text>
                     )}
                   </View>
@@ -138,7 +139,7 @@ export default function FamilyScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 4 },
+  heroMuted: { paddingLeft: 40, color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 4 },
   heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
   section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },
   gap: { marginBottom: 10 },

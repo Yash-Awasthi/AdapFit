@@ -52,6 +52,59 @@ class CommentResponse(BaseModel):
 shared_workouts = durable_dict("app.api.v1.endpoints.community.shared_workouts")  # share_id -> share data
 community_comments = durable_dict("app.api.v1.endpoints.community.community_comments")  # share_id -> list of comments
 community_likes = durable_dict("app.api.v1.endpoints.community.community_likes")  # share_id -> set of user_ids
+# Google Play requires reporting and blocking wherever users post.
+community_reports = durable_dict("app.api.v1.endpoints.community.reports")  # share_id -> {reporter id: report}
+community_blocks = durable_dict("app.api.v1.endpoints.community.blocks")  # user_id -> list of blocked user ids
+# ponytail: a post three people report is hidden from everyone until reviewed; a moderator queue replaces this.
+HIDE_AFTER_REPORTS = 3
+
+
+class ReportRequest(BaseModel):
+    reason: str = Field(pattern="^(spam|abuse|harmful_health_advice|sexual|other)$")
+    comment_id: Optional[str] = None
+    detail: str = Field("", max_length=500)
+
+
+def _visible_to(user_id: str, author_id: str, share_id: Optional[str] = None) -> bool:
+    if author_id in (community_blocks.get(user_id) or []):
+        return False
+    if share_id is None:
+        return True
+    post_reports = {r for r, rep in (community_reports.get(share_id) or {}).items() if not rep.get("comment_id")}
+    return user_id not in post_reports and len(post_reports) < HIDE_AFTER_REPORTS
+
+
+@router.post("/{share_id}/report", status_code=201)
+async def report_share(share_id: str, request: ReportRequest, user_id: str = Query("default")):
+    """Report a post or one of its comments. The reporter stops seeing the post at once."""
+    if share_id not in shared_workouts:
+        raise HTTPException(status_code=404, detail="Shared workout not found")
+    reports = dict(community_reports.get(share_id) or {})
+    reports[user_id] = {"reason": request.reason, "comment_id": request.comment_id, "detail": request.detail,
+                        "at": datetime.now(timezone.utc).isoformat()}
+    community_reports[share_id] = reports
+    from app.core import audit
+    await audit.record("community_report", user_id=shared_workouts[share_id]["user_id"], actor_id=user_id,
+                       share_id=share_id, reason=request.reason, comment_id=request.comment_id)
+    return {"reported": True, "hidden_for_everyone": not _visible_to("", "", share_id)}
+
+
+@router.post("/block/{blocked_id}")
+async def block_user(blocked_id: str, user_id: str = Query("default")):
+    """Hide everything this person posts or comments, for the caller only."""
+    if blocked_id == user_id:
+        raise HTTPException(status_code=400, detail="You cannot block yourself")
+    blocked = list(community_blocks.get(user_id) or [])
+    if blocked_id not in blocked:
+        blocked.append(blocked_id)
+    community_blocks[user_id] = blocked
+    return {"blocked": blocked}
+
+
+@router.delete("/block/{blocked_id}")
+async def unblock_user(blocked_id: str, user_id: str = Query("default")):
+    community_blocks[user_id] = [b for b in (community_blocks.get(user_id) or []) if b != blocked_id]
+    return {"blocked": community_blocks[user_id]}
 
 
 @router.get("/feed", response_model=List[ShareResponse])
@@ -61,7 +114,8 @@ async def get_community_feed(
     sort: str = Query("recent", pattern="^(recent|popular|following)$"),
 ):
     """Get the community feed of shared workouts."""
-    public_shares = [s for s in shared_workouts.values() if s["is_public"]]
+    public_shares = [s for s in shared_workouts.values()
+                     if s["is_public"] and _visible_to(user_id, s["user_id"], s["id"])]
 
     if sort == "popular":
         public_shares.sort(key=lambda s: len(community_likes.get(s["id"], set())), reverse=True)
@@ -158,12 +212,14 @@ async def like_workout(share_id: str, user_id: str = Query("default")):
 
 
 @router.get("/{share_id}/comments", response_model=List[CommentResponse])
-async def get_comments(share_id: str, limit: int = Query(20, ge=1, le=100)):
+async def get_comments(share_id: str, limit: int = Query(20, ge=1, le=100), user_id: str = Query("default")):
     """Get comments on a shared workout."""
     if share_id not in shared_workouts:
         raise HTTPException(status_code=404, detail="Shared workout not found")
 
-    comments = community_comments.get(share_id, [])
+    mine = (community_reports.get(share_id) or {}).get(user_id) or {}
+    comments = [c for c in community_comments.get(share_id, [])
+                if _visible_to(user_id, c["user_id"]) and c["id"] != mine.get("comment_id")]
     return [
         CommentResponse(id=c["id"], user_id=c["user_id"], user_name=c["user_name"],
                         text=c["text"], created_at=c["created_at"])

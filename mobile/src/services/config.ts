@@ -13,7 +13,7 @@ import { Platform } from 'react-native';
  * For a physical device in dev, set EXPO_PUBLIC_API_URL to your machine's
  * LAN IP, e.g.  EXPO_PUBLIC_API_URL=http://192.168.1.20:8000 npx expo start
  */
-const PRODUCTION_API = 'https://adapfit-production.up.railway.app';
+const PRODUCTION_API = 'https://adapfit-staging.onrender.com';
 const DEFAULT_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 const DEV_FALLBACK_API = `http://${DEFAULT_HOST}:8000`;
 

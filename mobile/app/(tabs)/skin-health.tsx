@@ -117,7 +117,7 @@ function MoleForm({ visible, title, submitLabel, onClose, onSubmit, withName }: 
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>{title}</Text>
-          {withName && (
+          {!!withName && (
             <>
               <TextInput style={styles.input} placeholder="Name, e.g. left forearm"
                 placeholderTextColor={colors.text.muted} value={name} onChangeText={setName}

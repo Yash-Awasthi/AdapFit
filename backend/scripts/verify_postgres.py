@@ -66,6 +66,16 @@ def main() -> int:
         assert bp.status_code == 201, bp.text
         print("logged a blood pressure reading (feature_state)")
 
+        # Every value the API accepts must also pass the table's CHECK constraints.
+        profile = client.post("/api/v1/users", headers=headers, json={"email": email, "name": "PG Check"})
+        assert profile.status_code == 201, profile.text
+        for goal in ("strength", "hypertrophy", "endurance", "fat_loss", "general_fitness"):
+            for level in ("beginner", "intermediate", "advanced"):
+                r = client.patch(f"/api/v1/users/{user_id}", headers=headers,
+                                 json={"primary_goal": goal, "fitness_level": level, "preferred_days_per_week": 3})
+                assert r.status_code == 200, (goal, level, r.text)
+        print("every goal and level the API accepts saves on Postgres")
+
         generated = client.post("/api/v1/workouts", headers=headers,
                                 json={"user_id": "", "target_date": "2026-05-07", "target_duration_minutes": 30})
         assert generated.status_code == 201, generated.text

@@ -108,7 +108,7 @@ export default function PeriodizationScreen() {
         ))}
       </View>
 
-      {plan && (
+      {!!plan && (
         <>
           <View style={s.planHeader}>
             <Calendar size={16} color={theme.primaryLight} />
@@ -168,7 +168,7 @@ export default function PeriodizationScreen() {
 function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, padding: 20 },
-    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 48 },
+    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 104 },
     subtitle: { fontSize: 14, color: theme.textMuted, marginBottom: 16 },
     goalRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
     goalBtn: {

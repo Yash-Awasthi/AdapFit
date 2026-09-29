@@ -68,7 +68,7 @@ export const InteractiveLineChart: React.FC<LineChartProps> = ({
   return (
     <View style={styles.chartContainer}>
       {/* Y-axis labels */}
-      {showLabels && (
+      {!!showLabels && (
         <View style={styles.yAxisLabels}>
           <Text style={styles.axisLabel}>{max.toFixed(0)}</Text>
           <Text style={styles.axisLabel}>{((max + min) / 2).toFixed(0)}</Text>
@@ -79,7 +79,7 @@ export const InteractiveLineChart: React.FC<LineChartProps> = ({
       {/* Chart area */}
       <View style={[styles.chartArea, { height: chartHeight, width: chartWidth }]}>
         {/* Grid lines */}
-        {showGrid && (
+        {!!showGrid && (
           <View style={styles.gridContainer}>
             {[0, 1, 2, 3, 4].map(i => (
               <View key={i} style={[styles.gridLine, { top: `${(i / 4) * 100}%` }]} />
@@ -108,7 +108,7 @@ export const InteractiveLineChart: React.FC<LineChartProps> = ({
               }}
               activeOpacity={0.7}
             >
-              {showDots && (
+              {!!showDots && (
                 <Animated.View
                   style={[
                     styles.dot,
@@ -145,7 +145,7 @@ export const InteractiveLineChart: React.FC<LineChartProps> = ({
       </View>
 
       {/* X-axis labels */}
-      {labels && (
+      {!!labels && (
         <View style={[styles.xAxisLabels, { width: chartWidth }]}>
           {labels.map((label, i) => (
             <Text key={i} style={styles.axisLabel}>{label}</Text>
@@ -303,8 +303,8 @@ export const InteractiveRingChart: React.FC<RingChartProps> = ({
 
         {/* Center */}
         <View style={styles.ringCenter}>
-          {centerValue && <Text style={styles.ringCenterValue}>{centerValue}</Text>}
-          {centerLabel && <Text style={styles.ringCenterLabel}>{centerLabel}</Text>}
+          {!!centerValue && <Text style={styles.ringCenterValue}>{centerValue}</Text>}
+          {!!centerLabel && <Text style={styles.ringCenterLabel}>{centerLabel}</Text>}
         </View>
       </View>
 
@@ -418,13 +418,13 @@ export const MetricCardWithChart: React.FC<MetricCardWithChartProps> = ({
   <View style={styles.metricCardWithChart}>
     <View style={styles.metricCardHeader}>
       <View style={[styles.metricCardIcon, { backgroundColor: color + '15' }]}>
-        {icon && <Ionicons name={icon as any} size={16} color={color} />}
+        {!!icon && <Ionicons name={icon as any} size={16} color={color} />}
       </View>
       <View style={styles.metricCardInfo}>
         <Text style={styles.metricCardTitle}>{title}</Text>
         <View style={styles.metricCardValueRow}>
           <Text style={[styles.metricCardValue, { color }]}>{value}</Text>
-          {change && (
+          {!!change && (
             <View style={[styles.metricCardChange, { backgroundColor: changeType === 'up' ? '#22C55E15' : '#EF444415' }]}>
               <Ionicons name={changeType === 'up' ? 'trending-up' : 'trending-down'} size={10} color={changeType === 'up' ? '#22C55E' : '#EF4444'} />
               <Text style={[styles.metricCardChangeText, { color: changeType === 'up' ? '#22C55E' : '#EF4444' }]}>{change}</Text>

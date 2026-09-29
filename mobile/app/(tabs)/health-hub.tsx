@@ -83,7 +83,7 @@ const BPMSection: React.FC = () => {
           <View style={styles.bpmCenter}>
             <ScoreRing score={bpm} size={130} strokeWidth={8} color={bpmColor} label="BPM" />
             <View style={styles.bpmMetaRow}>
-              {hrv && (
+              {!!hrv && (
                 <View style={styles.bpmMetaItem}>
                   <Ionicons name="pulse" size={14} color={colors.health.calm} />
                   <Text style={[typography.body.sm, { color: colors.health.calm }]}> {hrv.toFixed(0)}ms</Text>
@@ -188,24 +188,26 @@ const StressSection: React.FC = () => {
 const WellbeingSection: React.FC = () => {
   const [data, setData] = useState<any>({});
   useEffect(() => { api('/wellbeing/report').then(d => d && setData(d)); }, []);
-  const score = data.wellbeing_score_numeric || 75;
+  // No usage logged means no numbers: showing a made-up score would read as a measurement.
+  const hasUsage = !!data.total_screen_time_minutes;
+  const score = hasUsage ? (data.wellbeing_score_numeric ?? 0) : 0;
   const scoreColor = getScoreColor(score);
-  const screenTime = data.total_screen_time_minutes || 285;
+  const screenTime = data.total_screen_time_minutes || 0;
 
   return (
     <GlassCard variant="light" style={styles.sectionCard}>
       <SectionHeaderPremium icon="phone-portrait" iconColor={colors.health.digital} title="Digital Wellbeing" />
       <View style={styles.wellbeingRow}>
-        <ScoreRing score={score} size={90} strokeWidth={6} color={scoreColor} label="SCORE" />
+        <ScoreRing score={hasUsage ? score : null} size={90} strokeWidth={6} color={scoreColor} label="SCORE" />
         <View style={styles.wellbeingStats}>
           <View style={styles.wellbeingStatItem}>
             <Ionicons name="time" size={16} color={colors.health.digital} />
-            <Text style={styles.wellbeingStatText}>{Math.floor(screenTime / 60)}h {screenTime % 60}m</Text>
+            <Text style={styles.wellbeingStatText}>{hasUsage ? `${Math.floor(screenTime / 60)}h ${screenTime % 60}m` : '--'}</Text>
             <Text style={styles.wellbeingStatLabel}>Screen Time</Text>
           </View>
           <View style={styles.wellbeingStatItem}>
             <Ionicons name="finger-print" size={16} color={colors.health.digital} />
-            <Text style={styles.wellbeingStatText}>{data.total_pickups || 42}</Text>
+            <Text style={styles.wellbeingStatText}>{hasUsage ? (data.total_pickups ?? '--') : '--'}</Text>
             <Text style={styles.wellbeingStatLabel}>Pickups</Text>
           </View>
         </View>
@@ -232,9 +234,9 @@ const WalkSection: React.FC = () => {
   };
 
   const goals = [
-    { label: 'Steps', value: d.total_steps || 6543, target: 10000, icon: 'footsteps', color: colors.health.activity },
-    { label: 'km', value: d.total_distance_km || 4.2, target: 8, icon: 'map', color: colors.health.calm },
-    { label: 'Cal', value: d.total_calories || 320, target: 500, icon: 'flame', color: colors.health.energy },
+    { label: 'Steps', value: d.total_steps ?? 0, target: 10000, icon: 'footsteps', color: colors.health.activity },
+    { label: 'km', value: d.total_distance_km ?? 0, target: 8, icon: 'map', color: colors.health.calm },
+    { label: 'Cal', value: d.total_calories ?? 0, target: 500, icon: 'flame', color: colors.health.energy },
   ];
 
   return (

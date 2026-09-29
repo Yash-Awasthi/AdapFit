@@ -25,7 +25,7 @@ function Section({ icon, title, sub, children }: { icon: string; title: string; 
         <View style={{ flex: 1 }}><Text style={styles.title}>{title}</Text><Text style={styles.sub}>{sub}</Text></View>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.text.muted} />
       </TouchableOpacity>
-      {open && <View style={{ marginTop: 12 }}>{children}</View>}
+      {!!open && <View style={{ marginTop: 12 }}>{children}</View>}
     </GlassCard>
   );
 }
@@ -68,7 +68,7 @@ function Checkups() {
           <Text style={[styles.itemTitle, { color: c.due ? '#F59E0B' : colors.text.primary }]}>{c.name}{c.due ? ' · due' : ''}</Text>
           <Text style={styles.sub}>Every {c.every_years} year{c.every_years > 1 ? 's' : ''} · {c.where}</Text>
           <Text style={styles.sub}>{c.last_done ? `Last done ${c.last_done}` : 'No record yet'}</Text>
-          {c.due && <Text style={styles.link} onPress={() => done(c.id)}>I had this done today</Text>}
+          {!!c.due && <Text style={styles.link} onPress={() => done(c.id)}>I had this done today</Text>}
         </View>
       ))}
       <Text style={styles.sub}>{data.note}</Text>
@@ -99,7 +99,7 @@ function Labs() {
   return (
     <>
       <Chips options={tests.map((t) => ({ id: t.id, label: t.label }))} value={test} onChange={setTest} />
-      {test && (
+      {!!test && (
         <>
           <Input value={value} onChangeText={setValue} keyboardType="decimal-pad" placeholder={`Result (${tests.find((t) => t.id === test)?.unit})`} />
           <View style={styles.row}>
@@ -118,7 +118,7 @@ function Labs() {
             {t.change !== null ? ` · ${t.change > 0 ? '+' : ''}${t.change} since last` : ''}
           </Text>
           <Text style={styles.sub}>{t.history.map((h: any) => `${h.taken_on.slice(2)}: ${h.value}`).join('  ·  ')}</Text>
-          {t.next_step && <Text style={styles.body}>{t.next_step}</Text>}
+          {!!t.next_step && <Text style={styles.body}>{t.next_step}</Text>}
         </View>
       ))}
     </>
@@ -178,7 +178,7 @@ function Falls() {
         </TouchableOpacity>
       ))}
       <Btn label="Check fall risk" onPress={async () => setRes(await postJson('/senior-health/fall-check', ans))} />
-      {res && <View style={styles.result}><Text style={styles.itemTitle}>Score {res.score}{res.at_risk ? ' · worth a review' : ''}</Text><Text style={styles.body}>{res.next_step}</Text></View>}
+      {!!res && <View style={styles.result}><Text style={styles.itemTitle}>Score {res.score}{res.at_risk ? ' · worth a review' : ''}</Text><Text style={styles.body}>{res.next_step}</Text></View>}
       <Text style={styles.label}>Home safety</Text>
       {safety.map((a) => <Text key={a.area} style={styles.body}>{a.area}: {asArray<string>(a.checks).join('; ')}</Text>)}
     </>
@@ -230,7 +230,7 @@ function Allergies() {
       ))}
       <Input value={triggers} onChangeText={setTriggers} placeholder="Possible triggers (dust, pollen, food...)" />
       <Btn label="Log symptoms" onPress={save} />
-      {msg && <Text style={styles.body}>{msg}</Text>}
+      {!!msg && <Text style={styles.body}>{msg}</Text>}
     </>
   );
 }
@@ -283,7 +283,7 @@ function Pacing() {
         </Text>
       )}
       {asArray<string>(plan?.rules).map((r) => <Text key={r} style={styles.sub}>• {r}</Text>)}
-      {plan?.see_a_doctor && <Text style={styles.sub}>{plan.see_a_doctor}</Text>}
+      {!!plan?.see_a_doctor && <Text style={styles.sub}>{plan.see_a_doctor}</Text>}
     </>
   );
 }
@@ -313,8 +313,8 @@ export default function ConditionsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
-  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
+  heroMuted: { paddingLeft: 40, color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroTitle: { paddingLeft: 40, color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
   list: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg },
   section: { marginBottom: 12 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },

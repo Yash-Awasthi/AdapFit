@@ -116,6 +116,14 @@ def validate_startup() -> list[str]:
         if not settings.PUBLIC_BASE_URL.startswith("https://"):
             errors.append("PUBLIC_BASE_URL must be https in production: reset and guardian links carry tokens.")
 
+    if is_prod:
+        from pathlib import Path
+        legal = Path(__file__).resolve().parent.parent / "legal"
+        unfilled = [f.name for f in legal.glob("*.md") if "[COMPANY LEGAL NAME]" in f.read_text(encoding="utf-8")]
+        if unfilled:
+            logger.warning("Legal documents still carry placeholders (%s); fill them before public launch.",
+                           ", ".join(unfilled))
+
     return errors
 
 

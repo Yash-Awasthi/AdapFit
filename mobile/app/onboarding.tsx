@@ -47,7 +47,7 @@ const DEVICE_OPTIONS = [
 ];
 
 const ACTIVITY_LEVELS = [
-  { id: 'sedentary', label: 'Sedentary', desc: 'Little to no exercise', icon: '-bed', color: '#64748B' },
+  { id: 'sedentary', label: 'Sedentary', desc: 'Little to no exercise', icon: 'bed', color: '#64748B' },
   { id: 'light', label: 'Lightly Active', desc: '1-3 days/week', icon: 'walk', color: '#22C55E' },
   { id: 'moderate', label: 'Moderately Active', desc: '3-5 days/week', icon: 'bicycle', color: '#F59E0B' },
   { id: 'very', label: 'Very Active', desc: '6-7 days/week', icon: 'fitness', color: '#F97316' },
@@ -94,9 +94,9 @@ function SelectableCard({ icon, label, desc, color, selected, onPress }: {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[typography.body.md, { color: selected ? color : colors.text.primary, fontWeight: selected ? '700' : '500' }]}>{label}</Text>
-        {desc && <Text style={[typography.body.sm, { color: colors.text.muted, marginTop: 2 }]}>{desc}</Text>}
+        {!!desc && <Text style={[typography.body.sm, { color: colors.text.muted, marginTop: 2 }]}>{desc}</Text>}
       </View>
-      {selected && (
+      {!!selected && (
         <View style={[styles.checkCircle, { backgroundColor: color }]}>
           <Ionicons name="checkmark" size={14} color="#fff" />
         </View>
@@ -164,10 +164,9 @@ function GoalsStep({ selected, onToggle, onNext, onBack }: {
 }
 
 // ─── Step 3: Personal Info ────────────────────────────────────
-function PersonalInfoStep({ gender, setGender, age, setAge, weight, setWeight, height, setHeight, onNext, onBack }: {
+function PersonalInfoStep({ gender, setGender, age, setAge, height, setHeight, onNext, onBack }: {
   gender: string; setGender: (g: string) => void;
   age: string; setAge: (a: string) => void;
-  weight: string; setWeight: (w: string) => void;
   height: string; setHeight: (h: string) => void;
   onNext: () => void; onBack: () => void;
 }) {
@@ -203,17 +202,6 @@ function PersonalInfoStep({ gender, setGender, age, setAge, weight, setWeight, h
           />
         </View>
         <View style={styles.inputContainer}>
-          <Text style={[typography.label.sm, { color: colors.text.muted, marginBottom: 6 }]}>Weight (kg)</Text>
-          <TextInput
-            style={styles.input}
-            value={weight}
-            onChangeText={setWeight}
-            placeholder="70"
-            placeholderTextColor={colors.text.muted}
-            keyboardType="number-pad"
-          />
-        </View>
-        <View style={styles.inputContainer}>
           <Text style={[typography.label.sm, { color: colors.text.muted, marginBottom: 6 }]}>Height (cm)</Text>
           <TextInput
             style={styles.input}
@@ -231,7 +219,7 @@ function PersonalInfoStep({ gender, setGender, age, setAge, weight, setWeight, h
           <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
           <Text style={styles.secondaryButtonText}>Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onNext} style={styles.primaryButton}>
+        <TouchableOpacity onPress={onNext} style={[styles.primaryButton, { opacity: gender ? 1 : 0.5 }]} disabled={!gender}>
           <Text style={styles.primaryButtonText}>Continue</Text>
           <Ionicons name="arrow-forward" size={20} color="#fff" />
         </TouchableOpacity>
@@ -361,12 +349,12 @@ const TRAINING_DAYS: Record<string, number> = {
 export default function OnboardingScreen() {
   const router = useRouter();
   const userId = useUserStore((state) => state.userId);
-  const updateProfile = useUserStore((state) => state.updateProfile);
-  const [step, setStep] = useState(0);
+  const setUser = useUserStore((state) => state.setUser);
+  // Sign-up already collected the name, so this asks only what it does not have and creates the profile at the end.
+  const [step, setStep] = useState(1);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [gender, setGender] = useState('');
   const [age, setAge] = useState('');
-  const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
   const [device, setDevice] = useState('');
   const [activityLevel, setActivityLevel] = useState('');
@@ -396,17 +384,18 @@ export default function OnboardingScreen() {
     if (device && device !== 'none') profile.health_connect_enabled = true;
 
     try {
-      await updateProfile(profile);
+      // The account row exists from sign-up; this creates the profile and takes the name from the account.
+      const created = await postJson<any>('/users', profile);
+      if (!created) throw new Error('profile not saved');
+      await setUser(created);
       // The sleep target is a baseline input, not a profile field: it is what
       // the sleep score is measured against.
-      await postJson(`/users/${userId}/baselines`, { sleep_target_hours: sleepGoal });
+      await postJson(`/users/${created.id}/baselines`, { sleep_target_hours: sleepGoal });
     } catch {
-      // A failed save must not trap someone in onboarding; the profile screen
-      // can set the same fields later.
-      Alert.alert(
-        'Saved on this device only',
-        'Your profile could not reach the server. You can set it again from Settings.'
-      );
+      // Without the profile row the app sends the user straight back here, so stay and let them retry.
+      Alert.alert('Not saved', 'Your profile could not reach the server. Check your connection and try again.');
+      setSaving(false);
+      return;
     }
     setSaving(false);
     router.replace('/(tabs)');
@@ -416,21 +405,21 @@ export default function OnboardingScreen() {
     if (step < 4) setStep(step + 1);
     else finish();
   };
-  const goBack = () => { if (step > 0) setStep(step - 1); };
+  const goBack = () => { if (step > 1) setStep(step - 1); };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       {step > 0 && (
         <View style={styles.topBar}>
-          <StepIndicator current={step} total={5} />
-          <Text style={[typography.body.sm, { color: colors.text.muted }]}>Step {step} of 5</Text>
+          <StepIndicator current={step - 1} total={4} />
+          <Text style={[typography.body.sm, { color: colors.text.muted }]}>Step {step} of 4</Text>
         </View>
       )}
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         {step === 0 && <WelcomeStep onNext={goNext} />}
         {step === 1 && <GoalsStep selected={selectedGoals} onToggle={toggleGoal} onNext={goNext} onBack={goBack} />}
-        {step === 2 && <PersonalInfoStep gender={gender} setGender={setGender} age={age} setAge={setAge} weight={weight} setWeight={setWeight} height={height} setHeight={setHeight} onNext={goNext} onBack={goBack} />}
+        {step === 2 && <PersonalInfoStep gender={gender} setGender={setGender} age={age} setAge={setAge} height={height} setHeight={setHeight} onNext={goNext} onBack={goBack} />}
         {step === 3 && <DeviceStep selected={device} onSelect={setDevice} onNext={goNext} onBack={goBack} />}
         {step === 4 && <PreferencesStep activityLevel={activityLevel} setActivityLevel={setActivityLevel} sleepGoal={sleepGoal} setSleepGoal={setSleepGoal} onNext={goNext} onBack={goBack} />}
       </ScrollView>

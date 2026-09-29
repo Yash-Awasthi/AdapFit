@@ -203,7 +203,7 @@ export default function AddictionRecoveryScreen() {
           </View>
         )}
 
-        {hasProfile && (
+        {!!hasProfile && (
           <>
             <View style={styles.section}>
               <SectionHeaderPremium title="Milestones" icon="trophy" iconColor={colors.health.energy} />

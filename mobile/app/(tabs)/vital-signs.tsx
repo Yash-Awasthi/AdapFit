@@ -86,7 +86,7 @@ function VitalGauge({ value, max, label, unit, color, icon, status }: {
       </View>
       <View style={styles.gaugeValueRow}>
         <Text style={[styles.gaugeValue, { color: tint }]}>{measured ? value : '—'}</Text>
-        {measured && <Text style={styles.gaugeUnit}>{unit}</Text>}
+        {!!measured && <Text style={styles.gaugeUnit}>{unit}</Text>}
       </View>
       <ProgressBarPremium value={measured ? value : 0} max={max} color={tint} height={6} />
     </GlassCard>
@@ -125,7 +125,7 @@ function BloodPressure() {
         <TextInput style={[styles.input, { flex: 1 }]} placeholder="Pulse" placeholderTextColor={colors.text.muted} keyboardType="number-pad" value={pulse} onChangeText={setPulse} />
       </View>
       <TouchableOpacity style={[styles.logButton, { backgroundColor: '#8B5CF6' }]} onPress={save}><Text style={styles.logButtonText}>Save reading</Text></TouchableOpacity>
-      {last && <Text style={styles.emptyText}>{last.systolic}/{last.diastolic}: {last.label}. {last.next_step}</Text>}
+      {!!last && <Text style={styles.emptyText}>{last.systolic}/{last.diastolic}: {last.label}. {last.next_step}</Text>}
       {summ?.count > 0 && (
         <View>
           <Text style={styles.historyTime}>7-day average {summ.average} · {summ.range}</Text>
@@ -165,7 +165,7 @@ function SeekCareCheck() {
       <TouchableOpacity style={[styles.logButton, { backgroundColor: '#EF4444' }]} onPress={run}>
         <Text style={styles.logButtonText}>Check my readings</Text>
       </TouchableOpacity>
-      {result && (
+      {!!result && (
         <View>
           <Text style={[styles.historyValue, { color }]}>NEWS2 score {result.score}</Text>
           <Text style={styles.emptyText}>{result.next_step}</Text>

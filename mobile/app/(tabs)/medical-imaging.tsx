@@ -185,7 +185,7 @@ export default function MedicalImagingScreen() {
             ))}
           </GlassCard>
 
-          {result.follow_up_schedule && (
+          {!!result.follow_up_schedule && (
             <GlassCard variant="light" style={styles.sectionCard}>
               <Text style={styles.introTitle}>Follow up</Text>
               <Text style={styles.introText}>

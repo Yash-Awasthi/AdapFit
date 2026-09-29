@@ -86,7 +86,7 @@ Google Play Data safety and the App Store privacy label must match this table.
 | Fitness info (workouts, steps, heart rate, sleep) | Yes | Same as above | App functionality, personalisation | No |
 | Photos (meal, skin, progress) | Yes | Meal photos to Gemini only when `ai` is on | App functionality | Yes |
 | Approximate and precise location | Only when the user asks for care nearby, AQI or a route | Coordinates to OpenStreetMap and Open-Meteo | App functionality | Yes |
-| Messages to the coach | Yes | To Gemini or Groq when `ai` is on | App functionality | Yes |
+| Messages to the coach | Yes | To Gemini, Groq or TokenHarbor when `ai` is on | App functionality | Yes |
 | Genetic data | Read once, not stored | No | App functionality | Yes |
 | App activity / analytics | No | No | - | - |
 

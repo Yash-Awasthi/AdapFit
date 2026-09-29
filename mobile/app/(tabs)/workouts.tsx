@@ -60,7 +60,7 @@ export default function WorkoutsScreen() {
       </View>
 
       {/* Active Workout Banner */}
-      {activeSession && (
+      {!!activeSession && (
         <View style={ws.activeBanner}>
           <View style={{ flex: 1 }}><Text style={[typography.label.lg, { color: '#FFF' }]}>Workout in Progress</Text><Text style={[typography.body.xs, { color: '#FFFFFFCC' }]}>Started at {activeSession.start_time}</Text></View>
           <TouchableOpacity style={ws.completeBtn} onPress={completeWorkout}><Text style={[typography.label.lg, { color: colors.health.danger }]}>Finish</Text></TouchableOpacity>

@@ -2,7 +2,8 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { ThemeProvider, useTheme } from "../src/services/theme";
 import { QueryProvider } from "../src/services/query-provider";
 import { DevSettingsProvider } from "../src/services/devSettings";
@@ -56,11 +57,11 @@ function RootStack() {
   const signedIn = useUserStore((s) => s.signedIn);
   useEffect(() => {
     if (!hydrated || loading) return;
-    const onOnboarding = segments[0] === "onboarding-welcome";
+    const onOnboarding = segments[0] === "onboarding";
     if (!signedIn) {
       if (!["login", "register", "legal"].includes(segments[0] as string)) router.replace("/login" as any);
     } else if (!profile && !onOnboarding) {
-      router.replace("/onboarding-welcome");
+      router.replace("/onboarding");
     } else if (profile && onOnboarding) {
       router.replace("/(tabs)");
     }
@@ -97,7 +98,6 @@ function RootStack() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false, animation: "fade" }} />
         <Stack.Screen name="register" options={{ headerShown: false, animation: "slide_from_right" }} />
-        <Stack.Screen name="onboarding-welcome" options={{ headerShown: false, animation: "fade" }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, animation: "fade" }} />
         <Stack.Screen name="workout-active" options={{ headerShown: false }} />
         <Stack.Screen name="workout-detail" options={{ headerShown: false }} />
@@ -106,12 +106,25 @@ function RootStack() {
         <Stack.Screen name="legal" options={{ headerShown: false }} />
       </Stack>
       <ConnectionBanner />
+      <StatusBarScrim />
       {profile && segments[0] !== "sleep-sounds" && (
         <View style={{ position: "absolute", top: 96, right: 12 }} pointerEvents="none">
           <SyncStatusBadge />
         </View>
       )}
     </>
+  );
+}
+
+/** Fades content out under the clock and battery, so scrolling text never collides with them. */
+function StatusBarScrim() {
+  const top = useSafeAreaInsets().top;
+  return (
+    <LinearGradient
+      pointerEvents="none"
+      colors={["rgba(12,17,28,0.92)", "rgba(12,17,28,0)"]}
+      style={{ position: "absolute", top: 0, left: 0, right: 0, height: top + 10 }}
+    />
   );
 }
 

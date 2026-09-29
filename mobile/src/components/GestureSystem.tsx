@@ -68,14 +68,14 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
 
   return (
     <View style={[styles.swipeableContainer, style]}>
-      {leftAction && (
+      {!!leftAction && (
         <Animated.View style={[styles.swipeActionLeft, leftActionStyle, { backgroundColor: leftAction.color }]}>
           <Ionicons name={leftAction.icon as any} size={24} color="#FFF" />
           <Text style={styles.swipeActionText}>{leftAction.label}</Text>
         </Animated.View>
       )}
 
-      {rightAction && (
+      {!!rightAction && (
         <Animated.View style={[styles.swipeActionRight, rightActionStyle, { backgroundColor: rightAction.color }]}>
           <Ionicons name={rightAction.icon as any} size={24} color="#FFF" />
           <Text style={styles.swipeActionText}>{rightAction.label}</Text>
@@ -117,7 +117,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefres
 
   return (
     <View style={styles.pullContainer}>
-      {refreshing && (
+      {!!refreshing && (
         <View style={styles.refreshIndicator}>
           <Animated.View style={spinStyle}>
             <Ionicons name="refresh" size={20} color={color} />
@@ -165,7 +165,7 @@ export const SwipeableTabBar: React.FC<SwipeableTabBarProps> = ({
               onTabChange(i);
             }}
           >
-            {tab.icon && (
+            {!!tab.icon && (
               <Ionicons
                 name={tab.icon as any}
                 size={18}

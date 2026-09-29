@@ -2,6 +2,7 @@ import { cache } from './cache';
 import { API_BASE_URL } from './config';
 import { localDay } from '../utils/date';
 import { authedFetch } from './authToken';
+import { askDirectLlm, directLlmEnabled } from './directLlm';
 
 const API = API_BASE_URL;
 const CACHE_TTL = 60_000; // 1 minute
@@ -135,16 +136,24 @@ export const api = {
   },
 
   // Chat & AI Coach
-  chat: (
+  chat: async (
     userId: string,
     message: string,
     history: { role: string; content: string }[] = [],
     llmOverride?: { provider: string; api_key: string; model?: string; base_url?: string }
-  ) =>
-    request<{ reply: string; intent: string | null; follow_up_suggestions?: string[] }>(
-      '/api/v1/chat',
-      { method: 'POST', body: JSON.stringify({ user_id: userId, message, history, llm_override: llmOverride }) }
-    ),
+  ) => {
+    type Reply = { reply: string; intent: string | null; follow_up_suggestions?: string[]; llm_prompt?: string | null; llm_system?: string | null };
+    const ask = (extra: object) =>
+      request<Reply>('/api/v1/chat', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, message, history, llm_override: llmOverride, ...extra }),
+      });
+    if (!directLlmEnabled || llmOverride) return ask({});
+    const first = await ask({ client_llm: true });
+    if (!first.llm_prompt) return first;
+    const text = await askDirectLlm(first.llm_system ?? '', history, first.llm_prompt);
+    return ask(text ? { client_reply: text } : {});
+  },
 
   getMemoryContext: (userId: string) =>
     request<{ user_id: string; context: string; token_estimate: number }>(

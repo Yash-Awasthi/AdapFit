@@ -153,14 +153,14 @@ export default function SleepSoundsScreen() {
         </View>
       )}
 
-      {listening && (
+      {!!listening && (
         <View style={s.body}>
           <Text style={s.big}>{minutes}<Text style={s.unit}> min</Text></Text>
           <Text style={s.p}>Listening. Keep the screen on; tap the black screen to see this again.</Text>
         </View>
       )}
 
-      {result && (
+      {!!result && (
         <View style={s.body}>
           {result.status === 'scored' ? (
             <>

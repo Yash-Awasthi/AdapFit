@@ -32,7 +32,7 @@ function Section({ icon, title, sub, children }: { icon: string; title: string; 
         </View>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.text.muted} />
       </TouchableOpacity>
-      {open && <View style={{ marginTop: 12 }}>{children}</View>}
+      {!!open && <View style={{ marginTop: 12 }}>{children}</View>}
     </GlassCard>
   );
 }
@@ -84,7 +84,7 @@ function NearbyCare() {
           {p.phone ? <Text style={styles.link} onPress={() => Linking.openURL(`tel:${p.phone}`)}>{p.phone}</Text> : null}
         </TouchableOpacity>
       ))}
-      {places && <Text style={styles.sub}>Map data © OpenStreetMap contributors. Call ahead; details may be out of date.</Text>}
+      {!!places && <Text style={styles.sub}>Map data © OpenStreetMap contributors. Call ahead; details may be out of date.</Text>}
     </>
   );
 }
@@ -105,7 +105,7 @@ function SymptomCheck() {
   return (
     <>
       <Chips options={symptoms.map((s) => s.id)} value={pick} onChange={(v) => { setPick(v); setFlags([]); setResult(null); }} />
-      {chosen && (
+      {!!chosen && (
         <>
           <Text style={styles.label}>How bad, 1 to 10: {severity}</Text>
           <View style={styles.row}>
@@ -123,7 +123,7 @@ function SymptomCheck() {
           <Button label="How soon should I get care?" onPress={run} />
         </>
       )}
-      {result?.level && (
+      {!!result?.level && (
         <View style={[styles.result, { borderColor: LEVEL_COLOR[result.level] }]}>
           <Text style={[styles.itemTitle, { color: LEVEL_COLOR[result.level] }]}>{result.message}</Text>
           <Text style={styles.body}>{result.action}</Text>
@@ -171,7 +171,7 @@ function CheckForward() {
       <TextInput style={[styles.input, { minHeight: 90 }]} multiline value={text} onChangeText={setText} maxLength={4000}
         placeholder="Paste the health message you received" placeholderTextColor={colors.text.muted} />
       <Button label="Check it" onPress={run} busy={busy} />
-      {r && (
+      {!!r && (
         <View style={[styles.result, { borderColor: color[r.verdict] ?? colors.text.muted }]}>
           <Text style={[styles.itemTitle, { color: color[r.verdict] ?? colors.text.primary, textTransform: 'capitalize' }]}>{r.verdict}</Text>
           <Text style={styles.body}>{r.explanation}</Text>
@@ -237,7 +237,7 @@ function Schemes() {
       <TextInput style={styles.input} value={age} onChangeText={setAge} keyboardType="number-pad" placeholder="Age of the person" placeholderTextColor={colors.text.muted} />
       <Toggle label="Pregnant" v={pregnant} set={setPregnant} />
       <Toggle label="Salaried with an employer" v={employee} set={setEmployee} />
-      {employee && <TextInput style={styles.input} value={wage} onChangeText={setWage} keyboardType="number-pad" placeholder="Monthly wage (₹)" placeholderTextColor={colors.text.muted} />}
+      {!!employee && <TextInput style={styles.input} value={wage} onChangeText={setWage} keyboardType="number-pad" placeholder="Monthly wage (₹)" placeholderTextColor={colors.text.muted} />}
       <Toggle label="Central government employee or pensioner" v={govt} set={setGovt} />
       <Button label="Show schemes that may apply" onPress={run} />
       {list?.map((s) => (
@@ -249,7 +249,7 @@ function Schemes() {
           {s.helpline ? <Text style={styles.link} onPress={() => Linking.openURL(`tel:${s.helpline}`)}>Helpline {s.helpline}</Text> : null}
         </View>
       ))}
-      {list && <Text style={styles.sub}>Eligibility shown here is a guide. Confirm on the official portal.</Text>}
+      {!!list && <Text style={styles.sub}>Eligibility shown here is a guide. Confirm on the official portal.</Text>}
     </>
   );
 }
@@ -308,8 +308,8 @@ export default function CareScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
-  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
+  heroMuted: { paddingLeft: 40, color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroTitle: { paddingLeft: 40, color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
   heroBody: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 6 },
   list: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg },
   section: { marginBottom: 12 },

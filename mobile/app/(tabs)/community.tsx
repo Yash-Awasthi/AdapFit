@@ -17,6 +17,7 @@ import { colors, spacing, radius } from '../../src/theme';
 import { GlassCard } from '../../src/components/PremiumComponents';
 import { useApis } from '../../src/hooks/useApi';
 import { postJson, asArray } from '../../src/services/http';
+import { openModeration } from '../../src/services/moderation';
 import { useUserStore } from '../../src/stores';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -154,7 +155,7 @@ export default function CommunityScreen() {
         ))}
       </View>
 
-      {loading && <Text style={styles.emptyText}>Loading…</Text>}
+      {!!loading && <Text style={styles.emptyText}>Loading…</Text>}
 
       {!loading && activeTab === 'challenges' && (
         challenges.length === 0 ? (
@@ -275,6 +276,12 @@ export default function CommunityScreen() {
                     </Text>
                     <Text style={styles.feedTime}>{timeAgo(share.shared_at)}</Text>
                   </View>
+                  {share.user_id !== userId && (
+                    <TouchableOpacity hitSlop={12} accessibilityRole="button" accessibilityLabel="Report or block"
+                      onPress={() => openModeration({ shareId: share.id, authorId: share.user_id, authorName: share.user_name, userId }, reload)}>
+                      <Ionicons name="ellipsis-horizontal" size={20} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <Text style={styles.feedTitle}>{share.title}</Text>
                 {share.caption ? <Text style={styles.feedCaption}>{share.caption}</Text> : null}
@@ -311,7 +318,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
   contentContainer: { paddingBottom: 100 },
   header: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#FFF' },
+  headerTitle: { paddingLeft: 40, fontSize: 26, fontWeight: '800', color: '#FFF' },
   headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
 
   tabRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.screenPadding, marginTop: spacing.lg, marginBottom: spacing.md },

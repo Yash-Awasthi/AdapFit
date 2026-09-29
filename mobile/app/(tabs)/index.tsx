@@ -38,10 +38,11 @@ const getGreeting = () => {
   return { text: 'Good night', icon: 'moon', gradient: ['#2A2A5E', '#312E81'] };
 };
 
+// Same cut-offs as the server's readiness states (85 optimal, 65 moderate, 45 reduced), so Home and the workout agree.
 function getScoreLabel(score: number): string {
-  if (score >= 80) return 'Excellent';
-  if (score >= 60) return 'Good';
-  if (score >= 40) return 'Fair';
+  if (score >= 85) return 'Excellent';
+  if (score >= 65) return 'Good';
+  if (score >= 45) return 'Fair';
   return 'Needs Work';
 }
 
@@ -95,10 +96,11 @@ export default function HomeScreen() {
     ? Math.round(((latest.soreness_score + latest.fatigue_score) / 2) * 10)
     : null;
 
-  const glassesTarget = 8;
+  // A glass is 250 ml everywhere (Dashboard, Wellness), so the same goal reads the same on every screen.
+  const glassMl = 250;
   const totalMl = asNumber(data.hydration?.total_ml);
-  const goalMl = asNumber(data.hydration?.daily_goal_ml, 2000);
-  const glassMl = Math.max(1, Math.round(goalMl / glassesTarget));
+  const goalMl = asNumber(data.hydration?.daily_goal_ml, 3000);
+  const glassesTarget = Math.max(1, Math.round(goalMl / glassMl));
   const waterIntake = Math.min(glassesTarget, Math.floor(totalMl / glassMl));
 
   const logGlass = async () => {
@@ -124,7 +126,7 @@ export default function HomeScreen() {
     { icon: 'moon', value: sleepScore ?? '--', label: 'Sleep', color: colors.health.sleep },
     { icon: 'flame', value: calories !== null ? calories.toLocaleString() : '--', label: 'Calories', color: colors.health.energy },
     { icon: 'water', value: `${waterIntake}/${glassesTarget}`, label: 'Water', color: '#3B82F6' },
-    { icon: 'leaf', value: strain ?? '--', label: 'Strain', color: colors.health.calm },
+    { icon: 'leaf', value: strain ?? '--', label: 'Body load', color: colors.health.calm },
   ];
 
   return (
@@ -169,8 +171,8 @@ export default function HomeScreen() {
               <Text style={styles.heroScoreSubtitle}>
                 {healthScore === null
                   ? 'Check in this morning to see where you stand'
-                  : healthScore >= 80 ? "You're recovered — make it count"
-                  : healthScore >= 60 ? 'Solid. Train as planned'
+                  : healthScore >= 85 ? "You're recovered — make it count"
+                  : healthScore >= 65 ? 'Solid. Train as planned'
                   : 'Take it easy today'}
               </Text>
               <View style={styles.heroScoreBreakdown}>

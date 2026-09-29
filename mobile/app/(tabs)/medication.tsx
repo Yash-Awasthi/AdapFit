@@ -119,6 +119,7 @@ function AddMedicationModal({ visible, onClose, onAdded }: {
               accessibilityRole="button" style={{ paddingVertical: 6 }}>
               <Text style={styles.medDetail}>{p.brand}</Text>
               <Text style={styles.emptyBody}>{p.composition} · {p.manufacturer}</Text>
+              {!!p.prohibited_fdc && <Text style={[styles.emptyBody, { color: colors.health.stress }]}>{p.prohibited_fdc.message}</Text>}
             </TouchableOpacity>
           ))}
           <TextInput
@@ -151,7 +152,10 @@ function AddMedicationModal({ visible, onClose, onAdded }: {
   );
 }
 
-interface IndianProduct { brand: string; manufacturer: string; pack: string; composition: string }
+interface IndianProduct {
+  brand: string; manufacturer: string; pack: string; composition: string;
+  prohibited_fdc?: { status: string; message: string } | null;
+}
 interface DrugInfo {
   india?: IndianProduct[];
   india_source?: string;
@@ -320,7 +324,8 @@ export default function MedicationScreen() {
               const india = asArray<IndianProduct>(d.india)[0];
               return (
                 <View style={{ marginTop: 8 }}>
-                  {india && <Text style={styles.medDetail}>In India: {india.brand} · {india.composition} · {india.manufacturer}</Text>}
+                  {!!india && <Text style={styles.medDetail}>In India: {india.brand} · {india.composition} · {india.manufacturer}</Text>}
+                  {!!india?.prohibited_fdc && <Text style={[styles.medDetail, { color: colors.health.stress }]}>{india.prohibited_fdc.message}</Text>}
                   {m ? (
                     <>
                       <Text style={styles.medDetail}>{[m.brand_name, m.generic_name].filter(Boolean).join(' · ')}</Text>
@@ -335,7 +340,7 @@ export default function MedicationScreen() {
                 </View>
               );
             })()}
-            {refill && (
+            {!!refill && (
               <View style={styles.refillWarning}>
                 <Ionicons name="warning" size={12} color="#F59E0B" />
                 <Text style={styles.refillText}>

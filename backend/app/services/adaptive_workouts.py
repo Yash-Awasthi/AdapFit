@@ -70,6 +70,22 @@ LIMITATION_EXCLUSIONS = {
 }
 
 
+def _tokens(text: str) -> set:
+    """Significant word stems of a name or id, so 'Barbell Back Squat' and 'barbell_squat' meet."""
+    words = "".join(c.lower() if c.isalnum() else " " for c in text).split()
+    return {w[:-1] if w.endswith("s") and len(w) > 3 else w for w in words}
+
+
+def _matches_key(key: str, *texts: str) -> bool:
+    """True when every stem of an exclusion/alternative key appears in one of the exercise's texts.
+
+    The exclusion tables use canonical ids ('barbell_squat'); a client sends its own ids and names
+    ('ex_004', 'Barbell Back Squat'). Matching on stems keeps limitation filtering working either way.
+    """
+    key_tokens = _tokens(key)
+    return bool(key_tokens) and any(key_tokens <= _tokens(t) for t in texts if t)
+
+
 def select_adaptive_workout(
     exercises: list[Exercise],
     profile: UserFitnessProfile,
@@ -85,12 +101,13 @@ def select_adaptive_workout(
     3. Select top exercises ensuring muscle group variety
     4. Assign difficulty based on recent performance
     """
-    # Step 1: Filter by limitations
-    excluded = set()
+    # Step 1: Filter by limitations. Match on stems of the exercise id and name, so a client's
+    # own ids ('ex_004') are excluded as reliably as the canonical ones ('barbell_squat').
+    excluded_keys = set()
     for limitation in profile.limitations:
-        excluded.update(LIMITATION_EXCLUSIONS.get(limitation, []))
+        excluded_keys.update(LIMITATION_EXCLUSIONS.get(limitation, []))
 
-    available = [e for e in exercises if e.id not in excluded]
+    available = [e for e in exercises if not any(_matches_key(k, e.id, e.name) for k in excluded_keys)]
 
     # Step 2: Score by fitness level match
     level_map = {"beginner": 4, "intermediate": 6, "advanced": 8}
@@ -146,12 +163,20 @@ def get_accessible_alternatives(
     all_exercises: list[Exercise],
 ) -> dict:
     """Get accessible alternatives for an exercise based on user limitations."""
-    alternatives = ACCESSIBILITY_ALTERNATIVES.get(exercise_id, [])
+    exercise_map = {e.id: e for e in all_exercises}
+    this = exercise_map.get(exercise_id)
+    texts = [exercise_id] + ([this.name] if this else [])
+    # Copy, never alias: extending the module dict's own list would grow it on every call.
+    alternatives = list(ACCESSIBILITY_ALTERNATIVES.get(exercise_id, []))
+    if not alternatives:
+        for key, alts in ACCESSIBILITY_ALTERNATIVES.items():
+            if _matches_key(key, *texts):
+                alternatives.extend(alts)
 
     # Also check limitation-specific alternatives
     for limitation in limitations:
         for excluded_id in LIMITATION_EXCLUSIONS.get(limitation, []):
-            if excluded_id == exercise_id:
+            if _matches_key(excluded_id, *texts):
                 # Add limitation-specific alternatives
                 if limitation == "wheelchair":
                     alternatives.extend(["seated_arm_cycling", "resistance_band_exercises"])
@@ -160,7 +185,6 @@ def get_accessible_alternatives(
 
     # Deduplicate and verify alternatives exist
     alt_ids = list(dict.fromkeys(alternatives))
-    exercise_map = {e.id: e for e in all_exercises}
     valid_alts = [exercise_map[aid] for aid in alt_ids if aid in exercise_map]
 
     return {

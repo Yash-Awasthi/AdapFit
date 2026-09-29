@@ -77,7 +77,7 @@ export default function TelemedicineScreen() {
             <TouchableOpacity style={styles.btn} onPress={() => Linking.openURL(s.url)} accessibilityRole="link">
               <Text style={styles.btnText}>Open {s.name}</Text>
             </TouchableOpacity>
-            {s.phone && (
+            {!!s.phone && (
               <TouchableOpacity style={styles.btn} onPress={() => Linking.openURL(`tel:${s.phone}`)} accessibilityRole="button">
                 <Text style={styles.btnText}>Call {s.phone}</Text>
               </TouchableOpacity>
@@ -114,7 +114,7 @@ export default function TelemedicineScreen() {
             </TouchableOpacity>
           )}
         </View>
-        {check && (
+        {!!check && (
           <View style={styles.result}>
             <Text style={styles.body}>{check.message}</Text>
             {asArray<Match>(check.matches).map((m) => (
@@ -122,7 +122,7 @@ export default function TelemedicineScreen() {
                 {m.name} · {m.registration_no} · {m.council} · {m.qualification}{m.removed ? ' · REMOVED' : ''}
               </Text>
             ))}
-            {check.register_url && (
+            {!!check.register_url && (
               <Text style={styles.link} onPress={() => Linking.openURL(check.register_url!)}>Open the NMC register</Text>
             )}
           </View>

@@ -300,7 +300,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
             ))}
           </View>
 
-          {errorText && (
+          {!!errorText && (
             <View style={[styles.errorBox, { backgroundColor: `${theme.danger}1F` }]}>
               <X size={14} color={theme.danger} />
               <Text style={[styles.errorText, { color: theme.danger }]}>{errorText}</Text>
@@ -329,7 +329,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
           </TouchableOpacity>
 
           {/* Parsed Result */}
-          {parsedResult?.parsed_set && (
+          {!!parsedResult?.parsed_set && (
             <View style={[styles.resultBox, { backgroundColor: theme.background, borderLeftColor: theme.success }]}>
               <View style={styles.resultHeaderRow}>
                 <Text style={[styles.resultHeader, { color: theme.text }]}>Parsed Set:</Text>

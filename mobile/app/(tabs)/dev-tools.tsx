@@ -127,6 +127,7 @@ export default function DevToolsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScreenHeader
+        backable={false}
         title="Dev Tools"
         right={
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save" onPress={handleSave} hitSlop={10}>
@@ -187,7 +188,7 @@ export default function DevToolsScreen() {
             <Zap size={16} color={theme.warning} />
             <Text style={[styles.testBtnText, { color: theme.text }]}>{testing ? 'Testing…' : 'Test connection'}</Text>
           </TouchableOpacity>
-          {llmOverride && (
+          {!!llmOverride && (
             <TouchableOpacity style={[styles.testBtn, { backgroundColor: theme.surface, borderColor: theme.border }]} onPress={handleClear}>
               <Trash2 size={16} color={theme.danger} />
               <Text style={[styles.testBtnText, { color: theme.danger }]}>Clear</Text>

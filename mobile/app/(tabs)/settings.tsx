@@ -123,7 +123,7 @@ export default function SettingsScreen() {
 function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, padding: 20 },
-    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 48, marginBottom: 24 },
+    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 104, marginBottom: 24 },
     section: { marginBottom: 24 },
     sectionTitle: { fontSize: 14, fontWeight: '600', color: theme.textMuted, marginBottom: 8, textTransform: 'uppercase' },
     card: {

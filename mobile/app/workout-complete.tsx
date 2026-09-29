@@ -8,6 +8,7 @@ import { useUserStore, useWorkoutStore } from '../src/stores';
 import { useTheme } from '../src/services/theme';
 import { api } from '../src/services/api';
 import { addSyncMutation } from '../src/services/sync';
+import { plural } from '../src/utils/plural';
 
 export default function WorkoutComplete() {
   const { theme } = useTheme();
@@ -124,7 +125,7 @@ export default function WorkoutComplete() {
     <ScrollView style={s.container}>
       <Text style={s.title}>Post-Workout Feedback</Text>
       <Text style={s.subtitle}>
-        {loggedSets.length} sets logged · Help the AI learn what works for you
+        {plural(loggedSets.length, 'set')} logged · Help the AI learn what works for you
       </Text>
 
       <Text style={s.label}>Session RPE (1-10)</Text>
@@ -169,7 +170,7 @@ export default function WorkoutComplete() {
         ))}
       </View>
 
-      <Text style={s.label}>Notes (NLP analysis)</Text>
+      <Text style={s.label}>Notes</Text>
       <TextInput
         style={s.notesInput}
         multiline

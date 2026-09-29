@@ -250,7 +250,7 @@ export default function WellnessScreen() {
 function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, padding: 20 },
-    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 48, marginBottom: 16 },
+    title: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 104, marginBottom: 16 },
     hydrationCard: {
       backgroundColor: theme.surface,
       borderRadius: 12,

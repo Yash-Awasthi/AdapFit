@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.deep },
   scrollContent: { paddingBottom: 100 },
   hero: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: spacing.screenPadding, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  heroMuted: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  heroMuted: { paddingLeft: 40, color: 'rgba(255,255,255,0.8)', fontSize: 13 },
   heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 6 },
   heroBody: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 6, lineHeight: 20 },
   section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.xl },

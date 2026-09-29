@@ -187,7 +187,7 @@ export default function RespiratoryScreen() {
               </View>
             </TouchableOpacity>
 
-            {open && (
+            {!!open && (
               <View style={styles.activeExercise}>
                 <View style={styles.breathingVisual}>
                   <Pulse color={tint} size={100}>

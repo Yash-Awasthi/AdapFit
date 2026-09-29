@@ -178,7 +178,7 @@ export default function VoiceHealthScreen() {
                   <View key={feature.key} style={styles.trendCard}>
                     <View style={styles.trendHeader}>
                       <Text style={styles.trendName}>{feature.label}</Text>
-                      {ok && (
+                      {!!ok && (
                         <View style={styles.trendDirection}>
                           <Ionicons
                             name={trend!.direction === 'increased' ? 'arrow-up' : trend!.direction === 'decreased' ? 'arrow-down' : 'remove'}

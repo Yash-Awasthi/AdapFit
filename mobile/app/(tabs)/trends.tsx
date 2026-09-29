@@ -279,7 +279,7 @@ export default function TrendsScreen() {
           </ScrollView>
 
           {/* Selected Metric Detail */}
-          {selected && (
+          {!!selected && (
             <GlassCard variant="light" style={styles.detailCard}>
               <View style={styles.detailHeader}>
                 <View style={[styles.detailIcon, { backgroundColor: selected.color + '15' }]}>

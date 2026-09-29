@@ -37,7 +37,7 @@ export const BackButton: React.FC<BackButtonProps> = ({
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
     >
       <Ionicons name="chevron-back" size={size} color={color} />
-      {withLabel && <Text style={[styles.backLabel, { color }]}>Back</Text>}
+      {!!withLabel && <Text style={[styles.backLabel, { color }]}>Back</Text>}
     </TouchableOpacity>
   );
 };
@@ -69,16 +69,16 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   const content = (
     <View style={styles.headerContent}>
       <View style={styles.headerLeft}>
-        {backable && <BackButton color={gradient ? '#FFF' : colors.text.primary} />}
+        {!!backable && <BackButton color={gradient ? '#FFF' : colors.text.primary} />}
         <View style={{ flex: 1 }}>
           <Text style={[large ? styles.headerTitleLarge : styles.headerTitle, gradient && { color: '#FFF' }]}>{title}</Text>
-          {subtitle && <Text style={[styles.headerSubtitle, gradient && { color: 'rgba(255,255,255,0.7)' }]}>{subtitle}</Text>}
+          {!!subtitle && <Text style={[styles.headerSubtitle, gradient && { color: 'rgba(255,255,255,0.7)' }]}>{subtitle}</Text>}
         </View>
       </View>
-      {rightAction && (
+      {!!rightAction && (
         <TouchableOpacity style={[styles.headerAction, gradient && { backgroundColor: 'rgba(255,255,255,0.15)' }]} onPress={rightAction.onPress}>
           <Ionicons name={rightAction.icon as any} size={20} color={gradient ? '#FFF' : colors.primary} />
-          {rightLabel && <Text style={[styles.headerActionLabel, gradient && { color: '#FFF' }]}>{rightLabel}</Text>}
+          {!!rightLabel && <Text style={[styles.headerActionLabel, gradient && { color: '#FFF' }]}>{rightLabel}</Text>}
         </TouchableOpacity>
       )}
     </View>
@@ -136,7 +136,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         <View style={styles.bottomSheetHandle}>
           <View style={styles.bottomSheetHandleBar} />
         </View>
-        {title && (
+        {!!title && (
           <View style={styles.bottomSheetHeader}>
             <Text style={styles.bottomSheetTitle}>{title}</Text>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>
@@ -191,7 +191,7 @@ export const FloatingActionButton: React.FC<FABProps> = ({
         activeOpacity={0.8}
       >
         <Ionicons name={icon as any} size={24} color="#FFF" />
-        {label && <Text style={styles.fabLabel}>{label}</Text>}
+        {!!label && <Text style={styles.fabLabel}>{label}</Text>}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -201,7 +201,7 @@ export const FloatingActionButton: React.FC<FABProps> = ({
 export const SectionDivider: React.FC<{ label?: string }> = ({ label }) => (
   <View style={styles.sectionDivider}>
     <View style={styles.dividerLine} />
-    {label && <Text style={styles.dividerLabel}>{label}</Text>}
+    {!!label && <Text style={styles.dividerLabel}>{label}</Text>}
     <View style={styles.dividerLine} />
   </View>
 );

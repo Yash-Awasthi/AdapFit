@@ -193,7 +193,7 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          {minor && (
+          {!!minor && (
             <View style={ns.inputGroup}>
               <Text style={ns.label}>Parent or Guardian's Email</Text>
               <Text style={ns.hint}>Under {adultAge}, a parent or guardian has to agree before the app stores anything for you. We will email them.</Text>
@@ -204,7 +204,7 @@ export default function RegisterScreen() {
             </View>
           )}
 
-          {purposes && (
+          {!!purposes && (
             <View style={ns.inputGroup}>
               <Text style={ns.label}>{minor ? 'What you would like (your guardian decides)' : 'What you allow'}</Text>
               {(Object.keys(purposes) as PurposeId[]).filter((id) => !(minor && id === 'analytics')).map((id) => (

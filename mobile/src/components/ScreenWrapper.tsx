@@ -40,7 +40,7 @@ interface ScreenWrapperProps {
 }
 
 export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
-  children, title, subtitle, gradient, backable = true, rightAction,
+  children, title, subtitle, gradient, backable = false, rightAction,
   refreshing = false, onRefresh, loading = false, loadingType = 'spinner',
   empty = false, emptyIcon = 'document-text', emptyTitle = 'No Data',
   emptyMessage = 'Nothing to show here yet.', emptyAction,
@@ -123,7 +123,7 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
           </View>
           <Text style={styles.emptyTitle}>{emptyTitle}</Text>
           <Text style={styles.emptyMessage}>{emptyMessage}</Text>
-          {emptyAction && (
+          {!!emptyAction && (
             <TouchableOpacity style={styles.emptyAction} onPress={emptyAction.onPress}>
               <Text style={styles.emptyActionText}>{emptyAction.label}</Text>
             </TouchableOpacity>
@@ -143,21 +143,21 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
         )}
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
-            {backable && (
+            {!!backable && (
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" style={styles.backBtn} onPress={handleBack}>
                 <Ionicons name="chevron-back" size={24} color={gradient ? '#FFF' : colors.text.primary} />
               </TouchableOpacity>
             )}
             <Animated.View style={{ flex: 1, transform: [{ scale: titleScale }] }}>
               <Text style={[styles.headerTitle, gradient && { color: '#FFF' }]} numberOfLines={1}>{title}</Text>
-              {subtitle && (
+              {!!subtitle && (
                 <Animated.Text style={[styles.headerSubtitle, gradient && { color: 'rgba(255,255,255,0.7)' }, { opacity: subtitleOpacity }]} numberOfLines={1}>
                   {subtitle}
                 </Animated.Text>
               )}
             </Animated.View>
           </View>
-          {rightAction && (
+          {!!rightAction && (
             <TouchableOpacity accessibilityRole="button" accessibilityLabel={rightAction.icon.replace(/-/g, " ")} onPress={rightAction.onPress} style={[styles.headerAction, gradient && { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
               <Ionicons name={rightAction.icon as any} size={20} color={gradient ? '#FFF' : colors.primary} />
             </TouchableOpacity>

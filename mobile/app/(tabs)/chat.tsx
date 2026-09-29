@@ -201,7 +201,7 @@ export default function ChatScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {llmOverride && (
+      {!!llmOverride && (
         <View style={styles.devBanner}>
           <Wrench size={12} color={theme.warning} />
           <Text style={styles.devBannerText}>Using your {llmOverride.provider} key</Text>

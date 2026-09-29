@@ -71,7 +71,7 @@ export function BarChart({ data, labels, colors: barColors, height = 120, showVa
           const barHeight = (item.value / max) * (height - 24);                const barColor = item.color || '#6366F1';
           return (
             <View key={i} style={{ flex: 1, alignItems: 'center' }}>
-              {showValues && (
+              {!!showValues && (
                 <Text style={[typography.body.xs, { color: colors.text.muted, marginBottom: 4 }]}>{item.value}</Text>
               )}
               <Animated.View style={{
@@ -222,8 +222,8 @@ export function ProgressRing({ progress, size = 80, strokeWidth = 6, color, labe
         opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, progress / 100] }),
       }} />
       <View style={{ position: 'absolute', alignItems: 'center' }}>
-        {value && <Text style={[typography.metric.small, { color: colors.text.primary }]}>{value}</Text>}
-        {label && <Text style={[typography.body.xs, { color: colors.text.muted }]}>{label}</Text>}
+        {!!value && <Text style={[typography.metric.small, { color: colors.text.primary }]}>{value}</Text>}
+        {!!label && <Text style={[typography.body.xs, { color: colors.text.muted }]}>{label}</Text>}
       </View>
     </View>
   );
@@ -252,7 +252,7 @@ export function MetricCardWithChart({ title, value, unit, trend, trendDirection,
   return (
     <View style={styles.metricCardChart}>
       <View style={styles.metricCardHeader}>
-        {icon && (
+        {!!icon && (
           <View style={[styles.metricCardIcon, { backgroundColor: color + '18' }]}>
             <Ionicons name={icon as any} size={16} color={color} />
           </View>
@@ -263,9 +263,9 @@ export function MetricCardWithChart({ title, value, unit, trend, trendDirection,
       <View style={styles.metricCardBody}>
         <View>
           <Text style={[typography.metric.medium, { color: colors.text.primary }]}>{value}</Text>
-          {unit && <Text style={[typography.body.sm, { color: colors.text.muted }]}>{unit}</Text>}
+          {!!unit && <Text style={[typography.body.sm, { color: colors.text.muted }]}>{unit}</Text>}
         </View>
-        {sparkData && <MiniLineChart data={sparkData} color={color} height={40} width={100} />}
+        {!!sparkData && <MiniLineChart data={sparkData} color={color} height={40} width={100} />}
       </View>
     </View>
   );
@@ -303,10 +303,10 @@ export function DonutChart({ segments, size = 120, strokeWidth = 12, centerLabel
         borderRadius: (size - strokeWidth * 2) / 2,
         backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
       }}>
-        {centerLabel && (
+        {!!centerLabel && (
           <>
             <Text style={[typography.metric.small, { color: colors.text.primary }]}>{centerLabel.value}</Text>
-            {centerLabel.sublabel && <Text style={[typography.body.xs, { color: colors.text.muted }]}>{centerLabel.sublabel}</Text>}
+            {!!centerLabel.sublabel && <Text style={[typography.body.xs, { color: colors.text.muted }]}>{centerLabel.sublabel}</Text>}
           </>
         )}
       </View>

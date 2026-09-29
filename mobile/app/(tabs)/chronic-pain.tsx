@@ -274,7 +274,7 @@ export default function ChronicPainScreen() {
                     </Text>
                   </View>
                 ))}
-                {triggerAnalysis.recommendation && (
+                {!!triggerAnalysis.recommendation && (
                   <Text style={styles.recommendation}>{triggerAnalysis.recommendation}</Text>
                 )}
               </>

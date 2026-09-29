@@ -181,7 +181,7 @@ export default function WorkoutDetailScreen() {
         </View>
 
         {/* Rationale */}
-        {workout.adaptation_rationale && (
+        {!!workout.adaptation_rationale && (
           <Text style={s.rationale}>{workout.adaptation_rationale}</Text>
         )}
       </View>
@@ -213,7 +213,7 @@ export default function WorkoutDetailScreen() {
                 <Text style={s.setHeaderText}>Sets</Text>
                 <Text style={s.setHeaderText}>Target</Text>
                 <Text style={s.setHeaderText}>Actual</Text>
-                {comparison && <Text style={s.setHeaderText}>vs Last</Text>}
+                {!!comparison && <Text style={s.setHeaderText}>vs Last</Text>}
               </View>
               {Array.from({ length: ex.sets }).map((_, si) => (
                 <View key={si} style={s.setRow}>
@@ -224,7 +224,7 @@ export default function WorkoutDetailScreen() {
                   <Text style={s.setValue}>
                     {ex.actual_weight || '--'}kg × {ex.actual_reps || '--'}
                   </Text>
-                  {comparison && (
+                  {!!comparison && (
                     <Text
                       style={[
                         s.setValue,
@@ -256,7 +256,7 @@ export default function WorkoutDetailScreen() {
       })}
 
       {/* Previous Comparison */}
-      {previous && (
+      {!!previous && (
         <View style={s.comparisonCard}>
           <Text style={s.comparisonTitle}>vs Previous Workout</Text>
           <Text style={s.comparisonSubtitle}>{previous.title} ({previous.target_date})</Text>

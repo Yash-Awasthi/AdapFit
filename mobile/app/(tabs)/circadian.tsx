@@ -211,7 +211,7 @@ export default function CircadianScreen() {
         })}
       </View>
 
-      {info && (
+      {!!info && (
         <GlassCard variant="light" style={styles.sectionCard}>
           <Text style={styles.infoTitle}>{info.name}</Text>
           <Text style={styles.infoLine}>Wake {info.wake_time} · Wind down {info.wind_down}</Text>
@@ -226,7 +226,7 @@ export default function CircadianScreen() {
         {chartData.length > 0 ? (
           <>
             <InteractiveBarChart data={chartData} height={160} showValues />
-            {peak && (
+            {!!peak && (
               <Text style={styles.energyInsight}>
                 Peak energy around {hourLabel(peak.hour)}. {peak.recommendation}
               </Text>
@@ -307,7 +307,7 @@ export default function CircadianScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.scheduleActivity}>{style.label}</Text>
-                    {block.activities && (
+                    {!!block.activities && (
                       <Text style={styles.scheduleDetail} numberOfLines={2}>
                         {block.activities.join(' · ')}
                       </Text>

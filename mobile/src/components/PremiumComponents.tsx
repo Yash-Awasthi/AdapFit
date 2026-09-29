@@ -102,12 +102,12 @@ export const ScoreRing: React.FC<ScoreRingProps> = ({
     <View style={{ alignItems: 'center' }}>
       <View style={[styles.ringOuter, { width: size, height: size, borderRadius: size / 2, borderWidth: strokeWidth, borderColor: trackColor }]}>
         <View style={[styles.ringInner, { width: size - strokeWidth * 2, height: size - strokeWidth * 2, borderRadius: (size - strokeWidth * 2) / 2, backgroundColor: bgColor }]}>
-          {icon && <Ionicons name={icon as any} size={size * 0.18} color={scoreColor} style={{ marginBottom: 2 }} />}
+          {!!icon && <Ionicons name={icon as any} size={size * 0.18} color={scoreColor} style={{ marginBottom: 2 }} />}
           <Text style={[styles.ringScore, { fontSize: size * 0.3, color: scoreColor }]}>{score === null ? '—' : Math.round(score)}</Text>
-          {label && <Text style={[styles.ringLabel, { fontSize: size * 0.09 }]}>{label}</Text>}
+          {!!label && <Text style={[styles.ringLabel, { fontSize: size * 0.09 }]}>{label}</Text>}
         </View>
       </View>
-      {sublabel && <Text style={[styles.ringSublabel, { color: scoreColor }]}>{sublabel}</Text>}
+      {!!sublabel && <Text style={[styles.ringSublabel, { color: scoreColor }]}>{sublabel}</Text>}
     </View>
   );
 };
@@ -199,10 +199,10 @@ export const HealthMetricMini: React.FC<HealthMetricMiniProps> = ({ icon, value,
       </View>
       <Text style={[styles.metricMiniValue, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value}</Text>
       <Text style={styles.metricMiniLabel} numberOfLines={1}>{label}</Text>
-      {trend && (
+      {!!trend && (
         <View style={styles.metricMiniTrend}>
           <Ionicons name={trendIcon as any} size={10} color={trendColor} />
-          {trendValue && <Text style={[styles.metricMiniTrendText, { color: trendColor }]}>{trendValue}</Text>}
+          {!!trendValue && <Text style={[styles.metricMiniTrendText, { color: trendColor }]}>{trendValue}</Text>}
         </View>
       )}
     </TouchableOpacity>
@@ -227,9 +227,9 @@ export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({ title, subtitle,
         <LinearGradient colors={gradient as any} style={styles.headerGradient}>
           <View style={styles.headerContent}>
             <Text style={[styles.headerTitle, large && styles.headerTitleLarge]}>{title}</Text>
-            {subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
+            {!!subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
           </View>
-          {rightAction && (
+          {!!rightAction && (
             <TouchableOpacity accessibilityRole="button" accessibilityLabel={rightAction.icon.replace(/-/g, " ")} onPress={rightAction.onPress} style={styles.headerAction}>
               <Ionicons name={rightAction.icon as any} size={22} color="#FFF" />
             </TouchableOpacity>
@@ -239,9 +239,9 @@ export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({ title, subtitle,
         <View style={styles.headerContentPlain}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.headerTitlePlain, large && styles.headerTitleLarge]}>{title}</Text>
-            {subtitle && <Text style={styles.headerSubtitlePlain}>{subtitle}</Text>}
+            {!!subtitle && <Text style={styles.headerSubtitlePlain}>{subtitle}</Text>}
           </View>
-          {rightAction && (
+          {!!rightAction && (
             <TouchableOpacity accessibilityRole="button" accessibilityLabel={rightAction.icon.replace(/-/g, " ")} onPress={rightAction.onPress} style={styles.headerActionPlain}>
               <Ionicons name={rightAction.icon as any} size={22} color={colors.primary} />
             </TouchableOpacity>
@@ -269,10 +269,10 @@ export const SectionHeaderPremium: React.FC<SectionHeaderPremiumProps> = ({ icon
       </View>
       <View>
         <Text style={styles.sectionPremiumTitle}>{title}</Text>
-        {subtitle && <Text style={styles.sectionPremiumSubtitle}>{subtitle}</Text>}
+        {!!subtitle && <Text style={styles.sectionPremiumSubtitle}>{subtitle}</Text>}
       </View>
     </View>
-    {action && (
+    {!!action && (
       <TouchableOpacity onPress={action.onPress}>
         <Text style={[styles.sectionPremiumAction, { color: colors.primary }]}>{action.label}</Text>
       </TouchableOpacity>
@@ -294,7 +294,7 @@ export const ProgressBarPremium: React.FC<ProgressBarPremiumProps> = ({ value, m
   const pct = Math.min(100, (value / max) * 100);
   return (
     <View>
-      {showLabel && (
+      {!!showLabel && (
         <View style={styles.progressLabelRow}>
           <Text style={styles.progressLabelText}>{label || `${Math.round(pct)}%`}</Text>
           <Text style={styles.progressLabelValue}>{value} / {max}</Text>
@@ -318,14 +318,14 @@ interface StatCardProps {
 
 export const StatCard: React.FC<StatCardProps> = ({ value, label, icon, color = colors.primary, trend }) => (
   <View style={styles.statCard}>
-    {icon && (
+    {!!icon && (
       <View style={[styles.statCardIcon, { backgroundColor: color + '15' }]}>
         <Ionicons name={icon as any} size={16} color={color} />
       </View>
     )}
     <Text style={[styles.statCardValue, { color }]}>{value}</Text>
     <Text style={styles.statCardLabel}>{label}</Text>
-    {trend && (
+    {!!trend && (
       <Ionicons
         name={trend === 'up' ? 'arrow-up' : trend === 'down' ? 'arrow-down' : 'remove' as any}
         size={12}

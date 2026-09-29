@@ -58,8 +58,8 @@ const QuickLogItem: React.FC<QuickLogItemProps> = ({ icon, label, color, value, 
           <Ionicons name={icon as any} size={22} color={color} />
         </View>
         <Text style={styles.quickLogLabel}>{label}</Text>
-        {value && <Text style={[styles.quickLogValue, { color }]}>{value}</Text>}
-        {logged && (
+        {!!value && <Text style={[styles.quickLogValue, { color }]}>{value}</Text>}
+        {!!logged && (
           <View style={styles.quickLogCheck}>
             <Ionicons name="checkmark-circle" size={16} color={colors.health.calm} />
           </View>
@@ -156,7 +156,7 @@ export const QuickMeasurementButton: React.FC<QuickMeasurementProps> = ({ type, 
     <TouchableOpacity style={[styles.measurementBtn, active && { backgroundColor: config.color + '20', borderColor: config.color + '50' }]} onPress={onPress}>
       <Ionicons name={config.icon as any} size={20} color={config.color} />
       <Text style={[styles.measurementLabel, active && { color: config.color }]}>{config.label}</Text>
-      {active && <View style={[styles.measurementActiveDot, { backgroundColor: config.color }]} />}
+      {!!active && <View style={[styles.measurementActiveDot, { backgroundColor: config.color }]} />}
     </TouchableOpacity>
   );
 };

@@ -121,7 +121,7 @@ export function NotificationSetup() {
                 <View style={styles.notifInfo}>
                   <Text style={[styles.notifTitle, { color: theme.text }]}>{n.title}</Text>
                   <Text style={[styles.notifBody, { color: theme.textSecondary }]}>{n.body}</Text>
-                  {n.recurring && <Text style={[styles.notifRecurring, { color: theme.primaryLight }]}>Recurring</Text>}
+                  {!!n.recurring && <Text style={[styles.notifRecurring, { color: theme.primaryLight }]}>Recurring</Text>}
                 </View>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete reminder" onPress={() => deleteNotification(n.id)}>
                   <BellOff size={16} color={theme.danger} />
@@ -132,7 +132,7 @@ export function NotificationSetup() {
         </>
       )}
 
-      {prefs && (
+      {!!prefs && (
         <>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Preferences</Text>
           {[

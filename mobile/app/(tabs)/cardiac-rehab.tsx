@@ -172,7 +172,7 @@ export default function CardiacRehabScreen() {
               ? `${phase?.duration_weeks} weeks · ${daysLogged} day${daysLogged === 1 ? '' : 's'} logged`
               : 'Set up to begin'}
           </Text>
-          {configured && (
+          {!!configured && (
             <>
               <View style={styles.scoreRow}>
                 <ScoreRing score={Math.min(100, Math.round((weeklyMinutes / 150) * 100))} size={100} color="#22C55E" />
@@ -258,7 +258,7 @@ export default function CardiacRehabScreen() {
               </GlassCard>
             </View>
 
-            {phase && (
+            {!!phase && (
               <View style={styles.section}>
                 <SectionHeaderPremium title="This Phase" icon="fitness" iconColor={colors.health.activity} />
                 <GlassCard>
@@ -312,7 +312,7 @@ export default function CardiacRehabScreen() {
                         <Text style={styles.statLabel}>meds taken</Text>
                       </View>
                     </View>
-                    {progress.encouragement && (
+                    {!!progress.encouragement && (
                       <Text style={styles.helperText}>{progress.encouragement}</Text>
                     )}
                   </>
@@ -340,7 +340,7 @@ export default function CardiacRehabScreen() {
                     backgroundColor: taken ? colors.health.success : 'transparent',
                     borderColor: taken ? colors.health.success : colors.surface.border,
                   }]}>
-                    {taken && <Ionicons name="checkmark" size={10} color="#fff" />}
+                    {!!taken && <Ionicons name="checkmark" size={10} color="#fff" />}
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[typography.body.md, { color: colors.text.primary }]}>{med.medication}</Text>

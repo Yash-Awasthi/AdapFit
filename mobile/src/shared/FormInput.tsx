@@ -52,7 +52,7 @@ export function FormInput({
       <Text style={styles.inputLabel}>{label}</Text>
 
       <View style={[styles.inputContainer, focused && styles.inputContainerFocused, error && styles.inputContainerError]}>
-        {icon && (
+        {!!icon && (
           <MaterialCommunityIcons
             name={icon}
             size={19}
@@ -78,7 +78,7 @@ export function FormInput({
           accessibilityLabel={label}
         />
 
-        {rightIcon && (
+        {!!rightIcon && (
           <TouchableOpacity
             onPress={onRightIconPress}
             style={styles.rightIconBtn}
@@ -90,7 +90,7 @@ export function FormInput({
         )}
       </View>
 
-      {error && <Text style={styles.fieldError}>{error}</Text>}
+      {!!error && <Text style={styles.fieldError}>{error}</Text>}
     </View>
   );
 }

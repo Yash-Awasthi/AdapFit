@@ -25,7 +25,7 @@ export default function HealthCalendarScreen() {
   return (
     <ScrollView style={ns.container}>
       <View style={ns.header}>
-        <Text style={typography.heading.h1 as any}>Health Calendar</Text>
+        <Text style={[typography.heading.h1 as any, { paddingLeft: 40 }]}>Health Calendar</Text>
         <Text style={typography.body.sm as any}>Track cycles, appointments & medications</Text>
       </View>
 
@@ -103,7 +103,7 @@ export default function HealthCalendarScreen() {
                 <Text style={[typography.label.sm as any]}>{a.title}</Text>
                 <Text style={typography.body.xs as any}>{a.date} at {a.time}</Text>
               </View>
-              {a.doctor && <Text style={[typography.body.xs as any, { color: colors.text.muted }]}>{a.doctor}</Text>}
+              {!!a.doctor && <Text style={[typography.body.xs as any, { color: colors.text.muted }]}>{a.doctor}</Text>}
             </View>
           ))}
           <TouchableOpacity style={[presets.buttonSecondary, { marginTop: spacing.md }]}>

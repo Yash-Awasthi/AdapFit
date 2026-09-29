@@ -202,6 +202,12 @@ def test_profile_creation_needs_an_account_and_uses_its_id():
     assert r.status_code == 201 and r.json()["id"] == reg["user"]["id"] and r.json()["email"] == "profile@example.com"
 
 
+def test_profile_name_defaults_to_the_display_name_given_at_sign_up():
+    reg = register_user("named@example.com", "nameduser", display_name="Asha Rao")
+    r = c.post("/api/v1/users", headers=_bearer(reg["tokens"]["access_token"]), json={})
+    assert r.status_code == 201 and r.json()["name"] == "Asha Rao"
+
+
 def test_compliance_reports_measured_controls_not_blanket_claims():
     reg = register_user("compliance@example.com", "complianceuser")
     r = c.get("/api/v1/security/compliance/dpdp", headers=_bearer(reg["tokens"]["access_token"])).json()

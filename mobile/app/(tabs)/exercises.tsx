@@ -187,7 +187,7 @@ export default function ExercisesScreen() {
       )}
 
       {/* Exercise Detail & 1RM Modal */}
-      {selectedExercise && (
+      {!!selectedExercise && (
         <Modal visible={!!selectedExercise} transparent animationType="slide">
           <View style={s.modalOverlay}>
             <View style={s.modalCard}>
@@ -201,7 +201,7 @@ export default function ExercisesScreen() {
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false}>
-                {selectedExercise.gif_url && (
+                {!!selectedExercise.gif_url && (
                   <Image
                     source={{ uri: selectedExercise.gif_url }}
                     style={s.modalImage}
@@ -284,7 +284,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, padding: 20 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 48, marginBottom: 12 },
-    title: { fontSize: 28, fontWeight: '700', color: theme.text },
+    title: { fontSize: 28, fontWeight: '700', color: theme.text, paddingLeft: 40 },
     count: { fontSize: 14, color: theme.textMuted },
     filterRow: { marginBottom: 8, maxHeight: 40 },
     filterChip: {
