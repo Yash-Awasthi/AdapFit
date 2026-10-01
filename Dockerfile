@@ -2,7 +2,9 @@
 FROM python:3.12-slim
 
 # opencv and mediapipe need these shared libraries at import time on a slim image.
-RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+# upgrade first so the base image's OS packages carry the latest security fixes.
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
