@@ -62,18 +62,24 @@ class RecipeGeneratorService:
             recipes = list(self._recipes.values())
 
         plan = []
-        daily_cal = target_calories // 3
+        meal_cal = target_calories / 3
+
+        def portion(r: dict) -> dict:
+            # Recipes are 300-600 kcal; half-serving steps bring each meal near a third of the target.
+            servings = min(3.0, max(0.5, round(meal_cal / r["calories"] * 2) / 2))
+            return {"name": r["name"], "servings": servings,
+                    "calories": round(r["calories"] * servings), "protein": round(r["protein"] * servings)}
+
         for day in range(days):
             day_name = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][day % 7]
             breakfast = random.choice([r for r in recipes if "breakfast" in r.get("tags", []) or r["calories"] < 400] or recipes)
             lunch = random.choice([r for r in recipes if r["id"] != breakfast["id"] and 300 <= r["calories"] <= 500] or recipes)
             dinner = random.choice([r for r in recipes if r["id"] not in [breakfast["id"], lunch["id"]] and r["calories"] >= 350] or recipes)
+            meals = {"breakfast": portion(breakfast), "lunch": portion(lunch), "dinner": portion(dinner)}
             plan.append({
-                "day": day_name, "breakfast": {"name": breakfast["name"], "calories": breakfast["calories"], "protein": breakfast["protein"]},
-                "lunch": {"name": lunch["name"], "calories": lunch["calories"], "protein": lunch["protein"]},
-                "dinner": {"name": dinner["name"], "calories": dinner["calories"], "protein": dinner["protein"]},
-                "total_calories": breakfast["calories"] + lunch["calories"] + dinner["calories"],
-                "total_protein": breakfast["protein"] + lunch["protein"] + dinner["protein"],
+                "day": day_name, **meals,
+                "total_calories": sum(m["calories"] for m in meals.values()),
+                "total_protein": sum(m["protein"] for m in meals.values()),
             })
 
         total_cal = sum(d["total_calories"] for d in plan)

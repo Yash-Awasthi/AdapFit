@@ -1,89 +1,93 @@
-# AdapFit — road to a commercial release
+# AdapFit — open work
 
-Each phase is one working session. Every phase starts with an investigation
-step: measure the current state, write down what was found, then decide the
-concrete work. The bullets below are starting questions, not a fixed task list.
-`plan.md` holds the defect history; this file holds what is left to ship.
-`docs/PRODUCT_SCOPE.md` holds the positioning every phase works inside: consumer
-wellness, India first, every feature kept, nothing diagnoses.
+The one working list: what is left, nothing that is finished. Product limits
+live in `docs/PRODUCT_SCOPE.md` (consumer wellness, India first, nothing
+diagnoses); how each feature was checked lives in `docs/FEATURE_STATUS.md`.
 
----
+## What the product optimises for
 
-## Phase 6 — Monetisation (rest)
+1. Little or no manual logging.
+2. Turn data into a decision: what to do today, and why.
+3. Adapt daily rather than prescribe a static plan.
+4. Reliable, explainable recommendations: rules pick the decision, a model may
+   only phrase it.
+5. Trust: privacy, no dark subscriptions, the user owns their data.
 
-Decided 2026-09-29: every feature free at launch. Done in plan.md Part 20:
-the per-account daily AI quota. Left for when paid tiers are wanted (owner's
-decisions): tiers, INR prices, trial length, what stays free; a Play Console
-and payments profile; then server-side entitlements, Google Play Billing,
-restore purchases, refunds and receipts.
+The proprietary core is the recovery model, training-load model, personal
+baseline, safety rules and recommendation policy; everything around it should
+be borrowed infrastructure.
 
-## Phase 7 — AI and data quality (rest)
+## On a phone
 
-Done in plan.md Part 18. Left:
+- Walk the core loop: sign-up, onboarding, check-in (pain toggle, sore areas),
+  Home decision, generate workout, sets and rest timer, finish, completion.
+- Run `mobile/e2e/core-journey.yaml` (Maestro); fix selectors it cannot find and
+  add flows for check-in edge cases and sign-out.
+- Camera heart rate with a real fingertip, the form checker with a person
+  exercising, a BLE heart-rate strap; decide which wearables to keep for launch.
+- Voice log, GPS distance, and the two-account features (Family, Community,
+  Forums) with real use.
+- A Health Connect record deleted on the phone disappearing from the server
+  (needs a record the owner can delete, from an app that writes to Health
+  Connect).
+- Skin spot photo measurement (`lesion_measure.py`) on real phone photos of
+  moles with a coin for scale.
 
-- Photo measurement of skin spots (`lesion_measure.py`) is tested on synthetic
-  images only; calibrate on real phone photos of moles with a coin (needs the
-  owner's photos).
-- `screen_reply` and the red-flag check now cover English, Hindi and Hinglish
-  (plan.md Part 26); other languages have none, so do not offer them.
-- Verify on a device: a Health Connect record deleted on the phone leaving the
-  server after a sync (the server side works; the owner could not delete the
-  phone's one steps record). Needs a record the owner can delete, from an app
-  that writes to Health Connect.
+## App
 
-## Phase 8 — Infrastructure and operations (rest)
-
-Done in plan.md Part 17. Left:
-
-- Staging is live (plan.md Part 26). AI on Render itself needs a key from a
-  provider that accepts datacenter IPs (Groq or OpenRouter, free); until then
-  the phone calls TokenHarbor directly. Rotate the tokens pasted in chat.
-- Uptime monitor on `/health` (free UptimeRobot): needs the owner's account.
-- Remote push (FCM): needs a Firebase project, and a server event worth
-  pushing; every notification today is a local reminder.
-- iOS project, build profile, HealthKit entitlement and sync (deferred).
-- Expo past SDK 55 does not clear the remaining advisory (`docs/SECURITY.md`);
-  take SDK 56 or 57 only for features, on a branch, with a full device walk.
-
-## Phase 9 — User experience and quality (rest)
-
-Done in plan.md Part 19. Left:
-
-- Stroke rehab, chronic disease management, hospital at home and wound
-  assessment are API-only; design each with a clinician before giving it a screen.
-- Coach marketplace: rebuild only with verified, real practitioners.
-- API-only features still without a screen: peer support, vaccination records
-  (health passport), accessible workout alternatives, the accessibility API.
-- With the owner, on their phone: camera heart rate, pose and sensors, and a
-  BLE heart-rate strap; decide which wearables to keep for launch. Also a
-  Health Connect record deleted on the phone disappearing after a sync.
-- Sleep sounds stop listening if the screen turns off (JS timers pause); the
-  screen stays on under a black overlay. Native metering would lift that.
-- Localisation: no screen calls `t()`; the app is English only. Hindi first
-  (India launch): extract the core journey's strings, translate, add a picker.
-- Performance and app size.
+- Localisation: no screen calls `t()`; the app is English only. Hindi first:
+  extract the core journey's strings, translate, add a picker.
+- Safety screening covers English, Hindi and Hinglish only; do not offer other
+  languages until it covers them.
 - Layout: page content scrolls over the status bar; Record a route has a large
   empty area above Start; Filter by Muscle sits tight against Quick actions.
-- Run `e2e/core-journey.yaml` (Maestro) on the phone and fix the selectors it
-  cannot find; add flows for check-in edge cases and sign-out.
+- Sleep sounds stop listening when the screen turns off (JS timers pause);
+  native metering would lift the black-overlay workaround.
+- Screens for API-only features: peer support, vaccination records (health
+  passport), accessible workout alternatives, the accessibility API.
+- Stroke rehab, chronic disease management, hospital at home and wound
+  assessment are API-only; design each with a clinician before giving it a
+  screen. A coach marketplace only with verified, real practitioners.
+- Performance and app size.
+- Unused-import lint backlog (about 280 entries); CI checks only syntax and
+  undefined names.
 
-## Phase 10 — Launch readiness (rest)
+## Infrastructure
 
-Done in plan.md Part 21: prohibited-FDC check in the medicine lookup, store
-listing and Health Connect declaration drafts, legal placeholders flagged.
-Left:
-
-- Owner: who reviews community reports (they land in the security audit log
-  as `community_report`); choose the Play target audience (sign-up already
-  refuses under-13s).
-- Owner: company and legal entity, insurance, payment accounts; legal review
-  of third-party data (Indian Medicine Dataset, NMC register search) and of
-  `backend/app/legal/` with the `[...]` placeholders filled; appoint the
-  Grievance Officer; SMTP; DigiLocker age verification for guardian consent;
-  third-party penetration test; closed beta and feedback loop; support
-  channel, incident response and breach notification procedure; store
-  graphics, screenshots and the answers marked `[...]` in
-  `docs/STORE_LISTING.md` and `docs/HEALTH_CONNECT_DECLARATION.md`.
+- Server-side AI on Render needs a key from a provider that accepts datacenter
+  IPs (Groq or OpenRouter); until then the phone calls the model directly.
+  Move the AI key out of the app bundle once that works.
+- Rotate every token that was shared in chat.
+- Uptime monitor on `/health` (needs the owner's account).
+- Remote push (FCM): needs a Firebase project and a server event worth pushing.
+- iOS project, build profile, HealthKit entitlement and sync.
+- Rotated-token memory and the "sessions ended at" cut-off live in process
+  memory; persist them before running more than one worker.
+- Expo upgrade only for features, on a branch, with a full device walk; SDK 56
+  does not clear the remaining advisories (`docs/SECURITY.md`). Drop the
+  accepted ids in `mobile/scripts/audit-gate.mjs` when fixes ship.
 - Re-run `python -m scripts.build_cdsco_fdc` when a new 26A notification is
-  published; the 2024 list comes from Goa FDA's copy until CDSCO publishes a
-  consolidated one.
+  published.
+
+## Owner decisions before launch
+
+- Paid tiers when wanted: tiers, INR prices, trial length, what stays free; a
+  Play Console payments profile; then server-side entitlements, Play Billing,
+  restore purchases, refunds and receipts. Every feature is free until then.
+- Who reviews community reports (they land in the audit log as
+  `community_report`); the Play target audience.
+- Company and legal entity, insurance, payment accounts; legal review of
+  third-party data (Indian Medicine Dataset, NMC register search) and of
+  `backend/app/legal/` with its `[...]` placeholders filled; Grievance Officer;
+  SMTP; DigiLocker age verification for guardian consent.
+- Third-party penetration test, closed beta and feedback loop, support channel,
+  incident response and breach notification procedure.
+- Store graphics, screenshots and the `[...]` answers in
+  `docs/STORE_LISTING.md` and `docs/HEALTH_CONNECT_DECLARATION.md`.
+
+## Not doing
+
+- FHIR R4 wholesale: a storage rewrite, to be scoped on its own if needed.
+- Ownership checks in `AuthMiddleware`: it cannot know which resource a route
+  addresses and cannot see WebSocket traffic; the check belongs at the route
+  layer (`IdentityMiddleware` binds `user_id`).

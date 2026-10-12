@@ -1,6 +1,6 @@
 # AdapFit roadmap
 
-AdapFit is a consumer wellness app for India: it tracks, explains and suggests safe next steps, and never diagnoses. This file is the plain summary; `todo.md` holds the working list, `plan.md` the history and `docs/FEATURE_STATUS.md` how each feature was checked.
+AdapFit is a consumer wellness app for India: it tracks, explains and suggests safe next steps, and never diagnoses. This file is the plain summary; `todo.md` holds the open work and `docs/FEATURE_STATUS.md` how each feature was checked.
 
 Status: **MVP.** It runs end to end on a real phone against a free staging server. It is not production-ready.
 

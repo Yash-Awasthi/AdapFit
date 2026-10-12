@@ -131,13 +131,6 @@ def parse_activity(raw: dict) -> Optional[StravaActivity]:
         strava_type = raw.get("type", raw.get("sport_type", "Workout"))
         zfit_type = STRAVA_TYPE_MAP.get(strava_type, strava_type.lower())
 
-        tss = calculate_tss(
-            duration_minutes=raw.get("moving_time", 0) / 60,
-            avg_hr=raw.get("average_heartrate"),
-            max_hr=raw.get("max_heartrate"),
-            avg_power=raw.get("average_watts"),
-        )
-
         raw_id = raw.get("id")
         if not raw_id and not raw.get("type"):
             return None

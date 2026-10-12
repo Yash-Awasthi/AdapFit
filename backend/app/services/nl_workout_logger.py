@@ -83,6 +83,14 @@ class NLWorkoutLogger:
         r'(?:\s+in\s+(\d+)\s*(?:min(?:utes?)?|mins?))?',
         re.IGNORECASE
     )
+    # Pattern: [exercise] [weight] [for] [reps] reps  ("bench press 80kg for 12 reps") -> single set
+    EXERCISE_WEIGHT_REPS = re.compile(
+        r'((?!at\b|with\b|for\b|rpe\b)[a-zA-Z]+(?:\s+(?!at\b|with\b|for\b|rpe\b|\d)[a-zA-Z]+)*)'
+        r'\s+(?:at\s+)?(\d+(?:\.\d+)?)\s*(kg|lbs?|pounds?|kilos?)\s+(?:for\s+|x\s*)?(\d+)\s*reps?\b',
+        re.IGNORECASE
+    )
+    # Words that join clauses and are never part of an exercise name.
+    CONNECTORS = {"then", "and", "did", "also", "i", "plus", "after", "next"}
     RPE_EMBED = re.compile(r'(?:rpe|rpe\s*[:=]?)\s*(\d+(?:\.\d+)?)', re.IGNORECASE)
 
     def parse(self, text: str, timestamp: Optional[str] = None) -> Dict[str, Any]:
@@ -155,6 +163,18 @@ class NLWorkoutLogger:
                     weight_str=m.group(4), text=text
                 ))
 
+        # Pattern 3a: bench press 80kg for 12 reps (single set)
+        for m in self.EXERCISE_WEIGHT_REPS.finditer(text):
+            name = m.group(1).strip()
+            eid = self._resolve_exercise_id(name)
+            if eid and eid not in seen:
+                seen.add(eid)
+                kg = float(m.group(2)) * (0.453592 if m.group(3).lower().startswith(("lb", "pound")) else 1)
+                exercises.append(self._build_entry(
+                    name=name, exercise_id=eid, sets=1, reps=int(m.group(4)),
+                    weight_str=str(round(kg, 1)), text=text
+                ))
+
         # Pattern 3b: 12 reps of bench press at 80kg (single set)
         for m in self.REPS_FIRST.finditer(text):
             name = m.group(2).strip()
@@ -182,18 +202,21 @@ class NLWorkoutLogger:
         # If no structured patterns matched, try entity extraction
         if not exercises:
             ent_exercises = entity_extractor.extract_exercises(text)
-            weights = entities.get("weights", []) if (entities := entity_extractor.extract_all(text)) else []
+            entities = entity_extractor.extract_all(text)
+            weights = entities.get("weights", [])
             reps_list = entities.get("reps", [])
             sets_list = entities.get("sets", [])
 
             for i, ex in enumerate(ent_exercises[:6]):
                 if ex["exercise_id"] not in seen:
                     seen.add(ex["exercise_id"])
+                    # Reps said without sets is one set; neither said keeps the usual 3x10 guess.
+                    sets = sets_list[i] if i < len(sets_list) else (1 if i < len(reps_list) else 3)
                     exercises.append(self._build_entry(
                         name=ex["alias"], exercise_id=ex["exercise_id"],
-                        sets=sets_list[i] if i < len(sets_list) else (reps_list[i] if i < len(reps_list) else 3),
+                        sets=sets,
                         reps=reps_list[i] if i < len(reps_list) else 10,
-                        weight_str=None, text=text
+                        weight_str=str(weights[i]["value"]) if i < len(weights) else None, text=text
                     ))
 
         return exercises
@@ -203,6 +226,10 @@ class NLWorkoutLogger:
         weight_str: Optional[str], text: str
     ) -> Dict[str, Any]:
         """Build a single exercise log entry."""
+        words = name.split()
+        while len(words) > 1 and words[0].lower() in self.CONNECTORS:
+            words = words[1:]
+        name = " ".join(words)
         weight_kg = 0.0
         if weight_str:
             try:
