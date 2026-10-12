@@ -3,7 +3,7 @@
  * Switches playlists based on workout phase (warmup/main/cooldown).
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -72,37 +72,10 @@ export function SmartMusicPlayer({
   }, [currentSet, totalSets]);
 
   // BPM pulse animation
-  useEffect(() => {
-    if (isPlaying) {
-      const bpm = getCurrentTrack()?.bpm || 120;
-      const pulseInterval = 60000 / bpm; // ms per beat
-      const pulse = Animated.loop(
-        Animated.sequence([
-          Animated.timing(bpmPulse, {
-            toValue: 1.08,
-            duration: pulseInterval / 2,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(bpmPulse, {
-            toValue: 1,
-            duration: pulseInterval / 2,
-            easing: Easing.in(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      pulse.start();
-      return () => pulse.stop();
-    }
-  }, [isPlaying, trackIndex, currentPhase]);
 
   // Fetch playlist on mount
-  useEffect(() => {
-    fetchPlaylist();
-  }, []);
 
-  async function fetchPlaylist() {
+  const fetchPlaylist = useCallback(async () => {
     try {
       const res = await authedFetch(`${API_BASE_URL}/api/v1/music-playlists/generate`, {
         method: 'POST',
@@ -148,17 +121,44 @@ export function SmartMusicPlayer({
       ]);
     }
     setLoading(false);
-  }
+  }, [durationMinutes, workoutType]);
+  useEffect(() => {
+    fetchPlaylist();
+  }, [fetchPlaylist]);
 
-  function getCurrentPlaylist() {
+  const getCurrentPlaylist = useCallback(() => {
     return playlists.find((p) => p.phase === currentPhase) || playlists[0];
-  }
+  }, [playlists, currentPhase]);
 
-  function getCurrentTrack() {
+  const getCurrentTrack = useCallback(() => {
     const playlist = getCurrentPlaylist();
     if (!playlist || !playlist.tracks[trackIndex]) return null;
     return playlist.tracks[trackIndex];
-  }
+  }, [trackIndex, getCurrentPlaylist]);
+  useEffect(() => {
+    if (isPlaying) {
+      const bpm = getCurrentTrack()?.bpm || 120;
+      const pulseInterval = 60000 / bpm; // ms per beat
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(bpmPulse, {
+            toValue: 1.08,
+            duration: pulseInterval / 2,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(bpmPulse, {
+            toValue: 1,
+            duration: pulseInterval / 2,
+            easing: Easing.in(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [isPlaying, bpmPulse, getCurrentTrack]);
 
   function nextTrack() {
     Haptics.selectionAsync();
@@ -285,7 +285,7 @@ export function SmartMusicPlayer({
       <View style={[styles.trackList, { borderTopColor: theme.border }]}>
         {getCurrentPlaylist()?.tracks.map((t, i) => (
           <TouchableOpacity
-            key={i}
+            key={`${t.title}-${t.artist}`}
             style={[styles.trackItem, i === trackIndex && { backgroundColor: theme.background }]}
             onPress={() => {
               Haptics.selectionAsync();

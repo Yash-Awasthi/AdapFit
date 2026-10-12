@@ -58,7 +58,7 @@ def _template_to_regex(template: str) -> re.Pattern:
     return re.compile("^" + "".join(out) + "$")
 
 
-def _caller(scope: Scope) -> Optional[tuple[str, str]]:
+async def _caller(scope: Scope) -> Optional[tuple[str, str]]:
     """(user_id, role) for the request, or None when it is unauthenticated."""
     token = None
     for key, value in scope.get("headers", []):
@@ -67,7 +67,7 @@ def _caller(scope: Scope) -> Optional[tuple[str, str]]:
             if raw.startswith("Bearer "):
                 token = raw[7:]
             break
-    payload = decode_access_token(token) if token else None
+    payload = await decode_access_token(token) if token else None
     if payload:
         return str(payload["sub"]), str(payload.get("role") or "user")
     # Without a token there is no identity to bind to. AuthMiddleware has
@@ -104,12 +104,15 @@ class IdentityMiddleware:
             await self.app(scope, receive, send)
             return
 
-        caller = _caller(scope)
+        caller = await _caller(scope)
         # Services that keep per-user state read this rather than a parameter,
         # so it is set for every request, including the ones that pass through
         # untouched below. Each request runs in its own task context, so the
         # value cannot leak into another request.
         CURRENT_USER.set(caller[0] if caller else None)
+        if caller:
+            from app.core import durable
+            await durable.prefetch_user(caller[0])
 
         path = scope.get("path", "")
         if caller and caller[1] in ("admin", "superadmin") and path.startswith(API_PREFIX):

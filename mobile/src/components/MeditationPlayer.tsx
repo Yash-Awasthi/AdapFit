@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useEffectEvent } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Easing,
 } from "react-native";
@@ -40,6 +40,8 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
   const totalSteps = session.steps.length;
   const progress = totalSteps > 0 ? ((currentStepIdx + 1) / totalSteps) * 100 : 0;
 
+  const complete = useEffectEvent(() => onComplete());
+
   // Timer
   useEffect(() => {
     if (!isPlaying) return;
@@ -52,7 +54,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
             return session.steps[currentStepIdx + 1]?.duration_seconds || 0;
           } else {
             setIsPlaying(false);
-            onComplete();
+            complete();
             return 0;
           }
         }
@@ -61,7 +63,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
       setTotalElapsed((e) => e + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPlaying, currentStepIdx]);
+  }, [isPlaying, currentStepIdx, totalSteps, session.steps]);
 
   // Breathing animation
   useEffect(() => {
@@ -74,7 +76,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
     );
     loop.start();
     return () => loop.stop();
-  }, [isPlaying]);
+  }, [isPlaying, breathAnim]);
 
   // Pulse animation for current step
   useEffect(() => {
@@ -84,7 +86,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
         Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+  }, [pulseAnim]);
 
   const skipStep = () => {
     if (currentStepIdx < totalSteps - 1) {
@@ -170,7 +172,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
       {/* Benefits */}
       <View style={styles.benefitsRow}>
         {session.benefits.slice(0, 3).map((b, i) => (
-          <Text key={i} style={[styles.benefitTag, { backgroundColor: theme.surface, color: theme.textSecondary }]}>{b}</Text>
+          <Text key={b} style={[styles.benefitTag, { backgroundColor: theme.surface, color: theme.textSecondary }]}>{b}</Text>
         ))}
       </View>
     </View>

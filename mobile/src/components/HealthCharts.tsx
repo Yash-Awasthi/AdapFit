@@ -15,7 +15,7 @@ export function MiniLineChart({ data, color, height = 60, width = 200 }: {
   data: number[]; color: string; height?: number; width?: number;
 }) {
   const anim = useRef(new Animated.Value(0)).current;
-  useEffect(() => { Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: false }).start(); }, []);
+  useEffect(() => { Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: false }).start(); }, [anim]);
 
   if (!data.length) return null;
   const min = Math.min(...data);
@@ -34,6 +34,7 @@ export function MiniLineChart({ data, color, height = 60, width = 200 }: {
           const barHeight = ((val - min) / range) * (height - 8) + 4;
           return (
             <Animated.View
+              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
               key={i}
               style={{
                 flex: 1,
@@ -59,7 +60,7 @@ export function BarChart({ data, labels, colors: barColors, height = 120, showVa
   showValues?: boolean;
 }) {
   const anim = useRef(new Animated.Value(0)).current;
-  useEffect(() => { Animated.timing(anim, { toValue: 1, duration: 600, useNativeDriver: false }).start(); }, []);
+  useEffect(() => { Animated.timing(anim, { toValue: 1, duration: 600, useNativeDriver: false }).start(); }, [anim]);
 
   if (!data.length) return null;
   const max = Math.max(...data.map(d => d.value));
@@ -70,7 +71,7 @@ export function BarChart({ data, labels, colors: barColors, height = 120, showVa
         {data.map((item, i) => {
           const barHeight = (item.value / max) * (height - 24);                const barColor = item.color || '#6366F1';
           return (
-            <View key={i} style={{ flex: 1, alignItems: 'center' }}>
+            <View key={item.label} style={{ flex: 1, alignItems: 'center' }}>
               {!!showValues && (
                 <Text style={[typography.body.xs, { color: colors.text.muted, marginBottom: 4 }]}>{item.value}</Text>
               )}
@@ -101,6 +102,7 @@ export function RadarChart({ data, size = 200 }: {
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       {/* Concentric circles */}
       {Array.from({ length: levels }).map((_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
         <View key={i} style={{
           position: 'absolute',
           width: (radius * 2 * (i + 1)) / levels,
@@ -116,7 +118,7 @@ export function RadarChart({ data, size = 200 }: {
         const x = center + (radius + 16) * Math.cos(angle);
         const y = center + (radius + 16) * Math.sin(angle);
         return (
-          <Text key={i} style={[typography.body.xs, {
+          <Text key={item.label} style={[typography.body.xs, {
             position: 'absolute',
             left: x - 20,
             top: y - 8,
@@ -133,7 +135,7 @@ export function RadarChart({ data, size = 200 }: {
         const x = center + r * Math.cos(angle);
         const y = center + r * Math.sin(angle);
         return (
-          <View key={i} style={{
+          <View key={item.label} style={{
             position: 'absolute',
             left: x - 4,
             top: y - 4,
@@ -161,13 +163,16 @@ export function WeeklyHeatmap({ data, labels }: {
       <View style={{ flexDirection: 'row', marginBottom: 4 }}>
         <View style={{ width: 30 }} />
         {dayLabels.map((d, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
           <Text key={i} style={[typography.body.xs, { flex: 1, textAlign: 'center', color: colors.text.muted }]}>{d}</Text>
         ))}
       </View>
       {data.map((week, wi) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
         <View key={wi} style={{ flexDirection: 'row', marginBottom: 2 }}>
           <Text style={[typography.body.xs, { width: 30, color: colors.text.muted, textAlign: 'right', marginRight: 4 }]}>{labels?.[wi] || `W${wi + 1}`}</Text>
           {week.map((val, di) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
             <View key={di} style={{
               flex: 1, height: 20, margin: 1, borderRadius: 4,
               backgroundColor: intensityColors[Math.min(val, 4)],
@@ -194,6 +199,7 @@ export function Sparkline({ data, color, width = 80, height = 24 }: {
         {data.map((val, i) => {
           const h = ((val - min) / range) * (height - 4) + 2;
           return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
             <View key={i} style={{ flex: 1, height: h, backgroundColor: color + (i === data.length - 1 ? '' : '60'), borderRadius: 1 }} />
           );
         })}
@@ -207,7 +213,7 @@ export function ProgressRing({ progress, size = 80, strokeWidth = 6, color, labe
   progress: number; size?: number; strokeWidth?: number; color: string; label?: string; value?: string;
 }) {
   const anim = useRef(new Animated.Value(0)).current;
-  useEffect(() => { Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: false }).start(); }, []);
+  useEffect(() => { Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: false }).start(); }, [anim]);
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
@@ -288,6 +294,7 @@ export function DonutChart({ segments, size = 120, strokeWidth = 12, centerLabel
         const segmentAngle = (seg.value / total) * 360;
         // Simplified: use opacity layers
         return (
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
           <View key={i} style={{
             position: 'absolute',
             width: size, height: size, borderRadius: size / 2,

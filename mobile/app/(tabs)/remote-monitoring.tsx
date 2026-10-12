@@ -181,7 +181,7 @@ export default function RemoteMonitoringScreen() {
               <View style={styles.section}>
                 <SectionHeaderPremium title="Recent Alerts" icon="warning" iconColor={colors.health.warning} />
                 {dashboard.recent_alerts.map((a, i) => (
-                  <Text key={i} style={[typography.body.sm, { color: colors.health.warning, marginBottom: 6 }]}>{a.message}</Text>
+                  <Text key={a.message} style={[typography.body.sm, { color: colors.health.warning, marginBottom: 6 }]}>{a.message}</Text>
                 ))}
               </View>
             )}

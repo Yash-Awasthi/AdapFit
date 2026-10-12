@@ -90,7 +90,6 @@ export default function AnalyticsScreen() {
   const [range, setRange] = useState(RANGES[0]);
   const { data, loading, refreshing, refresh } = useApi<{ items: RecoveryLog[]; count: number }>(
     `/recovery-logs?days=${range.days}`,
-    [range.days]
   );
 
   const logs = asArray<RecoveryLog>(data?.items);

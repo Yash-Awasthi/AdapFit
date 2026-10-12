@@ -1,8 +1,10 @@
-"""Rewrite feature_state rows stored as pickle into the JSON form app.core.durable reads.
+"""Bring feature_state rows to the form app.core.durable reads.
 
-Run once per database (or local SQLite store) before starting the new server:
+Two older forms are rewritten: rows stored as pickle become JSON, and a shared
+service's single row holding every user (key "_") is split into one row per
+key of each state dict, under `namespace.attr`. Run before starting the server:
     python -m scripts.migrate_feature_state_json
-Rows already in JSON are left alone, so running it twice is safe.
+Rows already in the current form are left alone, so running it twice is safe.
 """
 import asyncio
 import io
@@ -46,27 +48,52 @@ def convert(blob: bytes) -> bytes:
     return durable._dumps(_SafeUnpickler(io.BytesIO(blob)).load())
 
 
+def split_shared(namespace: str, state: dict) -> list:
+    """(namespace.attr, key, value) rows for a shared service's old all-users row."""
+    out = []
+    for attr, value in state.items():
+        target = f"{namespace}.{attr}"
+        if target not in durable._holders:
+            continue  # reference data or a counter that is no longer stored
+        if attr == "_audit_log" and isinstance(value, list):
+            # The family sharing log moved from one list to one list per user it names.
+            by_user: dict = {}
+            for entry in value:
+                for uid in {entry.actor_id, entry.target_id} - {""}:
+                    by_user.setdefault(uid, []).append(entry)
+            value = by_user
+        out.extend((target, str(k), v) for k, v in value.items())
+    return out
+
+
 async def main() -> int:
+    import app.main  # noqa: F401  registers every holder, so a shared row's new namespaces are known
+
     store = durable._store()
     rows, failed = [], 0
-    for namespace, key, sealed in await store.load_all():
+    for namespace, key, sealed, _seq in await store.load_all():
+        if not sealed:
+            continue
         aad = durable._aad(namespace, key)
         blob = crypto.open_sealed(sealed, aad)
-        if blob[:1] != b"\x80":
-            continue
         try:
-            value = convert(blob)
+            if blob[:1] == b"\x80":
+                blob = convert(blob)
+                if key != "_":
+                    rows.append((namespace, key, crypto.seal(blob, aad)))
+            if key == "_" and namespace not in durable._holders:
+                for target, k, v in split_shared(namespace, durable._loads(blob)):
+                    rows.append((target, k, crypto.seal(durable._dumps(v), durable._aad(target, k))))
+                rows.append((namespace, key, b""))
         except Exception as exc:
             failed += 1
             print(f"not converted {namespace}/{key}: {exc}", file=sys.stderr)
-            continue
-        rows.append((namespace, key, crypto.seal(value, aad)))
     if failed:
         print(f"{failed} rows could not be converted; nothing was written", file=sys.stderr)
         return 1
     if rows:
-        await store.upsert(rows)
-    print(f"converted {len(rows)} rows")
+        await store.put(rows)
+    print(f"rewrote {len(rows)} rows")
     return 0
 
 

@@ -137,7 +137,7 @@ def test_feature_state_is_encrypted_at_rest_and_bound_to_its_row():
     store = durable.durable_dict("tests.security.secret_store")
     store["u-secret"] = {"note": "PLAINTEXT-MARKER"}
     asyncio.run(durable.flush())
-    raw = dict((k, v) for n, k, v in asyncio.run(durable._store().load_all()) if n == "tests.security.secret_store")
+    raw = {k: v for n, k, v, _ in asyncio.run(durable._store().load_all()) if n == "tests.security.secret_store"}
     blob = raw["u-secret"]
     assert crypto.is_sealed(blob) and b"PLAINTEXT-MARKER" not in blob
     # A blob moved to another row does not decrypt: the row is authenticated with the data.
@@ -158,7 +158,7 @@ def test_key_rotation_reencrypts_stored_rows(monkeypatch):
     try:
         assert asyncio.run(durable.reseal_all()) >= 1
         rows = asyncio.run(durable._store().load_all())
-        assert {crypto.key_id_of(b) for _, _, b in rows} == {"k2"}
+        assert {crypto.key_id_of(b) for _, _, b, _ in rows if b} == {"k2"}
     finally:
         # Back to the development key for the rest of the run.
         monkeypatch.setenv("DATA_ENCRYPTION_KEYS", f"{dev},{k2}")

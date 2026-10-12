@@ -3,7 +3,7 @@
  * personal records, muscle distribution, and monthly comparison.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { TextInput } from 'react-native';
 import {
   View,
@@ -93,9 +93,8 @@ export default function StatsScreen() {
   const [tid, setTid] = useState<IntensityResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchStats(); }, []);
 
-  async function fetchStats() {
+  const fetchStats = useCallback(async () => {
     try {
       const [res, f, t] = await Promise.all([
         authedFetch(`${API}/api/v1/workout-stats/${userId}?days=365`),
@@ -107,7 +106,8 @@ export default function StatsScreen() {
       setTid(t);
     } catch {}
     setLoading(false);
-  }
+  }, [userId]);
+  useEffect(() => { fetchStats(); }, [fetchStats]);
 
   if (loading) {
     return <View style={s.container}><Text style={s.loadingText}>Loading stats...</Text></View>;
@@ -176,7 +176,7 @@ export default function StatsScreen() {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Personal Records</Text>
           {stats.personal_records.slice(0, 5).map((pr, i) => (
-            <View key={i} style={s.prRow}>
+            <View key={`${pr.exercise_id}-${pr.date}`} style={s.prRow}>
               <Ionicons name="trophy-outline" size={16} color={i === 0 ? theme.warning : i === 1 ? theme.textSecondary : '#CD7F32'} />
               <View style={s.prInfo}>
                 <Text style={s.prExercise}>{pr.exercise_id.replace(/-/g, ' ')}</Text>
@@ -197,7 +197,7 @@ export default function StatsScreen() {
               const maxWorkouts = Math.max(...stats.monthly_comparison.map(x => x.workouts), 1);
               const barHeight = (m.workouts / maxWorkouts) * 80;
               return (
-                <View key={i} style={s.monthBar}>
+                <View key={m.month} style={s.monthBar}>
                   <Text style={s.monthValue}>{m.workouts}</Text>
                   <View style={[s.monthFill, { height: barHeight }]} />
                   <Text style={s.monthLabel}>{m.month.slice(5)}</Text>
@@ -243,7 +243,7 @@ export default function StatsScreen() {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Top Exercises by Volume</Text>
           {stats.top_exercises.map((ex, i) => (
-            <View key={i} style={s.topExRow}>
+            <View key={ex.exercise_id} style={s.topExRow}>
               <Text style={s.topExRank}>#{i + 1}</Text>
               <Text style={s.topExName}>{ex.exercise_id.replace(/-/g, ' ')}</Text>
               <Text style={s.topExVol}>{(ex.total_volume / 1000).toFixed(1)}k kg</Text>

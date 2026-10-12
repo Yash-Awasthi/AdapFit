@@ -24,7 +24,7 @@ ACCOUNTS_FILE = DATA_DIR / "accounts.json"
 _ACCOUNT_COLUMNS = (
     "id", "email", "username", "password_hash", "display_name", "avatar_url",
     "date_of_birth", "gender", "height_cm", "weight_kg", "units", "role",
-    "is_active", "last_login",
+    "is_active", "last_login", "sessions_revoked_at",
 )
 
 
@@ -48,6 +48,28 @@ class AccountStore:
                 )
             return [_from_row(dict(r)) for r in rows]
         return self._read_file()
+
+    async def get(self, user_id: str) -> Optional[Dict[str, Any]]:
+        return await self._one("id = $1", _uuid(user_id), lambda a: a.get("id") == user_id)
+
+    async def find(self, login: str) -> Optional[Dict[str, Any]]:
+        """The account whose email or username is login, case-insensitively."""
+        login = login.strip().lower()
+        return await self._one("(LOWER(email) = $1 OR LOWER(username) = $1)", login,
+                               lambda a: login in ((a.get("email") or "").lower(), (a.get("username") or "").lower()))
+
+    async def _one(self, where: str, arg: Any, match) -> Optional[Dict[str, Any]]:
+        if use_database():
+            from app.core.db import get_pool
+
+            pool = await get_pool()
+            if pool is not None:
+                async with pool.acquire() as conn:
+                    row = await conn.fetchrow(
+                        f"SELECT {', '.join(_ACCOUNT_COLUMNS)} FROM users WHERE password_hash IS NOT NULL AND {where}",
+                        arg)
+                return _from_row(dict(row)) if row else None
+        return next((a for a in self._read_file() if match(a)), None)
 
     async def save(self, account: Dict[str, Any]) -> None:
         if use_database():
@@ -154,6 +176,7 @@ def _from_row(row: Dict[str, Any]) -> Dict[str, Any]:
     for key in ("email", "username", "display_name", "avatar_url", "date_of_birth", "gender", "units", "role"):
         out[key] = out.get(key) or ("metric" if key == "units" else "user" if key == "role" else "")
     out["is_active"] = bool(out.get("is_active", True))
+    out["sessions_revoked_at"] = float(out.get("sessions_revoked_at") or 0)
     return out
 
 
@@ -166,19 +189,56 @@ class SessionStore:
     has already signed out of. Only the SHA-256 of each token is kept.
     """
 
-    async def load_all(self) -> Dict[str, Tuple[str, float]]:
-        """token_hash -> (user id, expiry), with expired entries dropped."""
-        now = _now()
+    async def consume(self, token_hash: str) -> Optional[Tuple[str, float]]:
+        """Remove a session and return (user id, expiry); None if it was not there. One caller wins a race."""
         if use_database():
             from app.core.db import get_pool
 
             pool = await get_pool()
             if pool is not None:
                 async with pool.acquire() as conn:
-                    await conn.execute("DELETE FROM user_sessions WHERE expires_at < NOW()")
-                    rows = await conn.fetch("SELECT token_hash, user_id, expires_at FROM user_sessions")
-                return {r["token_hash"]: (str(r["user_id"]), r["expires_at"].timestamp()) for r in rows}
-        return {h: tuple(v) for h, v in self._read().items() if v[1] > now}
+                    row = await conn.fetchrow(
+                        "DELETE FROM user_sessions WHERE token_hash = $1 RETURNING user_id, expires_at", token_hash)
+                return (str(row["user_id"]), row["expires_at"].timestamp()) if row else None
+        sessions = self._read()
+        found = sessions.pop(token_hash, None)
+        if found is not None:
+            _write_json(SESSIONS_FILE, sessions)
+        return tuple(found) if found else None
+
+    async def add_rotated(self, token_hash: str, user_id: str, expires_at: float) -> None:
+        """Remember a refresh token that was used, so presenting it again is seen as theft."""
+        if use_database():
+            from app.core.db import get_pool
+            from datetime import datetime, timezone
+
+            pool = await get_pool()
+            if pool is not None:
+                async with pool.acquire() as conn:
+                    await conn.execute("DELETE FROM rotated_refresh_tokens WHERE expires_at < NOW()")
+                    await conn.execute(
+                        "INSERT INTO rotated_refresh_tokens (token_hash, user_id, expires_at) VALUES ($1, $2, $3) "
+                        "ON CONFLICT (token_hash) DO NOTHING",
+                        token_hash, _uuid(user_id), datetime.fromtimestamp(expires_at, tz=timezone.utc))
+                return
+        now = _now()
+        rotated = {h: v for h, v in _read_json(ROTATED_FILE, {}).items() if v[1] > now}
+        rotated[token_hash] = [user_id, expires_at]
+        _write_json(ROTATED_FILE, rotated)
+
+    async def rotated_owner(self, token_hash: str) -> Optional[str]:
+        if use_database():
+            from app.core.db import get_pool
+
+            pool = await get_pool()
+            if pool is not None:
+                async with pool.acquire() as conn:
+                    owner = await conn.fetchval(
+                        "SELECT user_id FROM rotated_refresh_tokens WHERE token_hash = $1 AND expires_at > NOW()",
+                        token_hash)
+                return str(owner) if owner else None
+        found = _read_json(ROTATED_FILE, {}).get(token_hash)
+        return found[0] if found and found[1] > _now() else None
 
     def _read(self) -> Dict[str, list]:
         # Files written before sessions carried a user id hold a bare expiry; those sessions are dropped.
@@ -229,6 +289,7 @@ class SessionStore:
 
 
 SESSIONS_FILE = ACCOUNTS_FILE.with_name("sessions.json")
+ROTATED_FILE = ACCOUNTS_FILE.with_name("rotated_tokens.json")
 
 
 def _now() -> float:
@@ -265,6 +326,6 @@ session_store = SessionStore()
 
 def reset_for_tests() -> None:
     """Drop the JSON fallback files. Used by tests that need a clean account set."""
-    for path in (ACCOUNTS_FILE, SESSIONS_FILE):
+    for path in (ACCOUNTS_FILE, SESSIONS_FILE, ROTATED_FILE):
         if path.exists():
             path.unlink()

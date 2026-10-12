@@ -64,9 +64,9 @@ async def export_all(user_id: str = Query("default")):
     data["baseline"] = await storage.get_baseline(user_id)
     data["coach_memory"] = await storage.get_agent_memory(user_id)
     data["feature_data"] = per_user.export_user(user_id)
-    data["shared_feature_data"] = durable.export_shared(user_id)
+    data["shared_feature_data"] = await durable.export_shared(user_id)
     data["account"] = await _account(user_id)
-    data["privacy"] = {**privacy.state(user_id), "history": (dict.get(privacy._records, user_id) or {}).get("events", [])}
+    data["privacy"] = {**privacy.state(user_id), "history": (privacy._records.peek(user_id) or {}).get("events", [])}
     return envelope(user_id, data)
 
 

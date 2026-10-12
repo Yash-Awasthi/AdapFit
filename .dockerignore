@@ -9,6 +9,7 @@ backend/benchmark_results.json
 backend/app/data/*.sqlite3
 backend/app/data/accounts.json
 backend/app/data/sessions.json
+backend/app/data/rotated_tokens.json
 backend/app/data/store.json
 backend/app/data/data_encryption_key
 **/__pycache__/

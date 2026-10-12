@@ -3,11 +3,14 @@
 One image (`Dockerfile` at the repository root) runs the API. On start it
 applies pending migrations when `DATABASE_URL` is set, re-encrypts any
 `feature_state` row not under the first key in `DATA_ENCRYPTION_KEYS`, and
-serves on `$PORT` (default 8000) with one worker: feature state lives in
-process memory (`backend/app/core/durable.py`), so a second worker or replica
-would hold its own copy. Before adding one, move feature state to per-request
-loading and persist the used-refresh-token memory and the "sessions ended at"
-cut-off (`backend/app/core/auth.py`), which also live in memory.
+serves on `$PORT` (default 8000) with `$WEB_CONCURRENCY` workers (default 2).
+Workers and replicas share everything through the database: accounts, sessions,
+used refresh tokens and lockouts are read from it on every call, and feature
+state (`backend/app/core/durable.py`) loads per user on demand, follows other
+workers' writes before each request and merges concurrent writes to one row.
+Each worker keeps its own request rate limits, so the effective limit is the
+configured one times the worker count. Each worker also loads the pose model;
+on a 512 MB instance set `WEB_CONCURRENCY=1`.
 
 ## Local stack
 

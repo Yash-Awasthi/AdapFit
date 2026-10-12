@@ -189,4 +189,4 @@ class SubstanceUseService:
 
 from app.core.durable import shared  # noqa: E402
 
-substance_use_service = shared("app.services.substance_use.substance_use_service", SubstanceUseService())
+substance_use_service = shared("app.services.substance_use.substance_use_service", SubstanceUseService(), state=("profiles", "craving_logs", "journal_entries", "mat_logs", "sobriety_dates", "support_contacts"))

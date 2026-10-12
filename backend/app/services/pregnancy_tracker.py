@@ -275,4 +275,4 @@ class PregnancyTrackerService:
 
 from app.core.durable import shared  # noqa: E402
 
-pregnancy_tracker_service = shared("app.services.pregnancy_tracker.pregnancy_tracker_service", PregnancyTrackerService())
+pregnancy_tracker_service = shared("app.services.pregnancy_tracker.pregnancy_tracker_service", PregnancyTrackerService(), state=("profiles", "daily_logs", "kick_sessions"))

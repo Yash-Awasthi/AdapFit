@@ -238,4 +238,4 @@ class CognitiveTrainingService:
 
 from app.core.durable import shared  # noqa: E402
 
-cognitive_training_service = shared("app.services.cognitive_training.cognitive_training_service", CognitiveTrainingService())
+cognitive_training_service = shared("app.services.cognitive_training.cognitive_training_service", CognitiveTrainingService(), state=("profiles", "sessions"))

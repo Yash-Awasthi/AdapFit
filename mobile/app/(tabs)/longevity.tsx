@@ -272,7 +272,7 @@ export default function LongevityScreen() {
             <>
               <SectionHeaderPremium icon="bulb" iconColor="#F59E0B" title="Where to Start" />
               {interventions.map((item, i) => (
-                <GlassCard key={i} variant="light" style={styles.zoneCard}>
+                <GlassCard key={item.action} variant="light" style={styles.zoneCard}>
                   <Text style={styles.zoneName}>{item.action}</Text>
                   {typeof item.benefit_years === 'number' && (
                     <Text style={styles.zoneDesc}>

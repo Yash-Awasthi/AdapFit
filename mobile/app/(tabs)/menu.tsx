@@ -180,11 +180,11 @@ export default function MenuScreen() {
   useEffect(() => {
     const userId = profile?.id || 'default';
     api.getUser(userId).then(setUser).catch(() => {}).finally(() => setLoading(false));
-  }, [profile?.id, profile?.gender]);
+  }, [profile?.id]);
 
   useEffect(() => {
     refreshProfile();
-  }, []);
+  }, [refreshProfile]);
 
   if (loading) return <LoadingScreen />;
 

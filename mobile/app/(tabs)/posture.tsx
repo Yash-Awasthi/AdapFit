@@ -148,7 +148,7 @@ export default function PostureScreen() {
         exercises.map((exercise, i) => {
           const tint = targetColor(exercise.target);
           return (
-            <GlassCard key={i} variant="light" style={styles.exerciseCard}>
+            <GlassCard key={exercise.exercise} variant="light" style={styles.exerciseCard}>
               <View style={styles.exerciseRow}>
                 <View style={[styles.exerciseIcon, { backgroundColor: tint + '15' }]}>
                   <Ionicons name="body" size={18} color={tint} />
@@ -167,7 +167,7 @@ export default function PostureScreen() {
       {tips.map((tip, i) => {
         const tint = PRIORITY_COLOR[tip.priority] ?? '#94A3B8';
         return (
-          <GlassCard key={i} variant="light" style={styles.exerciseCard}>
+          <GlassCard key={tip.tip} variant="light" style={styles.exerciseCard}>
             <View style={styles.exerciseRow}>
               <View style={[styles.exerciseIcon, { backgroundColor: tint + '15' }]}>
                 <Ionicons name="build" size={18} color={tint} />
@@ -186,7 +186,7 @@ export default function PostureScreen() {
           <SectionHeaderPremium icon="calendar" iconColor="#22C55E" title="Daily Habits" />
           <GlassCard variant="light" style={styles.sectionCard}>
             {asArray<string>(plan.daily_habits).map((habit, i) => (
-              <View key={i} style={styles.habitRow}>
+              <View key={habit} style={styles.habitRow}>
                 <Ionicons name="checkmark-circle-outline" size={16} color="#22C55E" />
                 <Text style={styles.habitText}>{habit}</Text>
               </View>

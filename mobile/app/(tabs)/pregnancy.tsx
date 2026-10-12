@@ -199,7 +199,7 @@ export default function PregnancyScreen() {
               <Text style={[styles.emptyText, { marginTop: 8 }]}>No kick sessions logged yet.</Text>
             ) : (
               history.map((s, i) => (
-                <View key={i} style={styles.sessionRow}>
+                <View key={`${s.date}-${s.kicks}-${s.duration_minutes}`} style={styles.sessionRow}>
                   <Text style={[typography.body.sm, { color: colors.text.muted }]}>{s.date}</Text>
                   <Text style={[typography.body.md, { color: colors.text.primary }]}>{s.kicks} kicks / {s.duration_minutes} min</Text>
                   <Text style={[typography.body.sm, { color: s.status === 'fewer_than_usual' ? colors.health.warning : colors.health.success }]}>{s.status === 'fewer_than_usual' ? 'fewer than usual' : 'recorded'}</Text>

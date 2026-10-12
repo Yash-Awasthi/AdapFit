@@ -291,7 +291,7 @@ export default function FormCheckerScreen() {
           <View style={s.rulesContainer}>
             <Text style={s.rulesTitle}>Corrections:</Text>
             {suggestions.map((s2, i) => (
-              <View key={i} style={s.ruleRow}>
+              <View key={s2} style={s.ruleRow}>
                 <Ionicons name="warning-outline" size={14} color={theme.danger} />
                 <Text style={s.ruleText}>{s2}</Text>
               </View>

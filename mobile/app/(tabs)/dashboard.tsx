@@ -39,7 +39,7 @@ function MiniActivityRing({ progress, color, size = 48, strokeWidth = 4 }: { pro
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: false }).start();
-  }, []);
+  }, [anim]);
   const fill = anim.interpolate({ inputRange: [0, 1], outputRange: [0, progress / 100] });
   return (
     <View style={{ width: size, height: size }}>
@@ -172,10 +172,6 @@ export default function DashboardScreen() {
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
   const dailyTip = getDailyTip();
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-    loadData();
-  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -264,6 +260,11 @@ export default function DashboardScreen() {
       setLoading(false);
     }
   }, [userId]);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+    loadData();
+  }, [loadData, fadeAnim]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

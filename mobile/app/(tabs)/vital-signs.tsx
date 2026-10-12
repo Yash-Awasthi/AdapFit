@@ -294,7 +294,7 @@ export default function VitalSignsScreen() {
         ) : (
           ecg.map((reading, i) => (
             <View
-              key={`${reading.timestamp}-${i}`}
+              key={reading.timestamp}
               style={[styles.historyRow, i < ecg.length - 1 && styles.historyDivider]}
             >
               <View>
@@ -314,7 +314,7 @@ export default function VitalSignsScreen() {
         ) : (
           [...temperatures].reverse().map((reading, i, all) => (
             <View
-              key={`${reading.timestamp}-${i}`}
+              key={reading.timestamp}
               style={[styles.historyRow, i < all.length - 1 && styles.historyDivider]}
             >
               <View>

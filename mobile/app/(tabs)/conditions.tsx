@@ -3,7 +3,7 @@
  * programmes, fall prevention, eye care and allergies. Each result says what
  * to do next; none names a condition.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -47,8 +47,8 @@ function Checkups() {
   const [data, setData] = useState<any>(null);
   const [age, setAge] = useState('');
   const [sex, setSex] = useState<string | null>(null);
-  const load = () => getJson('/screening/schedule').then(setData);
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => getJson('/screening/schedule').then(setData), []);
+  useEffect(() => { load(); }, [load]);
   const save = async () => { if (age && sex && await postJson('/screening/profile', { age: Number(age), sex })) load(); };
   const done = async (id: string) => { if (await postJson('/screening/log', { check_id: id, done_on: today() })) load(); };
   if (data?.status !== 'ok') {
@@ -84,8 +84,8 @@ function Labs() {
   const [low, setLow] = useState('');
   const [high, setHigh] = useState('');
   const [date, setDate] = useState(today());
-  const load = () => getJson<any>('/biomarkers/summary').then((r) => setSummary(asArray(r?.tests)));
-  useEffect(() => { getJson<any[]>('/biomarkers/tests').then((r) => setTests(asArray(r))); load(); }, []);
+  const load = useCallback(() => getJson<any>('/biomarkers/summary').then((r) => setSummary(asArray(r?.tests))), []);
+  useEffect(() => { getJson<any[]>('/biomarkers/tests').then((r) => setTests(asArray(r))); load(); }, [load]);
   const add = async () => {
     if (!test || !value) return;
     const r = await postJson('/biomarkers/readings', {
@@ -241,8 +241,8 @@ function Pacing() {
   const [energy, setEnergy] = useState<string | null>(null);
   const [minutes, setMinutes] = useState('');
   const [peak, setPeak] = useState('');
-  const load = () => getJson('/fatigue-pacing/summary').then(setD);
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => getJson('/fatigue-pacing/summary').then(setD), []);
+  useEffect(() => { load(); }, [load]);
   const plan = d?.plan;
   const saveRhr = async () => { if (Number(rhr) >= 30 && await putJson('/fatigue-pacing/resting-hr', { bpm: Number(rhr) })) load(); };
   const logDay = async () => {

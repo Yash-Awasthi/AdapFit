@@ -49,7 +49,7 @@ async def put_consent(body: ConsentUpdate, user: dict = Depends(require_user)):
 
 @router.get("/consent/history")
 async def consent_history(user: dict = Depends(require_user)):
-    record = dict.get(privacy._records, user["id"]) or {}
+    record = privacy._records.peek(user["id"]) or {}
     return {"events": record.get("events", [])}
 
 

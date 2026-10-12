@@ -114,7 +114,7 @@ def test_a_guardian_who_declines_deletes_the_account(monkeypatch):
     uid = r.json()["user"]["id"]
     token = re.search(r"/privacy/guardian/(\S+)", sent[-1]).group(1)
     assert "deleted" in c.post(f"/api/v1/privacy/guardian/{token}", data={"decision": "decline"}).text
-    assert uid not in user_manager._users
+    assert asyncio.run(user_manager.get_user(uid)) is None
 
 
 def test_deletion_waits_out_the_grace_period_then_erases_shared_records():
@@ -144,8 +144,8 @@ def test_deletion_waits_out_the_grace_period_then_erases_shared_records():
     assert asyncio.run(privacy.run_due_deletions(time.time() + 60)) == 0
     assert asyncio.run(privacy.run_due_deletions(time.time() + privacy.DELETION_GRACE_SECONDS + 1)) == 1
 
-    assert uid not in user_manager._users
-    held = str(durable.export_shared(uid)) + str({k: v for k, v in dict.items(privacy._records) if k == uid})
+    assert asyncio.run(user_manager.get_user(uid)) is None
+    held = str(asyncio.run(durable.export_shared(uid))) + str(privacy._records.peek(uid))
     assert uid not in held and "2026-09-01" not in held
     from app.api.v1.endpoints.goals import goal_logs
     from app.api.v1.endpoints.community import community_comments, community_likes, shared_workouts
@@ -153,7 +153,7 @@ def test_deletion_waits_out_the_grace_period_then_erases_shared_records():
     assert post["id"] in shared_workouts and not community_comments.get(post["id"])
     assert uid not in community_likes.get(post["id"], set())
     rows = asyncio.run(durable._store().load_all())
-    assert not [r for r in rows if uid.encode() in r[2] or r[1] == uid]
+    assert not [r for r in rows if r[2] and (uid.encode() in r[2] or r[1] == uid)]
 
 
 def test_retention_erases_unconfirmed_children_and_warns_the_long_inactive(monkeypatch):
@@ -167,13 +167,15 @@ def test_retention_erases_unconfirmed_children_and_warns_the_long_inactive(monke
     kid = _signup("kid3@example.com", "kiduser3", birth_date=f"{time.gmtime().tm_year - 15}-01-01",
                   guardian_email="parent3@example.com").json()["user"]["id"]
     idle = register_user("idle@example.com", "idleuser")["user"]["id"]
-    user_manager._users[idle].created_at = time.time() - (privacy.INACTIVE_DAYS + 1) * 86400
+    from app.core.accounts import account_store
+    record = asyncio.run(account_store.get(idle))
+    asyncio.run(account_store.save({**record, "created_at": time.time() - (privacy.INACTIVE_DAYS + 1) * 86400}))
 
     later = time.time() + privacy.GUARDIAN_WAIT_DAYS * 86400 + 60
     asyncio.run(privacy.run_due_deletions(later))
-    assert kid not in user_manager._users
-    assert idle in user_manager._users and ("idle@example.com", "Your AdapFit account will be deleted") in mails
+    assert asyncio.run(user_manager.get_user(kid)) is None
+    assert asyncio.run(user_manager.get_user(idle)) and ("idle@example.com", "Your AdapFit account will be deleted") in mails
 
     asyncio.run(user_manager.login("idle@example.com", PASSWORD))
     asyncio.run(privacy.run_due_deletions(later + privacy.INACTIVE_NOTICE_HOURS * 3600))
-    assert idle in user_manager._users
+    assert asyncio.run(user_manager.get_user(idle))

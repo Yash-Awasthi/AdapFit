@@ -157,4 +157,4 @@ class HealthPassportService:
 
 from app.core.durable import shared  # noqa: E402
 
-health_passport = shared("app.services.health_passport.health_passport", HealthPassportService())
+health_passport = shared("app.services.health_passport.health_passport", HealthPassportService(), state=("passports", "vaccinations", "lab_results", "certificates", "travel_plans"))

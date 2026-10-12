@@ -280,4 +280,4 @@ class AllergyTrackerService:
 
 from app.core.durable import shared  # noqa: E402
 
-allergy_tracker_service = shared("app.services.allergy_tracker.allergy_tracker_service", AllergyTrackerService())
+allergy_tracker_service = shared("app.services.allergy_tracker.allergy_tracker_service", AllergyTrackerService(), state=("_pollen_readings", "profiles", "symptom_logs"))
