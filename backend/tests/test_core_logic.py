@@ -230,3 +230,27 @@ def test_an_offline_completion_replayed_by_sync_keeps_its_day():
         CURRENT_USER.reset(token)
     entry = asyncio.run(storage.get_workload_history("core-replay", 400))[-1]
     assert str(entry["recorded_at"])[:10] == "2026-06-02"
+
+
+def test_natural_language_log_reads_weight_then_reps():
+    from app.services.nl_workout_logger import nl_workout_logger
+    one = nl_workout_logger.parse("did bench press 80kg for 12 reps")["exercises"]
+    assert [(e["sets"], e["reps"], e["weight_kg"]) for e in one] == [(1, 12, 80.0)]
+    two = nl_workout_logger.parse("squats 100 kg 8 reps then deadlift 140kg 5 reps")["exercises"]
+    assert sorted((e["reps"], e["weight_kg"]) for e in two) == [(5, 140.0), (8, 100.0)]
+    assert not any(e["name"].lower().startswith("then") for e in two)
+
+
+def test_condition_summary_reports_what_it_measures():
+    from app.services.chronic_disease_manager import chronic_disease_service as cd
+    cd.register_condition("core-sum", "hypertension", "2020-01-01")
+    cd.log_symptoms("core-sum", "hypertension", ["fatigue"], 6)
+    cd.log_symptoms("core-sum", "hypertension", ["thirst"], 4)
+    s = cd.get_condition_summary("core-sum", "hypertension")
+    assert s["avg_recent_symptom_severity"] == 5.0 and "medication_adherence" in s
+
+
+def test_meal_plan_scales_portions_to_the_calorie_target():
+    from app.services.recipe_generator import recipe_generator_service as rg
+    plan = rg.generate_meal_plan(target_calories=2400, days=3)
+    assert abs(plan["avg_daily_calories"] - 2400) <= 2400 * 0.2

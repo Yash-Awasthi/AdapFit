@@ -169,6 +169,10 @@ class ChronicDiseaseManager:
             "condition": condition_key,
             "name": condition["name"],
             "severity": condition["severity"],
+            "avg_recent_symptom_severity": round(avg_severity, 1) if recent_symptoms else None,
+            "recent_vitals_in_range": in_range_count,
+            "recent_vitals_logged": len(recent_vitals),
+            "medication_adherence": adherence,
         }
 
 
