@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Request
-from app.core.limiter import make_limiter
 from app.services.recovery_engine import RecoveryEngine
 from app.services.ml_engine import ml_engine
 from app.services.nlp_pipeline import nlp_pipeline
@@ -11,7 +10,6 @@ from app.core.storage import storage
 from app.core.background import task_manager
 
 router = APIRouter()
-limiter = make_limiter()
 
 @router.get("/acwr")
 async def get_acwr_status(user_id: str):
@@ -165,17 +163,14 @@ async def get_agent_insights(user_id: str):
     }
 
 @router.post("/nlp/sentiment")
-@limiter.limit("30/minute")
 async def analyze_sentiment(request: Request, req: SentimentRequest):
     return nlp_pipeline.analyze_sentiment(req.text)
 
 @router.post("/nlp/parse-goals")
-@limiter.limit("10/minute")
 async def parse_goals(request: Request, req: GoalParsingRequest):
     return await nlp_pipeline.parse_goals_from_text(req.text)
 
 @router.post("/nlp/feedback")
-@limiter.limit("30/minute")
 async def analyze_feedback(request: Request, req: NLPFeedbackRequest):
     result = nlp_pipeline.extract_exercise_feedback(req.text)
     if req.exercise_id:

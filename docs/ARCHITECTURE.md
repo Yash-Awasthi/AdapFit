@@ -20,7 +20,7 @@ FastAPI Application
 Middleware Pipeline:
   1. CORS validation
   2. Request ID injection
-  3. Rate limiting (SlowAPI)
+  3. Rate limiting (token buckets in the database)
   4. Security headers
     ↓
 Route Handler:
