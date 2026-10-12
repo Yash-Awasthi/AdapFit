@@ -1,24 +1,25 @@
 # AdapFit backend. Build from the repository root: docker build -t adapfit .
-FROM python:3.12-slim
+FROM python:3.14-slim
+COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /bin/uv
 
-# opencv and mediapipe need these shared libraries at import time on a slim image.
+# MediaPipe's native library links EGL and GLES at import time, even on CPU.
 # upgrade first so the base image's OS packages carry the latest security fixes.
 RUN apt-get update && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && apt-get install -y --no-install-recommends libegl1 libgles2 \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-COPY backend/requirements.txt .
-# CPU wheels: the default torch wheel pulls several GB of CUDA libraries.
-RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/opt/venv PATH="/opt/venv/bin:$PATH"
+WORKDIR /app/backend
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --frozen --no-dev --no-cache
 
 # main.py adds the repository root to sys.path for the `src.*` imports.
-COPY src/ ./src/
-COPY backend/ ./backend/
-ADD https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task     ./backend/app/data/pose_landmarker_full.task
+COPY src/ /app/src/
+COPY backend/ /app/backend/
+ADD https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task     ./app/data/pose_landmarker_full.task
 RUN useradd -m -u 1000 app && chown -R app:app /app/backend/app/data
 USER app
-WORKDIR /app/backend
 
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PORT=8000
 # Only the platform proxy reaches the container, so X-Forwarded-For is the client address.

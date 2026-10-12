@@ -8,15 +8,13 @@ AdapFit — AI-Powered Fitness That Adapts To You.
 # Clone and setup
 git clone https://github.com/Yash-Awasthi/ZFIT.git
 cd ZFIT/backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+uv sync  # Python 3.14; add --extra ml for the optional NLP and voice models
 
 # Run tests
-python -m pytest tests/ -v
+uv run pytest tests/ -v
 
 # Start dev server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Tech Stack

@@ -61,7 +61,7 @@ Not a dashboard of raw numbers. Every screen answers: *What should I do today, a
 │  NLP sentiment · Preference learning · LLM (Groq/Gemini)│
 │  RAG Knowledge System · Vector Store · Health Validation │
 ├─────────────────────────────────────────────────────────┤
-│  Rust Core Engine (PyO3, optional) · PostgreSQL · Docker │
+│  Python core engine · PostgreSQL · Docker                │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -80,8 +80,8 @@ REST with the reasons; a language model may only reword that decision.
 
 ```bash
 cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv sync
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # → http://localhost:8000/docs (Swagger UI)
 ```
 
@@ -643,9 +643,7 @@ ZFIT/
 │   │   │   ├── rag_knowledge.py       # Fitness science knowledge base
 │   │   │   └── ...                    # 290+ service modules
 │   │   └── middleware/                # Security, validation, compression
-│   ├── core_engine/                   # Rust PyO3 extension (optional)
-│   │   ├── Cargo.toml
-│   │   └── src/                       # Rust source for fast computation
+│   ├── core_engine/                   # HRV, sleep, ACWR and recovery arithmetic
 │   ├── tests/                         # 228+ tests
 │   └── docs/                          # API docs, schema
 ├── mobile/
@@ -684,7 +682,7 @@ ZFIT/
 
 5. **In-memory by default** — Zero-config startup. Set `DATABASE_URL` for persistence.
 
-6. **Rust-powered core** — Optional PyO3 extension delivers 10-100x faster computation for HRV, recovery, and ACWR calculations. Falls back to pure Python seamlessly.
+6. **Plain arithmetic core** — HRV, sleep, ACWR and recovery scores are a few lines of Python in `core_engine/`; a native extension cost more in call overhead than the work it did.
 
 7. **API-first** — Every feature has a REST endpoint. Mobile is just one consumer.
 

@@ -99,8 +99,7 @@ CI (`.github/workflows/ci.yml`) runs `pip-audit`, `mobile/scripts/audit-gate.mjs
 lists) and a Trivy scan of the image (high and critical with a fix available);
 any finding fails the build.
 
-- `pip-audit -r backend/requirements.txt`: clean. mediapipe 1.0.1 (Tasks API)
-  no longer needs protobuf; torch was removed (nothing used it).
+- `pip-audit` on the locked runtime set (`uv export` of `backend/uv.lock`): clean.
 - Trivy on the image: no high or critical findings with a fix.
 - `npm audit --omit=dev` (mobile): 4 moderate, all `decode-uri-component@0.2.2` under
   `expo-router`'s `query-string` (a crafted deep link can stall the app's own URL parsing).

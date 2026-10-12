@@ -1,0 +1,52 @@
+[project]
+name = "adapfit-backend"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi==0.143.0",
+    "uvicorn[standard]==0.54.0",
+    "pydantic==2.14.1",
+    "pydantic-settings==2.15.0",
+    "python-multipart==0.0.32",
+    "httpx==0.28.1",
+    "slowapi==0.1.10",
+    "cryptography==50.0.2",
+    "asyncpg==0.32.0",
+    "pgvector==0.5.1",
+    # numpy, OpenCV and MediaPipe move together: OpenCV 5 wheels need numpy 2.
+    "numpy==2.5.4",
+    "opencv-contrib-python-headless==5.0.0.93",
+    "mediapipe==1.1.0",
+    "pillow==12.3.0",
+    "sentry-sdk[fastapi]==2.72.0",
+    "yt-dlp>=2026.8.19",
+    "defusedxml==0.7.1",
+]
+
+[project.optional-dependencies]
+# Imported lazily; each feature falls back to a rule-based path without them.
+ml = [
+    "sentence-transformers==6.1.0",
+    "transformers==5.19.0",
+    "faster-whisper==1.2.1",
+    "edge-tts==7.2.8",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.17.0",
+    "pip-audit==2.10.1",
+    # scripts/build_cdsco_fdc.py only
+    "pypdf",
+]
+
+[tool.uv]
+package = false
+# MediaPipe asks for the GUI OpenCV build, which needs X11 libraries a server
+# does not have; the headless build above provides the same cv2 module.
+override-dependencies = ["opencv-contrib-python; sys_platform == 'never'"]
+
+[tool.ruff]
+target-version = "py314"
