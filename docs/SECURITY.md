@@ -115,6 +115,3 @@ any finding fails the build.
 ## Not done yet
 
 - A third-party penetration test (Phase 10).
-- Rotated-token memory and the "sessions ended at" cut-off are in process
-  memory; a restart forgets them, bounded by the 15-minute access token.
-  Persist them before running more than one worker.

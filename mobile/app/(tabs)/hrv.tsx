@@ -193,7 +193,7 @@ export default function HrvScreen() {
             <GlassCard>
               <View style={styles.bars}>
                 {points.map((p, i) => (
-                  <View key={p.date + i} style={styles.barCol}>
+                  <View key={p.date} style={styles.barCol}>
                     <View style={[styles.bar, {
                       height: Math.max(4, (p.value / maxVal) * 90),
                       backgroundColor: ZONE_COLORS[zones[i]?.zone] ?? TINT,

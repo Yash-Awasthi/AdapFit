@@ -151,7 +151,7 @@ export default function VoiceHealthScreen() {
                 <Text style={styles.emptyText}>The exercise list could not be loaded.</Text>
               ) : (
                 exercises.map((exercise, i) => (
-                  <View key={i} style={styles.exerciseCard}>
+                  <View key={exercise.name} style={styles.exerciseCard}>
                     <View style={styles.exerciseHeader}>
                       <Text style={styles.exerciseName}>{exercise.name}</Text>
                       <Text style={styles.exerciseDuration}>{exercise.duration}</Text>

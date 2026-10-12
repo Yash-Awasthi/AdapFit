@@ -85,7 +85,7 @@ export const ScoreRing: React.FC<ScoreRingProps> = ({
     } else {
       progress.value = value;
     }
-  }, [value, animated]);
+  }, [value, animated, progress]);
 
   const scoreColor = color || (score === null ? colors.text.muted : score >= 80 ? colors.score.excellent : score >= 60 ? colors.score.good : score >= 40 ? colors.score.fair : colors.score.critical);
   const bgColor = scoreColor + '15';

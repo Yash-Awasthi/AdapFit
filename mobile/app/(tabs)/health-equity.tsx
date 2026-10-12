@@ -192,7 +192,7 @@ export default function HealthEquityScreen() {
             <Text style={styles.emptyText}>{scored ? 'No weak categories found.' : 'Score a category below 60 to see recommendations.'}</Text>
           ) : (
             recommendations.map((r, i) => (
-              <GlassCard key={`${r.name}-${i}`} style={{ marginBottom: 10 }}>
+              <GlassCard key={r.name} style={{ marginBottom: 10 }}>
                 <Text style={[typography.body.md, { color: colors.text.primary }]}>{r.name}</Text>
                 <Text style={[typography.body.xs, { color: colors.text.muted, marginTop: 4 }]}>{r.description}</Text>
               </GlassCard>

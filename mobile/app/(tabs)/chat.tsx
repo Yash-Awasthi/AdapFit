@@ -178,7 +178,7 @@ export default function ChatScreen() {
 
       setLoading(false);
     },
-    [messages, loading, llmOverride, sendStreaming]
+    [messages, loading, llmOverride, sendStreaming, userId]
   );
 
   const renderMessage = ({ item }: { item: Message }) => {

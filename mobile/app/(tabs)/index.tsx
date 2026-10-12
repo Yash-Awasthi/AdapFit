@@ -201,7 +201,7 @@ export default function HomeScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
           {quickActions.map((action, i) => (
             <QuickAction
-              key={i}
+              key={action.label}
               icon={action.icon}
               label={action.label}
               color={action.color}
@@ -299,6 +299,7 @@ export default function HomeScreen() {
             <View style={styles.hydrationGlasses}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <TouchableOpacity
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
                   key={i}
                   style={[styles.waterGlass, i < waterIntake && styles.waterGlassFilled]}
                   onPress={logGlass}
@@ -339,6 +340,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.streakDots}>
               {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
                 <View key={i} style={styles.streakDotContainer}>
                   <View style={[styles.streakDot, i < 5 && styles.streakDotActive]} />
                   <Text style={styles.streakDotLabel}>{day}</Text>

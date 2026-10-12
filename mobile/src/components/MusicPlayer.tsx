@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -29,9 +29,8 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
   const [track, setTrack] = useState<Track | null>(null);
   const [playlist, setPlaylist] = useState<string | null>(null);
 
-  useEffect(() => { fetchState(); }, []);
 
-  async function fetchState() {
+  const fetchState = useCallback(async () => {
     try {
       const res = await authedFetch(`${API}/api/v1/music/state?user_id=${userId}`);
       if (res.ok) {
@@ -41,7 +40,8 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
         setPlaylist(s.playlist_id);
       }
     } catch {}
-  }
+  }, [userId]);
+  useEffect(() => { fetchState(); }, [fetchState]);
 
   async function togglePlay() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

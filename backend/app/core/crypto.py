@@ -54,11 +54,19 @@ def keyring() -> List[Tuple[str, bytes]]:
     path = _dev_key_file()
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"dev:{new_key()}", encoding="utf-8")
+        # Written aside and linked into place: of several processes starting together, one key wins and all read it.
+        tmp = path.with_name(f"{path.name}.{os.getpid()}")
+        tmp.write_text(f"dev:{new_key()}", encoding="utf-8")
         try:
-            os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+            os.chmod(tmp, stat.S_IRUSR | stat.S_IWUSR)
         except OSError:
             pass
+        try:
+            os.link(tmp, path)
+        except FileExistsError:
+            pass
+        finally:
+            tmp.unlink()
     return _parse(path.read_text(encoding="utf-8"))
 
 

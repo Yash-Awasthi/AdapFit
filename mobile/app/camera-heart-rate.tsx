@@ -61,6 +61,41 @@ export default function CameraHeartRateScreen() {
   const measurementTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frameCountRef = useRef(0);
 
+  const calculateBPM = useCallback((): number | null => {
+    const samples = greenChannelAvg.current;
+    if (samples.length < MIN_SAMPLES_FOR_BPM) return null;
+
+    // Simple peak detection for BPM estimation
+    // In production, use FFT or autocorrelation for better accuracy
+    const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+    const threshold = mean * 1.05;
+
+    let peaks: number[] = [];
+    let lastPeakIdx = -10;
+
+    for (let i = 1; i < samples.length - 1; i++) {
+      if (samples[i] > threshold && samples[i] > samples[i - 1] && samples[i] > samples[i + 1]) {
+        if (i - lastPeakIdx > SAMPLE_RATE * 0.4) { // Min 0.4s between peaks (150 BPM max)
+          peaks.push(i);
+          lastPeakIdx = i;
+        }
+      }
+    }
+
+    if (peaks.length < 3) return null;
+
+    // Calculate average interval between peaks
+    let totalInterval = 0;
+    for (let i = 1; i < peaks.length; i++) {
+      totalInterval += peaks[i] - peaks[i - 1];
+    }
+    const avgInterval = totalInterval / (peaks.length - 1);
+
+    // Convert to BPM
+    const bpm = (SAMPLE_RATE / avgInterval) * 60;
+    return bpm;
+  }, []);
+
   const pushSample = useCallback((r: number, g: number, b: number) => {
     roiPixels.current.push([r, g, b]);
     if (roiPixels.current.length > 10000) roiPixels.current.shift();
@@ -87,7 +122,7 @@ export default function CameraHeartRateScreen() {
         setBpm(Math.round(liveBpm));
       }
     }
-  }, []);
+  }, [calculateBPM]);
 
   const frameOutput = useFrameOutput({
     targetResolution: FRAME_RESOLUTION,
@@ -127,13 +162,42 @@ export default function CameraHeartRateScreen() {
         ])
       ).start();
     }
-  }, [bpm]);
+  }, [bpm, pulseAnim]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (measurementTimer.current) clearInterval(measurementTimer.current);
     };
+  }, []);
+
+  const completeMeasurement = useCallback(async () => {
+    if (measurementTimer.current) clearInterval(measurementTimer.current);
+    setState('analyzing');
+
+    try {
+      const result = await api.post('/api/v1/rppg/estimate-hr-chrom', {
+        roi_pixels: roiPixels.current,
+        timestamp: Date.now() / 1000,
+      });
+      const finalBpm = result?.heart_rate_bpm;
+      if (typeof finalBpm === 'number' && finalBpm >= BPM_MIN && finalBpm <= BPM_MAX) {
+        const reading: HeartRateReading = {
+          bpm: Math.round(finalBpm),
+          confidence: result?.confidence ?? 0,
+          timestamp: Date.now(),
+          duration: MEASUREMENT_DURATION,
+        };
+        setBpm(reading.bpm);
+        setConfidence(reading.confidence);
+        setReadings(prev => [reading, ...prev].slice(0, 10));
+        setState('complete');
+      } else {
+        setState('error');
+      }
+    } catch {
+      setState('error');
+    }
   }, []);
 
   const startMeasurement = useCallback(async () => {
@@ -169,71 +233,9 @@ export default function CameraHeartRateScreen() {
         }
       }, 100);
     }, 2000);
-  }, [hasPermission, device]);
+  }, [hasPermission, device, requestPermission, completeMeasurement]);
 
-  const completeMeasurement = useCallback(async () => {
-    if (measurementTimer.current) clearInterval(measurementTimer.current);
-    setState('analyzing');
 
-    try {
-      const result = await api.post('/api/v1/rppg/estimate-hr-chrom', {
-        roi_pixels: roiPixels.current,
-        timestamp: Date.now() / 1000,
-      });
-      const finalBpm = result?.heart_rate_bpm;
-      if (typeof finalBpm === 'number' && finalBpm >= BPM_MIN && finalBpm <= BPM_MAX) {
-        const reading: HeartRateReading = {
-          bpm: Math.round(finalBpm),
-          confidence: result?.confidence ?? 0,
-          timestamp: Date.now(),
-          duration: MEASUREMENT_DURATION,
-        };
-        setBpm(reading.bpm);
-        setConfidence(reading.confidence);
-        setReadings(prev => [reading, ...prev].slice(0, 10));
-        setState('complete');
-      } else {
-        setState('error');
-      }
-    } catch {
-      setState('error');
-    }
-  }, []);
-
-  const calculateBPM = (): number | null => {
-    const samples = greenChannelAvg.current;
-    if (samples.length < MIN_SAMPLES_FOR_BPM) return null;
-
-    // Simple peak detection for BPM estimation
-    // In production, use FFT or autocorrelation for better accuracy
-    const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
-    const threshold = mean * 1.05;
-
-    let peaks: number[] = [];
-    let lastPeakIdx = -10;
-
-    for (let i = 1; i < samples.length - 1; i++) {
-      if (samples[i] > threshold && samples[i] > samples[i - 1] && samples[i] > samples[i + 1]) {
-        if (i - lastPeakIdx > SAMPLE_RATE * 0.4) { // Min 0.4s between peaks (150 BPM max)
-          peaks.push(i);
-          lastPeakIdx = i;
-        }
-      }
-    }
-
-    if (peaks.length < 3) return null;
-
-    // Calculate average interval between peaks
-    let totalInterval = 0;
-    for (let i = 1; i < peaks.length; i++) {
-      totalInterval += peaks[i] - peaks[i - 1];
-    }
-    const avgInterval = totalInterval / (peaks.length - 1);
-
-    // Convert to BPM
-    const bpm = (SAMPLE_RATE / avgInterval) * 60;
-    return bpm;
-  };
 
   const resetMeasurement = useCallback(() => {
     setState('idle');
@@ -434,7 +436,7 @@ export default function CameraHeartRateScreen() {
             Recent Measurements
           </Text>
           {readings.slice(0, 5).map((r, i) => (
-            <View key={i} style={styles.readingRow}>
+            <View key={r.timestamp} style={styles.readingRow}>
               <Ionicons name="heart" size={16} color={colors.health.heart} />
               <Text style={[typography.body.md, { color: colors.text.primary, flex: 1 }]}>
                 {r.bpm} BPM

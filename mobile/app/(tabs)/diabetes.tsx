@@ -251,7 +251,7 @@ export default function DiabetesScreen() {
               </Text>
             )}
             {[...readings].reverse().map((r, i) => (
-              <View key={`${r.timestamp}-${i}`} style={styles.readingCard}>
+              <View key={r.timestamp} style={styles.readingCard}>
                 <View style={styles.readingLeft}>
                   <Text style={styles.readingTime}>{clockTime(r.timestamp)}</Text>
                   <Text style={styles.readingType}>{prettyContext(r.context)}</Text>
@@ -299,7 +299,7 @@ export default function DiabetesScreen() {
               <Text style={styles.emptyText}>No doses logged in the last seven days.</Text>
             )}
             {[...insulin].reverse().map((entry, i) => (
-              <View key={`${entry.timestamp}-${i}`} style={styles.insCard}>
+              <View key={entry.timestamp} style={styles.insCard}>
                 <View style={styles.insLeft}>
                   <Text style={styles.insTime}>{clockTime(entry.timestamp)}</Text>
                   <Text style={styles.insType}>{entry.type} — {entry.site}</Text>
@@ -382,7 +382,7 @@ export default function DiabetesScreen() {
 
             <Text style={styles.sectionTitle}>Patterns</Text>
             {patterns.map((p, i) => (
-              <View key={i} style={styles.trendCard}>
+              <View key={p.pattern} style={styles.trendCard}>
                 <Text style={styles.trendTitle}>
                   {p.pattern}{typeof p.value === 'number' ? ` — ${p.value} mg/dL` : ''}
                 </Text>

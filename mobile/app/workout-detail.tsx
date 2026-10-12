@@ -3,7 +3,7 @@
  * Shows all exercises, sets/reps/weight, duration, calories, and comparison to previous sessions.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -65,9 +65,8 @@ export default function WorkoutDetailScreen() {
   const [previous, setPrevious] = useState<PreviousWorkout | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchWorkout(); }, [workoutId]);
 
-  async function fetchWorkout() {
+  const fetchWorkout = useCallback(async () => {
     try {
       // Fetch recent workouts and find the one by ID
       const res = await authedFetch(`${API}/api/v1/workouts?user_id=${userId}&days=90`);
@@ -86,7 +85,8 @@ export default function WorkoutDetailScreen() {
       }
     } catch {}
     setLoading(false);
-  }
+  }, [workoutId, userId]);
+  useEffect(() => { fetchWorkout(); }, [fetchWorkout]);
 
   function getComparison(exercise: ExerciseSet) {
     if (!previous) return null;
@@ -188,7 +188,7 @@ export default function WorkoutDetailScreen() {
       {workout.exercises.map((ex, i) => {
         const comparison = getComparison(ex);
         return (
-          <View key={i} style={s.exerciseCard}>
+          <View key={ex.exercise_id} style={s.exerciseCard}>
             <View style={s.exerciseHeader}>
               <View style={s.exerciseNumber}>
                 <Text style={s.exerciseNumberText}>{i + 1}</Text>
@@ -213,6 +213,7 @@ export default function WorkoutDetailScreen() {
                 {!!comparison && <Text style={s.setHeaderText}>vs Last</Text>}
               </View>
               {Array.from({ length: ex.sets }).map((_, si) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
                 <View key={si} style={s.setRow}>
                   <Text style={s.setValue}>{si + 1}</Text>
                   <Text style={s.setValue}>

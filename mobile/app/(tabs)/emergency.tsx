@@ -342,7 +342,7 @@ export default function EmergencyScreen() {
                 {group.items?.length ? (
                   <View style={styles.tagRow}>
                     {group.items.map((item, i) => (
-                      <View key={i} style={[styles.medicalTag, { backgroundColor: group.color + '15' }]}>
+                      <View key={item} style={[styles.medicalTag, { backgroundColor: group.color + '15' }]}>
                         <Text style={[styles.medicalTagText, { color: group.color }]}>{item}</Text>
                       </View>
                     ))}

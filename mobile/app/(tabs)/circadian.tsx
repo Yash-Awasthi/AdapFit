@@ -329,7 +329,7 @@ export default function CircadianScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.tipTitle}>Circadian Tips</Text>
               {info.tips.map((tip, i) => (
-                <Text key={i} style={styles.tipText}>• {tip}</Text>
+                <Text key={tip} style={styles.tipText}>• {tip}</Text>
               ))}
             </View>
           </View>

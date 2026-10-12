@@ -121,4 +121,4 @@ class RecipeGeneratorService:
 
 from app.core.durable import shared  # noqa: E402
 
-recipe_generator_service = shared("app.services.recipe_generator.recipe_generator_service", RecipeGeneratorService())
+recipe_generator_service = shared("app.services.recipe_generator.recipe_generator_service", RecipeGeneratorService(), state=("_meal_plans", "_favorites"))

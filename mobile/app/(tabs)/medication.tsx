@@ -360,7 +360,7 @@ export default function MedicationScreen() {
           {interactions !== null && (interactions.length === 0 ? (
             <Text style={styles.emptyBody}>No known interactions between these medicines in our database. Your pharmacist can double-check.</Text>
           ) : interactions.map((it, i) => (
-            <View key={i} style={{ marginTop: 10 }}>
+            <View key={`${it.drug_1}-${it.drug_2}`} style={{ marginTop: 10 }}>
               <Text style={[styles.medName, { color: it.severity === 'major' || it.severity === 'contraindicated' ? '#EF4444' : '#F59E0B' }]}>
                 {it.drug_1} + {it.drug_2} ({it.severity})
               </Text>

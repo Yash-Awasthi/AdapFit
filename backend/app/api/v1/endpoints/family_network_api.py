@@ -44,9 +44,8 @@ async def send_invite(request: InviteRequest, user: dict = Depends(require_user)
     """Invite by email or username. The reply is the same whether or not the account exists."""
     from app.core.auth import user_manager
 
-    await user_manager._ensure_loaded()
-    key = request.invitee.strip().lower()
-    invitee_id = user_manager._email_index.get(key) or user_manager._username_index.get(key)
+    invitee = await user_manager.find(request.invitee)
+    invitee_id = invitee.id if invitee else None
     if invitee_id and invitee_id != user["id"]:
         family_network_service.send_invite(user["id"], invitee_id, request.relationship, request.message, in_app=True)
     return {"sent": True, "message": "If that person has an AdapFit account, they will see your invite."}

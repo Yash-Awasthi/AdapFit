@@ -30,6 +30,7 @@ export default function LegalScreen() {
             const heading = line.match(/^(#+)\s+(.*)/);
             const clean = (heading ? heading[2] : line).replace(/\*\*/g, '');
             return (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
               <Text key={i} style={heading ? (heading[1].length === 1 ? s.h1 : s.h2) : s.p}>{clean}</Text>
             );
           })}

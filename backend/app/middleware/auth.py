@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.auth import decode_access_token, user_manager
+from app.core.auth import decode_access_token
 from app.core.config import settings
 
 
@@ -128,9 +128,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             )
         
         token = auth_header[7:]  # Remove "Bearer " prefix
-        
-        await user_manager._ensure_loaded()
-        payload = decode_access_token(token)
+        payload = await decode_access_token(token)
         
         if payload is None:
             return Response(

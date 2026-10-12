@@ -12,6 +12,9 @@ services:
     envVars:
       - key: ENVIRONMENT
         value: production
+      # The free plan has 512 MB and each worker takes about 200 MB; paid plans can drop this.
+      - key: WEB_CONCURRENCY
+        value: "1"
       - key: DATABASE_URL
         sync: false
       - key: DATA_ENCRYPTION_KEYS

@@ -9,6 +9,7 @@ Based on 2025 research (Nature, Medsi AI, Sonaphi):
 - Parkinson's disease early detection
 """
 
+import secrets
 import time
 import math
 from typing import Dict, List, Optional, Any
@@ -22,7 +23,6 @@ class VoiceBiomarkerService:
     """AI-powered voice analysis for health biomarker detection."""
 
     def __init__(self):
-        self._sequence = 0
         self.analyses: Dict[str, Dict] = {}
         self.user_baselines: Dict[str, Dict] = {}
 
@@ -58,8 +58,7 @@ class VoiceBiomarkerService:
 
         # Counter, not a second-resolution timestamp: two recordings analysed
         # in the same second shared an id and the first was overwritten.
-        self._sequence += 1
-        analysis_id = f"vb_{user_id}_{int(time.time())}_{self._sequence}"
+        analysis_id = f"vb_{user_id}_{int(time.time())}_{secrets.token_hex(4)}"
         features = self._extract_features(audio_features)
         comparison = self._compare_to_baseline(user_id, features)
 
@@ -190,4 +189,4 @@ class VoiceBiomarkerService:
 
 from app.core.durable import shared  # noqa: E402
 
-voice_biomarker_service = shared("app.services.voice_biomarker.voice_biomarker_service", VoiceBiomarkerService())
+voice_biomarker_service = shared("app.services.voice_biomarker.voice_biomarker_service", VoiceBiomarkerService(), state=("analyses", "user_baselines"))

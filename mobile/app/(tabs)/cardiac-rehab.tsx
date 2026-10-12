@@ -263,7 +263,7 @@ export default function CardiacRehabScreen() {
                 <SectionHeaderPremium title="This Phase" icon="fitness" iconColor={colors.health.activity} />
                 <GlassCard>
                   {phase.exercises.map((exercise, i) => (
-                    <View key={i} style={styles.listRow}>
+                    <View key={exercise} style={styles.listRow}>
                       <Ionicons name="ellipse" size={6} color={colors.health.activity} />
                       <Text style={[typography.body.md, { color: colors.text.primary, flex: 1 }]}>{exercise}</Text>
                     </View>
@@ -272,7 +272,7 @@ export default function CardiacRehabScreen() {
                 <GlassCard style={{ marginTop: spacing.md }}>
                   <Text style={[typography.label.md, { color: colors.health.heart, marginBottom: 6 }]}>Precautions</Text>
                   {phase.precautions.map((precaution, i) => (
-                    <View key={i} style={styles.listRow}>
+                    <View key={precaution} style={styles.listRow}>
                       <Ionicons name="warning" size={12} color={colors.health.heart} />
                       <Text style={[typography.body.sm, { color: colors.text.secondary, flex: 1 }]}>{precaution}</Text>
                     </View>
@@ -335,7 +335,7 @@ export default function CardiacRehabScreen() {
             medications.map((med, i) => {
               const taken = med.status === 'taken';
               return (
-                <View key={`${med.med_id}-${i}`} style={styles.medRow}>
+                <View key={`${med.medication}-${med.time}`} style={styles.medRow}>
                   <View style={[styles.medCheck, {
                     backgroundColor: taken ? colors.health.success : 'transparent',
                     borderColor: taken ? colors.health.success : colors.surface.border,

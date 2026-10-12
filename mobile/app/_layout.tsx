@@ -68,7 +68,6 @@ function RootStack() {
 
   // The server refuses data calls until consent is current, a guardian has
   // agreed, or a scheduled deletion is cancelled; send the user where they can act.
-  const userId = useUserStore((s) => s.userId);
   useEffect(() => {
     if (!hydrated || loading || !profile || !getToken()) return;
     getConsent().then((state) => {
@@ -78,7 +77,7 @@ function RootStack() {
         applyReminders(false);
       }
     });
-  }, [hydrated, loading, profile, userId, router]);
+  }, [hydrated, loading, profile, router]);
 
   if (!hydrated || loading) {
     return <LoadingScreen />;

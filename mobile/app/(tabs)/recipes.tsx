@@ -1,7 +1,7 @@
 /**
  * AI Recipe Generator — Meal planning, recipes, grocery lists
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, presets, glass } from '../../src/theme';
@@ -46,15 +46,15 @@ export default function RecipesScreen() {
 
   const diets = ['high-protein', 'vegan', 'keto', 'low-carb', 'gluten-free', 'meal-prep'];
 
-  useEffect(() => { loadRecipes(); }, []);
 
-  const loadRecipes = async (diet: string = '') => {
+  const loadRecipes = useCallback(async (diet: string = '') => {
     const params = new URLSearchParams();
     if (diet) params.set('diet', diet);
     const r = await authedFetch(`${API}/recipes/all?${params}`);
     const d = await r.json();
     setRecipes(d.recipes || []);
-  };
+  }, []);
+  useEffect(() => { loadRecipes(); }, [loadRecipes]);
 
   const searchRecipes = async () => {
     if (!query.trim()) { loadRecipes(selectedDiet); return; }

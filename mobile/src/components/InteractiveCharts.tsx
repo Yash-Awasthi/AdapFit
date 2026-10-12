@@ -51,7 +51,7 @@ export const InteractiveLineChart: React.FC<LineChartProps> = ({
     } else {
       animValue.setValue(1);
     }
-  }, [data]);
+  }, [animated, animValue]);
 
   const max = Math.max(...data);
   const min = Math.min(...data);
@@ -92,6 +92,7 @@ export const InteractiveLineChart: React.FC<LineChartProps> = ({
           const isSelected = selectedIndex === i;
           return (
             <TouchableOpacity
+              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
               key={i}
               style={[
                 styles.dataPoint,
@@ -148,6 +149,7 @@ export const InteractiveLineChart: React.FC<LineChartProps> = ({
       {!!labels && (
         <View style={[styles.xAxisLabels, { width: chartWidth }]}>
           {labels.map((label, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
             <Text key={i} style={styles.axisLabel}>{label}</Text>
           ))}
         </View>
@@ -183,7 +185,7 @@ export const InteractiveBarChart: React.FC<BarChartProps> = ({
     } else {
       for (const v of animValues) v.setValue(1);
     }
-  }, [data]);
+  }, [animated, animValues]);
 
   const max = Math.max(...data.map(d => d.value));
   const barWidth = (SCREEN_WIDTH - spacing.screenPadding * 2 - 40) / data.length;
@@ -197,7 +199,7 @@ export const InteractiveBarChart: React.FC<BarChartProps> = ({
 
         return (
           <TouchableOpacity
-            key={i}
+            key={bar.label}
             style={styles.barColumn}
             onPress={() => {
               setSelectedBar(i);
@@ -265,7 +267,7 @@ export const InteractiveRingChart: React.FC<RingChartProps> = ({
 
   useEffect(() => {
     Animated.timing(animValue, { toValue: 1, duration: 1000, useNativeDriver: false }).start();
-  }, []);
+  }, [animValue]);
 
   const total = segments.reduce((sum, s) => sum + s.value, 0);
   const radius = (size - strokeWidth) / 2;
@@ -277,7 +279,7 @@ export const InteractiveRingChart: React.FC<RingChartProps> = ({
           const isSelected = selectedSegment === i;
           return (
             <TouchableOpacity
-              key={i}
+              key={segment.label}
               style={styles.ringSegment}
               onPress={() => {
                 setSelectedSegment(i);
@@ -315,7 +317,7 @@ export const InteractiveRingChart: React.FC<RingChartProps> = ({
           const pct = ((segment.value / total) * 100).toFixed(0);
           return (
             <TouchableOpacity
-              key={i}
+              key={segment.label}
               style={[styles.ringLegendItem, isSelected && { backgroundColor: segment.color + '15' }]}
               onPress={() => setSelectedSegment(i)}
             >
@@ -354,7 +356,7 @@ export const Sparkline: React.FC<SparklineProps> = ({
     if (animated) {
       Animated.timing(animValue, { toValue: 1, duration: 600, useNativeDriver: false }).start();
     }
-  }, [data]);
+  }, [animated, animValue]);
 
   const max = Math.max(...data);
   const min = Math.min(...data);
@@ -370,6 +372,7 @@ export const Sparkline: React.FC<SparklineProps> = ({
     <View style={[styles.sparklineContainer, { height, width }]}>
       {points.map((p, i) => (
         <View
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
           key={i}
           style={[
             styles.sparklineDot,

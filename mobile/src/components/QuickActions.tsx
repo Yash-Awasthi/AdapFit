@@ -38,7 +38,7 @@ const QuickLogItem: React.FC<QuickLogItemProps> = ({ icon, label, color, value, 
 
   useEffect(() => {
     Animated.timing(enterAnim, { toValue: 1, duration: 400, delay, useNativeDriver: true }).start();
-  }, []);
+  }, [enterAnim, delay]);
 
   const handleTap = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -89,7 +89,7 @@ export const QuickLogGrid: React.FC<QuickLogGridProps> = ({ onLog }) => {
   return (
     <View style={styles.quickLogGrid}>
       {items.map((item, i) => (
-        <QuickLogItem key={i} {...item} delay={i * 80} />
+        <QuickLogItem key={item.label} {...item} delay={i * 80} />
       ))}
     </View>
   );
@@ -117,7 +117,7 @@ export const EmergencySOSButton: React.FC<EmergencySOSProps> = ({ onPress }) => 
         ]),
       ])
     ).start();
-  }, []);
+  }, [glowAnim, pulseAnim]);
 
   return (
     <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
@@ -179,7 +179,7 @@ export const ContextSuggestion: React.FC<ContextSuggestionProps> = ({
 
   useEffect(() => {
     Animated.timing(enterAnim, { toValue: 1, duration: 400, delay, useNativeDriver: true }).start();
-  }, []);
+  }, [enterAnim, delay]);
 
   return (
     <Animated.View style={[styles.suggestionCard, { opacity: enterAnim, transform: [{ translateX: enterAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] }]}>
@@ -236,7 +236,7 @@ export const SmartBanner: React.FC<SmartBannerProps> = ({
         Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, slideAnim, opacityAnim]);
 
   if (!visible) return null;
 
@@ -276,7 +276,7 @@ export const SwipeableQuickSettings: React.FC<QuickSettingsProps> = ({ visible, 
     } else {
       Animated.timing(slideAnim, { toValue: SCREEN_HEIGHT, duration: 250, useNativeDriver: true }).start();
     }
-  }, [visible]);
+  }, [visible, slideAnim]);
 
   if (!visible) return null;
 
@@ -295,7 +295,7 @@ export const SwipeableQuickSettings: React.FC<QuickSettingsProps> = ({ visible, 
           { icon: 'wifi', label: 'Sync', color: '#06B6D4' },
           { icon: 'lock', label: 'Privacy', color: '#EF4444' },
         ].map((item, i) => (
-          <TouchableOpacity key={i} style={styles.settingsItem}>
+          <TouchableOpacity key={item.label} style={styles.settingsItem}>
             <View style={[styles.settingsIcon, { backgroundColor: item.color + '15' }]}>
               <Ionicons name={item.icon as any} size={20} color={item.color} />
             </View>

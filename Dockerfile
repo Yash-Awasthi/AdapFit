@@ -31,5 +31,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ[\"PORT\"]}/health')"
 
-# One worker: feature state lives in process memory (app/core/durable.py).
-CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ]; then python -m scripts.apply_migrations && python -m scripts.migrate_feature_state_json || exit 1; fi; exec uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers"]
+# Workers share state through the database (app/core/durable.py, app/core/accounts.py).
+CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ]; then python -m scripts.apply_migrations && python -m scripts.migrate_feature_state_json || exit 1; fi; exec uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers ${WEB_CONCURRENCY:-2} --proxy-headers"]

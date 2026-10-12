@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -43,9 +43,8 @@ export function NotificationSetup() {
   const [prefs, setPrefs] = useState<Preferences | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchData(); }, []);
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [nRes, pRes] = await Promise.all([
@@ -56,7 +55,8 @@ export function NotificationSetup() {
       if (pRes.ok) setPrefs(await pRes.json());
     } catch {}
     setLoading(false);
-  }
+  }, [userId]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   // Every change on the server is mirrored into the phone's alarm schedule.
   async function reapply() {

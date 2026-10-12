@@ -49,11 +49,6 @@ export default function WorkoutActive() {
   }, [activeWorkout, router]);
 
   useEffect(() => {
-    setReps(defaultReps(currentExercise?.target_reps));
-    setRpe(currentExercise?.target_rpe ?? 8);
-  }, [exIdx]);
-
-  useEffect(() => {
     const interval = setInterval(() => {
       setElapsed((e) => e + 1);
       if (rest > 0) {
@@ -109,7 +104,10 @@ export default function WorkoutActive() {
       setSetNum((n) => n + 1);
       setRest(restSeconds);
     } else if (exIdx < exercises.length - 1) {
-      setExIdx((i) => i + 1);
+      const next = exercises[exIdx + 1];
+      setExIdx(exIdx + 1);
+      setReps(defaultReps(next.target_reps));
+      setRpe(next.target_rpe ?? 8);
       setSetNum(1);
       setRest(restSeconds);
     } else {

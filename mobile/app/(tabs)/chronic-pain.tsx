@@ -232,7 +232,7 @@ export default function ChronicPainScreen() {
               </Text>
             )}
             {[...entries].reverse().map((entry, i) => (
-              <View key={`${entry.date}-${entry.time}-${i}`} style={styles.diaryCard}>
+              <View key={`${entry.date}-${entry.time}-${entry.location}`} style={styles.diaryCard}>
                 <View style={styles.diaryLeft}>
                   <Text style={styles.diaryDate}>{relativeDay(entry.date)} · {entry.time}</Text>
                   <Text style={styles.diaryLocation}>{entry.location} — {entry.pain_type}</Text>
@@ -264,7 +264,7 @@ export default function ChronicPainScreen() {
             ) : (
               <>
                 {topTriggers.map((t, i) => (
-                  <View key={i} style={styles.triggerCard}>
+                  <View key={t.trigger} style={styles.triggerCard}>
                     <Text style={styles.triggerName}>{t.trigger}</Text>
                     <View style={styles.triggerBar}>
                       <View style={[styles.triggerFill, { width: `${t.high_pain_rate}%` }]} />
@@ -291,7 +291,7 @@ export default function ChronicPainScreen() {
               </Text>
             ) : (
               treatments.map((t, i) => (
-                <View key={i} style={styles.treatCard}>
+                <View key={t.treatment} style={styles.treatCard}>
                   <Text style={styles.treatName}>{t.treatment}</Text>
                   <View style={styles.treatBar}>
                     <View style={[styles.treatFill, { width: `${t.avg_relief_percent}%` }]} />
@@ -309,7 +309,7 @@ export default function ChronicPainScreen() {
           <>
             <Text style={styles.sectionTitle}>CBT Pain Management Techniques</Text>
             {cbt.map((technique, i) => (
-              <View key={i} style={styles.cbtCard}>
+              <View key={technique.name} style={styles.cbtCard}>
                 <View style={styles.cbtHeader}>
                   <Text style={styles.cbtName}>{technique.name}</Text>
                   <Text style={styles.cbtDuration}>{technique.duration}</Text>

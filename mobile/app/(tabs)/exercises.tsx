@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -50,11 +50,8 @@ export default function ExercisesScreen() {
 
   const { toggle, isBookmarked } = useBookmarkStore();
 
-  useEffect(() => {
-    fetchExercises();
-  }, [selectedCategory, selectedMuscle]);
 
-  async function fetchExercises() {
+  const fetchExercises = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -70,7 +67,10 @@ export default function ExercisesScreen() {
       }
     } catch {}
     setLoading(false);
-  }
+  }, [selectedMuscle, selectedCategory]);
+  useEffect(() => {
+    fetchExercises();
+  }, [fetchExercises]);
 
   // 1RM Formulas (Epley & Brzycki)
   const weight = parseFloat(calcWeight) || 0;

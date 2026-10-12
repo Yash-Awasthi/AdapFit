@@ -89,7 +89,7 @@ export default function WorkoutsScreen() {
             </View>
           </ScrollView>
           {loading ? <ActivityIndicator color={colors.primary} style={{ marginTop: 30 }} /> : exercises.map((ex, i) => (
-            <View key={i} style={ws.exerciseCard}>
+            <View key={ex.name} style={ws.exerciseCard}>
               <View style={{ flex: 1 }}>
                 <Text style={typography.label.lg}>{ex.name}</Text>
                 <Text style={typography.body.xs}>{ex.muscle_groups?.join(', ')} • {ex.equipment}</Text>
@@ -108,7 +108,7 @@ export default function WorkoutsScreen() {
 
       {/* Plans */}
       {activeTab === 'plans' && plans.map((p, i) => (
-        <View key={i} style={ws.planCard}>
+        <View key={p.name} style={ws.planCard}>
           <Text style={typography.heading.h4}>{p.name}</Text>
           <Text style={typography.body.sm}>{p.description}</Text>
           <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm }}>
@@ -133,7 +133,7 @@ export default function WorkoutsScreen() {
         <View style={[presets.card, { marginHorizontal: spacing.lg }]}>
           <View style={ws.statsGrid}>
             {[{ label: 'Workouts', value: stats.total_workouts || 0, icon: 'barbell' }, { label: 'Volume', value: `${((stats.total_volume_kg || 0) / 1000).toFixed(1)}t`, icon: 'trending-up' }, { label: 'Calories', value: stats.total_calories || 0, icon: 'flame' }, { label: 'Hours', value: ((stats.total_minutes || 0) / 60).toFixed(1), icon: 'time' }].map((s, i) => (
-              <View key={i} style={ws.statItem}>
+              <View key={s.label} style={ws.statItem}>
                 <Ionicons name={s.icon as any} size={20} color={colors.primary} />
                 <Text style={[typography.metric.small, { color: colors.primary }]}>{s.value}</Text>
                 <Text style={typography.body.xs}>{s.label}</Text>

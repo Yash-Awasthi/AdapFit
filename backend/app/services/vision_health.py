@@ -140,4 +140,4 @@ class VisionHealthService:
 
 from app.core.durable import shared  # noqa: E402
 
-vision_health_service = shared("app.services.vision_health.vision_health_service", VisionHealthService())
+vision_health_service = shared("app.services.vision_health.vision_health_service", VisionHealthService(), state=("prescriptions", "eye_exams", "screen_time_logs", "exercise_logs", "strain_logs"))

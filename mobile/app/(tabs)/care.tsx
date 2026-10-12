@@ -4,7 +4,7 @@
  * notes for the doctor. Everything here points to a next step; nothing here
  * diagnoses.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Alert, Linking,
 } from 'react-native';
@@ -259,8 +259,8 @@ function DoctorNotes() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [notes, setNotes] = useState<any[]>([]);
-  const load = () => getJson<any>(`/notepad/notes/${userId}`).then((r) => setNotes(asArray(r?.notes ?? r)));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => getJson<any>(`/notepad/notes/${userId}`).then((r) => setNotes(asArray(r?.notes ?? r))), [userId]);
+  useEffect(() => { load(); }, [load]);
   const add = async () => {
     if (!title.trim() || !content.trim()) return;
     if (await postJson('/notepad/add', { user_id: userId, title, content, category: 'doctor_visit' })) {

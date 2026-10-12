@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
@@ -68,9 +68,8 @@ export default function NutritionScreen() {
   const [filterType, setFilterType] = useState<string | null>(null);
   const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
 
-  useEffect(() => { fetchData(); fetchCurrentPlan(); }, []);
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [mealsRes, sumRes, tRes] = await Promise.all([
@@ -83,15 +82,16 @@ export default function NutritionScreen() {
       if (sumRes.ok) setSummary(await sumRes.json());
     } catch {}
     setLoading(false);
-  }
+  }, [userId]);
 
   // Picks up any plan the AI coach chat already generated for today.
-  async function fetchCurrentPlan() {
+  const fetchCurrentPlan = useCallback(async () => {
     try {
       const plan = await api.getCurrentMealPlan(userId);
       if (plan && plan.targets) setGeneratedPlan(plan);
     } catch {}
-  }
+  }, [userId]);
+  useEffect(() => { fetchData(); fetchCurrentPlan(); }, [fetchData, fetchCurrentPlan]);
 
   async function handleGeneratePlan() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -248,7 +248,7 @@ export default function NutritionScreen() {
           {!!generatedPlan.meals && (
             <View style={s.planMealList}>
               {generatedPlan.meals.slice(0, 3).map((m: any, idx: number) => (
-                <Text key={idx} style={s.planMealItem}>
+                <Text key={m.name} style={s.planMealItem}>
                   • {m.name}: {m.foods?.map((f: any) => f.food_name).join(', ')}
                 </Text>
               ))}

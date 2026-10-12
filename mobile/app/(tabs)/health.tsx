@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, AccessibilityInfo,
 } from "react-native";
@@ -76,9 +76,8 @@ export default function HealthScreen() {
   const [showAddCondition, setShowAddCondition] = useState(false);
   const [showAddMed, setShowAddMed] = useState(false);
 
-  useEffect(() => { loadData(); }, []);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const [prof, conds, meds, restricts] = await Promise.all([
       getJson<ProfileSummary>(`/health/profile-summary?user_id=${userId}`),
       getJson<{ conditions: Condition[] }>(`/health/conditions?user_id=${userId}`),
@@ -96,7 +95,8 @@ export default function HealthScreen() {
       recommend: asArray<string>(restricts?.recommend),
       warnings: asArray<string>(restricts?.warnings),
     });
-  };
+  }, [userId]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const toggleVoice = async () => {
     if (isListening) {
@@ -234,7 +234,7 @@ export default function HealthScreen() {
             <Text style={s.emptyText}>No conditions logged</Text>
           ) : (
             conditions.map((c, i) => (
-              <View key={i} style={s.conditionCard}>
+              <View key={c.condition_id} style={s.conditionCard}>
                 <View style={s.conditionDot} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.conditionName}>
@@ -262,7 +262,7 @@ export default function HealthScreen() {
             <Text style={s.emptyText}>No medications logged</Text>
           ) : (
             medications.map((m, i) => (
-              <View key={i} style={s.medCard}>
+              <View key={`${m.name}-${m.time_of_day}`} style={s.medCard}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.medName}>{m.name}</Text>
                   <Text style={s.medDetail}>
@@ -292,7 +292,7 @@ export default function HealthScreen() {
               <View style={s.restrictionGroup}>
                 <Text style={s.restrictionLabel}>AVOID</Text>
                 {restrictions.avoid.map((a, i) => (
-                  <Text key={i} style={s.restrictionItem}>• {a.replace(/_/g, " ")}</Text>
+                  <Text key={a} style={s.restrictionItem}>• {a.replace(/_/g, " ")}</Text>
                 ))}
               </View>
             )}
@@ -301,7 +301,7 @@ export default function HealthScreen() {
               <View style={s.restrictionGroup}>
                 <Text style={[s.restrictionLabel, { color: theme.success }]}>RECOMMENDED</Text>
                 {restrictions.recommend.map((r, i) => (
-                  <Text key={i} style={[s.restrictionItem, { color: "#6EE7B7" }]}>
+                  <Text key={r} style={[s.restrictionItem, { color: "#6EE7B7" }]}>
                     • {r.replace(/_/g, " ")}
                   </Text>
                 ))}
@@ -312,7 +312,7 @@ export default function HealthScreen() {
               <View style={s.restrictionGroup}>
                 <Text style={[s.restrictionLabel, { color: theme.warning }]}>WARNINGS</Text>
                 {restrictions.warnings.map((w, i) => (
-                  <Text key={i} style={[s.restrictionItem, { color: "#FDE68A" }]}>• {w}</Text>
+                  <Text key={w} style={[s.restrictionItem, { color: "#FDE68A" }]}>• {w}</Text>
                 ))}
               </View>
             )}

@@ -180,6 +180,7 @@ const MiniChart: React.FC<{ data: number[]; color: string; height?: number }> = 
       {data.map((val, i) => {
         const barHeight = ((val - min) / range) * (height - 20) + 10;
         return (
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
           <View key={i} style={miniChartStyles.barContainer}>
             <View style={[miniChartStyles.bar, { height: barHeight, backgroundColor: color + (i === data.length - 1 ? '' : '60') }]} />
           </View>
@@ -211,7 +212,7 @@ export default function TrendsScreen() {
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, []);
+  }, [fadeAnim]);
 
   useEffect(() => {
     let cancelled = false;
@@ -341,7 +342,7 @@ export default function TrendsScreen() {
             </GlassCard>
           ) : (
             insights.map((insight, i) => (
-              <GlassCard key={i} variant="light" style={styles.insightCard}>
+              <GlassCard key={insight.title} variant="light" style={styles.insightCard}>
                 <View style={styles.insightRow}>
                   <View style={[styles.insightIcon, { backgroundColor: insight.color + '15' }]}>
                     <Ionicons name={insight.icon as any} size={18} color={insight.color} />

@@ -135,4 +135,4 @@ class PeerSupportService:
 
 from app.core.durable import shared  # noqa: E402
 
-peer_support_service = shared("app.services.peer_support.peer_support_service", PeerSupportService())
+peer_support_service = shared("app.services.peer_support.peer_support_service", PeerSupportService(), state=("profiles", "matches", "circles", "check_ins"))

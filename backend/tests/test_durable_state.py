@@ -23,17 +23,14 @@ def _auth(monkeypatch):
 
 
 def _simulate_restart():
-    """Drop every in-memory copy, as a new process would start, then reload from the store."""
+    """Drop every in-memory copy, as a new process would start; rows load again on first use."""
     for kind, holder in durable._holders.values():
         if kind == "per_user":
             holder.reset()
-        elif kind == "shared":
-            inst = object.__getattribute__(holder, "_instance")
-            object.__setattr__(holder, "_instance", type(inst)())
         else:
             dict.clear(holder)
-    durable._saved_hash.clear()
-    asyncio.run(durable.load_all())
+    durable._rows.clear()
+    durable._full.clear()
 
 
 def test_meals_sleep_and_medical_id_survive_a_restart():
@@ -76,16 +73,17 @@ def test_stored_values_come_back_with_their_types():
     assert back["prefs"].model_dump(exclude_unset=True) == {"hydration": True}
 
 
-def test_a_pickled_row_stops_startup_instead_of_being_overwritten():
+def test_a_pickled_row_is_refused_instead_of_being_overwritten():
     from app.core import crypto
 
+    store = durable.durable_dict("tests.durable.old")
     sealed = crypto.seal(b"\x80\x05N.", durable._aad("tests.durable.old", "k"))
-    asyncio.run(durable._store().upsert([("tests.durable.old", "k", sealed)]))
+    asyncio.run(durable._store().put([("tests.durable.old", "k", sealed)]))
     try:
         with pytest.raises(RuntimeError, match="migrate_feature_state_json"):
-            asyncio.run(durable.load_all())
+            store.get("k")
     finally:
-        asyncio.run(durable._store().delete([("tests.durable.old", "k")]))
+        asyncio.run(durable._store().put([("tests.durable.old", "k", b"")]))
 
 
 def test_unchanged_state_is_not_rewritten():
@@ -104,7 +102,7 @@ def test_deleting_an_account_erases_its_feature_rows():
     c.post("/api/v1/nutrition/meals", headers=h, json={"name": "Idli", "calories": 200, "meal_type": "breakfast"})
     assert asyncio.run(user_manager.delete_user(uid))["deleted"]
     rows = asyncio.run(durable._store().load_all())
-    assert not [r for r in rows if r[1] == uid]
+    assert [r for r in rows if r[1] == uid] and not [r for r in rows if r[1] == uid and r[2]]
 
 
 def test_the_migration_script_turns_pickled_rows_into_json():
@@ -115,11 +113,59 @@ def test_the_migration_script_turns_pickled_rows_into_json():
 
     old = {"prefs": NotificationPreference(hydration=True), "when": date(2026, 10, 1), "tags": {"a"}}
     ns = "tests.durable.migrated"
-    asyncio.run(durable._store().upsert([(ns, "k", crypto.seal(pickle.dumps(old, 5), durable._aad(ns, "k")))]))
+    asyncio.run(durable._store().put([(ns, "k", crypto.seal(pickle.dumps(old, 5), durable._aad(ns, "k")))]))
     try:
         assert asyncio.run(migration.main()) == 0
-        sealed = dict((k, v) for n, k, v in asyncio.run(durable._store().load_all()) if n == ns)["k"]
+        sealed = {k: v for n, k, v, _ in asyncio.run(durable._store().load_all()) if n == ns}["k"]
         assert durable._loads(crypto.open_sealed(sealed, durable._aad(ns, "k"))) == old
         assert asyncio.run(migration.main()) == 0
     finally:
-        asyncio.run(durable._store().delete([(ns, "k")]))
+        asyncio.run(durable._store().put([(ns, "k", b"")]))
+
+
+def _write_as_other_worker(ns: str, key: str, value, expected):
+    from app.core import crypto
+    payload = crypto.seal(durable._dumps(value), durable._aad(ns, key))
+    seq, _ = asyncio.run(durable._store().write(ns, key, payload, expected))
+    assert seq is not None
+
+
+def test_a_change_from_another_worker_is_applied_before_the_next_request():
+    ns = "tests.durable.follow"
+    store = durable.durable_dict(ns)
+    store["u"] = {"goal": 1}
+    asyncio.run(durable.flush())
+    _write_as_other_worker(ns, "u", {"goal": 2}, durable._rows[(ns, "u")].seq)
+    asyncio.run(durable.sync())
+    assert store.peek("u") == {"goal": 2}
+
+
+def test_a_row_another_worker_changed_is_merged_not_overwritten():
+    ns = "tests.durable.merge"
+    store = durable.durable_dict(ns)
+    store["u"] = {"meals": ["poha"], "goal": 1}
+    asyncio.run(durable.flush())
+    _write_as_other_worker(ns, "u", {"meals": ["poha", "dal"], "goal": 2}, durable._rows[(ns, "u")].seq)
+
+    store["u"]["meals"].append("idli")  # this worker has not seen the other write yet
+    asyncio.run(durable.flush())
+
+    expected = {"meals": ["poha", "dal", "idli"], "goal": 2}
+    assert store.peek("u") == expected
+    payload, _ = durable._store().fetch_sync(ns, "u")
+    assert durable._decode(durable._open(ns, "u", payload)) == expected
+
+
+def test_the_migration_script_splits_a_shared_service_row_per_user():
+    from scripts import migrate_feature_state_json as migration
+    from app.core import crypto
+    from app.services.health_notepad import health_notepad
+
+    old_ns = "app.services.health_notepad.health_notepad"
+    old = {"notes": {"user-a": [{"id": "n1", "title": "Knee"}], "user-b": [{"id": "n2", "title": "Sleep"}]}}
+    asyncio.run(durable._store().put([(old_ns, "_", crypto.seal(durable._dumps(old), durable._aad(old_ns, "_")))]))
+    assert asyncio.run(migration.main()) == 0
+    _simulate_restart()
+    assert health_notepad.notes.peek("user-a") == [{"id": "n1", "title": "Knee"}]
+    assert health_notepad.notes.peek("user-b")[0]["title"] == "Sleep"
+    assert not durable._store().fetch_sync(old_ns, "_")[0]

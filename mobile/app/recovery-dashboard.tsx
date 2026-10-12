@@ -75,7 +75,7 @@ function RecoveryScoreRing({ score, size = 200 }: { score: number; size?: number
       Animated.timing(pulseAnim, { toValue: 1.02, duration: 600, useNativeDriver: true }),
       Animated.timing(pulseAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
-  }, [score]);
+  }, [score, pulseAnim, animValue]);
 
   return (
     <Animated.View
@@ -112,7 +112,7 @@ function DomainRow({ name, score, status, insight, dataAvailable }: {
         useNativeDriver: false,
       }).start();
     }
-  }, [score, dataAvailable]);
+  }, [score, dataAvailable, barAnim]);
 
   return (
     <Pressable
@@ -192,7 +192,7 @@ function SkeletonPlaceholder() {
         Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+  }, [pulseAnim]);
 
   return (
     <View style={styles.skeletonContainer} accessibilityRole="progressbar" accessibilityLabel="Loading recovery data">
@@ -253,7 +253,7 @@ export default function RecoveryDashboardScreen() {
   useEffect(() => {
     loadData();
     Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, []);
+  }, [loadData, fadeAnim]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -405,7 +405,7 @@ export default function RecoveryDashboardScreen() {
               </View>
               <View style={styles.insightsContainer} accessibilityRole="list">
                 {data.cross_domain_insights.map((insight, i) => (
-                  <InsightRow key={i} text={insight} />
+                  <InsightRow key={insight} text={insight} />
                 ))}
               </View>
             </View>
@@ -424,7 +424,7 @@ export default function RecoveryDashboardScreen() {
               </View>
               {data.recommendations.map((rec, i) => (
                 <RecommendationCard
-                  key={i}
+                  key={`${rec.category}-${rec.message}`}
                   priority={rec.priority}
                   category={rec.category}
                   message={rec.message}

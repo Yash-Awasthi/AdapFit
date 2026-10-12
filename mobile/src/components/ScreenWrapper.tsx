@@ -57,7 +57,7 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [slideAnim, fadeAnim]);
 
   // Collapsible header interpolation
   const headerHeight = scrollY.interpolate({
@@ -100,6 +100,7 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
           ) : (
             <View style={styles.skeletonContainer}>
               {Array.from({ length: 5 }).map((_, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
                 <View key={i} style={styles.skeletonCard}>
                   <Skeleton width="60%" height={16} />
                   <Skeleton width="100%" height={12} style={{ marginTop: 8 }} />

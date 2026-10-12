@@ -66,12 +66,11 @@ async def lifespan(app: FastAPI):
     # A failure here means nobody can log in, so it stops startup rather than
     # leaving the API up and answering every login with "invalid credentials".
     from app.core.auth import user_manager
-    await user_manager.load()
-    logger.info("Accounts loaded: %d", len(user_manager._users))
-    # ── Restore feature data ──────────────────────────────────────────────
-    # Same rule as accounts: serving requests on empty state would save it over the real data.
+    logger.info("Accounts: %d", len(await user_manager.all_users()))
+    # ── Feature data ──────────────────────────────────────────────────────
+    # Rows load on demand; from here on the process follows what other workers write.
     from app.core import durable
-    logger.info("Feature state restored: %s", await durable.load_all())
+    await durable.start()
     # Seals rows written before encryption or under a retired key, so a deploy or key change needs no manual call.
     logger.info("Feature state rows resealed: %d", await durable.reseal_all())
     # ── Initialize services ───────────────────────────────────────────────
@@ -86,6 +85,7 @@ async def lifespan(app: FastAPI):
     yield
     sweeper.cancel()
     await durable.flush()
+    durable.close()
     logger.info("AdapFit shutting down")
 
 
@@ -154,8 +154,9 @@ app.add_middleware(
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())[:8]
-    response = await call_next(request)
     from app.core import durable
+    await durable.sync()
+    response = await call_next(request)
     await durable.flush()
     response.headers["X-Request-ID"] = request_id
     response.headers["X-API-Version"] = settings.VERSION

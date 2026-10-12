@@ -182,7 +182,7 @@ export default function PrivacyScreen() {
           <Text style={ns.section}>Recent security activity</Text>
           <View style={ns.notice}>
             {activity.slice(0, 10).map((e, i) => (
-              <Text key={`${e.at}-${i}`} style={ns.muted}>
+              <Text key={`${e.at}-${e.event}`} style={ns.muted}>
                 {new Date(e.at * 1000).toLocaleString()} · {SECURITY_EVENT_LABELS[e.event] ?? e.event.replace(/_/g, ' ')}
               </Text>
             ))}

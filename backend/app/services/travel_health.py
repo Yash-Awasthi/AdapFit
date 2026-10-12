@@ -247,4 +247,4 @@ class TravelHealthService:
 
 from app.core.durable import shared  # noqa: E402
 
-travel_health_service = shared("app.services.travel_health.travel_health_service", TravelHealthService())
+travel_health_service = shared("app.services.travel_health.travel_health_service", TravelHealthService(), state=("trips",))

@@ -166,4 +166,4 @@ class PrecisionNutritionService:
 
 from app.core.durable import shared  # noqa: E402
 
-precision_nutrition = shared("app.services.precision_nutrition.precision_nutrition", PrecisionNutritionService())
+precision_nutrition = shared("app.services.precision_nutrition.precision_nutrition", PrecisionNutritionService(), state=("profiles", "diet_plans", "food_logs", "supplement_logs"))
