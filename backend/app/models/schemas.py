@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional, Dict, Any, Generic, TypeVar
 from enum import Enum
 from pydantic import BaseModel, Field
@@ -193,6 +194,8 @@ class WorkoutCompleteRequest(BaseModel):
     session_rpe: int = Field(ge=1, le=10)
     logged_exercises: List[CompletedExerciseLog]
     user_feedback_notes: Optional[str] = None
+    # When the session ended on the device; an offline completion syncs later than it happened.
+    completed_at: Optional[datetime] = None
 
 class WorkoutCompleteResponse(BaseModel):
     log_id: str

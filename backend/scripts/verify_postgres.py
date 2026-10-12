@@ -14,10 +14,11 @@ import sys
 import uuid
 
 BACKEND = pathlib.Path(__file__).resolve()
-for line in (pathlib.Path(".env")).read_text(encoding="utf-8").splitlines():
+ENV_FILE = pathlib.Path(".env")
+for line in (ENV_FILE.read_text(encoding="utf-8") if ENV_FILE.exists() else "").splitlines():
     if line.strip() and not line.startswith("#") and "=" in line:
         key, _, value = line.partition("=")
-        os.environ[key.strip()] = value.strip()
+        os.environ.setdefault(key.strip(), value.strip())
 
 os.environ["AUTH_DISABLED"] = "false"
 os.environ["RATE_LIMITING_ENABLED"] = "false"

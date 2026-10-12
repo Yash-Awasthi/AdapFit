@@ -6,9 +6,19 @@ from fastapi import APIRouter, Query
 
 from app.core.storage import storage
 from app.core.workout_metrics import HISTORY_ENTRIES, acwr_ratio
-from app.services.daily_decision import DecisionSignals, decide, signals_from_logs
+from app.services.daily_decision import DailyDecision, DecisionSignals, decide, signals_from_logs
 
 router = APIRouter()
+
+
+async def decision_for(user_id: str, recovery_log: dict) -> DailyDecision:
+    """The decision for a stored check-in; the workout generator reads the same one."""
+    workload = await storage.get_workload_history(user_id, HISTORY_ENTRIES)
+    try:
+        workout_logs = await storage.get_workout_logs(user_id, 7)
+    except Exception:
+        workout_logs = []
+    return decide(signals_from_logs(recovery_log, None, acwr_ratio(workload), workout_logs))
 
 
 async def _latest(getter, *args) -> dict:
@@ -36,16 +46,7 @@ async def decision_today(user_id: str = Query("default"),
         return {"user_id": user_id, "decision": None, "headline": "Check in to see today's plan",
                 "reasons": ["No check-in yet today."], "cautions": [], "confidence": None,
                 "intensity_ceiling_pct": None, "safety_override": None}
-    workload = await storage.get_workload_history(user_id, HISTORY_ENTRIES)
-
-    try:
-        workout_logs = await storage.get_workout_logs(user_id, 7)
-    except Exception:
-        workout_logs = []
-
-    signals = signals_from_logs(recovery_log, None, acwr_ratio(workload), workout_logs)
-    result = decide(signals)
-    payload = result.to_dict()
+    payload = (await decision_for(user_id, recovery_log)).to_dict()
     payload["user_id"] = user_id
     return payload
 

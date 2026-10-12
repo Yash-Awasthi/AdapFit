@@ -29,6 +29,9 @@ WINDOW_DAYS = 28
 # floor regardless of how consistent the readings look.
 MIN_HRV_STD = 3.0
 
+# Adults need at least 7h; a habitual short sleeper's own mean would hide the deficit.
+MIN_SLEEP_TARGET_HOURS = 7.0
+
 DEFAULTS: Dict[str, float] = {
     "hrv_mean_rmssd": settings.DEFAULT_BASELINE_HRV_RMSSD,
     "hrv_std_rmssd": settings.DEFAULT_BASELINE_HRV_STD,
@@ -84,7 +87,8 @@ def compute(recovery_logs: List[Dict[str, Any]], workload_history: List[Dict[str
         "hrv_mean_rmssd": round(_blend(DEFAULTS["hrv_mean_rmssd"], _mean(hrvs), len(hrvs)), 1),
         "hrv_std_rmssd": round(max(MIN_HRV_STD, _blend(DEFAULTS["hrv_std_rmssd"], hrv_std, len(hrvs))), 1),
         "rhr_baseline": round(_blend(DEFAULTS["rhr_baseline"], _mean(rhrs), len(rhrs)), 1),
-        "sleep_target_hours": round(_blend(DEFAULTS["sleep_target_hours"], _mean(sleeps), len(sleeps)), 1),
+        "sleep_target_hours": round(max(MIN_SLEEP_TARGET_HOURS,
+                                        _blend(DEFAULTS["sleep_target_hours"], _mean(sleeps), len(sleeps))), 1),
         "chronic_load_28d": round(_chronic_load(workload_history or []), 1),
         "sample_counts": {"hrv": len(hrvs), "rhr": len(rhrs), "sleep": len(sleeps)},
         "confidence": round(min(1.0, max(len(hrvs), len(sleeps)) / FULL_CONFIDENCE_SAMPLES), 2),

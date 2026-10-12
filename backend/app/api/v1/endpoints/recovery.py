@@ -122,7 +122,7 @@ async def recovery_today(user_id: str, day: Optional[str] = Query(None, pattern=
     hrv, z = log.get("hrv_rmssd"), log.get("hrv_z_score")
     rhr, rhr_delta = log.get("resting_heart_rate"), log.get("resting_hr_delta")
     domains = [
-        _domain("hrv", None if z is None else max(0, min(100, 60 + z * 20)),
+        _domain("hrv", None if z is None else RecoveryEngine.hrv_score_from_z(z),
                 f"HRV {hrv:.0f} ms, {z:+.1f} SD from your normal of {base['hrv_mean_rmssd']:.0f} ms."
                 if hrv is not None and z is not None else "No HRV in today's check-in."),
         _domain("sleep", log.get("sleep_score"),

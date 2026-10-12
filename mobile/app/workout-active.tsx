@@ -8,7 +8,7 @@ import { speak } from '../src/services/tts';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../src/services/theme';
 import { useWorkoutStore, useUserStore } from '../src/stores';
-import { patchJson, postJson } from '../src/services/http';
+import { postJson } from '../src/services/http';
 
 const FALLBACK_IMAGE =
   'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/0.jpg';
@@ -16,26 +16,6 @@ const FALLBACK_IMAGE =
 function defaultReps(targetReps?: string): number {
   const match = targetReps?.match(/\d+/);
   return match ? parseInt(match[0], 10) : 10;
-}
-
-/** Every set of one exercise, in the shape the completion endpoint takes. */
-function groupByExercise(sets: { exercise_id: string; name: string; set_number: number; weight_kg: number; reps_completed: number; rpe: number }[]) {
-  const byExercise = new Map<string, { exercise_id: string; name: string; sets: any[] }>();
-  for (const set of sets) {
-    const entry = byExercise.get(set.exercise_id) ?? {
-      exercise_id: set.exercise_id,
-      name: set.name,
-      sets: [],
-    };
-    entry.sets.push({
-      set_number: set.set_number,
-      weight_kg: set.weight_kg,
-      reps_completed: set.reps_completed,
-      rpe: set.rpe,
-    });
-    byExercise.set(set.exercise_id, entry);
-  }
-  return [...byExercise.values()];
 }
 
 export default function WorkoutActive() {
@@ -124,47 +104,23 @@ export default function WorkoutActive() {
       target_reps: defaultReps(currentExercise.target_reps),
     }).then((r) => { if (r?.should_scale) setScaleTip(r.decisions[0]?.description ?? r.summary); });
 
+    const restSeconds = currentExercise.rest_seconds ?? 90;
     if (setNum < (currentExercise.sets || 1)) {
       setSetNum((n) => n + 1);
-      setRest(90);
+      setRest(restSeconds);
     } else if (exIdx < exercises.length - 1) {
       setExIdx((i) => i + 1);
       setSetNum(1);
-      setRest(90);
+      setRest(restSeconds);
     } else {
       finishWorkout();
     }
   };
 
-  /**
-   * Send the session, then move on.
-   *
-   * The sets were only ever kept in the local store, so the server never saw
-   * the work: training load, the acute:chronic ratio and therefore tomorrow's
-   * decision were all computed from an empty history. The average RPE across
-   * the logged sets is the session RPE, which is what load is calculated from.
-   */
-  const finishWorkout = async () => {
+  // workout-complete sends the session once, with the user's RPE and notes.
+  const finishWorkout = () => {
     if (finishing) return;
     setFinishing(true);
-
-    const sets = loggedSets.length ? loggedSets : [];
-    const averageRpe = sets.length
-      ? Math.round(sets.reduce((sum, set) => sum + (set.rpe || 0), 0) / sets.length)
-      : 0;
-
-    if (sets.length && activeWorkout?.workout_id) {
-      await patchJson(`/workouts/${activeWorkout.workout_id}`, {
-        user_id: userId,
-        actual_duration_minutes: Math.max(1, Math.round(elapsed / 60)),
-        // The endpoint requires 1-10; a session with no RPE recorded still has
-        // a duration worth keeping, so it lands at the middle rather than failing.
-        session_rpe: Math.min(10, Math.max(1, averageRpe || 5)),
-        logged_exercises: groupByExercise(sets),
-      });
-    }
-
-    setFinishing(false);
     router.push('/workout-complete');
   };
 

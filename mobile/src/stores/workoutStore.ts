@@ -10,6 +10,7 @@ export interface Exercise {
   target_reps: string;
   target_rpe?: number;
   gif_url?: string;
+  rest_seconds?: number;
 }
 
 interface Workout {

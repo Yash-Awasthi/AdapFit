@@ -130,15 +130,18 @@ def select_adaptive_workout(
 
     scored.sort(key=lambda x: x[1], reverse=True)
 
-    # Step 3: Select with muscle group variety
+    # Step 3: one exercise per muscle group first, then fill from the best of the rest.
     selected = []
     used_muscles = set()
-    for exercise, score in scored:
-        if len(selected) >= target_exercises:
-            break
-        if exercise.muscle_group not in used_muscles or len(selected) < target_exercises // 2:
+    for exercise, _ in scored:
+        if len(selected) < target_exercises and exercise.muscle_group not in used_muscles:
             selected.append(exercise)
             used_muscles.add(exercise.muscle_group)
+    for exercise, _ in scored:
+        if len(selected) >= target_exercises:
+            break
+        if exercise not in selected:
+            selected.append(exercise)
 
     return {
         "exercises": [
@@ -251,33 +254,29 @@ def suggest_progression(
 
     recent = performance_history[-10:]
     recent_rpes = [p.rpe for p in recent if p.rpe is not None]
-    completion_rate = sum(1 for p in recent if p.completed) / len(recent)
-
     if not recent_rpes:
         return {"recommendation": "start_light", "reason": "No RPE data — begin with baseline"}
 
+    completion_rate = sum(1 for p in recent if p.completed) / len(recent)
     avg_rpe = statistics.mean(recent_rpes)
 
-    if avg_rpe < 5 and completion_rate >= 0.9:
-        return {
-            "recommendation": "increase_difficulty",
-            "reason": f"RPE {avg_rpe:.1f} with {completion_rate:.0%} completion — ready for more",
-            "suggested_change": "+1 difficulty or +2 reps",
-        }
-    elif avg_rpe > 8:
+    if len(recent_rpes) >= 2 and all(r > 8 for r in recent_rpes[-2:]):
         return {
             "recommendation": "decrease_difficulty",
-            "reason": f"RPE {avg_rpe:.1f} — too challenging, reduce load",
+            "reason": "RPE above 8 in your last 2 sessions — too challenging, reduce load",
             "suggested_change": "-1 difficulty or add rest day",
         }
-    elif avg_rpe >= 6 and avg_rpe <= 8:
+    if len(recent_rpes) >= 3 and all(r < 6 for r in recent_rpes[-3:]) and completion_rate >= 0.9:
+        change = "+1 difficulty or +2 reps"
+        if profile.limitations:
+            change += f", except on exercises that load your {', '.join(profile.limitations)}"
         return {
-            "recommendation": "maintain",
-            "reason": f"RPE {avg_rpe:.1f} — in optimal training zone",
-            "suggested_change": "Same difficulty, focus on form",
+            "recommendation": "increase_difficulty",
+            "reason": f"RPE under 6 in your last 3 sessions with {completion_rate:.0%} completion — ready for more",
+            "suggested_change": change,
         }
-    else:
-        return {
-            "recommendation": "maintain",
-            "reason": f"RPE {avg_rpe:.1f} with {completion_rate:.0%} completion — steady progress",
-        }
+    return {
+        "recommendation": "maintain",
+        "reason": f"RPE {avg_rpe:.1f} with {completion_rate:.0%} completion — steady progress",
+        "suggested_change": "Same difficulty, focus on form",
+    }

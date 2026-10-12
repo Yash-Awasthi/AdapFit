@@ -83,6 +83,7 @@ class IdentityMiddleware:
         self.app = app
         self._fastapi_app = fastapi_app
         self._matchers: Optional[list[re.Pattern]] = None
+        self._static: set[tuple[str, str]] = set()
 
     def _path_matchers(self) -> list[re.Pattern]:
         """Compiled matchers for every route template that names a user_id."""
@@ -91,6 +92,8 @@ class IdentityMiddleware:
             try:
                 paths = self._fastapi_app.openapi().get("paths", {}) if self._fastapi_app else {}
                 templates = [p for p in paths if "{user_id}" in p]
+                # A literal route such as /passport/create outranks /passport/{user_id}.
+                self._static = {(m.upper(), p) for p, ops in paths.items() if "{" not in p for m in ops}
             except Exception:
                 templates = []
             self._matchers = [_template_to_regex(t) for t in templates]
@@ -154,7 +157,10 @@ class IdentityMiddleware:
         return None
 
     def _rebind_path(self, scope: Scope, path: str, user_id: str) -> None:
-        for matcher in self._path_matchers():
+        matchers = self._path_matchers()
+        if (scope.get("method", ""), path) in self._static:
+            return
+        for matcher in matchers:
             found = matcher.match(path)
             if not found:
                 continue

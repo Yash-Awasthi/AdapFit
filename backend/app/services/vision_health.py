@@ -68,7 +68,7 @@ class VisionHealthService:
             "id": str(uuid.uuid4()),
             "hours": hours,
             "breaks_taken": breaks_taken,
-            "strain_level": min(max(strain_level), 10),
+            "strain_level": min(max(strain_level, 1), 10),
             "recommended_breaks": max(int(hours * 3), 1),
             "break_compliance": min(breaks_taken / max(int(hours * 3), 1) * 100, 100),
             "timestamp": datetime.now().isoformat(),
@@ -80,7 +80,7 @@ class VisionHealthService:
         entry = {
             "id": str(uuid.uuid4()),
             "symptoms": symptoms,
-            "severity": min(max(severity), 10),
+            "severity": min(max(severity, 1), 10),
             "duration_hours": duration_hours,
             "timestamp": datetime.now().isoformat(),
         }
@@ -110,7 +110,7 @@ class VisionHealthService:
         exercises = self.exercise_logs.get(user_id, [])
         score = 100
         if screen:
-            avg_strain = sum(s["strain_level"] for s in strain) / max(len(strain), 1)
+            avg_strain = sum(s["strain_level"] for s in screen) / len(screen)
             score -= avg_strain * 3
         if exercises:
             recent_exercises = [e for e in exercises if datetime.fromisoformat(e["timestamp"]) > datetime.now() - timedelta(days=7)]

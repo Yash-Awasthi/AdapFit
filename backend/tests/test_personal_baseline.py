@@ -52,9 +52,9 @@ def test_identical_readings_do_not_collapse_the_deviation():
 
 
 def test_missing_fields_are_skipped_rather_than_guessed():
-    baseline = compute([{"sleep_duration_hours": 6.0}] * FULL_CONFIDENCE_SAMPLES)
+    baseline = compute([{"sleep_duration_hours": 7.5}] * FULL_CONFIDENCE_SAMPLES)
     assert baseline["hrv_mean_rmssd"] == pytest.approx(DEFAULTS["hrv_mean_rmssd"])
-    assert baseline["sleep_target_hours"] == pytest.approx(6.0, abs=0.1)
+    assert baseline["sleep_target_hours"] == pytest.approx(7.5, abs=0.1)
 
 
 def test_unparseable_values_do_not_crash_the_baseline():

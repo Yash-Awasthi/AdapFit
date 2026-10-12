@@ -1,5 +1,4 @@
 from typing import Optional, Tuple
-import math
 from app.models.schemas import (
     WearableBiometrics,
     SubjectiveCheckin,
@@ -10,6 +9,7 @@ from app.models.schemas import (
     RecoveryCalculationResponse
 )
 from app.core.config import settings
+from app.services.daily_decision import BANDS, Decision
 
 class RecoveryEngine:
     """
@@ -33,12 +33,24 @@ class RecoveryEngine:
         
         std = baseline_std if baseline_std > 0.1 else 10.0
         z_score = (today_hrv - baseline_mean) / std
-        
-        # Map Z-Score (-2.0 to +2.0) linearly to (0 to 100), centered at 50 for z=0
-        hrv_score = 50.0 + (z_score * 25.0)
-        hrv_score = max(0.0, min(100.0, hrv_score))
-        
-        return round(z_score, 2), round(hrv_score, 1)
+        return round(z_score, 2), RecoveryEngine.hrv_score_from_z(z_score)
+
+    @staticmethod
+    def hrv_score_from_z(z_score: float) -> float:
+        """Z-score -2..+2 mapped linearly onto 0..100, centred at 50."""
+        return round(max(0.0, min(100.0, 50.0 + z_score * 25.0)), 1)
+
+    @staticmethod
+    def readiness_for(recovery_score: float) -> ReadinessState:
+        """Readiness on the same bands as the daily decision, so the two never disagree."""
+        floors = {decision: floor for floor, decision in BANDS}
+        if recovery_score >= 85:
+            return ReadinessState.OPTIMAL
+        if recovery_score >= floors[Decision.TRAIN]:
+            return ReadinessState.MODERATE
+        if recovery_score >= floors[Decision.REDUCE]:
+            return ReadinessState.REDUCED
+        return ReadinessState.DEPLETED
 
     @staticmethod
     def calculate_sleep_score(
@@ -68,19 +80,16 @@ class RecoveryEngine:
     def calculate_subjective_score(checkin: Optional[SubjectiveCheckin]) -> float:
         """
         Computes subjective recovery rating from 1-10 Hooper-Mackinnon questionnaire.
-        Formula: (Soreness + Energy + (11-Stress) + (11-Fatigue)) / 40 * 100
+        Formula: (Soreness + Energy + (11-Stress) + sore-area points) / 40 * 100, where no sore areas is 10.
         """
         if checkin is None:
             return 75.0  # Default neutral/good
         
-        # Energy is derived as (11 - fatigue) or direct ratings
-        soreness = checkin.soreness          # 1 (sore) to 10 (fresh)
-        fatigue_inverted = 11 - checkin.fatigue # 1 (exhausted -> inv 10) to 10 (energized -> inv 1) wait:
-        # If checkin.fatigue is 1 (exhausted), 11-fatigue = 10, but we want 1=exhausted (bad) so let's use direct score:
-        # In schemas: soreness: 1(sore)-10(fresh), fatigue: 1(exhausted)-10(energized), stress: 1(relaxed)-10(extreme stress)
-        energy_rating = checkin.fatigue     # 1 (exhausted) to 10 (energized)
-        stress_inverted = 11 - checkin.stress # 1 (relaxed -> 10) to 10 (stressed -> 1)
-        
+        # Scales: soreness 1 sore-10 fresh, fatigue 1 exhausted-10 energized, stress 1 relaxed-10 stressed.
+        soreness = checkin.soreness
+        energy_rating = checkin.fatigue
+        stress_inverted = 11 - checkin.stress
+
         total_points = soreness + energy_rating + stress_inverted + (10 if len(checkin.sore_muscle_groups) == 0 else max(2, 10 - len(checkin.sore_muscle_groups)*2))
         score = (total_points / 40.0) * 100.0
         return round(max(0.0, min(100.0, score)), 1)
@@ -152,18 +161,13 @@ class RecoveryEngine:
         recovery_score = int(round(max(0.0, min(100.0, raw_score))))
 
         # 6. State Machine Classification
-        if recovery_score >= 85:
-            state = ReadinessState.OPTIMAL
-            directive = "High readiness detected. Progressive overload, heavy compound movements, or high intensity recommended."
-        elif recovery_score >= 65:
-            state = ReadinessState.MODERATE
-            directive = "Normal baseline readiness. Standard hypertrophy/endurance session with moderate volume (RPE 7-8)."
-        elif recovery_score >= 45:
-            state = ReadinessState.REDUCED
-            directive = "Mild fatigue or suppressed recovery. Scaled-back volume, lower axial load, or active recovery recommended."
-        else:
-            state = ReadinessState.DEPLETED
-            directive = "Systemic exhaustion or severe workload spike. Prescribed full rest, gentle mobility, foam rolling, or Zone 1 walk."
+        state = cls.readiness_for(recovery_score)
+        directive = {
+            ReadinessState.OPTIMAL: "High readiness detected. Progressive overload, heavy compound movements, or high intensity recommended.",
+            ReadinessState.MODERATE: "Normal baseline readiness. Standard hypertrophy/endurance session with moderate volume (RPE 7-8).",
+            ReadinessState.REDUCED: "Mild fatigue or suppressed recovery. Scaled-back volume and lower axial load recommended.",
+            ReadinessState.DEPLETED: "Recovery is low. Gentle mobility, foam rolling, or a Zone 1 walk instead of training.",
+        }[state]
 
         if acwr_status == ACWRStatus.DANGER_ZONE:
             directive += " [ALERT: ACWR > 1.5 indicates high acute fatigue spike; deload recommended.]"

@@ -98,7 +98,7 @@ class ChronicDiseaseManager:
             "id": str(uuid.uuid4()),
             "condition": condition_key,
             "symptoms": symptoms,
-            "severity": min(max(severity), 10),
+            "severity": min(max(severity, 1), 10),
             "notes": notes,
             "timestamp": datetime.now().isoformat(),
         }
