@@ -2,7 +2,7 @@
  * Animation System — Comprehensive Animation Library
  * Page transitions, card entrances, loading, success/error, scroll-triggered
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useEffectEvent } from 'react';
 import {
   View, Text, Animated, Easing, Dimensions, StyleSheet,
   Platform,
@@ -27,7 +27,7 @@ export const PageTransition: React.FC<PageTransitionProps> = ({
 
   useEffect(() => {
     Animated.timing(animValue, { toValue: 1, duration, delay, useNativeDriver: true, easing: Easing.out(Easing.cubic) }).start();
-  }, []);
+  }, [delay, duration, animValue]);
 
   const getStyle = () => {
     switch (type) {
@@ -63,7 +63,6 @@ export const StaggeredList: React.FC<StaggeredListProps> = ({
     <View>
       {React.Children.map(children, (child, index) => (
         <StaggeredItem
-          key={index}
           delay={index * staggerDelay}
           type={animationType}
           offset={initialOffset}
@@ -85,7 +84,7 @@ const StaggeredItem: React.FC<{
 
   useEffect(() => {
     Animated.timing(animValue, { toValue: 1, duration: 400, delay, useNativeDriver: true, easing: Easing.out(Easing.cubic) }).start();
-  }, []);
+  }, [animValue, delay]);
 
   const getStyle = () => {
     switch (type) {
@@ -128,7 +127,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({ children, onPress, d
 
   useEffect(() => {
     Animated.timing(enterAnim, { toValue: 1, duration: 500, delay, useNativeDriver: true, easing: Easing.out(Easing.cubic) }).start();
-  }, []);
+  }, [delay, enterAnim]);
 
   return (
     <Animated.View
@@ -176,7 +175,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ width = '100%', height = 20,
         Animated.timing(pulseAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+  }, [pulseAnim]);
 
   return (
     <Animated.View
@@ -215,6 +214,7 @@ export const SuccessAnimation: React.FC<SuccessAnimationProps> = ({
 }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const checkAnim = useRef(new Animated.Value(0)).current;
+  const complete = useEffectEvent(() => onComplete?.());
 
   useEffect(() => {
     if (visible) {
@@ -226,11 +226,11 @@ export const SuccessAnimation: React.FC<SuccessAnimationProps> = ({
           Animated.parallel([
             Animated.timing(scaleAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
             Animated.timing(checkAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-          ]).start(() => onComplete?.());
+          ]).start(() => complete());
         }, 1500);
       });
     }
-  }, [visible]);
+  }, [visible, scaleAnim, checkAnim]);
 
   if (!visible) return null;
 
@@ -258,6 +258,7 @@ export const ErrorAnimation: React.FC<ErrorAnimationProps> = ({
 }) => {
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const complete = useEffectEvent(() => onComplete?.());
 
   useEffect(() => {
     if (visible) {
@@ -272,11 +273,11 @@ export const ErrorAnimation: React.FC<ErrorAnimationProps> = ({
         ]),
       ]).start(() => {
         setTimeout(() => {
-          Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => onComplete?.());
+          Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => complete());
         }, 2000);
       });
     }
-  }, [visible]);
+  }, [visible, shakeAnim, fadeAnim]);
 
   if (!visible) return null;
 
@@ -308,7 +309,7 @@ export const Pulse: React.FC<PulseProps> = ({ color = colors.primary, size = 100
         Animated.timing(opacityAnim, { toValue: 0, duration: 1000, useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+  }, [pulseAnim, opacityAnim]);
 
   return (
     <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
@@ -346,12 +347,13 @@ export const LoadingWave: React.FC<LoadingWaveProps> = ({ color = colors.primary
         ])
       ))
     ).start();
-  }, []);
+  }, [animations]);
 
   return (
     <View style={styles.waveContainer}>
       {animations.map((anim, i) => (
         <Animated.View
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
           key={i}
           style={[styles.waveBar, { backgroundColor: color, height: 30, opacity: anim, transform: [{ scaleY: anim }] }]}
         />
@@ -388,7 +390,7 @@ export const Confetti: React.FC<ConfettiProps> = ({ visible, colors: confettiCol
         ]).start();
       });
     }
-  }, [visible]);
+  }, [visible, pieces]);
 
   if (!visible) return null;
 
@@ -396,6 +398,7 @@ export const Confetti: React.FC<ConfettiProps> = ({ visible, colors: confettiCol
     <View style={styles.confettiContainer} pointerEvents="none">
       {pieces.map((piece, i) => (
         <Animated.View
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
           key={i}
           style={[
             styles.confettiPiece,
@@ -437,7 +440,7 @@ export const FloatingLabelInput: React.FC<FloatingLabelProps> = ({
       duration: 200,
       useNativeDriver: true,
     }).start();
-  }, [focused, value]);
+  }, [focused, value, labelAnim]);
 
   const labelStyle = {
     transform: [{ translateY: labelAnim.interpolate({ inputRange: [0, 1], outputRange: [18, -8] }) }],

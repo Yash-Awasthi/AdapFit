@@ -67,6 +67,7 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
     <View style={styles.stepIndicator}>
       {Array.from({ length: total }).map((_, i) => (
         <View
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
           key={i}
           style={[
             styles.stepDot,

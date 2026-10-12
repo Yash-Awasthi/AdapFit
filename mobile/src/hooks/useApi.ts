@@ -21,7 +21,7 @@ export interface ApiState<T> {
   reload: () => Promise<void>;
 }
 
-export function useApi<T>(path: string | null, deps: unknown[] = []): ApiState<T> {
+export function useApi<T>(path: string | null): ApiState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,8 +34,7 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): ApiState<T
     const result = await getJson<T>(path);
     setData(result);
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, ...deps]);
+  }, [path]);
 
   useEffect(() => {
     load();
@@ -64,12 +63,13 @@ export function useApis<T extends Record<string, unknown>>(
   const [refreshing, setRefreshing] = useState(false);
   const key = paths ? JSON.stringify(paths) : '';
 
+  // Keyed on the serialised paths: callers build the object inline, so its identity changes every render.
   const load = useCallback(async () => {
-    if (!paths) {
+    if (!key) {
       setLoading(false);
       return;
     }
-    const entries = Object.entries(paths) as [keyof T, string][];
+    const entries = Object.entries(JSON.parse(key) as { [K in keyof T]: string }) as [keyof T, string][];
     const results = await Promise.all(entries.map(([, path]) => getJson(path)));
     const next: Partial<T> = {};
     entries.forEach(([name], i) => {
@@ -77,7 +77,6 @@ export function useApis<T extends Record<string, unknown>>(
     });
     setData(next);
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   useEffect(() => {

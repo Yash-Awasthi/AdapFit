@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import {
   View,
@@ -64,11 +64,8 @@ export default function WellnessScreen() {
   const [activeMeditation, setActiveMeditation] = useState<Awaited<ReturnType<typeof api.getMeditationSession>> | null>(null);
   const breathAnim = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    fetchData();
-  }, []);
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
       const [exRes, hydData, medData] = await Promise.all([
         authedFetch(`${API}/api/v1/mental-health/breathing-exercises`),
@@ -79,7 +76,10 @@ export default function WellnessScreen() {
       if (hydData) setHydration(hydData);
       if (medData) setMeditations(medData.sessions);
     } catch {}
-  }
+  }, [userId]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   async function openMeditation(id: string) {
     try {

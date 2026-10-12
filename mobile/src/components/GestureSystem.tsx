@@ -149,7 +149,7 @@ export const SwipeableTabBar: React.FC<SwipeableTabBarProps> = ({
 
   React.useEffect(() => {
     indicatorX.value = withSpring(activeTab * tabWidth, { damping: 15, stiffness: 300 });
-  }, [activeTab, tabWidth]);
+  }, [activeTab, tabWidth, indicatorX]);
 
   const indicatorStyle = useAnimatedStyle(() => ({
     width: tabWidth,
@@ -161,7 +161,7 @@ export const SwipeableTabBar: React.FC<SwipeableTabBarProps> = ({
       <View style={styles.tabBar}>
         {tabs.map((tab, i) => (
           <TouchableOpacity
-            key={i}
+            key={tab.label}
             style={styles.tabItem}
             onPress={() => {
               Haptics.selectionAsync();

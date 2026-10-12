@@ -68,7 +68,7 @@ export default function PersonalInfoScreen() {
       setPrimaryGoal(u.primary_goal || 'hypertrophy');
       setDaysPerWeek(String(u.preferred_days_per_week ?? 4));
     }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  }, [userId]);
 
   async function handleSave() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

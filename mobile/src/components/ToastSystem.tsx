@@ -2,7 +2,7 @@
  * Toast Notification System — Slide-in Alerts, Quick Feedback
  * Success, error, warning, info toasts with auto-dismiss
  */
-import React, { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext, useCallback, useEffectEvent } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Animated,
   Dimensions, Platform, StatusBar,
@@ -60,6 +60,7 @@ const ToastItem: React.FC<{
   const slideAnim = useRef(new Animated.Value(t.position === 'bottom' ? 100 : -100)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const config = TOAST_CONFIG[t.type];
+  const dismiss = useEffectEvent(onDismiss);
 
   useEffect(() => {
     // Haptic feedback
@@ -79,11 +80,11 @@ const ToastItem: React.FC<{
       Animated.parallel([
         Animated.timing(slideAnim, { toValue: t.position === 'bottom' ? 100 : -100, duration: 250, useNativeDriver: true }),
         Animated.timing(opacityAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-      ]).start(() => onDismiss());
+      ]).start(() => dismiss());
     }, t.duration || 3000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [t.position, t.duration, t.type, slideAnim, opacityAnim]);
 
   return (
     <Animated.View
@@ -180,7 +181,7 @@ export const QuickAlert: React.FC<QuickAlertProps> = ({
         Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, scaleAnim, opacityAnim]);
 
   if (!visible) return null;
 

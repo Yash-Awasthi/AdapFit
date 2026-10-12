@@ -65,8 +65,8 @@ be borrowed infrastructure.
   (camera heart rate, form checker, BLE, Health Connect, gestures) and move to
   the final releases when they ship. Drop the accepted ids in
   `mobile/scripts/audit-gate.mjs` when fixes ship.
-- Biome warns on about 800 lines (exhaustive deps, index keys, unused code);
-  CI fails only on errors.
+- Biome warns on about 830 lines (`any`, non-null assertions, unused imports
+  and parameters); CI fails only on errors.
 - Re-run `python -m scripts.build_cdsco_fdc` when a new 26A notification is
   published.
 

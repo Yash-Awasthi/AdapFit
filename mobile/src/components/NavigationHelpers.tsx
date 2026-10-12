@@ -64,7 +64,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [slideAnim, fadeAnim]);
 
   const content = (
     <View style={styles.headerContent}>
@@ -124,7 +124,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, slideAnim, opacityAnim]);
 
   if (!visible) return null;
 
@@ -168,7 +168,7 @@ export const FloatingActionButton: React.FC<FABProps> = ({
 
   useEffect(() => {
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 50, friction: 5, delay: 300 }).start();
-  }, []);
+  }, [scaleAnim]);
 
   return (
     <Animated.View

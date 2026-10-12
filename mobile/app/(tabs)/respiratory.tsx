@@ -199,6 +199,7 @@ export default function RespiratoryScreen() {
                   </Pulse>
                 </View>
                 {exercise.steps.map((step, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
                   <Text key={i} style={styles.stepText}>{i + 1}. {step}</Text>
                 ))}
                 {exercise.benefits.length > 0 && (

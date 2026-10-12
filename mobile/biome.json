@@ -13,12 +13,10 @@
       "preset": "recommended",
       "correctness": {
         "noUnusedImports": "warn",
-        "noUnusedVariables": "warn",
-        "useExhaustiveDependencies": "warn"
+        "noUnusedVariables": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "warn",
-        "noArrayIndexKey": "warn"
+        "noExplicitAny": "warn"
       },
       "style": {
         "noNonNullAssertion": "warn"
@@ -39,11 +37,11 @@
   "files": {
     "includes": [
       "**",
-      "!**/node_modules/",
-      "!**/.expo/",
-      "!**/android/",
-      "!**/ios/",
-      "!**/e2e/"
+      "!**/node_modules",
+      "!**/.expo",
+      "!**/android",
+      "!**/ios",
+      "!**/e2e"
     ]
   }
 }

@@ -2,7 +2,7 @@
  * Workout Screen — Premium AI-Powered Workout Generator
  * Glassmorphism cards, animated elements, modern workout UI
  */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
   ScrollView, Animated, ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
@@ -90,15 +90,10 @@ export default function WorkoutScreen() {
     setAsking(false);
   };
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-    fetchWorkouts();
-  }, []);
 
   // Home's Start workout passes a fresh number each press, so it generates again even on an open tab.
-  useEffect(() => { if (auto) generateWorkout(); }, [auto]);
 
-  const fetchWorkouts = async () => {
+  const fetchWorkouts = useCallback(async () => {
     try {
       const res = await authedFetch(`${API}/workouts?days=14`);
       if (res.ok) {
@@ -107,16 +102,21 @@ export default function WorkoutScreen() {
       }
     } catch {}
     setLoading(false);
-  };
+  }, []);
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+    fetchWorkouts();
+  }, [fadeAnim, fetchWorkouts]);
 
-  const generateWorkout = async () => {
+  const generateWorkout = useCallback(async () => {
     setGenerating(true);
     // The server binds the workout to the signed-in account; user_id in the body is ignored.
     const workout = await postJson<any>('/workouts', { user_id: '', target_date: localDay(), target_duration_minutes: minutesFrom(prompt) });
     setGenerating(false);
     if (workout) setWorkouts((prev) => [workout, ...prev]);
     else Alert.alert('No workout', 'The workout could not be generated. Check your connection and try again.');
-  };
+  }, [prompt]);
+  useEffect(() => { if (auto) generateWorkout(); }, [auto, generateWorkout]);
 
   const filteredWorkouts = selectedMuscle === 'All'
     ? workouts

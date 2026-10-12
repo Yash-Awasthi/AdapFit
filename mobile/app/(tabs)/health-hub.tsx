@@ -47,7 +47,7 @@ const BPMSection: React.FC = () => {
     } else {
       pulseAnim.setValue(1);
     }
-  }, [measuring]);
+  }, [measuring, pulseAnim]);
 
   /**
    * rPPG needs the average red, green and blue of each camera frame at around
@@ -244,7 +244,7 @@ const WalkSection: React.FC = () => {
       <SectionHeaderPremium icon="walk" iconColor={colors.health.activity} title="Activity" />
       <View style={styles.goalsRow}>
         {goals.map((g, i) => (
-          <View key={i} style={styles.goalCard}>
+          <View key={g.label} style={styles.goalCard}>
             <View style={[styles.goalIcon, { backgroundColor: g.color + '15' }]}>
               <Ionicons name={g.icon as any} size={18} color={g.color} />
             </View>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -56,16 +56,16 @@ export default function PeriodizationScreen() {
 
   const GOALS = ['strength', 'hypertrophy', 'endurance'];
 
-  useEffect(() => { fetchPlan(); }, [selectedGoal]);
 
-  async function fetchPlan() {
+  const fetchPlan = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authedFetch(`${API}/api/v1/periodization?user_id=${userId}`);
       if (res.ok) setPlan(await res.json());
     } catch {}
     setLoading(false);
-  }
+  }, [userId]);
+  useEffect(() => { fetchPlan(); }, [fetchPlan]);
 
   async function generatePlan(goal: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

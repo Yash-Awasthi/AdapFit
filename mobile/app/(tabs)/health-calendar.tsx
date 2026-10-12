@@ -68,7 +68,7 @@ export default function HealthCalendarScreen() {
             <View style={[presets.card, { marginHorizontal: spacing.lg, marginBottom: spacing.lg }]}>
               <Text style={[typography.heading.h4 as any, { marginBottom: spacing.md }]}>Upcoming Predictions</Text>
               {predictions.predictions.slice(0, 3).map((p: any, i: number) => (
-                <View key={i} style={ns.predictionRow}>
+                <View key={p.cycle} style={ns.predictionRow}>
                   <View style={[ns.predictionDot, { backgroundColor: colors.health.heart }]} />
                   <View style={{ flex: 1 }}>
                     <Text style={[typography.label.sm as any]}>Period #{p.cycle}</Text>
@@ -97,7 +97,7 @@ export default function HealthCalendarScreen() {
           {appointments.length === 0 ? (
             <Text style={[typography.body.sm as any, { color: colors.text.muted, textAlign: 'center', padding: spacing.xl }]}>No upcoming appointments</Text>
           ) : appointments.map((a, i) => (
-            <View key={i} style={ns.appointmentRow}>
+            <View key={`${a.title}-${a.date}-${a.time}`} style={ns.appointmentRow}>
               <Ionicons name="calendar" size={18} color={colors.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={[typography.label.sm as any]}>{a.title}</Text>
@@ -119,7 +119,7 @@ export default function HealthCalendarScreen() {
           {medications.length === 0 ? (
             <Text style={[typography.body.sm as any, { color: colors.text.muted, textAlign: 'center', padding: spacing.xl }]}>No medications scheduled</Text>
           ) : medications.map((m, i) => (
-            <View key={i} style={ns.medRow}>
+            <View key={`${m.name}-${m.dosage}`} style={ns.medRow}>
               <View style={[ns.medIcon, { backgroundColor: colors.health.sleep + '20' }]}>
                 <Ionicons name="medical" size={18} color={colors.health.sleep} />
               </View>

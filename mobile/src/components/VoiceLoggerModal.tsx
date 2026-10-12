@@ -67,7 +67,7 @@ function SoundwaveBar({ index, isActive }: { index: number; isActive: boolean })
         useNativeDriver: false,
       }).start();
     }
-  }, [isActive]);
+  }, [isActive, animValue]);
 
   const height = animValue.interpolate({
     inputRange: [0, 1],
@@ -133,7 +133,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
       pulseAnim.setValue(1);
       setRecordingDuration(0);
     }
-  }, [isRecording]);
+  }, [isRecording, pulseAnim]);
 
   async function toggleRecording() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -239,6 +239,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
           {/* Soundwave Visualizer */}
           <View style={[styles.waveContainer, { backgroundColor: theme.background }]}>
             {Array.from({ length: 20 }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed position is this element's identity; the list never reorders
               <SoundwaveBar key={i} index={i} isActive={isRecording} />
             ))}
           </View>
@@ -287,7 +288,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
             <Text style={[styles.presetLabel, { color: theme.textMuted }]}>Quick Presets:</Text>
             {PRESET_PHRASES.map((phrase, i) => (
               <TouchableOpacity
-                key={i}
+                key={phrase}
                 style={[styles.presetChip, { backgroundColor: theme.background }]}
                 onPress={() => {
                   setInputText(phrase);
