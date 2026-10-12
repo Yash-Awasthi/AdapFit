@@ -1,7 +1,8 @@
 -- Feature data that the app keeps in memory and writes through after each change.
 -- One row per (feature, user) for per-user services, one per feature for shared
--- services, and one per key for module-level stores. Payloads are pickled
--- snapshots restored with an allowlisting unpickler (app/core/durable.py).
+-- services, and one per key for module-level stores. Payloads are sealed JSON
+-- snapshots (app/core/durable.py); scripts/migrate_feature_state_json.py
+-- converts rows written by the earlier pickle format.
 CREATE TABLE IF NOT EXISTS feature_state (
     namespace   TEXT        NOT NULL,
     key         TEXT        NOT NULL,
