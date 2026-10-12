@@ -3,17 +3,21 @@
 Open work for the whole project is in `todo.md`; this file is only what needs
 the Windows machine.
 
-1. Update and apply the pending migrations (012 to 014). `backend/.env` must
-   hold `DATABASE_URL` and the same `DATA_ENCRYPTION_KEYS` the database was
-   written with; a different key makes startup refuse to load sealed rows.
+1. Update and apply the pending migrations (012 to 014), then convert the
+   feature state rows from pickle to JSON (the server refuses to start on a
+   pickled row). `backend/.env` must hold `DATABASE_URL` and the same
+   `DATA_ENCRYPTION_KEYS` the database was written with; a different key makes
+   startup refuse to load sealed rows. The backend now needs Python 3.14 and uv.
    ```powershell
    git checkout master
    git pull
    cd backend
-   python -m scripts.apply_migrations --list
-   python -m scripts.apply_migrations
-   python -m scripts.verify_postgres
-   python -m pytest tests -q -p no:warnings
+   uv sync
+   uv run python -m scripts.apply_migrations --list
+   uv run python -m scripts.apply_migrations
+   uv run python -m scripts.migrate_feature_state_json
+   uv run python -m scripts.verify_postgres
+   uv run python -m pytest tests -q -p no:warnings
    ```
 2. Install and type-check the app:
    ```powershell

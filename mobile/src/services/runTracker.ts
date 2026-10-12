@@ -80,7 +80,7 @@ TaskManager.defineTask(RUN_TASK, async ({ data, error }: TaskManager.TaskManager
     accuracy_m: l.coords.accuracy ?? null, timestamp: new Date(l.timestamp).toISOString(),
   }));
   const queue = await editQueue((q) => [...q, ...fixes]);
-  listeners.forEach((fn) => fn(fixes));
+  for (const fn of listeners) fn(fixes);
   if (queue.length >= BATCH) flush();
 });
 

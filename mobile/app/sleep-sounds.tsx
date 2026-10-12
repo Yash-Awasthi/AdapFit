@@ -71,7 +71,10 @@ export default function SleepSoundsScreen() {
       const now = Date.now();
       detector.current?.push(now, st.metering);
       const m = Math.floor(st.durationMillis / 60000);
-      if (m !== lastMinute) setMinutes((lastMinute = m));
+      if (m !== lastMinute) {
+        lastMinute = m;
+        setMinutes(m);
+      }
     }, 250);
     return () => clearInterval(tick);
   }, [listening, recorder]);

@@ -4,7 +4,7 @@ Write-through persistence for feature state that lives in process memory.
 Three kinds of holder register here: per-user service proxies (one row per
 user), shared service singletons (one row), and module-level dicts (one row
 per key). Everything loads once at startup; after each request the holders
-it touched are snapshotted and any that changed are written back.
+it touched are snapshotted as tagged JSON and any that changed are written back.
 
 This keeps the in-memory model, so the server must run one worker: two
 processes would each hold their own copy.
@@ -12,22 +12,29 @@ ponytail: whole-state load at startup and a single worker; move to per-request
 hydration by user (rows are already keyed by user) when memory or scale demands it.
 """
 import asyncio
+import base64
+import enum
 import hashlib
-import io
+import importlib
+import json
 import logging
 import os
-import pickle
 import sqlite3
 import threading
+from collections import OrderedDict, defaultdict, deque
+from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
+from uuid import UUID
+
+from pydantic import BaseModel
 
 from app.core import crypto
 
 logger = logging.getLogger(__name__)
 
 SHARED_KEY = "_"
-_PROTOCOL = 5
 
 # namespace -> (kind, holder)
 _holders: Dict[str, Tuple[str, Any]] = {}
@@ -40,31 +47,162 @@ _pending: Dict[str, list] = {}
 _loading = False
 
 
-# ── Safe unpickling ─────────────────────────────────────────────────────────
-# Only plain data and classes defined in this app may be rebuilt, so a row
-# written by someone with database access cannot run code when loaded.
-_SAFE = {
-    ("builtins", "set"), ("builtins", "frozenset"), ("builtins", "complex"), ("builtins", "bytearray"),
-    ("datetime", "datetime"), ("datetime", "date"), ("datetime", "time"), ("datetime", "timedelta"),
-    ("datetime", "timezone"), ("collections", "OrderedDict"), ("collections", "defaultdict"),
-    ("collections", "deque"), ("copyreg", "_reconstructor"), ("builtins", "object"),
-    ("builtins", "list"), ("builtins", "dict"), ("decimal", "Decimal"), ("uuid", "UUID"),
-}
+# ── Encoding ────────────────────────────────────────────────────────────────
+# State is stored as tagged JSON, never pickle: decoding only rebuilds plain data,
+# enums and classes defined in this app, so a tampered row cannot run code.
+
+_TAG = "$t"
+_FACTORIES = {"list": list, "dict": dict, "set": set, "int": int, "float": float, "str": str}
 
 
-class _SafeUnpickler(pickle.Unpickler):
-    def find_class(self, module: str, name: str):
-        if (module, name) in _SAFE:
-            return super().find_class(module, name)
-        if module.startswith("app.") and "." not in name:
-            obj = super().find_class(module, name)
-            if isinstance(obj, type) and obj.__module__ == module:
-                return obj
-        raise pickle.UnpicklingError(f"refusing to load {module}.{name}")
+def _class_path(cls: type) -> Optional[str]:
+    module = cls.__module__
+    if module.startswith("app.") and "." not in cls.__qualname__:
+        return f"{module}:{cls.__qualname__}"
+    return None
+
+
+def _class_at(path: str) -> type:
+    module, _, name = path.partition(":")
+    if not module.startswith("app.") or not name or "." in name:
+        raise ValueError(f"refusing to load {path}")
+    cls = getattr(importlib.import_module(module), name, None)
+    if not isinstance(cls, type) or cls.__module__ != module:
+        raise ValueError(f"refusing to load {path}")
+    return cls
+
+
+def _pairs(d: dict) -> list:
+    return [[_encode(k), _encode(v)] for k, v in d.items()]
+
+
+def _encode(value: Any) -> Any:
+    """Tagged-JSON form of value; TypeError for anything that is not state (locks, clients)."""
+    if isinstance(value, enum.Enum):
+        path = _class_path(type(value))
+        if path is None:
+            raise TypeError(f"enum {type(value).__module__}.{type(value).__qualname__} is not this app's")
+        return {_TAG: "enum", "c": path, "v": _encode(value.value)}
+    t = type(value)
+    if value is None or t in (bool, str, int, float):
+        return value
+    if t is list:
+        return [_encode(v) for v in value]
+    if t is dict:
+        if all(type(k) is str for k in value) and _TAG not in value:
+            return {k: _encode(v) for k, v in value.items()}
+        return {_TAG: "dict", "v": _pairs(value)}
+    if t is tuple:
+        return {_TAG: "tuple", "v": [_encode(v) for v in value]}
+    if t in (set, frozenset):
+        return {_TAG: t.__name__, "v": [_encode(v) for v in value]}
+    if t is OrderedDict:
+        return {_TAG: "OrderedDict", "v": _pairs(value)}
+    if t is defaultdict:
+        factory = next((n for n, f in _FACTORIES.items() if f is value.default_factory), None)
+        if factory is None and value.default_factory is not None:
+            raise TypeError(f"defaultdict factory {value.default_factory!r} cannot be stored")
+        return {_TAG: "defaultdict", "f": factory, "v": _pairs(value)}
+    if t is deque:
+        return {_TAG: "deque", "m": value.maxlen, "v": [_encode(v) for v in value]}
+    if t is datetime:
+        return {_TAG: "datetime", "v": value.isoformat()}
+    if t is date:
+        return {_TAG: "date", "v": value.isoformat()}
+    if t is time:
+        return {_TAG: "time", "v": value.isoformat()}
+    if t is timedelta:
+        return {_TAG: "timedelta", "v": [value.days, value.seconds, value.microseconds]}
+    if t is timezone:
+        return {_TAG: "timezone", "v": [value.utcoffset(None).total_seconds(), value.tzname(None)]}
+    if t is Decimal:
+        return {_TAG: "Decimal", "v": str(value)}
+    if t is UUID:
+        return {_TAG: "UUID", "v": str(value)}
+    if t is complex:
+        return {_TAG: "complex", "v": [value.real, value.imag]}
+    if t in (bytes, bytearray):
+        return {_TAG: t.__name__, "v": base64.b64encode(value).decode()}
+    path = _class_path(t)
+    if path is not None:
+        if isinstance(value, BaseModel):
+            return {_TAG: "model", "c": path, "set": sorted(value.model_fields_set),
+                    "v": {k: _encode(v) for k, v in vars(value).items()}}
+        if isinstance(value, tuple):
+            return {_TAG: "obj", "c": path, "args": [_encode(v) for v in value]}
+        if hasattr(value, "__dict__") and not hasattr(t, "__slots__"):
+            return {_TAG: "obj", "c": path, "v": {k: _encode(v) for k, v in vars(value).items()}}
+    raise TypeError(f"{t.__module__}.{t.__qualname__} cannot be stored")
+
+
+def _decode(node: Any) -> Any:
+    if isinstance(node, list):
+        return [_decode(v) for v in node]
+    if not isinstance(node, dict):
+        return node
+    tag = node.get(_TAG)
+    if tag is None:
+        return {k: _decode(v) for k, v in node.items()}
+    v = node.get("v")
+    if tag == "dict":
+        return {_decode(k): _decode(x) for k, x in v}
+    if tag == "OrderedDict":
+        return OrderedDict((_decode(k), _decode(x)) for k, x in v)
+    if tag == "defaultdict":
+        return defaultdict(_FACTORIES[node["f"]] if node["f"] else None, ((_decode(k), _decode(x)) for k, x in v))
+    if tag == "tuple":
+        return tuple(_decode(x) for x in v)
+    if tag == "set":
+        return {_decode(x) for x in v}
+    if tag == "frozenset":
+        return frozenset(_decode(x) for x in v)
+    if tag == "deque":
+        return deque((_decode(x) for x in v), node["m"])
+    if tag == "datetime":
+        return datetime.fromisoformat(v)
+    if tag == "date":
+        return date.fromisoformat(v)
+    if tag == "time":
+        return time.fromisoformat(v)
+    if tag == "timedelta":
+        return timedelta(days=v[0], seconds=v[1], microseconds=v[2])
+    if tag == "timezone":
+        return timezone(timedelta(seconds=v[0]), v[1])
+    if tag == "Decimal":
+        return Decimal(v)
+    if tag == "UUID":
+        return UUID(v)
+    if tag == "complex":
+        return complex(*v)
+    if tag in ("bytes", "bytearray"):
+        raw = base64.b64decode(v)
+        return raw if tag == "bytes" else bytearray(raw)
+    if tag == "enum":
+        cls = _class_at(node["c"])
+        if not issubclass(cls, enum.Enum):
+            raise ValueError(f"{node['c']} is not an enum")
+        return cls(_decode(v))
+    if tag == "model":
+        cls = _class_at(node["c"])
+        if not issubclass(cls, BaseModel):
+            raise ValueError(f"{node['c']} is not a model")
+        return cls.model_construct(set(node["set"]), **{k: _decode(x) for k, x in v.items()})
+    if tag == "obj":
+        cls = _class_at(node["c"])
+        if "args" in node:
+            return cls(*(_decode(x) for x in node["args"]))
+        obj = cls.__new__(cls)
+        vars(obj).update({k: _decode(x) for k, x in v.items()})
+        return obj
+    raise ValueError(f"unknown tag {tag!r}")
+
+
+def _dumps(value: Any) -> bytes:
+    return json.dumps(_encode(value), separators=(",", ":")).encode()
 
 
 def _loads(blob: bytes) -> Any:
-    return _SafeUnpickler(io.BytesIO(blob)).load()
+    return _decode(json.loads(blob))
 
 
 # ── Storage backends ────────────────────────────────────────────────────────
@@ -247,27 +385,26 @@ def durable_dict(namespace: str) -> DurableDict:
 
 # ── Snapshots ───────────────────────────────────────────────────────────────
 
-def _state_of(obj: Any) -> Dict[str, Any]:
-    """Instance attributes that can be pickled; locks, sockets and clients are skipped."""
+def _state_of(obj: Any) -> bytes:
+    """Instance attributes that are data; locks, sockets and clients are skipped."""
     out = {}
     for name, value in vars(obj).items():
         try:
-            pickle.dumps(value, _PROTOCOL)
-        except Exception:
+            out[name] = _encode(value)
+        except TypeError:
             continue
-        out[name] = value
-    return out
+    return json.dumps(out, separators=(",", ":")).encode()
 
 
 def _snapshot(namespace: str, key: str) -> Optional[bytes]:
     kind, holder = _holders[namespace]
     if kind == "per_user":
         instances = object.__getattribute__(holder, "_instances")
-        return pickle.dumps(_state_of(instances[key]), _PROTOCOL) if key in instances else None
+        return _state_of(instances[key]) if key in instances else None
     if kind == "shared":
-        return pickle.dumps(_state_of(object.__getattribute__(holder, "_instance")), _PROTOCOL)
+        return _state_of(object.__getattribute__(holder, "_instance"))
     if dict.__contains__(holder, key):
-        return pickle.dumps(dict.__getitem__(holder, key), _PROTOCOL)
+        return _dumps(dict.__getitem__(holder, key))
     return None
 
 
@@ -290,6 +427,8 @@ async def load_all() -> Dict[str, int]:
         for namespace, key, sealed in await _store().load_all():
             # Outside the try: a missing key must stop startup, not restore empty state that is then saved.
             blob = crypto.open_sealed(sealed, _aad(namespace, key))
+            if blob[:1] == b"\x80":
+                raise RuntimeError("feature_state holds pickled rows; run python -m scripts.migrate_feature_state_json")
             if namespace not in _holders:
                 _pending.setdefault(namespace, []).append((key, blob))
                 skipped += 1

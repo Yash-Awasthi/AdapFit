@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Target, Zap, CheckCircle, AlertTriangle, X, ChevronLeft, Camera as CameraIcon } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { api } from '../src/services/api';
 import { useTheme } from '../src/services/theme';
@@ -231,13 +231,13 @@ export default function FormCheckerScreen() {
   const renderExercise = ({ item }: { item: ExerciseDefinition }) => (
     <TouchableOpacity style={s.exerciseCard} onPress={() => startSession(item)}>
       <View style={[s.exerciseIcon, { backgroundColor: item.visualization.color + '20' }]}>
-        <Target size={24} color={item.visualization.color} />
+        <Ionicons name="locate-outline" size={24} color={item.visualization.color} />
       </View>
       <View style={s.exerciseInfo}>
         <Text style={s.exerciseName}>{item.name}</Text>
         <Text style={s.exerciseMuscle}>{item.target_muscle}</Text>
       </View>
-      <Zap size={16} color={theme.textMuted} />
+      <Ionicons name="flash-outline" size={16} color={theme.textMuted} />
     </TouchableOpacity>
   );
 
@@ -246,7 +246,7 @@ export default function FormCheckerScreen() {
       <View style={s.container}>
         <View style={s.activeHeader}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="End session" onPress={endSession}>
-            <X size={24} color={theme.textSecondary} />
+            <Ionicons name="close" size={24} color={theme.textSecondary} />
           </TouchableOpacity>
           <Text style={s.activeTitle}>{selectedExercise.name}</Text>
           <View style={s.repBadge}>
@@ -282,7 +282,7 @@ export default function FormCheckerScreen() {
 
         {!!lastMessage && (
           <View style={s.messageBox}>
-            <AlertTriangle size={14} color={theme.warning} />
+            <Ionicons name="warning-outline" size={14} color={theme.warning} />
             <Text style={s.messageText}>{lastMessage}</Text>
           </View>
         )}
@@ -292,7 +292,7 @@ export default function FormCheckerScreen() {
             <Text style={s.rulesTitle}>Corrections:</Text>
             {suggestions.map((s2, i) => (
               <View key={i} style={s.ruleRow}>
-                <AlertTriangle size={14} color={theme.danger} />
+                <Ionicons name="warning-outline" size={14} color={theme.danger} />
                 <Text style={s.ruleText}>{s2}</Text>
               </View>
             ))}
@@ -301,14 +301,14 @@ export default function FormCheckerScreen() {
         {grade === 'A' && suggestions.length === 0 && (
           <View style={s.rulesContainer}>
             <View style={s.ruleRow}>
-              <CheckCircle size={14} color={theme.success} />
+              <Ionicons name="checkmark-circle-outline" size={14} color={theme.success} />
               <Text style={s.ruleText}>Form looks solid — keep it up.</Text>
             </View>
           </View>
         )}
 
         <TouchableOpacity style={s.simulateBtn} onPress={() => withCountdown(checkForm)} disabled={analyzing || autoCounting || countdown !== null}>
-          <CameraIcon size={16} color="#CBD5E1" />
+          <Ionicons name="camera-outline" size={16} color="#CBD5E1" />
           <Text style={s.simulateBtnText}>{analyzing ? 'Analyzing…' : countdown !== null ? `Starting in ${countdown}…` : 'Check Form (5 s timer)'}</Text>
         </TouchableOpacity>
 
@@ -330,7 +330,7 @@ export default function FormCheckerScreen() {
     <View style={s.container}>
       <View style={s.topRow}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={s.backBtn}>
-          <ChevronLeft size={22} color={theme.text} />
+          <Ionicons name="chevron-back" size={22} color={theme.text} />
         </TouchableOpacity>
       </View>
       <Text style={s.title}>Form Checker</Text>

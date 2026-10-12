@@ -120,7 +120,7 @@ async def synthesize_speech(
     if edge is None:
         return {
             "ok": False,
-            "message": "TTS engine unavailable — install edge-tts (pip install edge-tts).",
+            "message": "TTS engine unavailable — install the backend's ml extra (uv sync --extra ml).",
             "available": False,
         }
 

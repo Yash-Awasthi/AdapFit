@@ -15,7 +15,7 @@ let reachable = true;
 function report(ok: boolean) {
   if (ok === reachable) return;
   reachable = ok;
-  listeners.forEach((l) => l(ok));
+  for (const l of listeners) l(ok);
 }
 export function onReachabilityChange(listener: Reachability): () => void {
   listeners.add(listener);

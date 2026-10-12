@@ -38,7 +38,7 @@ let currentState: SyncState = {
 };
 
 function notifyListeners() {
-  listeners.forEach((cb) => cb({ ...currentState }));
+  for (const cb of listeners) cb({ ...currentState });
 }
 
 export function onSyncStateChange(callback: (state: SyncState) => void): () => void {
