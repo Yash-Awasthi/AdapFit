@@ -166,9 +166,10 @@ class StorageEngine:
         async with self._lock:
             log.setdefault("id", str(uuid.uuid4()))
             log.setdefault("created_at", datetime.now(timezone.utc).isoformat())
-            if user_id not in self.recovery_logs:
-                self.recovery_logs[user_id] = []
-            self.recovery_logs[user_id].append(log)
+            # One log per day, as Postgres upserts on (user_id, log_date).
+            day = log.get("log_date")
+            logs = [l for l in self.recovery_logs.get(user_id, []) if day is None or l.get("log_date") != day]
+            self.recovery_logs[user_id] = logs + [log]
             if len(self.recovery_logs[user_id]) > 90:
                 self.recovery_logs[user_id] = self.recovery_logs[user_id][-90:]
             await self._save()

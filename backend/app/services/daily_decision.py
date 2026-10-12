@@ -37,8 +37,9 @@ HEADLINE = {
 # Upper bound on ACWR before added load is treated as a spike.
 ACWR_SPIKE = 1.5
 ACWR_HIGH = 1.3
-SEVERE_SORENESS = 8
-SEVERE_FATIGUE = 8
+# Check-in scales run 1 (very sore / exhausted) to 10 (fresh / energized), so low is bad.
+SEVERE_SORENESS = 3
+SEVERE_FATIGUE = 3
 
 
 @dataclass
@@ -49,8 +50,8 @@ class DecisionSignals:
     sleep_hours: Optional[float] = None
     sleep_score: Optional[float] = None
     hrv_z_score: Optional[float] = None
-    soreness: Optional[float] = None       # 1-10, higher is worse
-    fatigue: Optional[float] = None        # 1-10, higher is worse
+    soreness: Optional[float] = None       # 1 very sore - 10 fresh
+    fatigue: Optional[float] = None        # 1 exhausted - 10 energized
     resting_hr_delta: Optional[float] = None
     pain_flagged: bool = False
     illness_flagged: bool = False
@@ -122,35 +123,41 @@ def decide(signals: DecisionSignals) -> DailyDecision:
         decision = _band(score)
         reasons.append(f"Recovery score is {round(score)}/100.")
 
+    # The recovery score already weighs HRV, sleep, check-in ratings and load, so a
+    # flag only stops a full-training day; pushing a low band lower counts it twice.
+    flagged = False
     if signals.hrv_z_score is not None:
         if signals.hrv_z_score <= -1.0:
             reasons.append(f"HRV is {abs(signals.hrv_z_score):.1f} SD below your baseline.")
-            decision = _downgrade(decision)
+            flagged = True
         elif signals.hrv_z_score >= 1.0:
             reasons.append(f"HRV is {signals.hrv_z_score:.1f} SD above your baseline.")
 
     if signals.sleep_hours is not None and signals.sleep_hours < 6:
-        reasons.append(f"You slept {signals.sleep_hours:.1f}h, below your usual need.")
-        decision = _downgrade(decision)
+        reasons.append(f"You slept {signals.sleep_hours:.1f}h, below the 7h most adults need.")
+        flagged = True
     elif signals.sleep_score is not None and signals.sleep_score < 50:
         reasons.append("Sleep quality was poor last night.")
-        decision = _downgrade(decision)
+        flagged = True
 
     if signals.acwr is not None:
         if signals.acwr >= ACWR_SPIKE:
             reasons.append(f"Training load spiked (ACWR {signals.acwr:.2f}).")
-            decision = _downgrade(decision)
+            flagged = True
         elif signals.acwr >= ACWR_HIGH:
             reasons.append(f"Recent load is elevated (ACWR {signals.acwr:.2f}).")
             cautions.append("Hold volume flat this week rather than adding to it.")
         elif signals.acwr < 0.8:
             reasons.append(f"Recent load is light (ACWR {signals.acwr:.2f}), leaving room to build.")
 
-    if signals.soreness is not None and signals.soreness >= SEVERE_SORENESS:
-        reasons.append(f"Muscle soreness is high ({signals.soreness:.0f}/10).")
-        decision = _downgrade(decision)
-    if signals.fatigue is not None and signals.fatigue >= SEVERE_FATIGUE:
-        reasons.append(f"Perceived fatigue is high ({signals.fatigue:.0f}/10).")
+    if signals.soreness is not None and signals.soreness <= SEVERE_SORENESS:
+        reasons.append(f"Muscle soreness is high (you rated freshness {signals.soreness:.0f}/10).")
+        flagged = True
+    if signals.fatigue is not None and signals.fatigue <= SEVERE_FATIGUE:
+        reasons.append(f"Energy is low ({signals.fatigue:.0f}/10).")
+        flagged = True
+
+    if flagged and (score is None or decision == Decision.TRAIN):
         decision = _downgrade(decision)
 
     if signals.resting_hr_delta is not None and signals.resting_hr_delta >= 7:

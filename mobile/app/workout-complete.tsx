@@ -14,7 +14,8 @@ export default function WorkoutComplete() {
   const { theme } = useTheme();
   const userId = useUserStore((s) => s.userId);
   const { activeWorkout, loggedSets, startedAt, endWorkout } = useWorkoutStore();
-  const [rpe, setRpe] = useState(7);
+  const setRpes = loggedSets.map((x) => x.rpe).filter((x): x is number => typeof x === 'number' && x > 0);
+  const [rpe, setRpe] = useState(setRpes.length ? Math.round(setRpes.reduce((a, b) => a + b, 0) / setRpes.length) : 7);
   const [enj, setEnj] = useState(8);
   const [notes, setNotes] = useState('');
   const [done, setDone] = useState(false);

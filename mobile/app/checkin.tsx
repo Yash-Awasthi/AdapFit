@@ -12,6 +12,8 @@ import { authedFetch } from '../src/services/authToken';
 import { localDay } from '../src/utils/date';
 
 const API = API_BASE_URL;
+// Body areas the server expands to catalog muscles when it leaves sore ones out of a plan.
+const SORE_AREAS = ['chest', 'back', 'shoulders', 'arms', 'core', 'legs'];
 
 function SliderField({
   label,
@@ -93,6 +95,9 @@ export default function CheckinScreen() {
   const [soreness, setSoreness] = useState(5);
   const [fatigue, setFatigue] = useState(5);
   const [stress, setStress] = useState(5);
+  const [soreAreas, setSoreAreas] = useState<string[]>([]);
+  const [pain, setPain] = useState(false);
+  const [ill, setIll] = useState(false);
   const [loading, setLoading] = useState(false);
   const [health, setHealth] = useState<HealthBiometrics | null>(null);
   const router = useRouter();
@@ -125,7 +130,9 @@ export default function CheckinScreen() {
             soreness,
             fatigue,
             stress,
-            sore_muscle_groups: [],
+            sore_muscle_groups: soreAreas,
+            pain_flagged: pain,
+            illness_flagged: ill,
           },
           wearable_data: {
             sleep_duration_hours: sleepSet ? sleep : undefined,
@@ -217,6 +224,43 @@ export default function CheckinScreen() {
         color={theme.danger}
       />
 
+      <Text style={s.sectionLabel}>Sore areas</Text>
+      <View style={s.chipRow}>
+        {SORE_AREAS.map((area) => {
+          const on = soreAreas.includes(area);
+          return (
+            <TouchableOpacity
+              key={area}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on }}
+              style={[s.chip, on && { backgroundColor: theme.danger, borderColor: theme.danger }]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setSoreAreas((cur) => (on ? cur.filter((a) => a !== area) : [...cur, area]));
+              }}
+            >
+              <Text style={[s.chipText, on && { color: '#fff' }]}>{area}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {[
+        { label: 'I have pain (not just soreness)', value: pain, set: setPain },
+        { label: "I'm feeling ill", value: ill, set: setIll },
+      ].map(({ label, value, set }) => (
+        <TouchableOpacity
+          key={label}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: value }}
+          style={[s.flagRow, value && { borderColor: theme.danger }]}
+          onPress={() => { Haptics.selectionAsync(); set(!value); }}
+        >
+          <Text style={s.flagText}>{label}</Text>
+          <Text style={[s.flagValue, value && { color: theme.danger }]}>{value ? 'Yes' : 'No'}</Text>
+        </TouchableOpacity>
+      ))}
+
       <Button
         title="Submit Check-in"
         onPress={handleSubmit}
@@ -233,6 +277,13 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
     subtitle: { fontSize: 14, color: theme.textMuted, marginBottom: 16 },
     syncBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
     syncBadgeText: { fontSize: 12, fontWeight: '600' },
+    sectionLabel: { fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 12 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
+    chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface },
+    chipText: { fontSize: 13, fontWeight: '600', color: theme.textMuted, textTransform: 'capitalize' },
+    flagRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface, marginBottom: 12 },
+    flagText: { fontSize: 14, color: theme.text, flex: 1 },
+    flagValue: { fontSize: 14, fontWeight: '700', color: theme.textMuted },
   });
 }
 

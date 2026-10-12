@@ -124,3 +124,9 @@ def test_template_matcher_captures_only_the_user_segment():
     found = matcher.match("/api/v1/x/abc/items/99")
     assert found and found.group("user_id") == "abc"
     assert matcher.match("/api/v1/x/abc/items/99/extra") is None
+
+
+def test_a_static_segment_is_not_mistaken_for_a_user_id(caller):
+    """POST /passport/create must reach its own route, not /passport/{user_id}."""
+    r = c.post("/api/v1/passport/create", json={}, headers=_headers(caller))
+    assert r.status_code == 422, r.text

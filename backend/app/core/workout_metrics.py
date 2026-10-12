@@ -77,10 +77,15 @@ def acwr(logs: Iterable[Mapping[str, Any]], today: Optional[date] = None) -> Tup
         return None, None
     acute = chronic = 0.0
     la, lc = 2 / (ACUTE_DAYS + 1), 2 / (CHRONIC_DAYS + 1)
-    for offset in range((today - first).days + 1):
+    days = (today - first).days + 1
+    for offset in range(days):
         load = daily.get(date.fromordinal(first.toordinal() + offset), 0.0)
         acute = la * load + (1 - la) * acute
         chronic = lc * load + (1 - lc) * chronic
+    # Both averages start from zero; dividing out the missing weight stops a young
+    # history reading as a spike (steady training would otherwise show ACWR ~1.16).
+    acute /= 1 - (1 - la) ** days
+    chronic /= 1 - (1 - lc) ** days
     return round(acute, 1), round(chronic, 1)
 
 
