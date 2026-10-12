@@ -11,7 +11,7 @@ from app.models.schemas import (
     PrescribedExercise,
     WarmupCooldownItem
 )
-from app.services.exercise_service import exercise_service
+from app.services.exercise_service import exercise_service, fit_to_minutes, session_minutes
 from app.core.gemini import gemini_endpoint
 from app.core.llm_quota import ai_call_allowed
 
@@ -38,7 +38,8 @@ class RecommendationEngine:
         eq = equipment_access or ["bodyweight", "dumbbells"]
 
         # 1. Attempt Gemini 2.0 Flash / Groq LLM Generation if API Key is configured
-        if settings.GEMINI_API_KEY and ai_call_allowed():
+        # A depleted day is fixed mobility work; there is nothing for a model to plan.
+        if readiness_state != ReadinessState.DEPLETED and settings.GEMINI_API_KEY and ai_call_allowed():
             try:
                 llm_result = await cls._generate_via_gemini(
                     readiness_state=readiness_state,
@@ -49,14 +50,19 @@ class RecommendationEngine:
                     goal=goal
                 )
                 if llm_result:
+                    # The model's own duration is not trusted; the plan is cut to the time asked for.
+                    minutes = session_minutes(readiness_state, target_duration)
+                    exercises = fit_to_minutes([PrescribedExercise(**e) for e in llm_result.get("exercises", [])], minutes)
+                    if not exercises:
+                        raise ValueError("model returned no exercises")
                     return WorkoutGenerateResponse(
                         workout_id=workout_id,
                         title=llm_result.get("title", f"Adaptive Workout ({readiness_state.value})"),
                         readiness_state=readiness_state,
                         adaptation_rationale=screen_reply(llm_result.get("adaptation_rationale")) or f"Scaled for {readiness_state.value} recovery.",
-                        target_duration_minutes=llm_result.get("target_duration_minutes", target_duration),
+                        target_duration_minutes=minutes,
                         warmup=[WarmupCooldownItem(**w) for w in llm_result.get("warmup", [])],
-                        exercises=[PrescribedExercise(**e) for e in llm_result.get("exercises", [])],
+                        exercises=exercises,
                         cooldown=[WarmupCooldownItem(**c) for c in llm_result.get("cooldown", [])]
                     )
             except Exception:
@@ -66,7 +72,9 @@ class RecommendationEngine:
         fallback_data = exercise_service.get_fallback_routine(
             readiness_state=readiness_state,
             sore_muscles=sore,
-            equipment=eq
+            equipment=eq,
+            target_duration=target_duration,
+            seed=str(target_date),
         )
 
         return WorkoutGenerateResponse(

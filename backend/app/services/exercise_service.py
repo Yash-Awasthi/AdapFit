@@ -1,7 +1,46 @@
 import json
 import os
+import random
 from typing import List, Optional, Dict, Any
 from app.models.schemas import ExerciseItem, PrescribedExercise, ReadinessState, WarmupCooldownItem
+
+# Body regions a balanced session rotates through, keyed by the catalog's primary muscle names.
+_REGION = {
+    "quadriceps": "legs", "quads": "legs", "hamstrings": "legs", "glutes": "legs", "calves": "legs",
+    "inner_thighs": "legs", "chest": "push", "shoulders": "push", "triceps": "push",
+    "back": "pull", "middle back": "pull", "lats": "pull", "traps": "pull", "rear_delts": "pull",
+    "biceps": "pull", "core": "core", "lower back": "core", "forearms": "arms",
+}
+_REGION_ORDER = ("legs", "push", "pull", "core")
+_AREA_MUSCLES = {
+    "arms": {"biceps", "triceps", "forearms"},
+    "back": {"middle back", "lats", "lower back", "traps", "rear_delts"},
+}
+# Minutes outside the working sets: warm-up, cool-down, changeovers.
+_OVERHEAD_MINUTES = 8
+
+def session_minutes(readiness_state: ReadinessState, requested: int) -> int:
+    """A reduced day gets two thirds of the requested time."""
+    return round(requested * 2 / 3) if readiness_state == ReadinessState.REDUCED else requested
+
+
+def exercise_minutes(sets: int, rest_seconds: int) -> float:
+    """About 45s of work per set, the prescribed rest, and a minute to change over."""
+    return sets * (45 + rest_seconds) / 60 + 1
+
+
+def fit_to_minutes(exercises: List[PrescribedExercise], minutes: int) -> List[PrescribedExercise]:
+    """Keep exercises in order while they fit the session; always keep the first."""
+    budget = minutes - _OVERHEAD_MINUTES
+    kept: List[PrescribedExercise] = []
+    for ex in exercises:
+        cost = exercise_minutes(ex.sets, ex.rest_seconds)
+        if kept and cost > budget:
+            break
+        kept.append(ex)
+        budget -= cost
+    return kept
+
 
 class ExerciseService:
     def __init__(self):
@@ -30,6 +69,9 @@ class ExerciseService:
         """
         filtered = []
         exclude_set = set(m.lower() for m in (exclude_muscles or []))
+        # The check-in names body areas ("legs", "arms"); expand them to catalog muscles.
+        for area in list(exclude_set):
+            exclude_set |= {m for m, region in _REGION.items() if region == area} | _AREA_MUSCLES.get(area, set())
 
         for ex in self.exercises:
             # Equipment check
@@ -63,10 +105,15 @@ class ExerciseService:
         self,
         readiness_state: ReadinessState,
         sore_muscles: Optional[List[str]] = None,
-        equipment: Optional[List[str]] = None
+        equipment: Optional[List[str]] = None,
+        target_duration: int = 45,
+        seed: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Generates a 100% deterministic, rule-based workout fallback if LLM is offline.
+        Rule-based workout used when no LLM is available.
+
+        Deterministic for a given seed (the target date), so a day's plan is stable
+        while consecutive days rotate through different exercises.
         """
         eq = equipment or ["bodyweight", "dumbbells"]
         sore = sore_muscles or []
@@ -118,7 +165,7 @@ class ExerciseService:
             cooldown = [
                 WarmupCooldownItem(name="Foam Rolling SMR (Quads & Glutes)", duration_sec=120)
             ]
-            candidates = self.filter_exercises(eq, max_axial_load=max_axial, exclude_muscles=sore)
+            candidates = self.filter_exercises(eq, max_axial_load=max_axial, exclude_muscles=sore, category="strength")
 
         else: # DEPLETED (Red)
             title = "Active Recovery & Mobility Restoration"
@@ -177,29 +224,24 @@ class ExerciseService:
                 "cooldown": []
             }
 
-        # Build exercises from candidates (pick up to 4 diverse exercises)
-        selected_exercises: List[PrescribedExercise] = []
-        used_muscles = set()
+        duration = session_minutes(readiness_state, target_duration)
+        wanted = max(2, min(8, int((duration - _OVERHEAD_MINUTES) // exercise_minutes(sets_count, rest))))
+        picks = self._balanced_pick(candidates, wanted, seed)
 
-        for cand in candidates:
-            prim = cand.primary_muscles[0] if cand.primary_muscles else "chest"
-            if prim not in used_muscles or len(selected_exercises) < 3:
-                used_muscles.add(prim)
-                selected_exercises.append(
-                    PrescribedExercise(
-                        exercise_id=cand.id,
-                        name=cand.name,
-                        target_muscle=prim.capitalize(),
-                        sets=sets_count,
-                        target_reps=reps,
-                        target_rpe=target_rpe,
-                        rest_seconds=rest,
-                        gif_url=cand.gif_url,
-                        notes=f"Prescribed for {readiness_state.value} state. Focus on controlled cadence."
-                    )
-                )
-            if len(selected_exercises) >= 4:
-                break
+        selected_exercises: List[PrescribedExercise] = [
+            PrescribedExercise(
+                exercise_id=cand.id,
+                name=cand.name,
+                target_muscle=cand.primary_muscles[0].capitalize(),
+                sets=sets_count,
+                target_reps=reps,
+                target_rpe=target_rpe,
+                rest_seconds=rest,
+                gif_url=cand.gif_url,
+                notes=f"Prescribed for {readiness_state.value} state. Focus on controlled cadence."
+            )
+            for cand in picks
+        ]
 
         if not selected_exercises:
             # Guaranteed fallback
@@ -221,10 +263,30 @@ class ExerciseService:
         return {
             "title": title,
             "adaptation_rationale": rationale,
-            "target_duration_minutes": 45 if readiness_state != ReadinessState.REDUCED else 30,
+            "target_duration_minutes": duration,
             "warmup": warmup,
             "exercises": selected_exercises,
             "cooldown": cooldown
         }
+
+    @staticmethod
+    def _balanced_pick(candidates: List[ExerciseItem], wanted: int, seed: Optional[str]) -> List[ExerciseItem]:
+        """Rotate legs, push, pull and core, one exercise per primary muscle."""
+        pool = [c for c in candidates if c.primary_muscles]
+        random.Random(seed).shuffle(pool)
+        picked: List[ExerciseItem] = []
+        used = set()
+        while len(picked) < wanted:
+            before = len(picked)
+            for region in _REGION_ORDER + (None,):
+                cand = next((c for c in pool if c.primary_muscles[0] not in used
+                             and (region is None or _REGION.get(c.primary_muscles[0]) == region)), None)
+                if cand and len(picked) < wanted:
+                    picked.append(cand)
+                    used.add(cand.primary_muscles[0])
+            if len(picked) == before:
+                break
+        return picked
+
 
 exercise_service = ExerciseService()
