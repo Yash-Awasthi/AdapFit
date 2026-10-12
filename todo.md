@@ -63,9 +63,15 @@ be borrowed infrastructure.
 - iOS project, build profile, HealthKit entitlement and sync.
 - Rotated-token memory and the "sessions ended at" cut-off live in process
   memory; persist them before running more than one worker.
-- Expo upgrade only for features, on a branch, with a full device walk; SDK 56
-  does not clear the remaining advisories (`docs/SECURITY.md`). Drop the
-  accepted ids in `mobile/scripts/audit-gate.mjs` when fixes ship.
+- Feature state (`backend/app/core/durable.py`) is now sealed JSON, but still
+  loads whole at startup and shared services hold every user's records in one
+  object; move to per-request hydration by user before raising `--workers`.
+- Expo SDK 58 and React Native 0.88 are pre-releases: walk the app on a device
+  (camera heart rate, form checker, BLE, Health Connect, gestures) and move to
+  the final releases when they ship. Drop the accepted ids in
+  `mobile/scripts/audit-gate.mjs` when fixes ship.
+- Biome warns on about 800 lines (exhaustive deps, index keys, unused code);
+  CI fails only on errors.
 - Re-run `python -m scripts.build_cdsco_fdc` when a new 26A notification is
   published.
 
