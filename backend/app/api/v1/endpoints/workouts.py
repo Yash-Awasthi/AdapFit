@@ -99,10 +99,12 @@ async def complete_workout(workout_id: str, req: WorkoutCompleteRequest):
                     message="Workout already logged.",
                 )
         session_load = float(req.actual_duration_minutes * req.session_rpe)
-        entry = {"session_load": session_load, "session_rpe": req.session_rpe,
-                 "recorded_at": datetime.now(timezone.utc).isoformat()}
+        now = datetime.now(timezone.utc)
+        done_at = req.completed_at or now
+        done_at = min(now, done_at if done_at.tzinfo else done_at.replace(tzinfo=timezone.utc))
+        entry = {"session_load": session_load, "session_rpe": req.session_rpe, "recorded_at": done_at.isoformat()}
         history = await storage.get_workload_history(req.user_id, workout_metrics.HISTORY_ENTRIES)
-        acute_load, chronic_load = workout_metrics.acwr(history + [entry])
+        acute_load, chronic_load = workout_metrics.acwr(history + [entry], done_at.date())
         acwr, acwr_status, _ = RecoveryEngine.evaluate_acwr(acute_load, chronic_load)
         if acwr is None:
             acwr_status = None
@@ -123,6 +125,7 @@ async def complete_workout(workout_id: str, req: WorkoutCompleteRequest):
             "acwr_status": acwr_status,
             "logged_exercises": [ex.model_dump() for ex in req.logged_exercises],
             "user_feedback_notes": req.user_feedback_notes,
+            "completed_at": done_at.isoformat(),
         })
 
         nlp_sentiment = None

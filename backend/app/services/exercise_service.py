@@ -19,6 +19,29 @@ _AREA_MUSCLES = {
 # Minutes outside the working sets: warm-up, cool-down, changeovers.
 _OVERHEAD_MINUTES = 8
 
+def session_minutes(readiness_state: ReadinessState, requested: int) -> int:
+    """A reduced day gets two thirds of the requested time."""
+    return round(requested * 2 / 3) if readiness_state == ReadinessState.REDUCED else requested
+
+
+def exercise_minutes(sets: int, rest_seconds: int) -> float:
+    """About 45s of work per set, the prescribed rest, and a minute to change over."""
+    return sets * (45 + rest_seconds) / 60 + 1
+
+
+def fit_to_minutes(exercises: List[PrescribedExercise], minutes: int) -> List[PrescribedExercise]:
+    """Keep exercises in order while they fit the session; always keep the first."""
+    budget = minutes - _OVERHEAD_MINUTES
+    kept: List[PrescribedExercise] = []
+    for ex in exercises:
+        cost = exercise_minutes(ex.sets, ex.rest_seconds)
+        if kept and cost > budget:
+            break
+        kept.append(ex)
+        budget -= cost
+    return kept
+
+
 class ExerciseService:
     def __init__(self):
         data_path = os.path.join(os.path.dirname(__file__), "..", "data", "exercises.json")
@@ -201,9 +224,8 @@ class ExerciseService:
                 "cooldown": []
             }
 
-        duration = target_duration if readiness_state != ReadinessState.REDUCED else round(target_duration * 2 / 3)
-        per_exercise = sets_count * (45 + rest) / 60 + 1
-        wanted = max(2, min(8, int((duration - _OVERHEAD_MINUTES) // per_exercise)))
+        duration = session_minutes(readiness_state, target_duration)
+        wanted = max(2, min(8, int((duration - _OVERHEAD_MINUTES) // exercise_minutes(sets_count, rest))))
         picks = self._balanced_pick(candidates, wanted, seed)
 
         selected_exercises: List[PrescribedExercise] = [

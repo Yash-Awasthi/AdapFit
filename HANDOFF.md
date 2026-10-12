@@ -95,22 +95,30 @@ it did not persist on Postgres. All of the following are fixed and covered by
 
 ## Verified so far (Linux)
 
-- 1105 backend tests pass (`test_lesion_measure.py` skipped there only because
+- 1110 backend tests pass (`test_lesion_measure.py` skipped there only because
   libGL was missing on that machine).
 - Every route hit as a signed-in user on both the memory store and Postgres 16:
   no 5xx left except the optional pose-estimation and text-to-speech engines
   (503 until their packages are installed).
 - `verify_postgres` passes; a 30-day check-in and workout loop on Postgres gave
   30 distinct plans, a REST plus mobility day on pain, sore legs left out of the
-  next plan, and no duplicate load on repeat completion.
+  next plan, no duplicate load on repeat completion, and backdated sessions
+  giving ACWR None until day 28 and 1.0 for steady training after it.
 - Mobile `tsc` and the `.check.ts` scripts pass.
+
+## Session dating and model plans
+
+- The completion screen sends `completed_at` (taken at submit, so it rides in
+  the offline queue). The server uses it for the load history and the workout
+  log, never later than its own clock, and computes the stored ACWR as of that
+  day. On Postgres it fills `workload_history.recorded_at` and
+  `workout_logs.completed_at` instead of the insert time.
+- A model-generated plan is cut to the requested time with the same per-exercise
+  estimate the rule-based plan uses (`exercise_service.fit_to_minutes`), and a
+  depleted day never asks the model.
 
 ## Still open
 
-- Completed sessions are dated when the server receives them. A workout queued
-  offline and synced days later lands on the sync day in the load history.
-- When an LLM key is set, the generated plan is not checked against the
-  requested duration.
 - Not run on a phone or emulator.
 - The unused-import lint backlog (about 280 entries) is untouched; CI only
   checks syntax and undefined names.

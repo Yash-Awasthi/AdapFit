@@ -86,6 +86,16 @@ def _rows(records: Sequence[asyncpg.Record]) -> List[Dict[str, Any]]:
     return [_row(r) for r in records]
 
 
+def _timestamp(value: Any) -> Optional[datetime]:
+    """An ISO timestamp from a log as a datetime asyncpg can bind; None leaves the column default."""
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value)) if value else None
+    except ValueError:
+        return None
+
+
 def _decode_json(row: Optional[Dict[str, Any]], keys: Sequence[str]) -> Optional[Dict[str, Any]]:
     """asyncpg returns jsonb columns as raw text; decode the given keys in place."""
     if row is None:
@@ -318,8 +328,9 @@ class WorkoutLogRepository:
         pool = await _pool()
         async with pool.acquire() as conn:
             saved = await conn.fetchrow(
-                "INSERT INTO workout_logs (user_id, data) VALUES ($1, $2::jsonb) RETURNING *",
-                user_id, json.dumps(log),
+                "INSERT INTO workout_logs (user_id, data, completed_at) "
+                "VALUES ($1, $2::jsonb, COALESCE($3, NOW())) RETURNING *",
+                user_id, json.dumps(log), _timestamp(log.get("completed_at")),
             )
         result = _decode_json(_row(saved), self._JSON_KEYS)
         return {**result["data"], "id": result["id"], "completed_at": result["completed_at"]}
@@ -348,8 +359,9 @@ class WorkloadRepository:
         pool = await _pool()
         async with pool.acquire() as conn:
             saved = await conn.fetchrow(
-                "INSERT INTO workload_history (user_id, data) VALUES ($1, $2::jsonb) RETURNING *",
-                user_id, json.dumps(entry),
+                "INSERT INTO workload_history (user_id, data, recorded_at) "
+                "VALUES ($1, $2::jsonb, COALESCE($3, NOW())) RETURNING *",
+                user_id, json.dumps(entry), _timestamp(entry.get("recorded_at")),
             )
         result = _decode_json(_row(saved), self._JSON_KEYS)
         return {**result["data"], "recorded_at": result["recorded_at"]}

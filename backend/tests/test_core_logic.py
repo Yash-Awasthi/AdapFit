@@ -158,3 +158,75 @@ def test_logged_symptoms_and_vision_strain_are_clamped_and_scored():
     v.log_screen_time("core-v", 5, 3, 6)
     v.log_strain("core-v", ["dry eyes"], 0, 2.0)
     assert 0 <= v.get_vision_health_score("core-v")["score"] <= 100
+
+
+def test_a_session_synced_later_keeps_the_day_it_was_done():
+    w = c.post("/api/v1/workouts", json={"user_id": "core-sync", "target_date": "2026-06-01"}).json()
+    done_at = "2026-06-01T18:30:00+00:00"
+    body = {"user_id": "core-sync", "actual_duration_minutes": 40, "session_rpe": 7, "logged_exercises": [],
+            "completed_at": done_at}
+    c.patch(f"/api/v1/workouts/{w['workout_id']}", json=body)
+    entry = asyncio.run(storage.get_workload_history("core-sync", 400))[-1]
+    assert str(entry["recorded_at"])[:10] == "2026-06-01"
+
+
+def test_a_completion_time_in_the_future_is_not_trusted():
+    w = c.post("/api/v1/workouts", json={"user_id": "core-future", "target_date": "2026-06-01"}).json()
+    body = {"user_id": "core-future", "actual_duration_minutes": 40, "session_rpe": 7, "logged_exercises": [],
+            "completed_at": "2999-01-01T00:00:00+00:00"}
+    c.patch(f"/api/v1/workouts/{w['workout_id']}", json=body)
+    entry = asyncio.run(storage.get_workload_history("core-future", 400))[-1]
+    assert str(entry["recorded_at"])[:4] != "2999"
+
+
+def _llm_plan(n):
+    ex = {"exercise_id": "pushups", "name": "Push-Up", "target_muscle": "Chest", "sets": 4,
+          "target_reps": "10", "target_rpe": 7.0, "rest_seconds": 90}
+    return {"title": "LLM plan", "adaptation_rationale": "ok", "target_duration_minutes": 120,
+            "warmup": [], "exercises": [dict(ex, exercise_id=f"e{i}") for i in range(n)], "cooldown": []}
+
+
+def test_an_llm_plan_is_fitted_to_the_requested_time(monkeypatch):
+    from app.services import recommendation_engine as re_mod
+    monkeypatch.setattr(re_mod.settings, "GEMINI_API_KEY", "test")
+    monkeypatch.setattr(re_mod, "ai_call_allowed", lambda *a, **k: True)
+
+    async def fake(cls, **kw):
+        return _llm_plan(12)
+    monkeypatch.setattr(re_mod.RecommendationEngine, "_generate_via_gemini", classmethod(fake))
+    w = asyncio.run(re_mod.recommendation_engine.generate_workout(
+        "core-llm", "2026-06-01", ReadinessState.MODERATE, 80, target_duration=30))
+    assert w.target_duration_minutes == 30
+    assert 1 <= len(w.exercises) < 12
+
+
+def test_a_depleted_day_never_asks_the_llm(monkeypatch):
+    from app.services import recommendation_engine as re_mod
+    monkeypatch.setattr(re_mod.settings, "GEMINI_API_KEY", "test")
+    monkeypatch.setattr(re_mod, "ai_call_allowed", lambda *a, **k: True)
+
+    calls = []
+
+    async def fake(cls, **kw):
+        calls.append(kw)
+        return _llm_plan(6)
+    monkeypatch.setattr(re_mod.RecommendationEngine, "_generate_via_gemini", classmethod(fake))
+    w = asyncio.run(re_mod.recommendation_engine.generate_workout(
+        "core-llm2", "2026-06-01", ReadinessState.DEPLETED, 20, target_duration=45))
+    assert not calls and w.exercises[0].exercise_id == "world-greatest-stretch"
+
+
+def test_an_offline_completion_replayed_by_sync_keeps_its_day():
+    from app.core.per_user import CURRENT_USER
+    w = c.post("/api/v1/workouts", json={"user_id": "core-replay", "target_date": "2026-06-02"}).json()
+    token = CURRENT_USER.set("core-replay")
+    try:
+        from app.api.v1.endpoints.tasks import BatchSyncRequest, batch_sync
+        asyncio.run(batch_sync(BatchSyncRequest(mutations=[{
+            "id": "q1", "table_name": "workouts", "record_id": w["workout_id"], "operation": "update",
+            "payload": {"actual_duration_minutes": 30, "session_rpe": 6, "logged_exercises": [],
+                        "completed_at": "2026-06-02T07:00:00Z"}}])))
+    finally:
+        CURRENT_USER.reset(token)
+    entry = asyncio.run(storage.get_workload_history("core-replay", 400))[-1]
+    assert str(entry["recorded_at"])[:10] == "2026-06-02"
