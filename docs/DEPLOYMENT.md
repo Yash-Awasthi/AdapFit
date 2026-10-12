@@ -8,8 +8,8 @@ Workers and replicas share everything through the database: accounts, sessions,
 used refresh tokens and lockouts are read from it on every call, and feature
 state (`backend/app/core/durable.py`) loads per user on demand, follows other
 workers' writes before each request and merges concurrent writes to one row.
-Each worker keeps its own request rate limits, so the effective limit is the
-configured one times the worker count. Each worker also loads the pose model;
+Rate limit buckets are database rows too, so a limit holds across workers.
+Each worker loads the pose model;
 on a 512 MB instance set `WEB_CONCURRENCY=1`.
 
 ## Local stack

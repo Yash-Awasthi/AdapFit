@@ -113,7 +113,7 @@ docker compose up --build
 | `GROQ_API_KEY` | No | — | Groq Llama for AI fallback |
 | `ENVIRONMENT` | No | `development` | `production` enables fail-fast checks |
 | `AUTH_DISABLED` | No | `false` | Skip JWT validation in dev |
-| `RATE_LIMITING_ENABLED` | No | `false` | Enable slowapi rate limiting |
+| `RATE_LIMITING_ENABLED` | No | `false` | Enable rate limiting (buckets shared by all workers) |
 | `RATE_LIMIT_PER_MINUTE` | No | `100` | Requests per minute per IP |
 
 ---
@@ -462,7 +462,7 @@ Enterprise-grade security:
 - **PBKDF2-SHA256** password hashing (310,000 iterations)
 - **JWT** with access + refresh token rotation (30-day refresh)
 - **Account lockout** after 5 failed attempts (15-minute lockout)
-- **Rate limiting** per-IP on all endpoints (slowapi)
+- **Rate limiting** per account or address on all endpoints, shared by all workers
 - **CSP headers** — Content Security Policy on all responses
 - **Input sanitization** — XSS, SQL injection, and suspicious pattern detection
 - **IP blocking** — Abuse prevention

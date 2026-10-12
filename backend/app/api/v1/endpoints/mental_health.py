@@ -7,13 +7,11 @@ from typing import List, Literal, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from app.core.limiter import make_limiter
 
 from app.core.storage import storage
 from app.core.cache import api_response_cache as cache
 
 router = APIRouter()
-limiter = make_limiter()
 
 
 # --- Schemas ---
@@ -117,7 +115,6 @@ BREATHING_EXERCISES = [
 # --- Endpoints ---
 
 @router.post("", response_model=MoodLogResponse, status_code=201)
-@limiter.limit("20/minute")
 async def log_mood(request: Request, req: MoodLogRequest):
     """Log a mood entry with energy and anxiety levels."""
     entry = {

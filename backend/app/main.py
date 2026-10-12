@@ -19,8 +19,6 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Requ
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
-from slowapi.errors import RateLimitExceeded
-from app.core.limiter import make_limiter
 
 from app.core.config import settings
 from app.core.logging_config import setup_logging, get_logger
@@ -103,9 +101,6 @@ async def _erase_due_accounts():
         await asyncio.sleep(60)
 
 
-# Rate limiter
-limiter = make_limiter()
-
 import os as _os
 _is_prod = _os.getenv("ENVIRONMENT", "development") == "production"
 
@@ -119,10 +114,6 @@ app = FastAPI(
     redoc_url=None if _is_prod else "/redoc",
     lifespan=lifespan,
 )
-app.state.limiter = limiter
-if settings.RATE_LIMITING_ENABLED:
-    from slowapi import _rate_limit_exceeded_handler
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS. The mobile app sends no Origin; this only matters to browsers.
 if _is_prod:
@@ -212,7 +203,6 @@ async def root():
 
 
 @app.get("/health")
-@limiter.limit("30/minute")
 async def health(request: Request):
     # Record counts stay out: this route is public. Admins read them at /api/v1/admin/stats.
     services = {}
