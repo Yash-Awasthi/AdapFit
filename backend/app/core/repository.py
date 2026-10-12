@@ -141,7 +141,9 @@ async def _upsert(
     cols = [c for c in allowed if c in data]
     conflict = (conflict_cols,) if isinstance(conflict_cols, str) else tuple(conflict_cols)
     placeholders = ", ".join(f"${i + 1}" for i in range(len(cols)))
-    update_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c not in conflict)
+    # With nothing but the key to write, a no-op update still lets RETURNING yield the row.
+    update_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c not in conflict) \
+        or f"{conflict[0]} = EXCLUDED.{conflict[0]}"
     row = await conn.fetchrow(
         f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders}) "
         f"ON CONFLICT ({', '.join(conflict)}) DO UPDATE SET {update_clause} RETURNING *",
@@ -199,7 +201,7 @@ class RecoveryLogRepository:
         "user_id", "log_date", "hrv_rmssd", "hrv_z_score", "resting_heart_rate", "sleep_score",
         "sleep_duration_hours", "sleep_efficiency_pct", "subjective_score", "soreness_score",
         "fatigue_score", "stress_score", "sore_muscle_groups", "readiness_state", "recovery_score",
-        "steps", "active_calories", "water_intake_ml",
+        "steps", "active_calories", "water_intake_ml", "pain_flagged", "illness_flagged", "resting_hr_delta",
     )
 
     async def add(self, user_id: str, log: dict) -> dict:
@@ -236,6 +238,7 @@ class RecoveryLogRepository:
 
 def _as_api_workout(w: dict) -> dict:
     """The shape memory mode and the app use: `workout_id` and exercise `name`, whatever the columns are called."""
+    _decode_json(w, WorkoutRepository._JSON_KEYS)
     w["workout_id"] = str(w["id"])
     for ex in w.get("exercises") or []:
         ex["name"] = ex.get("name") or ex.get("exercise_name") or str(ex.get("exercise_id", "")).replace("-", " ").title()
@@ -246,20 +249,21 @@ class WorkoutRepository:
     _COLUMNS = (
         "user_id", "title", "target_date", "readiness_state", "recovery_score", "adaptation_rationale",
         "target_duration_minutes", "actual_duration_minutes", "session_rpe", "acwr_before", "completed",
+        "warmup", "cooldown",
     )
+    _JSON_KEYS = ("warmup", "cooldown")
     _EXERCISE_COLUMNS = (
         "workout_id", "exercise_id", "exercise_name", "target_muscle", "sets", "target_reps",
         "target_rpe", "actual_weight", "actual_reps", "actual_rpe", "axial_loading_rating", "order_index", "completed",
+        "rest_seconds", "gif_url", "notes",
     )
 
     async def save(self, user_id: str, workout: dict) -> dict:
         user_id = _to_pg("user_id", normalize_user_id(user_id))
-        # Warmup and cooldown have no columns in the live schema and are dropped
-        # here; in postgres/supabase mode those two fields are lost until a
-        # migration adds them.
         exercises = workout.get("exercises") or []
         # Keep the id the app was given, so completing it names the same row.
-        workout = {**workout, "user_id": user_id, "id": workout.get("workout_id") or workout.get("id")}
+        workout = _encode_json({**workout, "user_id": user_id, "id": workout.get("workout_id") or workout.get("id")},
+                               self._JSON_KEYS)
         pool = await _pool()
         async with pool.acquire() as conn:
             async with conn.transaction():
@@ -430,9 +434,12 @@ class DietPlanRepository:
 class AgentMemoryRepository:
     _COLUMNS = (
         "user_id", "exercise_preferences", "accepted_workouts", "rejected_workouts", "pain_flags",
-        "great_exercises", "adaptation_history", "nlp_feedback_history", "evolution_version",
+        "great_exercises", "adaptation_history", "nlp_feedback_history", "evolution_version", "extra",
     )
-    _JSON_KEYS = ("exercise_preferences", "pain_flags", "great_exercises", "adaptation_history", "nlp_feedback_history")
+    _JSON_KEYS = ("exercise_preferences", "pain_flags", "great_exercises", "adaptation_history",
+                  "nlp_feedback_history", "extra")
+    # Row bookkeeping, never user data to carry in `extra`.
+    _ROW_KEYS = {"id", "user_id", "created_at"}
     _DEFAULT = {
         "exercise_preferences": {},
         "accepted_workouts": 0,
@@ -444,6 +451,12 @@ class AgentMemoryRepository:
         "evolution_version": 1,
     }
 
+    @classmethod
+    def _flatten(cls, row: dict) -> dict:
+        row = _decode_json(row, cls._JSON_KEYS)
+        extra = row.pop("extra", None) or {}
+        return {**extra, **row}
+
     async def get(self, user_id: str) -> dict:
         user_id = _to_pg("user_id", normalize_user_id(user_id))
         pool = await _pool()
@@ -451,17 +464,24 @@ class AgentMemoryRepository:
             row = await conn.fetchrow("SELECT * FROM agent_memory WHERE user_id = $1", user_id)
             if row is None:
                 data = _encode_json({**self._DEFAULT, "user_id": user_id}, self._JSON_KEYS)
-                row = await _insert(conn, "agent_memory", self._COLUMNS, data)
-                return _decode_json(row, self._JSON_KEYS)
-        return _decode_json(_row(row), self._JSON_KEYS)
+                return self._flatten(await _insert(conn, "agent_memory", self._COLUMNS, data))
+        return self._flatten(_row(row))
 
     async def update(self, user_id: str, updates: dict) -> dict:
         user_id = _to_pg("user_id", normalize_user_id(user_id))
-        data = _encode_json({**updates, "user_id": user_id}, self._JSON_KEYS)
+        others = {k: v for k, v in updates.items() if k not in self._COLUMNS and k not in self._ROW_KEYS}
         pool = await _pool()
         async with pool.acquire() as conn:
-            row = await _upsert(conn, "agent_memory", self._COLUMNS, data, "user_id")
-        return _decode_json(row, self._JSON_KEYS)
+            async with conn.transaction():
+                data = {k: v for k, v in updates.items() if k in self._COLUMNS}
+                if others:
+                    current = await conn.fetchval(
+                        "SELECT extra FROM agent_memory WHERE user_id = $1 FOR UPDATE", user_id)
+                    current = json.loads(current) if isinstance(current, str) else (current or {})
+                    data["extra"] = {**current, **others}
+                data = _encode_json({**data, "user_id": user_id}, self._JSON_KEYS)
+                row = await _upsert(conn, "agent_memory", self._COLUMNS, data, "user_id")
+        return self._flatten(row)
 
 
 # Singleton repository instances

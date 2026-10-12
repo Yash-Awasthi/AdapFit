@@ -3,9 +3,8 @@
 -- 36 domain modules, UUID PKs, pgvector embeddings
 -- ============================================================
 
--- Enable extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- UUIDs come from the built-in gen_random_uuid() (Postgres 13+), so a stock
+-- install needs no contrib extensions.
 -- pgvector ships with Supabase and with the pgvector Docker image, but not
 -- with a stock Postgres install. Semantic exercise search falls back to an
 -- in-memory index without it, so a missing extension must not stop the whole
@@ -23,7 +22,7 @@ $$;
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE,
     name TEXT,
     age INT CHECK (age > 0 AND age < 150),
@@ -41,7 +40,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS user_baselines (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     hrv_mean_rmssd NUMERIC(6,2) DEFAULT 50.0,
     hrv_std_rmssd NUMERIC(6,2) DEFAULT 10.0,
@@ -57,7 +56,7 @@ CREATE TABLE IF NOT EXISTS user_baselines (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS daily_recovery_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     log_date DATE NOT NULL,
     hrv_rmssd NUMERIC(6,2),
@@ -87,7 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_recovery_user_date ON daily_recovery_logs(user_id
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS workouts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     target_date DATE,
@@ -105,7 +104,7 @@ CREATE TABLE IF NOT EXISTS workouts (
 CREATE INDEX IF NOT EXISTS idx_workouts_user_date ON workouts(user_id, target_date DESC);
 
 CREATE TABLE IF NOT EXISTS workout_exercises (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workout_id UUID REFERENCES workouts(id) ON DELETE CASCADE,
     exercise_id TEXT NOT NULL,
     exercise_name TEXT,
@@ -154,7 +153,7 @@ $$;
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS hydration_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     log_date DATE NOT NULL DEFAULT CURRENT_DATE,
     amount_ml INT NOT NULL CHECK (amount_ml > 0),
@@ -165,7 +164,7 @@ CREATE TABLE IF NOT EXISTS hydration_logs (
 CREATE INDEX IF NOT EXISTS idx_hydration_user_date ON hydration_logs(user_id, log_date DESC);
 
 CREATE TABLE IF NOT EXISTS meal_plans (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     plan_date DATE NOT NULL,
     goal TEXT,
@@ -182,7 +181,7 @@ CREATE TABLE IF NOT EXISTS meal_plans (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS sleep_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     log_date DATE NOT NULL,
     duration_hours NUMERIC(4,2),
@@ -202,7 +201,7 @@ CREATE TABLE IF NOT EXISTS sleep_logs (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS body_composition_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     log_date DATE NOT NULL,
     weight_kg NUMERIC(5,1),
@@ -224,7 +223,7 @@ CREATE INDEX IF NOT EXISTS idx_body_user_date ON body_composition_logs(user_id, 
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS goals (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     goal_type TEXT CHECK (goal_type IN ('strength', 'body_composition', 'consistency', 'habit', 'custom')),
     title TEXT NOT NULL,
@@ -242,7 +241,7 @@ CREATE TABLE IF NOT EXISTS goals (
 );
 
 CREATE TABLE IF NOT EXISTS achievements (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     badge_type TEXT NOT NULL,
     badge_name TEXT NOT NULL,
@@ -256,7 +255,7 @@ CREATE TABLE IF NOT EXISTS achievements (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS workout_shares (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     workout_id UUID REFERENCES workouts(id) ON DELETE SET NULL,
     title TEXT,
@@ -268,7 +267,7 @@ CREATE TABLE IF NOT EXISTS workout_shares (
 );
 
 CREATE TABLE IF NOT EXISTS workout_share_likes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     share_id UUID REFERENCES workout_shares(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     liked_at TIMESTAMPTZ DEFAULT NOW(),
@@ -276,7 +275,7 @@ CREATE TABLE IF NOT EXISTS workout_share_likes (
 );
 
 CREATE TABLE IF NOT EXISTS workout_share_comments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     share_id UUID REFERENCES workout_shares(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
@@ -288,7 +287,7 @@ CREATE TABLE IF NOT EXISTS workout_share_comments (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS fitness_challenges (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     challenge_type TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
@@ -301,7 +300,7 @@ CREATE TABLE IF NOT EXISTS fitness_challenges (
 );
 
 CREATE TABLE IF NOT EXISTS challenge_participants (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     challenge_id UUID REFERENCES fitness_challenges(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     progress NUMERIC(10,2) DEFAULT 0,
@@ -312,7 +311,7 @@ CREATE TABLE IF NOT EXISTS challenge_participants (
 );
 
 CREATE TABLE IF NOT EXISTS challenge_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     participant_id UUID REFERENCES challenge_participants(id) ON DELETE CASCADE,
     log_date DATE NOT NULL,
     value NUMERIC(10,2) NOT NULL,
@@ -326,7 +325,7 @@ CREATE TABLE IF NOT EXISTS challenge_logs (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS chat_sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     started_at TIMESTAMPTZ DEFAULT NOW(),
     ended_at TIMESTAMPTZ,
@@ -336,7 +335,7 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
 );
 
 CREATE TABLE IF NOT EXISTS chat_messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID REFERENCES chat_sessions(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     role TEXT CHECK (role IN ('user', 'assistant')),
@@ -353,7 +352,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id, created_at DE
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS training_schedule (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     schedule_date DATE NOT NULL,
     workout_type TEXT,
@@ -370,7 +369,7 @@ CREATE TABLE IF NOT EXISTS training_schedule (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS notification_preferences (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     workout_reminders BOOLEAN DEFAULT TRUE,
     recovery_checkins BOOLEAN DEFAULT TRUE,
@@ -386,7 +385,7 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS user_preferences (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     pref_key TEXT NOT NULL,
     pref_value TEXT NOT NULL,
@@ -402,7 +401,7 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS prediction_feedback (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     prediction_type TEXT NOT NULL,
     predicted_value NUMERIC(10,2),
@@ -417,7 +416,7 @@ CREATE TABLE IF NOT EXISTS prediction_feedback (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS workout_templates (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
     category TEXT CHECK (category IN ('push', 'pull', 'legs', 'upper', 'lower', 'full_body', 'custom')),
@@ -434,7 +433,7 @@ CREATE TABLE IF NOT EXISTS workout_templates (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS workout_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     completed_at TIMESTAMPTZ DEFAULT NOW(),
     data JSONB NOT NULL DEFAULT '{}'::jsonb
@@ -443,7 +442,7 @@ CREATE TABLE IF NOT EXISTS workout_logs (
 CREATE INDEX IF NOT EXISTS idx_workout_logs_user_date ON workout_logs(user_id, completed_at DESC);
 
 CREATE TABLE IF NOT EXISTS workload_history (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     recorded_at TIMESTAMPTZ DEFAULT NOW(),
     data JSONB NOT NULL DEFAULT '{}'::jsonb
@@ -452,7 +451,7 @@ CREATE TABLE IF NOT EXISTS workload_history (
 CREATE INDEX IF NOT EXISTS idx_workload_history_user_date ON workload_history(user_id, recorded_at DESC);
 
 CREATE TABLE IF NOT EXISTS agent_memory (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     exercise_preferences JSONB DEFAULT '{}'::jsonb,
     accepted_workouts INT DEFAULT 0,

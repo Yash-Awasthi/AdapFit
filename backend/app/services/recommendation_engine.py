@@ -66,7 +66,9 @@ class RecommendationEngine:
         fallback_data = exercise_service.get_fallback_routine(
             readiness_state=readiness_state,
             sore_muscles=sore,
-            equipment=eq
+            equipment=eq,
+            target_duration=target_duration,
+            seed=str(target_date),
         )
 
         return WorkoutGenerateResponse(
