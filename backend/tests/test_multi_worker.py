@@ -34,7 +34,7 @@ def servers():
     data = tempfile.mkdtemp(prefix="adapfit-two-workers-")
     env = {**os.environ, "ADAPFIT_DATA_DIR": data, "AUTH_DISABLED": "false",
            "DATABASE_URL": os.getenv("ADAPFIT_TEST_DATABASE_URL", ""),
-           "RATE_LIMITING_ENABLED": "false", "JWT_SECRET_KEY": "two-workers-" + "k" * 64}
+           "RATE_LIMITING_ENABLED": "true", "JWT_SECRET_KEY": "two-workers-" + "k" * 64}
     procs, urls = [], []
     for n in range(2):
         port = _free_port()
@@ -106,3 +106,16 @@ def test_a_refresh_token_works_once_across_workers(servers):
     assert a.post("/auth/refresh", json={"refresh_token": first["refresh_token"]}).status_code == 401
     assert b.post("/auth/refresh", json={"refresh_token": newer["refresh_token"]}).status_code == 401
     assert b.get("/auth/me", headers=_auth(newer["access_token"])).status_code == 401
+
+
+def test_the_sign_in_limit_holds_across_workers(servers):
+    """30 sign-in attempts per address in total, not 30 on each worker."""
+    a, b = servers
+    statuses = []
+    for n in range(40):
+        worker = (a, b)[n % 2]
+        statuses.append(worker.post("/auth/login", json={"email": "nobody@example.com", "password": "x"}).status_code)
+        if statuses[-1] == 429:
+            break
+    # Earlier tests in this module already spent a few attempts from this address.
+    assert statuses[-1] == 429 and len(statuses) <= 30, statuses

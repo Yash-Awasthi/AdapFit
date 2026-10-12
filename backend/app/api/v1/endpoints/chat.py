@@ -9,7 +9,6 @@ import httpx
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from app.core.limiter import make_limiter
 
 from app.core.config import settings
 from app.core.gemini import DEFAULT_MODEL, extract_text, gemini_endpoint
@@ -29,7 +28,6 @@ from app.core import llm_quota
 from app.core.llm_quota import ai_call_allowed
 
 router = APIRouter()
-limiter = make_limiter()
 logger = logging.getLogger(__name__)
 
 
@@ -243,7 +241,6 @@ def _generate_follow_ups(intent: str, context: dict) -> List[str]:
 
 
 @router.post("", response_model=ChatResponse)
-@limiter.limit("30/minute")
 async def chat(request: Request, req: ChatRequest):
     """AI fitness coach chat with intent classification, RAG, and structured prompts."""
 

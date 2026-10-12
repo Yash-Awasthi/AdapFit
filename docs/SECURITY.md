@@ -24,7 +24,9 @@ How AdapFit protects accounts and health records, and the runbooks for keys.
 ## Rate limits
 
 `app/core/rate_limiter.py`, a token bucket per caller (account when signed in,
-otherwise address) and route class:
+otherwise address) and route class. Buckets are rows in the database (SQLite
+without `DATABASE_URL`), taken under a row lock, so every worker draws from the
+same bucket:
 
 | Routes | Burst | Sustained |
 |---|---|---|
@@ -32,7 +34,9 @@ otherwise address) and route class:
 | Password change, account deletion | 10 | 2 per minute |
 | AI routes (chat, coach, meal photos, voice) | 20 | 4 per minute |
 | Export, key rotation | 5 | 1 per 2 minutes |
+| Mood log, NLP goal parsing, sentiment, feedback | 10–30 | the same per minute |
 | Everything else under `/api/v1` | 180 | 3 per second |
+| `/health` | 30 | 30 per minute |
 
 Behind a proxy the client address comes from `X-Forwarded-For`, which uvicorn
 only trusts when `FORWARDED_ALLOW_IPS` allows the proxy (the Dockerfiles set
