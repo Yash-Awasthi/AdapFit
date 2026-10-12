@@ -94,9 +94,10 @@ short-lived.
 
 ## Dependency scan (2026-09-29)
 
-CI (`.github/workflows/ci.yml`) runs `pip-audit`, `npm audit --omit=dev
---audit-level=high` and a Trivy scan of the image (high and critical with a
-fix available); any finding fails the build.
+CI (`.github/workflows/ci.yml`) runs `pip-audit`, `mobile/scripts/audit-gate.mjs`
+(`npm audit --omit=dev`, failing on high and critical except the accepted ids it
+lists) and a Trivy scan of the image (high and critical with a fix available);
+any finding fails the build.
 
 - `pip-audit -r backend/requirements.txt`: clean. mediapipe 1.0.1 (Tasks API)
   no longer needs protobuf; torch was removed (nothing used it).
@@ -106,6 +107,11 @@ fix available); any finding fails the build.
   No patched release exists, and Expo SDK 56 still depends on it, so upgrading Expo does not
   clear it. `uuid@7` inside the build-time `xcode` tool is pinned to 11.1.1 through an
   `overrides` entry in `mobile/package.json`.
+- Accepted high advisories with no patched release, both in build tooling that
+  never ships in the app bundle: `braces` 3.0.3 (GHSA-vfj7-8cjw-p6xm, a deeply
+  nested glob exhausts the stack, reached through Metro's file watcher) and
+  `node-forge` 1.4.0 (GHSA-86w9-cpqp-85rv, lax PKCS#1 signature parsing, reached
+  through Expo CLI code signing). Drop each id from the gate when a fix ships.
 
 ## Not done yet
 

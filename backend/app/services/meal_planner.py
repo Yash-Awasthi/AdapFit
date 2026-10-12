@@ -142,8 +142,6 @@ class MealPlanner:
         carbs_g = weight_kg * template["carb_per_kg"]
         fat_g = weight_kg * template["fat_per_kg"]
 
-        # Verify calories add up (protein=4cal, carb=4cal, fat=9cal)
-        macro_calories = (protein_g * 4) + (carbs_g * 4) + (fat_g * 9)
         # Adjust carbs to match target
         remaining_cal = target_calories - (protein_g * 4) - (fat_g * 9)
         if remaining_cal > 0:
