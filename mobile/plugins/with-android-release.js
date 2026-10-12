@@ -43,7 +43,8 @@ const withHealthConnectQuery = (config) =>
   withAndroidManifest(config, (cfg) => {
     const manifest = cfg.modResults.manifest;
     const pkg = 'com.google.android.apps.healthdata';
-    const queries = (manifest.queries ??= []);
+    manifest.queries ??= [];
+    const queries = manifest.queries;
     const present = queries.some((q) => (q.package ?? []).some((p) => p.$['android:name'] === pkg));
     if (!present) queries.push({ package: [{ $: { 'android:name': pkg } }] });
     return cfg;
