@@ -41,6 +41,7 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
+      - run: npm run lint
       - run: for f in src/services/*.check.ts src/theme/*.check.ts; do node "$f" || exit 1; done
       # High and critical fail the build except the unpatched ones listed in the script (docs/SECURITY.md).
       - run: node scripts/audit-gate.mjs

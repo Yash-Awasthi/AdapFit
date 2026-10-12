@@ -13,10 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import {
-  ArrowLeft, Clock, Flame, TrendingUp, TrendingDown,
-  Dumbbell, CheckCircle, AlertTriangle,
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../src/services/config';
 import { useUserStore } from '../src/stores';
@@ -126,7 +123,7 @@ export default function WorkoutDetailScreen() {
     return (
       <View style={s.container}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()}>
-          <ArrowLeft size={24} color={theme.text} />
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={s.loadingText}>Workout not found</Text>
       </View>
@@ -151,22 +148,22 @@ export default function WorkoutDetailScreen() {
 
         <View style={s.summaryStats}>
           <View style={s.summaryStat}>
-            <Clock size={16} color={theme.warning} />
+            <Ionicons name="time-outline" size={16} color={theme.warning} />
             <Text style={s.summaryValue}>{workout.actual_duration_minutes || '--'}m</Text>
             <Text style={s.summaryLabel}>Duration</Text>
           </View>
           <View style={s.summaryStat}>
-            <Flame size={16} color={theme.danger} />
+            <Ionicons name="flame-outline" size={16} color={theme.danger} />
             <Text style={s.summaryValue}>{calcCalories()}</Text>
             <Text style={s.summaryLabel}>Calories</Text>
           </View>
           <View style={s.summaryStat}>
-            <Dumbbell size={16} color={theme.primaryLight} />
+            <Ionicons name="barbell-outline" size={16} color={theme.primaryLight} />
             <Text style={s.summaryValue}>{(totalVolume / 1000).toFixed(1)}k</Text>
             <Text style={s.summaryLabel}>Volume (kg)</Text>
           </View>
           <View style={s.summaryStat}>
-            <TrendingUp size={16} color={theme.success} />
+            <Ionicons name="trending-up" size={16} color={theme.success} />
             <Text style={s.summaryValue}>{workout.session_rpe || '--'}</Text>
             <Text style={s.summaryLabel}>Avg RPE</Text>
           </View>
@@ -201,9 +198,9 @@ export default function WorkoutDetailScreen() {
                 <Text style={s.exerciseMuscle}>{ex.target_muscle}</Text>
               </View>
               {ex.completed ? (
-                <CheckCircle size={18} color={theme.success} />
+                <Ionicons name="checkmark-circle-outline" size={18} color={theme.success} />
               ) : (
-                <AlertTriangle size={18} color={theme.warning} />
+                <Ionicons name="warning-outline" size={18} color={theme.warning} />
               )}
             </View>
 

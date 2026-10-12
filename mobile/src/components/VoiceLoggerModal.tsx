@@ -10,7 +10,7 @@ import {
   Easing,
   Platform,
 } from 'react-native';
-import { Mic, MicOff, Check, X, Sparkles, Volume2 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync } from 'expo-audio';
 import { File } from 'expo-file-system';
@@ -224,11 +224,11 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerTitle}>
-              <Mic size={20} color={theme.primaryLight} />
+              <Ionicons name="mic-outline" size={20} color={theme.primaryLight} />
               <Text style={[styles.title, { color: theme.text }]}>Voice Workout Logger</Text>
             </View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>
-              <X size={20} color={theme.textSecondary} />
+              <Ionicons name="close" size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -257,9 +257,9 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
                 disabled={transcribing}
               >
                 {isRecording ? (
-                  <MicOff size={24} color="#fff" />
+                  <Ionicons name="mic-off-outline" size={24} color="#fff" />
                 ) : (
-                  <Mic size={24} color="#fff" />
+                  <Ionicons name="mic-outline" size={24} color="#fff" />
                 )}
               </TouchableOpacity>
             </Animated.View>
@@ -294,7 +294,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
                   handleParse(phrase);
                 }}
               >
-                <Sparkles size={12} color={theme.primaryLight} />
+                <Ionicons name="sparkles-outline" size={12} color={theme.primaryLight} />
                 <Text style={[styles.presetText, { color: theme.textSecondary }]}>{phrase}</Text>
               </TouchableOpacity>
             ))}
@@ -302,7 +302,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
 
           {!!errorText && (
             <View style={[styles.errorBox, { backgroundColor: `${theme.danger}1F` }]}>
-              <X size={14} color={theme.danger} />
+              <Ionicons name="close" size={14} color={theme.danger} />
               <Text style={[styles.errorText, { color: theme.danger }]}>{errorText}</Text>
             </View>
           )}
@@ -344,7 +344,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
                     );
                   }}
                 >
-                  <Volume2 size={16} color={theme.primaryLight} />
+                  <Ionicons name="volume-high-outline" size={16} color={theme.primaryLight} />
                 </TouchableOpacity>
               </View>
               <Text style={[styles.resultText, { color: theme.textSecondary }]}>
@@ -364,7 +364,7 @@ export function VoiceLoggerModal({ visible, onClose, onSetLogged }: VoiceLoggerM
               </Text>
 
               <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: theme.success }]} onPress={handleConfirm}>
-                <Check size={18} color="#0F172A" />
+                <Ionicons name="checkmark" size={18} color="#0F172A" />
                 <Text style={styles.confirmBtnText}>Apply & Complete Set</Text>
               </TouchableOpacity>
             </View>

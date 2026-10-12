@@ -9,7 +9,7 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import { Send, Bot, User, Mic, Wrench } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarHeight } from '../../src/theme/layout';
@@ -186,7 +186,7 @@ export default function ChatScreen() {
     return (
       <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
         <View style={styles.bubbleHeader}>
-          {isUser ? <User size={14} color={theme.primaryLight} /> : <Bot size={14} color={theme.success} />}
+          {isUser ? <Ionicons name="person-outline" size={14} color={theme.primaryLight} /> : <Ionicons name="hardware-chip-outline" size={14} color={theme.success} />}
           <Text style={styles.bubbleRole}>{isUser ? 'You' : 'Coach'}</Text>
         </View>
         <Text style={[styles.bubbleText, isUser ? styles.userText : styles.assistantText]}>
@@ -203,7 +203,7 @@ export default function ChatScreen() {
     >
       {!!llmOverride && (
         <View style={styles.devBanner}>
-          <Wrench size={12} color={theme.warning} />
+          <Ionicons name="construct-outline" size={12} color={theme.warning} />
           <Text style={styles.devBannerText}>Using your {llmOverride.provider} key</Text>
         </View>
       )}
@@ -243,7 +243,7 @@ export default function ChatScreen() {
             setInput('How am I doing today?');
           }}
         >
-          <Mic size={20} color={theme.primaryLight} />
+          <Ionicons name="mic-outline" size={20} color={theme.primaryLight} />
         </TouchableOpacity>
         <TextInput
           style={styles.input}
@@ -262,7 +262,7 @@ export default function ChatScreen() {
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); sendMessage(input); }}
           disabled={!input.trim() || loading}
         >
-          <Send size={20} color={input.trim() && !loading ? '#fff' : theme.textMuted} />
+          <Ionicons name="send" size={20} color={input.trim() && !loading ? '#fff' : theme.textMuted} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

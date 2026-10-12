@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../src/services/theme';
@@ -105,7 +105,7 @@ export default function PersonalInfoScreen() {
         title="Personal Info"
         right={
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save" onPress={handleSave} disabled={saving} hitSlop={10}>
-            <Check size={22} color={theme.primaryLight} />
+            <Ionicons name="checkmark" size={22} color={theme.primaryLight} />
           </TouchableOpacity>
         }
       />

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Trophy, Send, ArrowRight, Share2 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Share } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useUserStore, useWorkoutStore } from '../src/stores';
@@ -80,7 +80,7 @@ export default function WorkoutComplete() {
       <View style={s.container}>
         <View style={s.doneContainer}>
           <View style={s.trophyContainer}>
-            <Trophy size={64} color={theme.warning} />
+            <Ionicons name="trophy-outline" size={64} color={theme.warning} />
           </View>
           <Text style={s.doneTitle}>Workout Complete!</Text>
           <Text style={s.doneSubtitle}>
@@ -109,7 +109,7 @@ export default function WorkoutComplete() {
               });
             }}
           >
-            <Share2 size={16} color={theme.primaryLight} />
+            <Ionicons name="share-social-outline" size={16} color={theme.primaryLight} />
             <Text style={s.shareText}>Share</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -117,7 +117,7 @@ export default function WorkoutComplete() {
             onPress={() => router.replace('/(tabs)')}
           >
             <Text style={s.homeButtonText}>Back to Dashboard</Text>
-            <ArrowRight size={16} color="#fff" />
+            <Ionicons name="arrow-forward" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -184,7 +184,7 @@ export default function WorkoutComplete() {
       />
 
       <TouchableOpacity style={s.submitButton} onPress={submit}>
-        <Send size={20} color="#fff" />
+        <Ionicons name="send" size={20} color="#fff" />
         <Text style={s.submitText}>Submit Feedback</Text>
       </TouchableOpacity>
     </ScrollView>

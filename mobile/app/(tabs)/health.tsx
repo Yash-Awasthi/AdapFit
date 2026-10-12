@@ -2,10 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, AccessibilityInfo,
 } from "react-native";
-import {
-  Heart, Pill, AlertTriangle, Activity, Mic, MicOff, ChevronRight,
-  Shield, Stethoscope, Calendar,
-} from "lucide-react-native";
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from "../../src/services/theme";
 import { API_BASE_URL } from "../../src/services/config";
 import { getJson, asArray } from "../../src/services/http";
@@ -183,7 +180,7 @@ export default function HealthScreen() {
           accessibilityLabel={isListening ? "Stop voice input" : "Start voice input"}
           accessibilityRole="button"
         >
-          {isListening ? <MicOff size={20} color="#FFF" /> : <Mic size={20} color="#FFF" />}
+          {isListening ? <Ionicons name="mic-off-outline" size={20} color="#FFF" /> : <Ionicons name="mic-outline" size={20} color="#FFF" />}
         </TouchableOpacity>
         <TextInput
           style={s.voiceInput}
@@ -199,7 +196,7 @@ export default function HealthScreen() {
         {/* Risk Banner */}
         {!!profile?.needs_doctor_clearance && (
           <View style={[s.banner, { backgroundColor: "#7F1D1D" }]}>
-            <AlertTriangle size={18} color="#FCA5A5" />
+            <Ionicons name="warning-outline" size={18} color="#FCA5A5" />
             <Text style={s.bannerText}>
               High risk profile — consult your doctor before new exercises
             </Text>
@@ -227,7 +224,7 @@ export default function HealthScreen() {
         {/* Active Conditions */}
         <View style={s.section}>
           <View style={s.sectionHeader}>
-            <Stethoscope size={18} color={theme.primaryLight} />
+            <Ionicons name="medkit-outline" size={18} color={theme.primaryLight} />
             <Text style={s.sectionTitle}>Active Conditions</Text>
             <TouchableOpacity onPress={() => setShowAddCondition(true)} accessibilityLabel="Add condition">
               <Text style={s.addBtn}>+ Add</Text>
@@ -255,7 +252,7 @@ export default function HealthScreen() {
         {/* Medications */}
         <View style={s.section}>
           <View style={s.sectionHeader}>
-            <Pill size={18} color="#8B5CF6" />
+            <Ionicons name="medical-outline" size={18} color="#8B5CF6" />
             <Text style={s.sectionTitle}>Current Medications</Text>
             <TouchableOpacity onPress={() => setShowAddMed(true)} accessibilityLabel="Add medication">
               <Text style={s.addBtn}>+ Add</Text>
@@ -273,7 +270,7 @@ export default function HealthScreen() {
                   </Text>
                   {!!m.interacts_with_exercise && (
                     <View style={s.warningBadge}>
-                      <AlertTriangle size={12} color={theme.warning} />
+                      <Ionicons name="warning-outline" size={12} color={theme.warning} />
                       <Text style={s.warningText}>Exercise caution: {m.exercise_notes}</Text>
                     </View>
                   )}
@@ -287,7 +284,7 @@ export default function HealthScreen() {
         {!!restrictions && (
           <View style={s.section}>
             <View style={s.sectionHeader}>
-              <Shield size={18} color={theme.success} />
+              <Ionicons name="shield-outline" size={18} color={theme.success} />
               <Text style={s.sectionTitle}>Exercise Restrictions</Text>
             </View>
 
@@ -332,7 +329,7 @@ export default function HealthScreen() {
               {Object.entries(CONDITION_LABELS).map(([id, label]) => (
                 <TouchableOpacity key={id} style={s.modalOption} onPress={() => addCondition(id)}>
                   <Text style={s.modalOptionText}>{label}</Text>
-                  <ChevronRight size={16} color={theme.textMuted} />
+                  <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
