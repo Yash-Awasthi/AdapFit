@@ -47,6 +47,8 @@ export default function WorkoutComplete() {
       enjoyment: enj,
       logged_exercises: loggedExercises,
       user_feedback_notes: notes,
+      // Kept in the queued payload, so a session synced days later still counts on the day it was done.
+      completed_at: new Date().toISOString(),
     };
 
     try {
