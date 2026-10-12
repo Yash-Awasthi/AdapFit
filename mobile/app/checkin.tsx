@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Moon, Flame, Zap, Wind, Watch } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../src/components';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../src/services/config';
@@ -31,7 +31,7 @@ function SliderField({
   label: string;
   value: number | null;
   onChange: (v: number) => void;
-  icon: any;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
   min?: number;
   max?: number;
   leftLabel: string;
@@ -46,7 +46,7 @@ function SliderField({
   return (
     <View style={s.container} accessibilityLabel={accessibilityLabel} accessibilityHint={accessibilityHint}>
       <View style={s.header}>
-        <Icon size={18} color={color} />
+        <Ionicons name={Icon} size={18} color={color} />
         <Text style={s.label}>{label}</Text>
         <Text style={[s.value, { color }]}>{value ?? '—'}</Text>
       </View>
@@ -164,7 +164,7 @@ export default function CheckinScreen() {
 
       {synced && health && (
         <View style={s.syncBadge}>
-          <Watch size={14} color={theme.success} />
+          <Ionicons name="watch-outline" size={14} color={theme.success} />
           <Text style={[s.syncBadgeText, { color: theme.success }]}>
             Synced from {health.source === 'healthconnect' ? 'Health Connect' : 'Apple Health'}
             {health.steps != null ? ` · ${health.steps.toLocaleString()} steps today` : ''}
@@ -176,7 +176,7 @@ export default function CheckinScreen() {
         label="Sleep Hours"
         value={sleepSet ? sleep : null}
         onChange={(v) => { setSleep(v); setSleepSet(true); }}
-        icon={Moon}
+        icon="moon-outline"
         min={3}
         max={12}
         leftLabel="3h"
@@ -190,7 +190,7 @@ export default function CheckinScreen() {
         label="Soreness"
         value={soreness}
         onChange={setSoreness}
-        icon={Flame}
+        icon="flame-outline"
         min={1}
         max={10}
         leftLabel="Sore"
@@ -204,7 +204,7 @@ export default function CheckinScreen() {
         label="Energy"
         value={fatigue}
         onChange={setFatigue}
-        icon={Zap}
+        icon="flash-outline"
         min={1}
         max={10}
         leftLabel="Drained"
@@ -216,7 +216,7 @@ export default function CheckinScreen() {
         label="Stress"
         value={stress}
         onChange={setStress}
-        icon={Wind}
+        icon="cloud-outline"
         min={1}
         max={10}
         leftLabel="Relaxed"

@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Wind, Brain, Droplets, Plus, Clock } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SectionHeader } from '../../src/components';
 import MeditationPlayer from '../../src/components/MeditationPlayer';
 import { api } from '../../src/services/api';
@@ -160,7 +160,7 @@ export default function WellnessScreen() {
       <View style={s.hydrationCard}>
         <View style={s.hydrationHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Droplets size={20} color="#38BDF8" />
+            <Ionicons name="water-outline" size={20} color="#38BDF8" />
             <Text style={s.hydrationTitle}>Water Intake</Text>
           </View>
           <Text style={s.hydrationTotal}>
@@ -202,7 +202,7 @@ export default function WellnessScreen() {
           onPress={() => startBreathing(ex)}
         >
           <View style={s.breathHeader}>
-            <Wind size={20} color={theme.primaryLight} />
+            <Ionicons name="cloud-outline" size={20} color={theme.primaryLight} />
             <Text style={s.breathName}>{ex.name}</Text>
           </View>
           <Text style={s.breathDesc}>{ex.description}</Text>
@@ -233,10 +233,10 @@ export default function WellnessScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
         {meditations.map((m) => (
           <TouchableOpacity key={m.id} style={s.medCard} onPress={() => openMeditation(m.id)}>
-            <Brain size={20} color={theme.primaryLight} />
+            <Ionicons name="bulb-outline" size={20} color={theme.primaryLight} />
             <Text style={s.medName}>{m.name}</Text>
             <View style={s.medMetaRow}>
-              <Clock size={12} color={theme.textMuted} />
+              <Ionicons name="time-outline" size={12} color={theme.textMuted} />
               <Text style={s.medMeta}>{m.duration_minutes} min</Text>
             </View>
             <Text style={s.medMeta}>{m.difficulty}</Text>

@@ -43,8 +43,8 @@ python -m scripts.verify_postgres
 
 ```bash
 cd backend
-pip install -r requirements.txt
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+uv sync
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 - **API Docs**: http://localhost:8000/docs

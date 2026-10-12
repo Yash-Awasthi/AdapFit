@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../services/theme';
 import { SCREEN_HEADER_TOP } from '../theme/layout';
 
@@ -13,7 +13,7 @@ export function ScreenHeader({ title, right, backable = true }: { title: string;
     <View style={styles.header}>
       {backable ? (
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
-          <ChevronLeft size={22} color={theme.text} />
+          <Ionicons name="chevron-back" size={22} color={theme.text} />
         </TouchableOpacity>
       ) : <View style={styles.backBtn} />}
       <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>

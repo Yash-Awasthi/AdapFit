@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
-import { Utensils, Plus, Trash2, Sparkles, ChefHat, Camera } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { LoadingScreen } from '../../src/components';
@@ -227,7 +227,7 @@ export default function NutritionScreen() {
         onPress={handleGeneratePlan}
         disabled={generating}
       >
-        <Sparkles size={16} color={theme.primaryLight} />
+        <Ionicons name="sparkles-outline" size={16} color={theme.primaryLight} />
         <Text style={s.aiPlanText}>
           {generating ? 'Generating Smart Plan...' : 'Generate AI Day Meal Plan'}
         </Text>
@@ -237,7 +237,7 @@ export default function NutritionScreen() {
       {!!generatedPlan && (
         <View style={s.planCard}>
           <View style={s.planHeader}>
-            <ChefHat size={16} color={theme.success} />
+            <Ionicons name="fast-food-outline" size={16} color={theme.success} />
             <Text style={s.planTitle}>
               AI Plan: {generatedPlan.targets?.target_calories ?? 2400} kcal ({generatedPlan.goal})
             </Text>
@@ -267,11 +267,11 @@ export default function NutritionScreen() {
 
       <View style={s.actionRow}>
         <TouchableOpacity style={[s.addBtn, { flex: 1 }]} onPress={() => setShowForm(!showForm)}>
-          <Plus size={16} color="#fff" />
+          <Ionicons name="add" size={16} color="#fff" />
           <Text style={s.addBtnText}>Log Meal</Text>
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Log a meal from a photo" style={s.cameraBtn} onPress={photoLog} disabled={analyzingPhoto}>
-          {analyzingPhoto ? <ActivityIndicator size="small" color="#fff" /> : <Camera size={18} color="#fff" />}
+          {analyzingPhoto ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="camera-outline" size={18} color="#fff" />}
         </TouchableOpacity>
       </View>
 
@@ -341,7 +341,7 @@ export default function NutritionScreen() {
               </Text>
             </View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete meal" onPress={() => deleteMeal(item.id)}>
-              <Trash2 size={16} color={theme.danger} />
+              <Ionicons name="trash-outline" size={16} color={theme.danger} />
             </TouchableOpacity>
           </View>
         )}

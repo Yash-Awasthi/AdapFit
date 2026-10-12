@@ -9,7 +9,6 @@ from app.models.schemas import SentimentRequest, GoalParsingRequest, NLPFeedback
 from app.core import workout_metrics
 from app.core.storage import storage
 from app.core.background import task_manager
-from core_engine import is_rust_available
 
 router = APIRouter()
 limiter = make_limiter()
@@ -71,7 +70,6 @@ async def get_ml_insights(user_id: str):
         "hrv_forecast": hrv_forecast,
         "recovery_anomalies": anomalies,
         "model_status": ml_engine.get_status(),
-        "core_engine_rust": is_rust_available(),
     }
 
 @router.get("/alerts")
@@ -143,7 +141,6 @@ async def get_agent_status():
         "vector_store": vector_store.get_status(),
         "nlp": nlp_pipeline.get_status(),
         "ml_engine": ml_engine.get_status(),
-        "core_engine_rust": is_rust_available(),
     }
 
 @router.get("/agent/preferences/{user_id}")

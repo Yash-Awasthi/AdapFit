@@ -12,7 +12,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import { TrendingUp, Trophy, Dumbbell, Clock, Zap } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL as API } from '../../src/services/config';
 import { useTheme } from '../../src/services/theme';
 import { authedFetch } from '../../src/services/authToken';
@@ -118,7 +118,7 @@ export default function StatsScreen() {
       <View style={s.container}>
         <Text style={s.title}>Workout Stats</Text>
         <View style={s.emptyCard}>
-          <Dumbbell size={40} color={theme.border} />
+          <Ionicons name="barbell-outline" size={40} color={theme.border} />
           <Text style={s.emptyText}>No workouts yet</Text>
           <Text style={s.emptySubtext}>Complete workouts to see your stats here</Text>
         </View>
@@ -133,22 +133,22 @@ export default function StatsScreen() {
       {/* Summary Cards */}
       <View style={s.summaryGrid}>
         <View style={s.summaryCard}>
-          <Dumbbell size={20} color={theme.primaryLight} />
+          <Ionicons name="barbell-outline" size={20} color={theme.primaryLight} />
           <Text style={s.summaryValue}>{stats.total_workouts}</Text>
           <Text style={s.summaryLabel}>Workouts</Text>
         </View>
         <View style={s.summaryCard}>
-          <TrendingUp size={20} color={theme.success} />
+          <Ionicons name="trending-up" size={20} color={theme.success} />
           <Text style={s.summaryValue}>{(stats.total_volume_kg / 1000).toFixed(1)}k</Text>
           <Text style={s.summaryLabel}>kg Volume</Text>
         </View>
         <View style={s.summaryCard}>
-          <Clock size={20} color={theme.warning} />
+          <Ionicons name="time-outline" size={20} color={theme.warning} />
           <Text style={s.summaryValue}>{Math.round(stats.total_duration_minutes / 60)}h</Text>
           <Text style={s.summaryLabel}>Total Time</Text>
         </View>
         <View style={s.summaryCard}>
-          <Zap size={20} color={theme.danger} />
+          <Ionicons name="flash-outline" size={20} color={theme.danger} />
           <Text style={s.summaryValue}>{stats.avg_session_rpe}</Text>
           <Text style={s.summaryLabel}>Avg RPE</Text>
         </View>
@@ -177,7 +177,7 @@ export default function StatsScreen() {
           <Text style={s.sectionTitle}>Personal Records</Text>
           {stats.personal_records.slice(0, 5).map((pr, i) => (
             <View key={i} style={s.prRow}>
-              <Trophy size={16} color={i === 0 ? theme.warning : i === 1 ? theme.textSecondary : '#CD7F32'} />
+              <Ionicons name="trophy-outline" size={16} color={i === 0 ? theme.warning : i === 1 ? theme.textSecondary : '#CD7F32'} />
               <View style={s.prInfo}>
                 <Text style={s.prExercise}>{pr.exercise_id.replace(/-/g, ' ')}</Text>
                 <Text style={s.prDate}>{pr.date}</Text>

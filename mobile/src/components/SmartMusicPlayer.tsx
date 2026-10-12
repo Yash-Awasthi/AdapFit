@@ -12,10 +12,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import {
-  Play, Pause, SkipForward, SkipBack, Music,
-  Volume2, Zap, Snowflake, Flame,
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
 import { useTheme } from '../services/theme';
@@ -46,10 +43,10 @@ interface SmartMusicPlayerProps {
 }
 
 const PHASE_CONFIG = {
-  warmup: { color: '#F59E0B', icon: Flame, label: 'Warmup' },
-  main: { color: '#EF4444', icon: Zap, label: 'Power' },
-  cooldown: { color: '#38BDF8', icon: Snowflake, label: 'Cooldown' },
-};
+  warmup: { color: '#F59E0B', icon: 'flame-outline', label: 'Warmup' },
+  main: { color: '#EF4444', icon: 'flash-outline', label: 'Power' },
+  cooldown: { color: '#38BDF8', icon: 'snow-outline', label: 'Cooldown' },
+} as const;
 
 export function SmartMusicPlayer({
   workoutType = 'strength',
@@ -179,7 +176,7 @@ export function SmartMusicPlayer({
 
   const track = getCurrentTrack();
   const phaseConfig = PHASE_CONFIG[currentPhase as keyof typeof PHASE_CONFIG];
-  const PhaseIcon = phaseConfig?.icon || Music;
+  const PhaseIcon = phaseConfig?.icon || 'musical-notes-outline';
 
   if (loading || !track) {
     return (
@@ -195,7 +192,7 @@ export function SmartMusicPlayer({
         <View style={styles.compactRow}>
           <Animated.View style={{ transform: [{ scale: bpmPulse }] }}>
             <View style={[styles.phaseDot, { backgroundColor: phaseConfig.color }]}>
-              <PhaseIcon size={12} color="#fff" />
+              <Ionicons name={PhaseIcon} size={12} color="#fff" />
             </View>
           </Animated.View>
           <View style={styles.compactInfo}>
@@ -204,13 +201,13 @@ export function SmartMusicPlayer({
           </View>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={isPlaying ? 'Pause' : 'Play'} onPress={() => setIsPlaying(!isPlaying)} style={styles.compactPlay}>
             {isPlaying ? (
-              <Pause size={14} color={theme.text} />
+              <Ionicons name="pause" size={14} color={theme.text} />
             ) : (
-              <Play size={14} color={theme.text} />
+              <Ionicons name="play" size={14} color={theme.text} />
             )}
           </TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack} style={styles.compactPlay}>
-            <SkipForward size={14} color={theme.textSecondary} />
+            <Ionicons name="play-skip-forward-outline" size={14} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -223,7 +220,7 @@ export function SmartMusicPlayer({
       <View style={styles.phaseRow}>
         {playlists.map((p) => {
           const cfg = PHASE_CONFIG[p.phase as keyof typeof PHASE_CONFIG];
-          const Icon = cfg?.icon || Music;
+          const Icon = cfg?.icon || 'musical-notes-outline';
           const isActive = p.phase === currentPhase;
           return (
             <View
@@ -234,7 +231,7 @@ export function SmartMusicPlayer({
                 isActive && { backgroundColor: cfg.color + '30', borderColor: cfg.color },
               ]}
             >
-              <Icon size={12} color={isActive ? cfg.color : theme.textMuted} />
+              <Ionicons name={Icon} size={12} color={isActive ? cfg.color : theme.textMuted} />
               <Text style={[styles.phaseChipText, { color: theme.textMuted }, isActive && { color: cfg.color }]}>
                 {cfg?.label || p.phase}
               </Text>
@@ -246,7 +243,7 @@ export function SmartMusicPlayer({
       {/* Track Info */}
       <View style={styles.trackInfo}>
         <Animated.View style={[styles.albumArt, { backgroundColor: theme.background }, { transform: [{ scale: bpmPulse }] }]}>
-          <Music size={32} color={phaseConfig.color} />
+          <Ionicons name="musical-notes-outline" size={32} color={phaseConfig.color} />
         </Animated.View>
         <View style={styles.trackDetails}>
           <Text style={[styles.trackTitle, { color: theme.text }]}>{track.title}</Text>
@@ -264,7 +261,7 @@ export function SmartMusicPlayer({
       {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous track" onPress={prevTrack} style={styles.controlBtn}>
-          <SkipBack size={20} color={theme.textSecondary} />
+          <Ionicons name="play-skip-back-outline" size={20} color={theme.textSecondary} />
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
           style={[styles.playBtn, { backgroundColor: phaseConfig.color }]}
@@ -274,13 +271,13 @@ export function SmartMusicPlayer({
           }}
         >
           {isPlaying ? (
-            <Pause size={24} color="#fff" />
+            <Ionicons name="pause" size={24} color="#fff" />
           ) : (
-            <Play size={24} color="#fff" />
+            <Ionicons name="play" size={24} color="#fff" />
           )}
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack} style={styles.controlBtn}>
-          <SkipForward size={20} color={theme.textSecondary} />
+          <Ionicons name="play-skip-forward-outline" size={20} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>
 

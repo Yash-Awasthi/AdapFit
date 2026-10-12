@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Timer, Check, ArrowRight, SkipForward, Mic, Minus, Plus } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SmartMusicPlayer } from '../src/components/SmartMusicPlayer';
 import { VoiceLoggerModal } from '../src/components/VoiceLoggerModal';
 import { speak } from '../src/services/tts';
@@ -152,12 +152,12 @@ export default function WorkoutActive() {
       {/* Header with Timer & Voice Button */}
       <View style={s.headerRow}>
         <View style={s.timerHeader}>
-          <Timer size={20} color={theme.primaryLight} />
+          <Ionicons name="timer-outline" size={20} color={theme.primaryLight} />
           <Text style={s.timerText}>{fmt(elapsed)}</Text>
         </View>
 
         <TouchableOpacity style={s.voiceMicBtn} onPress={() => setShowVoiceModal(true)}>
-          <Mic size={18} color={theme.primaryLight} />
+          <Ionicons name="mic-outline" size={18} color={theme.primaryLight} />
           <Text style={s.voiceMicText}>Voice Log</Text>
         </TouchableOpacity>
       </View>
@@ -183,11 +183,11 @@ export default function WorkoutActive() {
           <Text style={s.adjusterLabel}>Weight (kg)</Text>
           <View style={s.stepper}>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease weight by 2.5 kilograms" onPress={() => setWeight((w) => Math.max(0, w - 2.5))} style={s.stepBtn}>
-              <Minus size={14} color={theme.text} />
+              <Ionicons name="remove" size={14} color={theme.text} />
             </TouchableOpacity>
             <Text style={s.stepValue}>{weight}</Text>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase weight by 2.5 kilograms" onPress={() => setWeight((w) => w + 2.5)} style={s.stepBtn}>
-              <Plus size={14} color={theme.text} />
+              <Ionicons name="add" size={14} color={theme.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -195,11 +195,11 @@ export default function WorkoutActive() {
           <Text style={s.adjusterLabel}>Reps</Text>
           <View style={s.stepper}>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease reps" onPress={() => setReps((r) => Math.max(0, r - 1))} style={s.stepBtn}>
-              <Minus size={14} color={theme.text} />
+              <Ionicons name="remove" size={14} color={theme.text} />
             </TouchableOpacity>
             <Text style={s.stepValue}>{reps}</Text>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase reps" onPress={() => setReps((r) => r + 1)} style={s.stepBtn}>
-              <Plus size={14} color={theme.text} />
+              <Ionicons name="add" size={14} color={theme.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -207,11 +207,11 @@ export default function WorkoutActive() {
           <Text style={s.adjusterLabel}>RPE</Text>
           <View style={s.stepper}>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease effort (RPE)" onPress={() => setRpe((p) => Math.max(1, p - 0.5))} style={s.stepBtn}>
-              <Minus size={14} color={theme.text} />
+              <Ionicons name="remove" size={14} color={theme.text} />
             </TouchableOpacity>
             <Text style={s.stepValue}>{rpe}</Text>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase effort (RPE)" onPress={() => setRpe((p) => Math.min(10, p + 0.5))} style={s.stepBtn}>
-              <Plus size={14} color={theme.text} />
+              <Ionicons name="add" size={14} color={theme.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -233,13 +233,13 @@ export default function WorkoutActive() {
           <Text style={s.restLabel}>Rest Timer</Text>
           <Text style={s.restTime}>{fmt(rest)}</Text>
           <TouchableOpacity style={s.skipButton} onPress={skipRest}>
-            <SkipForward size={16} color={theme.textSecondary} />
+            <Ionicons name="play-skip-forward-outline" size={16} color={theme.textSecondary} />
             <Text style={s.skipText}>Skip</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <TouchableOpacity style={s.completeButton} onPress={() => completeSet()}>
-          <Check size={24} color={theme.background} />
+          <Ionicons name="checkmark" size={24} color={theme.background} />
           <Text style={s.completeText}>Complete Set</Text>
         </TouchableOpacity>
       )}
@@ -250,7 +250,7 @@ export default function WorkoutActive() {
       {/* Finish Workout early */}
       <TouchableOpacity style={s.finishButton} onPress={finishWorkout} disabled={finishing}>
         <Text style={s.finishText}>{finishing ? 'Saving…' : 'Finish Workout'}</Text>
-        <ArrowRight size={16} color={theme.textSecondary} />
+        <Ionicons name="arrow-forward" size={16} color={theme.textSecondary} />
       </TouchableOpacity>
 
       {/* Voice Logger Modal */}

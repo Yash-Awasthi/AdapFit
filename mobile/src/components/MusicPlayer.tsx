@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Play, Pause, SkipForward, SkipBack, Music } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
 import { useUserStore } from '../stores';
@@ -88,7 +88,7 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
       <View style={styles.presetRow}>
         {['warmup', 'strength', 'hiit', 'cooldown'].map(id => (
           <TouchableOpacity key={id} style={[styles.presetBtn, { backgroundColor: theme.surface }]} onPress={() => startPreset(id)}>
-            <Music size={14} color={theme.primary} />
+            <Ionicons name="musical-notes-outline" size={14} color={theme.primary} />
             <Text style={[styles.presetText, { color: theme.primary }]}>{id}</Text>
           </TouchableOpacity>
         ))}
@@ -100,14 +100,14 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
     return (
       <View style={[styles.compactBar, { backgroundColor: theme.surface }]}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Play or pause" onPress={togglePlay} style={[styles.compactPlay, { backgroundColor: theme.primary }]}>
-          {playing ? <Pause size={16} color={theme.text} /> : <Play size={16} color={theme.text} />}
+          {playing ? <Ionicons name="pause" size={16} color={theme.text} /> : <Ionicons name="play" size={16} color={theme.text} />}
         </TouchableOpacity>
         <View style={styles.compactInfo}>
           <Text style={[styles.compactTitle, { color: theme.text }]} numberOfLines={1}>{track.title}</Text>
           <Text style={[styles.compactArtist, { color: theme.textMuted }]}>{track.artist}{track.bpm ? ` · ${track.bpm} BPM` : ''}</Text>
         </View>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack}>
-          <SkipForward size={18} color={theme.textSecondary} />
+          <Ionicons name="play-skip-forward-outline" size={18} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>
     );
@@ -116,7 +116,7 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
   return (
     <View style={[styles.card, { backgroundColor: theme.surface }]}>
       <View style={styles.header}>
-        <Music size={16} color={theme.primary} />
+        <Ionicons name="musical-notes-outline" size={16} color={theme.primary} />
         <Text style={[styles.headerTitle, { color: theme.textMuted }]}>Now Playing</Text>
       </View>
       <Text style={[styles.trackTitle, { color: theme.text }]}>{track.title}</Text>
@@ -125,13 +125,13 @@ export function MusicPlayer({ compact = false, onStateChange }: MusicPlayerProps
       </Text>
       <View style={styles.controls}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack} style={styles.controlBtn}>
-          <SkipBack size={20} color={theme.textSecondary} />
+          <Ionicons name="play-skip-back-outline" size={20} color={theme.textSecondary} />
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Play or pause" onPress={togglePlay} style={[styles.playBtn, { backgroundColor: theme.primary }]}>
-          {playing ? <Pause size={24} color={theme.text} /> : <Play size={24} color={theme.text} />}
+          {playing ? <Ionicons name="pause" size={24} color={theme.text} /> : <Ionicons name="play" size={24} color={theme.text} />}
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next track" onPress={nextTrack} style={styles.controlBtn}>
-          <SkipForward size={20} color={theme.textSecondary} />
+          <Ionicons name="play-skip-forward-outline" size={20} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>

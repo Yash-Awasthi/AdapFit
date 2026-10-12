@@ -4,6 +4,7 @@
 backend/.env
 backend/tests/
 backend/scratch/
+backend/.venv/
 backend/benchmark_results.json
 backend/app/data/*.sqlite3
 backend/app/data/accounts.json

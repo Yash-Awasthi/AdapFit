@@ -11,10 +11,7 @@ import {
   Switch,
   StyleSheet,
 } from 'react-native';
-import {
-  Download, Shield, Moon, Sun, Globe,
-  ChevronRight, Palette,
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useTheme, AccentName } from '../../src/services/theme';
@@ -44,7 +41,7 @@ export default function SettingsScreen() {
       <View style={s.section}>
         <Text style={s.sectionTitle}>Appearance</Text>
         <View style={s.card}>
-          {isDark ? <Moon size={20} color={theme.primaryLight} /> : <Sun size={20} color={theme.warning} />}
+          {isDark ? <Ionicons name="moon-outline" size={20} color={theme.primaryLight} /> : <Ionicons name="sunny-outline" size={20} color={theme.warning} />}
           <View style={s.cardContent}>
             <Text style={s.cardTitle}>Dark Mode</Text>
             <Text style={s.cardDesc}>{isDark ? 'On — easier in low light' : 'Off — bright surroundings'}</Text>
@@ -58,7 +55,7 @@ export default function SettingsScreen() {
         </View>
         <View style={[s.card, { flexDirection: 'column', alignItems: 'stretch' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-            <Palette size={20} color={theme.primaryLight} />
+            <Ionicons name="color-palette-outline" size={20} color={theme.primaryLight} />
             <View style={s.cardContent}>
               <Text style={s.cardTitle}>Accent Color</Text>
               <Text style={s.cardDesc}>Choose the app's highlight color</Text>
@@ -94,14 +91,14 @@ export default function SettingsScreen() {
         <Text style={s.sectionTitle}>Privacy & Data</Text>
         <ChangePassword />
         <TouchableOpacity style={s.exportBtn} onPress={() => router.push('/privacy' as any)}>
-          <Shield size={18} color={theme.success} />
+          <Ionicons name="shield-outline" size={18} color={theme.success} />
           <Text style={s.exportText}>Consent, sign out, delete account</Text>
-          <ChevronRight size={16} color={theme.textMuted} />
+          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
         </TouchableOpacity>
         <TouchableOpacity style={s.exportBtn} onPress={() => router.push('/(tabs)/data-export' as any)}>
-          <Download size={18} color={theme.primary} />
+          <Ionicons name="download-outline" size={18} color={theme.primary} />
           <Text style={s.exportText}>Export my data</Text>
-          <ChevronRight size={16} color={theme.textMuted} />
+          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -109,7 +106,7 @@ export default function SettingsScreen() {
       <View style={s.section}>
         <Text style={s.sectionTitle}>About</Text>
         <View style={s.card}>
-          <Globe size={20} color={theme.primaryLight} />
+          <Ionicons name="globe-outline" size={20} color={theme.primaryLight} />
           <View style={s.cardContent}>
             <Text style={s.cardTitle}>AdapFit v2.0.0</Text>
             <Text style={s.cardDesc}>AI-Powered Adaptive Fitness Engine</Text>

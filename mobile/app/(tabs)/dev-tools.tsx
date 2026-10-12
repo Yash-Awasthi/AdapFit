@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Switch, Alert, Modal, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Check, Trash2, Zap, ChevronDown, X, Search } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../src/services/theme';
 import { useDevSettings, LlmProvider } from '../../src/services/devSettings';
@@ -131,7 +131,7 @@ export default function DevToolsScreen() {
         title="Dev Tools"
         right={
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save" onPress={handleSave} hitSlop={10}>
-            <Check size={22} color={theme.primaryLight} />
+            <Ionicons name="checkmark" size={22} color={theme.primaryLight} />
           </TouchableOpacity>
         }
       />
@@ -179,18 +179,18 @@ export default function DevToolsScreen() {
             <Text style={[styles.dropdownValue, { color: model ? theme.text : theme.textMuted }]} numberOfLines={1}>
               {model || (provider === 'gemini' ? 'gemini-2.0-flash' : provider === 'groq' ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini')}
             </Text>
-            <ChevronDown size={18} color={theme.textMuted} />
+            <Ionicons name="chevron-down" size={18} color={theme.textMuted} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.buttonRow}>
           <TouchableOpacity style={[styles.testBtn, { backgroundColor: theme.surface, borderColor: theme.border }]} onPress={handleTest} disabled={testing}>
-            <Zap size={16} color={theme.warning} />
+            <Ionicons name="flash-outline" size={16} color={theme.warning} />
             <Text style={[styles.testBtnText, { color: theme.text }]}>{testing ? 'Testing…' : 'Test connection'}</Text>
           </TouchableOpacity>
           {!!llmOverride && (
             <TouchableOpacity style={[styles.testBtn, { backgroundColor: theme.surface, borderColor: theme.border }]} onPress={handleClear}>
-              <Trash2 size={16} color={theme.danger} />
+              <Ionicons name="trash-outline" size={16} color={theme.danger} />
               <Text style={[styles.testBtnText, { color: theme.danger }]}>Clear</Text>
             </TouchableOpacity>
           )}
@@ -219,12 +219,12 @@ export default function DevToolsScreen() {
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>Choose a model</Text>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setModelPickerOpen(false)} hitSlop={10}>
-                <X size={22} color={theme.textMuted} />
+                <Ionicons name="close" size={22} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
 
             <View style={[styles.searchRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Search size={16} color={theme.textMuted} />
+              <Ionicons name="search" size={16} color={theme.textMuted} />
               <TextInput
                 style={[styles.searchInput, { color: theme.text }]}
                 value={modelSearch}
@@ -269,7 +269,7 @@ export default function DevToolsScreen() {
                   <Text style={[styles.modelRowText, { color: item === model ? theme.primaryLight : theme.text }]} numberOfLines={1}>
                     {item}
                   </Text>
-                  {item === model && <Check size={16} color={theme.primaryLight} />}
+                  {item === model && <Ionicons name="checkmark" size={16} color={theme.primaryLight} />}
                 </TouchableOpacity>
               )}
               style={styles.modelList}

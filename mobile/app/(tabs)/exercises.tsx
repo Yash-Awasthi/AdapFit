@@ -10,7 +10,7 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { Search, Bookmark, BookmarkCheck, X, Calculator, Sparkles } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LoadingScreen, EmptyState } from '../../src/components';
 import { useBookmarkStore } from '../../src/stores';
 import * as Haptics from 'expo-haptics';
@@ -175,9 +175,9 @@ export default function ExercisesScreen() {
                 }}
               >
                 {isBookmarked(item.id) ? (
-                  <BookmarkCheck size={20} color={theme.primaryLight} />
+                  <Ionicons name="bookmark" size={20} color={theme.primaryLight} />
                 ) : (
-                  <Bookmark size={20} color={theme.textMuted} />
+                  <Ionicons name="bookmark-outline" size={20} color={theme.textMuted} />
                 )}
               </TouchableOpacity>
             </TouchableOpacity>
@@ -196,7 +196,7 @@ export default function ExercisesScreen() {
                   {selectedExercise.name}
                 </Text>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setSelectedExercise(null)}>
-                  <X size={22} color={theme.textSecondary} />
+                  <Ionicons name="close" size={22} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -223,7 +223,7 @@ export default function ExercisesScreen() {
                 {/* 1RM Calculator Card */}
                 <View style={s.calcCard}>
                   <View style={s.calcHeader}>
-                    <Calculator size={18} color={theme.primaryLight} />
+                    <Ionicons name="calculator-outline" size={18} color={theme.primaryLight} />
                     <Text style={s.calcTitle}>1RM Load Estimator</Text>
                   </View>
 

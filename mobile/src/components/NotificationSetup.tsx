@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
-import { Bell, BellOff, Moon, Dumbbell, Activity, Droplets } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { API_BASE_URL } from '../services/config';
 import { useUserStore } from '../stores';
@@ -29,11 +29,11 @@ interface Preferences {
   quiet_hours_end: string;
 }
 
-const TYPE_ICONS: Record<string, any> = {
-  workout_reminder: Dumbbell,
-  recovery_checkin: Activity,
-  sleep_reminder: Moon,
-  hydration: Droplets,
+const TYPE_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+  workout_reminder: 'barbell-outline',
+  recovery_checkin: 'pulse-outline',
+  sleep_reminder: 'moon-outline',
+  hydration: 'water-outline',
 };
 
 export function NotificationSetup() {
@@ -100,11 +100,11 @@ export function NotificationSetup() {
     <View style={styles.container}>
       {notifications.length === 0 ? (
         <View style={styles.empty}>
-          <BellOff size={32} color={theme.textMuted} />
+          <Ionicons name="notifications-off-outline" size={32} color={theme.textMuted} />
           <Text style={[styles.emptyTitle, { color: theme.text }]}>No Notifications</Text>
           <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>Set up reminders to stay on track.</Text>
           <TouchableOpacity style={[styles.setupBtn, { backgroundColor: theme.primary }]} onPress={setupDefaults}>
-            <Bell size={16} color="#fff" />
+            <Ionicons name="notifications-outline" size={16} color="#fff" />
             <Text style={styles.setupBtnText}>Setup Defaults</Text>
           </TouchableOpacity>
         </View>
@@ -112,11 +112,11 @@ export function NotificationSetup() {
         <>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Scheduled Reminders</Text>
           {notifications.map((n) => {
-            const Icon = TYPE_ICONS[n.type] || Bell;
+            const Icon = TYPE_ICONS[n.type] || 'notifications-outline';
             return (
               <View key={n.id} style={[styles.notifCard, { backgroundColor: theme.surface }]}>
                 <View style={[styles.notifIcon, { backgroundColor: theme.primaryBg }]}>
-                  <Icon size={18} color={theme.primaryLight} />
+                  <Ionicons name={Icon} size={18} color={theme.primaryLight} />
                 </View>
                 <View style={styles.notifInfo}>
                   <Text style={[styles.notifTitle, { color: theme.text }]}>{n.title}</Text>
@@ -124,7 +124,7 @@ export function NotificationSetup() {
                   {!!n.recurring && <Text style={[styles.notifRecurring, { color: theme.primaryLight }]}>Recurring</Text>}
                 </View>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete reminder" onPress={() => deleteNotification(n.id)}>
-                  <BellOff size={16} color={theme.danger} />
+                  <Ionicons name="notifications-off-outline" size={16} color={theme.danger} />
                 </TouchableOpacity>
               </View>
             );

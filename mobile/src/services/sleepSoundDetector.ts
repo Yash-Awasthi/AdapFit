@@ -121,7 +121,7 @@ export class SleepSoundDetector {
         return;
       }
     }
-    run.forEach((b) => this.noiseEvent(b));
+    for (const b of run) this.noiseEvent(b);
   }
 
   report(): NightReport {

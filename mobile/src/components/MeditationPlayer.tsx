@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Easing,
 } from "react-native";
-import { Play, Pause, SkipForward, X, Wind, Clock } from "lucide-react-native";
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from "../services/theme";
 
 interface MeditationStep {
@@ -101,7 +101,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Close button */}
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={styles.closeBtn} onPress={onClose}>
-        <X size={24} color={theme.textSecondary} />
+        <Ionicons name="close" size={24} color={theme.textSecondary} />
       </TouchableOpacity>
 
       {/* Session info */}
@@ -134,7 +134,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
 
       {/* Current instruction */}
       <Animated.View style={[styles.instructionCard, { backgroundColor: theme.surface, transform: [{ scale: pulseAnim }] }]}>
-        <Wind size={20} color={theme.primaryLight} />
+        <Ionicons name="cloud-outline" size={20} color={theme.primaryLight} />
         <Text style={[styles.instructionText, { color: theme.text }]}>{currentStep?.instruction || "Session complete"}</Text>
       </Animated.View>
 
@@ -146,7 +146,7 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
       {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity style={styles.controlBtn} onPress={skipStep}>
-          <SkipForward size={24} color={theme.textSecondary} />
+          <Ionicons name="play-skip-forward-outline" size={24} color={theme.textSecondary} />
           <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>Skip</Text>
         </TouchableOpacity>
 
@@ -155,14 +155,14 @@ export default function MeditationPlayer({ session, onComplete, onClose }: Props
           onPress={() => setIsPlaying(!isPlaying)}
         >
           {isPlaying ? (
-            <Pause size={32} color="#FFF" />
+            <Ionicons name="pause" size={32} color="#FFF" />
           ) : (
-            <Play size={32} color="#FFF" style={{ marginLeft: 4 }} />
+            <Ionicons name="play" size={32} color="#FFF" style={{ marginLeft: 4 }} />
           )}
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.controlBtn} onPress={onComplete}>
-          <Clock size={24} color={theme.textSecondary} />
+          <Ionicons name="time-outline" size={24} color={theme.textSecondary} />
           <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>End</Text>
         </TouchableOpacity>
       </View>

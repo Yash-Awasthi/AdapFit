@@ -181,7 +181,7 @@ export const InteractiveBarChart: React.FC<BarChartProps> = ({
         Animated.timing(v, { toValue: 1, duration: 400, useNativeDriver: false })
       )).start();
     } else {
-      animValues.forEach(v => v.setValue(1));
+      for (const v of animValues) v.setValue(1);
     }
   }, [data]);
 

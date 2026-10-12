@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Calendar, TrendingUp, Zap, Dumbbell, Coffee } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LoadingScreen } from '../../src/components';
 import { API_BASE_URL } from '../../src/services/config';
@@ -39,11 +39,11 @@ const PHASE_COLORS: Record<string, string> = {
   deload: '#22C55E',
 };
 
-const PHASE_ICONS: Record<string, any> = {
-  accumulation: Dumbbell,
-  intensification: Zap,
-  peak: TrendingUp,
-  deload: Coffee,
+const PHASE_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+  accumulation: 'barbell-outline',
+  intensification: 'flash-outline',
+  peak: 'trending-up',
+  deload: 'cafe-outline',
 };
 
 export default function PeriodizationScreen() {
@@ -111,7 +111,7 @@ export default function PeriodizationScreen() {
       {!!plan && (
         <>
           <View style={s.planHeader}>
-            <Calendar size={16} color={theme.primaryLight} />
+            <Ionicons name="calendar-outline" size={16} color={theme.primaryLight} />
             <Text style={s.planName}>{plan.name}</Text>
             <Text style={s.planWeeks}>{plan.duration_weeks} weeks</Text>
           </View>
@@ -124,13 +124,13 @@ export default function PeriodizationScreen() {
             contentContainerStyle={s.list}
             renderItem={({ item }) => {
               const color = PHASE_COLORS[item.phase] || '#818CF8';
-              const Icon = PHASE_ICONS[item.phase] || Dumbbell;
+              const Icon = PHASE_ICONS[item.phase] || 'barbell-outline';
               const isCurrent = item.week === plan.current_week;
               return (
                 <View style={[s.weekCard, isCurrent && { borderColor: color }]}>
                   <View style={s.weekLeft}>
                     <View style={[s.phaseIcon, { backgroundColor: color + '20' }]}>
-                      <Icon size={16} color={color} />
+                      <Ionicons name={Icon} size={16} color={color} />
                     </View>
                     <View style={s.weekInfo}>
                       <Text style={s.weekTitle}>Week {item.week}</Text>

@@ -5,7 +5,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemeProvider, useTheme } from "../src/services/theme";
-import { QueryProvider } from "../src/services/query-provider";
 import { DevSettingsProvider } from "../src/services/devSettings";
 import { useUserStore } from "../src/stores";
 import { useEffect } from "react";
@@ -133,11 +132,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
-          <QueryProvider>
-            <DevSettingsProvider>
-              <RootStack />
-            </DevSettingsProvider>
-          </QueryProvider>
+          <DevSettingsProvider>
+            <RootStack />
+          </DevSettingsProvider>
         </ThemeProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>
