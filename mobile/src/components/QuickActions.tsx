@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
 
   // SOS
   sosButton: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.health.heart, justifyContent: 'center', alignItems: 'center' },
-  sosGlow: { ...StyleSheet.absoluteFillObject, borderRadius: 32, backgroundColor: colors.health.heart, opacity: 0.3 },
+  sosGlow: { ...StyleSheet.absoluteFill, borderRadius: 32, backgroundColor: colors.health.heart, opacity: 0.3 },
   sosLabel: { fontSize: 12, fontWeight: '800', color: '#FFF', marginTop: 2 },
 
   // Measurement

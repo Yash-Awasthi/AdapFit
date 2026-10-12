@@ -409,7 +409,7 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
       {step > 0 && (
         <View style={styles.topBar}>
           <StepIndicator current={step - 1} total={4} />

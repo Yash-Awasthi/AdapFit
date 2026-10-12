@@ -19,13 +19,17 @@ the Windows machine.
    uv run python -m scripts.verify_postgres
    uv run python -m pytest tests -q -p no:warnings
    ```
-2. Install and type-check the app:
+2. Install and type-check the app. `android/` is no longer in git; move
+   `android\keystore.properties` and `android\app\adapfit-release.keystore`
+   up to `mobile\` (set `storeFile=adapfit-release.keystore`) before deleting
+   the old folder, then let prebuild regenerate it:
    ```powershell
    cd ..\mobile
    npm ci
    npx tsc --noEmit
    node scripts/audit-gate.mjs
-   npx expo start
+   npx expo prebuild -p android --clean
+   npx expo run:android
    ```
 3. On a device or emulator, walk the core loop and confirm:
    - Check-in with the pain toggle on gives a REST decision and a mobility

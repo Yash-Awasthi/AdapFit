@@ -257,7 +257,7 @@ export default function FormCheckerScreen() {
         <View style={s.cameraWrap}>
           <CameraView ref={cameraRef} style={s.camera} facing={facing} />
           {countdown !== null && (
-            <View style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 96, fontWeight: '800', color: '#fff' }}>{countdown}</Text>
             </View>
           )}

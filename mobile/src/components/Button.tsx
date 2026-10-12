@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector, useTapGesture } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { useDevSettings } from '../services/devSettings';
 import { useTheme } from '../services/theme';
@@ -42,17 +42,18 @@ export function Button({
   };
 
   // Callbacks on the JS thread: haptics and onPress are plain JS, which the UI thread cannot call.
-  const tapGesture = Gesture.Tap()
-    .runOnJS(true)
-    .onBegin(() => {
+  const tapGesture = useTapGesture({
+    runOnJS: true,
+    onBegin: () => {
       if (!reduceMotion) scale.value = withSpring(0.96, { damping: 15, stiffness: 300 });
-    })
-    .onFinalize(() => {
+    },
+    onFinalize: () => {
       if (!reduceMotion) scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-    })
-    .onEnd(() => {
+    },
+    onDeactivate: () => {
       if (!disabled && !loading) press();
-    });
+    },
+  });
 
   const variantStyles = {
     primary: {

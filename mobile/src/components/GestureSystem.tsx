@@ -10,10 +10,12 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
-  runOnJS,
   FadeInDown,
 } from 'react-native-reanimated';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import {
+  GestureDetector, useCompetingGestures, useLongPressGesture, usePanGesture, useTapGesture,
+} from 'react-native-gesture-handler';
+import { scheduleOnRN } from 'react-native-worklets';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme';
 import * as Haptics from 'expo-haptics';
@@ -39,20 +41,21 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, []);
 
-  const panGesture = Gesture.Pan()
-    .onUpdate((e) => {
+  const panGesture = usePanGesture({
+    onUpdate: (e) => {
       translateX.value = e.translationX;
-    })
-    .onEnd((e) => {
+    },
+    onDeactivate: (e) => {
       if (e.translationX < -SWIPE_THRESHOLD && onSwipeLeft) {
-        runOnJS(triggerHaptic)();
-        runOnJS(onSwipeLeft)();
+        scheduleOnRN(triggerHaptic);
+        scheduleOnRN(onSwipeLeft);
       } else if (e.translationX > SWIPE_THRESHOLD && onSwipeRight) {
-        runOnJS(triggerHaptic)();
-        runOnJS(onSwipeRight)();
+        scheduleOnRN(triggerHaptic);
+        scheduleOnRN(onSwipeRight);
       }
       translateX.value = withSpring(0, { damping: 15, stiffness: 300 });
-    });
+    },
+  });
 
   const leftActionStyle = useAnimatedStyle(() => ({
     opacity: translateX.value < -50 ? Math.min(1, Math.abs(translateX.value + 50) / 50) : 0,
@@ -214,17 +217,18 @@ export const HapticButton: React.FC<HapticButtonProps> = ({
     Haptics.impactAsync(hapticMap[haptic] || Haptics.ImpactFeedbackStyle.Medium);
   }, [haptic]);
 
-  const tapGesture = Gesture.Tap()
-    .onBegin(() => {
+  const tapGesture = useTapGesture({
+    onBegin: () => {
       scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
-    })
-    .onFinalize(() => {
+    },
+    onFinalize: () => {
       scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-    })
-    .onEnd(() => {
-      runOnJS(triggerHaptic)();
-      runOnJS(onPress)();
-    });
+    },
+    onDeactivate: () => {
+      scheduleOnRN(triggerHaptic);
+      scheduleOnRN(onPress);
+    },
+  });
 
   return (
     <GestureDetector gesture={tapGesture}>
@@ -254,31 +258,33 @@ export const LongPressCard: React.FC<LongPressCardProps> = ({ children, onLongPr
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
   }, []);
 
-  const longPressGesture = Gesture.LongPress()
-    .minDuration(500)
-    .onBegin(() => {
+  const longPressGesture = useLongPressGesture({
+    minDuration: 500,
+    onBegin: () => {
       scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-    })
-    .onFinalize(() => {
+    },
+    onFinalize: () => {
       scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-    })
-    .onEnd(() => {
-      runOnJS(triggerHaptic)();
-      runOnJS(onLongPress)();
-    });
+    },
+    onDeactivate: () => {
+      scheduleOnRN(triggerHaptic);
+      scheduleOnRN(onLongPress);
+    },
+  });
 
-  const tapGesture = Gesture.Tap()
-    .onBegin(() => {
+  const tapGesture = useTapGesture({
+    onBegin: () => {
       scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-    })
-    .onFinalize(() => {
+    },
+    onFinalize: () => {
       scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-    })
-    .onEnd(() => {
-      if (onPress) runOnJS(onPress)();
-    });
+    },
+    onDeactivate: () => {
+      if (onPress) scheduleOnRN(onPress);
+    },
+  });
 
-  const composed = Gesture.Race(longPressGesture, tapGesture);
+  const composed = useCompetingGestures(longPressGesture, tapGesture);
 
   return (
     <GestureDetector gesture={composed}>
