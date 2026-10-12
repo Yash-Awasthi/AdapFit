@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   webview: { flex: 1, width: '100%', backgroundColor: '#000' },
-  loading: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
+  loading: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center' },
   posterIcon: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   playBadge: {
     width: 56, height: 56, borderRadius: 28,

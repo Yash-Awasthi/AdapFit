@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
 
   // Quick Alert
   quickAlertOverlay: {
-    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)',
+    ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center', alignItems: 'center', zIndex: 10000,
   },
   quickAlert: {

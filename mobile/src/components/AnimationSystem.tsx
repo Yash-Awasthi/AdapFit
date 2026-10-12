@@ -5,7 +5,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, Animated, Easing, Dimensions, StyleSheet,
-  Platform, InteractionManager,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme';
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   waveBar: { width: 4, borderRadius: 2 },
 
   // Confetti
-  confettiContainer: { ...StyleSheet.absoluteFillObject, zIndex: 9999 },
+  confettiContainer: { ...StyleSheet.absoluteFill, zIndex: 9999 },
   confettiPiece: { position: 'absolute', width: 8, height: 8, borderRadius: 2, top: 0 },
 
   // Floating Input

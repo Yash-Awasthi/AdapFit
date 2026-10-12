@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-teal.svg)](https://fastapi.tiangolo.com)
-[![React Native](https://img.shields.io/badge/React%20Native-0.83+-purple.svg)](https://reactnative.dev)
+[![React Native](https://img.shields.io/badge/React%20Native-0.88+-purple.svg)](https://reactnative.dev)
 [![Expo](https://img.shields.io/badge/Expo-SDK%2055-black.svg)](https://expo.dev)
 [![Tests](https://img.shields.io/badge/Tests-228+-brightgreen.svg)](#testing)
 [![Endpoints](https://img.shields.io/badge/API-290+-endpoints-orange.svg)](#api-overview)
@@ -48,7 +48,7 @@ Not a dashboard of raw numbers. Every screen answers: *What should I do today, a
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    MOBILE APP                            │
-│  React Native · Expo SDK 55 · TypeScript · Zustand      │
+│  React Native · Expo SDK 58 · TypeScript · Zustand      │
 │  60+ screens · Offline-first SQLite · BLE sensors        │
 ├─────────────────────────────────────────────────────────┤
 │                   REST API (HTTPS) + WebSocket           │
@@ -544,14 +544,14 @@ Key endpoint:
 
 | Layer | Technology |
 |-------|------------|
-| Framework | React Native 0.83 + Expo SDK 55 |
+| Framework | React Native 0.88 + Expo SDK 58 (React Compiler on) |
 | Routing | expo-router (file-based) |
 | State | Zustand 5.0 |
-| Data Fetching | TanStack Query 5.x |
-| Styling | NativeWind (Tailwind CSS) |
-| Charts | react-native-circular-progress, SVG |
+| Data Fetching | `fetch` with small `useApi` hooks |
+| Styling | `StyleSheet`, Ionicons |
+| Charts | react-native-svg |
 | Animations | React Native Reanimated 4.x |
-| Gestures | React Native Gesture Handler |
+| Gestures | React Native Gesture Handler 3 (hook API) |
 | Offline | expo-sqlite (WAL mode, sync queue) |
 | BLE | react-native-ble-plx |
 | Camera | expo-camera |

@@ -259,7 +259,7 @@ export default function DevToolsScreen() {
                       Use "{modelSearch.trim()}"
                     </Text>
                   </TouchableOpacity>
-                ) : null
+                ) : undefined
               }
               renderItem={({ item }) => (
                 <TouchableOpacity

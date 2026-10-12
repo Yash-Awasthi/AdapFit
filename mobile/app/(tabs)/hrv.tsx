@@ -170,7 +170,7 @@ export default function HrvScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={TINT} />}>
         <LinearGradient colors={[TINT, '#059669', colors.bg.deep]} style={styles.hero}>

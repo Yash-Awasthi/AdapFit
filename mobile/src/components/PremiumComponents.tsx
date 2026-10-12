@@ -12,7 +12,6 @@ import Animated, {
   withSpring,
   withDelay,
   FadeInDown,
-  runOnJS,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';

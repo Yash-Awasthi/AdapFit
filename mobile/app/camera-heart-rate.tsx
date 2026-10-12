@@ -19,7 +19,7 @@ import { useRouter } from 'expo-router';
 import {
   Camera, useCameraDevice, useCameraPermission, useFrameOutput,
 } from 'react-native-vision-camera';
-import { runOnJS } from 'react-native-worklets';
+import { scheduleOnRN } from 'react-native-worklets';
 import { colors, typography, spacing } from '../src/theme';
 import { api } from '../src/services/api';
 
@@ -58,7 +58,7 @@ export default function CameraHeartRateScreen() {
   const greenChannelAvg = useRef<number[]>([]);
   const roiPixels = useRef<number[][]>([]);
   const startTimeRef = useRef<number>(0);
-  const measurementTimer = useRef<NodeJS.Timeout | null>(null);
+  const measurementTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frameCountRef = useRef(0);
 
   const pushSample = useCallback((r: number, g: number, b: number) => {
@@ -111,7 +111,7 @@ export default function CameraHeartRateScreen() {
       frame.dispose();
 
       if (count > 0) {
-        runOnJS(pushSample)(rSum / count, gSum / count, bSum / count);
+        scheduleOnRN(pushSample, rSum / count, gSum / count, bSum / count);
       }
     },
   });
@@ -252,7 +252,7 @@ export default function CameraHeartRateScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
 
       {/* Camera Preview */}
       <View style={styles.cameraContainer}>
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     flex: 1, justifyContent: 'center', alignItems: 'center',
     backgroundColor: '#1A1A2E',
   },
-  overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between' },
+  overlay: { ...StyleSheet.absoluteFill, justifyContent: 'space-between' },
   topBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingTop: 50, paddingHorizontal: 16,
