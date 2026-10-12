@@ -281,7 +281,15 @@ class _SQLite:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(str(path), check_same_thread=False, timeout=30, isolation_level=None)
-        self._db.execute("PRAGMA journal_mode=WAL")
+        # Switching to WAL takes the file exclusively and skips the busy timeout; workers starting together retry.
+        for attempt in range(100):
+            try:
+                self._db.execute("PRAGMA journal_mode=WAL")
+                break
+            except sqlite3.OperationalError:
+                if attempt == 99:
+                    raise
+                _time.sleep(0.1)
         self._db.execute(_SQLITE_SCHEMA)
         if "seq" not in [r[1] for r in self._db.execute("PRAGMA table_info(feature_state)")]:
             self._db.execute("ALTER TABLE feature_state ADD COLUMN seq INTEGER NOT NULL DEFAULT 0")
