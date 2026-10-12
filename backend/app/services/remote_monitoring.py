@@ -279,4 +279,4 @@ class RemoteMonitoringService:
 
 from app.core.durable import shared  # noqa: E402
 
-remote_monitoring_service = shared("app.services.remote_monitoring.remote_monitoring_service", RemoteMonitoringService())
+remote_monitoring_service = shared("app.services.remote_monitoring.remote_monitoring_service", RemoteMonitoringService(), state=("_readings", "_devices", "_alerts"))

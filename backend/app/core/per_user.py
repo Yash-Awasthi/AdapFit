@@ -54,6 +54,7 @@ class PerUserProxy:
         ns = object.__getattribute__(self, "_ns")
         if ns:
             from app.core import durable
+            durable.ensure_user(ns, user_id)
             durable.touch(ns, user_id)
         with lock:
             if user_id in instances:
@@ -149,8 +150,11 @@ def _plain(value: Any) -> Any:
 
 def export_user(user_id: str) -> Dict[str, Any]:
     """Everything each per-user service holds for one user, as plain JSON-able data."""
+    from app.core import durable
+
     out: Dict[str, Any] = {}
     for name, proxy in _registry.items():
+        durable.ensure_user(name, user_id)
         instances = object.__getattribute__(proxy, "_instances")
         instance = instances.get(user_id)
         if instance is None:

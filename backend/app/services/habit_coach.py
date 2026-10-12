@@ -207,4 +207,4 @@ class HabitCoachService:
 
 from app.core.durable import shared  # noqa: E402
 
-habit_coach_service = shared("app.services.habit_coach.habit_coach_service", HabitCoachService())
+habit_coach_service = shared("app.services.habit_coach.habit_coach_service", HabitCoachService(), state=("_user_habits", "_habit_log", "_com_b_assessments"))

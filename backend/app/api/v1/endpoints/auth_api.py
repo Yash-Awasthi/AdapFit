@@ -58,8 +58,7 @@ async def _extract_user(authorization: Optional[str] = None) -> Optional[dict]:
     """Extract user from Authorization header."""
     if not authorization:
         return None
-    await user_manager._ensure_loaded()
-    payload = decode_access_token(authorization.replace("Bearer ", ""))
+    payload = await decode_access_token(authorization.replace("Bearer ", ""))
     if not payload:
         return None
     return await user_manager.get_user(payload["sub"])

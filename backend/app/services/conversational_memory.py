@@ -439,4 +439,4 @@ class ConversationalMemory:
 # Singleton
 from app.core.durable import shared  # noqa: E402
 
-conversational_memory = shared("app.services.conversational_memory.conversational_memory", ConversationalMemory())
+conversational_memory = shared("app.services.conversational_memory.conversational_memory", ConversationalMemory(), state=("_summaries", "_preferences", "_active_sessions", "_user_facts"))

@@ -63,4 +63,4 @@ class HealthNotepad:
 
 from app.core.durable import shared  # noqa: E402
 
-health_notepad = shared("app.services.health_notepad.health_notepad", HealthNotepad())
+health_notepad = shared("app.services.health_notepad.health_notepad", HealthNotepad(), state=("notes",))

@@ -360,4 +360,4 @@ class LongevityTrackerService:
 
 from app.core.durable import shared  # noqa: E402
 
-longevity_tracker_service = shared("app.services.longevity_tracker.longevity_tracker_service", LongevityTrackerService())
+longevity_tracker_service = shared("app.services.longevity_tracker.longevity_tracker_service", LongevityTrackerService(), state=("profiles", "interventions"))

@@ -27,8 +27,7 @@ async def _decode_user_from_token(token: Optional[str]) -> Optional[dict]:
     """Decode and validate JWT, return user dict or None."""
     if not token:
         return None
-    await user_manager._ensure_loaded()
-    payload = decode_access_token(token)
+    payload = await decode_access_token(token)
     if not payload:
         return None
     return await user_manager.get_user(payload["sub"])

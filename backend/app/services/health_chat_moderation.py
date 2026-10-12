@@ -30,7 +30,6 @@ class ChatModeration:
     def __init__(self):
         self.flagged_content: Dict[str, List[dict]] = {}
         self.user_reports: Dict[str, List[dict]] = {}
-        self.moderation_logs: Dict[str, List[dict]] = []
 
     def moderate_content(self, content: str, user_id: str) -> dict:
         content_lower = content.lower()
@@ -46,7 +45,6 @@ class ChatModeration:
                     "timestamp": datetime.now().isoformat(),
                 }
                 self.flagged_content.setdefault(user_id, []).append(flag)
-                self.moderation_logs.append(flag)
                 return {"safe": False, "action": action, "category": category, "message": "Content flagged for safety review"}
         
         if any(topic in content_lower for topic in ["suicid", "self harm", "want to die", "end it all"]):
@@ -60,7 +58,9 @@ class ChatModeration:
         return report
 
     def get_flagged_content(self, limit: int = 50) -> List[dict]:
-        return self.moderation_logs[-limit:]
+        flags = sorted((f for user_flags in self.flagged_content.values() for f in user_flags),
+                       key=lambda f: f["timestamp"])
+        return flags[-limit:]
 
     def get_helplines(self, country: str = "india") -> dict:
         return self.HELPLINE_NUMBERS.get(country, self.HELPLINE_NUMBERS["india"])
@@ -68,4 +68,4 @@ class ChatModeration:
 
 from app.core.durable import shared  # noqa: E402
 
-chat_moderation = shared("app.services.health_chat_moderation.chat_moderation", ChatModeration())
+chat_moderation = shared("app.services.health_chat_moderation.chat_moderation", ChatModeration(), state=("flagged_content", "user_reports"))

@@ -732,4 +732,4 @@ class ContentPlatformService:
 # Singleton
 from app.core.durable import shared  # noqa: E402
 
-content_platform_service = shared("app.services.content_platform.content_platform_service", ContentPlatformService())
+content_platform_service = shared("app.services.content_platform.content_platform_service", ContentPlatformService(), state=("_user_engagement", "_bookmarks"))

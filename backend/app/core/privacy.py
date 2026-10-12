@@ -74,8 +74,9 @@ def _now() -> str:
 
 
 def _is_account(uid: Optional[str]) -> bool:
-    from app.core.auth import user_manager
-    return bool(uid) and uid != SHARED and uid in user_manager._users
+    """The signed-in caller (whose token was checked against the account), or anyone with a consent record."""
+    from app.core.per_user import CURRENT_USER
+    return bool(uid) and uid != SHARED and (uid == CURRENT_USER.get() or _records.peek(uid) is not None)
 
 
 def age_from(birth_date: str, today: Optional[date] = None) -> int:
@@ -132,7 +133,7 @@ def start(uid: str, birth_date: str, choices: dict, guardian_email: Optional[str
 
 def current(uid: str) -> Dict[str, dict]:
     """Latest decision per purpose. A decision under an older policy version is reported but not granted."""
-    events = (dict.get(_records, uid) or {}).get("events", [])
+    events = (_records.peek(uid) or {}).get("events", [])
     out = {}
     for purpose in PURPOSES:
         last = next((e for e in reversed(events) if e["purpose"] == purpose), None)
@@ -143,10 +144,10 @@ def current(uid: str) -> Dict[str, dict]:
 
 
 def state(uid: str) -> dict:
-    record = dict.get(_records, uid) or {}
+    record = _records.peek(uid) or {}
     purposes = current(uid)
     guardian = record.get("guardian")
-    deletion = dict.get(_deletions, uid)
+    deletion = _deletions.peek(uid)
     return {
         "policy_version": POLICY_VERSION,
         "purposes": {p: {**PURPOSES[p], **purposes[p]} for p in PURPOSES},
@@ -163,7 +164,7 @@ def update(uid: str, choices: dict) -> dict:
     unknown = set(choices) - set(PURPOSES)
     if unknown:
         raise ValueError(f"Unknown consent purpose: {', '.join(sorted(unknown))}")
-    record = dict.get(_records, uid) or {}
+    record = _records.peek(uid) or {}
     if record.get("minor") and any(choices.values()):
         raise PermissionError("Under 18, only a parent or guardian can give consent")
     _append(uid, choices, "user")
@@ -182,9 +183,9 @@ def blocked(uid: str) -> Optional[str]:
     """Why an account may not use its data right now, or None."""
     if not _is_account(uid):
         return None
-    if dict.__contains__(_deletions, uid):
+    if _deletions.peek(uid) is not None:
         return "deletion_pending"
-    record = dict.get(_records, uid) or {}
+    record = _records.peek(uid) or {}
     if record.get("minor") and not record.get("guardian"):
         return "guardian_pending"
     if not current(uid)["health_data"]["granted"]:
@@ -201,10 +202,10 @@ def _digest(token: str) -> str:
 async def send_guardian_link(uid: str) -> bool:
     from app.core.mailer import send_mail
 
-    record = dict.get(_records, uid) or {}
+    record = _records.peek(uid) or {}
     if not record.get("minor") or record.get("guardian"):
         return False
-    for key in [k for k, v in dict.items(_guardian_links) if v["user_id"] == uid]:
+    for key in [k for k, v in _guardian_links.peek_items() if v["user_id"] == uid]:
         del _guardian_links[key]
     token = secrets.token_urlsafe(32)
     _guardian_links[_digest(token)] = {"user_id": uid, "expires_at": time.time() + GUARDIAN_LINK_HOURS * 3600}
@@ -221,10 +222,10 @@ async def send_guardian_link(uid: str) -> bool:
 
 
 def guardian_link(token: str) -> Optional[dict]:
-    link = dict.get(_guardian_links, _digest(token))
+    link = _guardian_links.peek(_digest(token))
     if not link or link["expires_at"] < time.time():
         return None
-    return {"user_id": link["user_id"], "record": dict.get(_records, link["user_id"]) or {}}
+    return {"user_id": link["user_id"], "record": _records.peek(link["user_id"]) or {}}
 
 
 def guardian_confirm(token: str, name: str, relationship: str, declared_adult: bool, choices: dict) -> dict:
@@ -265,7 +266,7 @@ def request_deletion(uid: str, seconds: int = DELETION_GRACE_SECONDS, reason: st
 
 def on_login(uid: str) -> None:
     """Coming back cancels an erasure scheduled for inactivity, not one the user asked for."""
-    pending = dict.get(_deletions, uid)
+    pending = _deletions.peek(uid)
     if pending and pending.get("reason") == "inactive":
         _deletions.pop(uid, None)
 
@@ -277,10 +278,10 @@ async def schedule_retention(now: Optional[float] = None) -> int:
 
     now = now or time.time()
     scheduled = 0
-    for user in list(user_manager._users.values()):
-        if dict.__contains__(_deletions, user.id) or user.role in ("admin", "superadmin"):
+    for user in await user_manager.all_users():
+        if _deletions.peek(user.id) is not None or user.role in ("admin", "superadmin"):
             continue
-        record = dict.get(_records, user.id) or {}
+        record = _records.peek(user.id) or {}
         if record.get("minor") and not record.get("guardian") and user.created_at < now - GUARDIAN_WAIT_DAYS * 86400:
             request_deletion(user.id, 0, "guardian_never_confirmed", now)
             scheduled += 1
@@ -305,7 +306,7 @@ async def run_due_deletions(now: Optional[float] = None) -> int:
 
     now = now or time.time()
     await schedule_retention(now)
-    due = [(uid, d.get("reason", "user")) for uid, d in list(dict.items(_deletions)) if d["due_at"] <= now]
+    due = [(uid, d.get("reason", "user")) for uid, d in _deletions.peek_items() if d["due_at"] <= now]
     for uid, reason in due:
         await user_manager.delete_user(uid)
         _deletions.pop(uid, None)

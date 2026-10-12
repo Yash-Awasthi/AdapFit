@@ -61,11 +61,6 @@ be borrowed infrastructure.
 - Uptime monitor on `/health` (needs the owner's account).
 - Remote push (FCM): needs a Firebase project and a server event worth pushing.
 - iOS project, build profile, HealthKit entitlement and sync.
-- Rotated-token memory and the "sessions ended at" cut-off live in process
-  memory; persist them before running more than one worker.
-- Feature state (`backend/app/core/durable.py`) is now sealed JSON, but still
-  loads whole at startup and shared services hold every user's records in one
-  object; move to per-request hydration by user before raising `--workers`.
 - Expo SDK 58 and React Native 0.88 are pre-releases: walk the app on a device
   (camera heart rate, form checker, BLE, Health Connect, gestures) and move to
   the final releases when they ship. Drop the accepted ids in

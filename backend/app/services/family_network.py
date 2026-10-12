@@ -176,7 +176,7 @@ class FamilyNetworkService:
     def __init__(self):
         self._invites: dict[str, FamilyInvite] = {}
         self._connections: dict[str, FamilyConnection] = {}
-        self._audit_log: list[SharingAuditEntry] = []
+        self._audit_log: dict[str, list[SharingAuditEntry]] = {}  # user id -> entries naming them
 
     # === Invitation System ===
 
@@ -452,10 +452,7 @@ class FamilyNetworkService:
 
     def get_audit_history(self, user_id: str, limit: int = 50) -> list[dict]:
         """Get audit history of sharing actions."""
-        entries = [
-            e for e in self._audit_log
-            if e.actor_id == user_id or e.target_id == user_id
-        ]
+        entries = self._audit_log.get(user_id, [])
         return [
             {
                 "action": e.action,
@@ -474,17 +471,19 @@ class FamilyNetworkService:
         return None
 
     def _audit(self, action: str, actor: str, target: str, data_type: str, details: dict):
-        self._audit_log.append(SharingAuditEntry(
+        entry = SharingAuditEntry(
             id=f"aud_{secrets.token_hex(6)}",
             actor_id=actor, target_id=target,
             action=action, data_type=data_type,
             timestamp=time.time(), details=details,
-        ))
-        # Keep last 5000 entries
-        if len(self._audit_log) > 5000:
-            self._audit_log[:] = self._audit_log[-2500:]
+        )
+        for uid in {actor, target} - {""}:
+            log = self._audit_log.setdefault(uid, [])
+            log.append(entry)
+            if len(log) > 500:
+                log[:] = log[-250:]
 
 
 from app.core.durable import shared  # noqa: E402
 
-family_network_service = shared("app.services.family_network.family_network_service", FamilyNetworkService())
+family_network_service = shared("app.services.family_network.family_network_service", FamilyNetworkService(), state=("_invites", "_connections", "_audit_log"))

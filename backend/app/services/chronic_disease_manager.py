@@ -178,4 +178,4 @@ class ChronicDiseaseManager:
 
 from app.core.durable import shared  # noqa: E402
 
-chronic_disease_service = shared("app.services.chronic_disease_manager.chronic_disease_service", ChronicDiseaseManager())
+chronic_disease_service = shared("app.services.chronic_disease_manager.chronic_disease_service", ChronicDiseaseManager(), state=("patients", "condition_logs", "care_plans", "symptom_diaries", "medication_logs", "vital_logs", "goals"))

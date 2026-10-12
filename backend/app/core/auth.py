@@ -170,12 +170,12 @@ def decode_token(token: str) -> Optional[dict]:
     return payload
 
 
-def decode_access_token(token: str) -> Optional[dict]:
+async def decode_access_token(token: str) -> Optional[dict]:
     """An access token that is still valid; a refresh token is not a credential for API calls."""
     payload = decode_token(token)
     if not payload or payload.get("type") != "access" or not payload.get("sub"):
         return None
-    if not user_manager.token_current(payload):
+    if not await user_manager.token_current(payload):
         return None
     return payload
 
@@ -209,6 +209,7 @@ class User:
     is_active: bool = True
     created_at: float = field(default_factory=time.time)
     last_login: float = 0
+    sessions_revoked_at: float = 0  # access tokens issued before this no longer work
 
     def to_dict(self) -> dict:
         return {
@@ -218,6 +219,7 @@ class User:
             "gender": self.gender, "height": self.height, "weight": self.weight,
             "units": self.units, "role": self.role, "is_active": self.is_active,
             "created_at": self.created_at, "last_login": self.last_login,
+            "sessions_revoked_at": self.sessions_revoked_at,
         }
 
     @classmethod
@@ -241,53 +243,30 @@ class UserManager:
     """
     User registration, authentication, and profile management.
 
-    The dicts here cache the durable store in app.core.accounts; they are not
-    the system of record. Every mutation is written through before it is
-    reported as done, so a restart or a second process sees the same accounts.
+    Nothing about an account is cached in the process: every call reads the
+    store in app.core.accounts, and every change is written there before it is
+    reported, so any number of workers agree on accounts, sessions and lockouts.
     """
 
-    def __init__(self):
-        self._users: dict[str, User] = {}
-        self._email_index: dict[str, str] = {}
-        self._username_index: dict[str, str] = {}
-        self._refresh_tokens: dict[str, tuple[str, float]] = {}  # token hash -> (user id, expiry)
-        # ponytail: rotated-token memory and the revocation cut-off live in process memory; a restart forgets
-        # them, bounded by the 15-minute access token. Persist both before running more than one worker.
-        self._rotated: dict[str, tuple[str, float]] = {}  # hash of a used refresh token -> (user id, expiry)
-        self._revoked_before: dict[str, float] = {}  # user id -> tokens issued before this are void
-        self._failed_attempts: dict[str, list[float]] = {}  # email -> [timestamps]
-        self._lockouts: dict[str, float] = {}  # email -> lockout_expiry
-        self._loaded = False
+    async def _user(self, user_id: str) -> Optional["User"]:
+        from app.core.accounts import account_store
 
-    async def load(self) -> None:
-        """Populate the cache from the durable store. Safe to call repeatedly."""
-        from app.core.accounts import account_store, session_store
+        record = await account_store.get(user_id) if user_id else None
+        return User.from_dict(record) if record else None
 
-        self._users.clear()
-        self._email_index.clear()
-        self._username_index.clear()
-        for record in await account_store.load_all():
-            self._index(User.from_dict(record))
-        self._refresh_tokens = await session_store.load_all()
-        self._loaded = True
+    async def find(self, login: str) -> Optional["User"]:
+        """The account with this email or username."""
+        from app.core.accounts import account_store
 
-    async def _ensure_loaded(self) -> None:
-        if not self._loaded:
-            await self.load()
+        record = await account_store.find(login)
+        return User.from_dict(record) if record else None
 
-    def token_current(self, payload: dict) -> bool:
+    async def token_current(self, payload: dict) -> bool:
         """False once the account is gone, suspended, or its sessions were ended after the token was issued."""
-        uid = str(payload.get("sub", ""))
-        if self._loaded:
-            user = self._users.get(uid)
-            if user is None or not user.is_active:
-                return False
-        return float(payload.get("iat", 0)) >= self._revoked_before.get(uid, 0)
-
-    def _index(self, user: "User") -> None:
-        self._users[user.id] = user
-        self._email_index[user.email.lower()] = user.id
-        self._username_index[user.username.lower()] = user.id
+        user = await self._user(str(payload.get("sub", "")))
+        if user is None or not user.is_active:
+            return False
+        return float(payload.get("iat", 0)) >= user.sessions_revoked_at
 
     async def _persist(self, user: "User") -> None:
         from app.core.accounts import account_store
@@ -299,25 +278,17 @@ class UserManager:
 
         tokens = create_token_pair(user.id, user.role)
         expiry = time.time() + REFRESH_TOKEN_EXPIRE_DAYS * 86400
-        digest = _token_hash(tokens["refresh_token"])
-        self._refresh_tokens[digest] = (user.id, expiry)
-        await session_store.add(digest, user.id, expiry)
+        await session_store.add(_token_hash(tokens["refresh_token"]), user.id, expiry)
         return tokens
-
-    async def _forget_refresh(self, refresh_token: str) -> None:
-        from app.core.accounts import session_store
-
-        digest = _token_hash(refresh_token)
-        self._refresh_tokens.pop(digest, None)
-        await session_store.remove(digest)
 
     async def revoke_sessions(self, user_id: str, reason: str) -> None:
         """End every session: refresh tokens are deleted and access tokens issued until now stop working."""
         from app.core.accounts import session_store
 
-        self._revoked_before[user_id] = time.time()
-        for digest in [d for d, (uid, _) in self._refresh_tokens.items() if uid == user_id]:
-            self._refresh_tokens.pop(digest, None)
+        user = await self._user(user_id)
+        if user is not None:
+            user.sessions_revoked_at = time.time()
+            await self._persist(user)
         await session_store.remove_user(user_id)
         await _log_audit_event("sessions_revoked", user_id=user_id, details={"reason": reason})
 
@@ -326,10 +297,9 @@ class UserManager:
                        ip: str = "") -> dict:
         from app.core import privacy
 
-        await self._ensure_loaded()
-        if email.lower() in self._email_index:
+        if await self.find(email):
             return {"error": "Email already registered"}
-        if username.lower() in self._username_index:
+        if await self.find(username):
             return {"error": "Username already taken"}
         pw_check = validate_password_strength(password)
         if not pw_check["valid"]:
@@ -346,7 +316,6 @@ class UserManager:
             password_hash=hash_password(password),
             display_name=display_name or username, date_of_birth=birth_date,
         )
-        self._index(user)
         await self._persist(user)
         consent_state = privacy.start(user_id, birth_date, consent or {}, guardian_email)
         if consent_state["guardian_pending"]:
@@ -356,93 +325,86 @@ class UserManager:
         return {"user": _public(user), "tokens": tokens, "privacy": consent_state}
 
     async def login(self, email: str, password: str, ip: str = "") -> dict:
-        await self._ensure_loaded()
         email_lower = email.lower()
+        now = time.time()
+        failures = _login_failures.get(email_lower) or {}
 
-        lockout_until = self._lockouts.get(email_lower, 0)
-        if lockout_until > time.time():
-            remaining = int((lockout_until - time.time()) / 60) + 1
-            await _log_audit_event("login_locked", user_id=self._email_index.get(email_lower, ""),
+        lockout_until = failures.get("locked_until", 0)
+        if lockout_until > now:
+            remaining = int((lockout_until - now) / 60) + 1
+            locked = await self.find(email_lower)
+            await _log_audit_event("login_locked", user_id=locked.id if locked else "",
                                    email=email_lower, details={"minutes_remaining": remaining}, ip=ip)
             return {"error": f"Account locked. Try again in {remaining} minutes."}
+        if lockout_until:
+            _login_failures.pop(email_lower, None)
+            failures = {}
 
-        if lockout_until and lockout_until < time.time():
-            self._lockouts.pop(email_lower, None)
-            self._failed_attempts.pop(email_lower, None)
-
-        user_id = self._email_index.get(email_lower)
-        if not user_id:
+        user = await self.find(email_lower)
+        if user is None or user.email != email_lower:
             await _log_audit_event("login_failed_unknown_email", email=email_lower, ip=ip)
             # Hash anyway: an unknown email must not answer faster than a wrong password.
             verify_password(password, hash_password(password))
             return {"error": "Invalid credentials"}
-        user = self._users.get(user_id)
-        if not user or not verify_password(password, user.password_hash):
-            now = time.time()
-            attempts = self._failed_attempts.setdefault(email_lower, [])
-            attempts.append(now)
+        if not verify_password(password, user.password_hash):
             cutoff = now - LOCKOUT_DURATION_MINUTES * 60
-            self._failed_attempts[email_lower] = [t for t in attempts if t > cutoff]
-
-            await _log_audit_event("login_failed_bad_password", user_id=user_id, ip=ip,
-                                   details={"attempts": len(self._failed_attempts[email_lower])})
-
-            if len(self._failed_attempts[email_lower]) >= MAX_FAILED_ATTEMPTS:
-                self._lockouts[email_lower] = now + LOCKOUT_DURATION_MINUTES * 60
-                await _log_audit_event("account_locked", user_id=user_id, ip=ip,
-                                       details={"attempts": len(self._failed_attempts[email_lower])})
-
+            attempts = [t for t in failures.get("attempts", []) if t > cutoff] + [now]
+            failures = {"attempts": attempts}
+            await _log_audit_event("login_failed_bad_password", user_id=user.id, ip=ip,
+                                   details={"attempts": len(attempts)})
+            if len(attempts) >= MAX_FAILED_ATTEMPTS:
+                failures["locked_until"] = now + LOCKOUT_DURATION_MINUTES * 60
+                await _log_audit_event("account_locked", user_id=user.id, ip=ip,
+                                       details={"attempts": len(attempts)})
+            _login_failures[email_lower] = failures
             return {"error": "Invalid credentials"}
         if not user.is_active:
-            await _log_audit_event("login_disabled_account", user_id=user_id, ip=ip)
+            await _log_audit_event("login_disabled_account", user_id=user.id, ip=ip)
             return {"error": "Account disabled"}
 
-        self._failed_attempts.pop(email_lower, None)
-        self._lockouts.pop(email_lower, None)
-
-        user.last_login = time.time()
+        _login_failures.pop(email_lower, None)
+        user.last_login = now
         await self._persist(user)
         from app.core import privacy
-        privacy.on_login(user_id)
+        privacy.on_login(user.id)
         tokens = await self._issue(user)
 
-        await _log_audit_event("login_success", user_id=user_id, ip=ip)
+        await _log_audit_event("login_success", user_id=user.id, ip=ip)
         return {"user": _public(user), "tokens": tokens}
 
     async def refresh(self, refresh_token: str, ip: str = "") -> dict:
-        await self._ensure_loaded()
+        from app.core.accounts import session_store
+
         payload = decode_token(refresh_token)
         if not payload or payload.get("type") != "refresh":
             return {"error": "Invalid refresh token"}
         digest = _token_hash(refresh_token)
-        now = time.time()
-        self._rotated = {d: v for d, v in self._rotated.items() if v[1] > now}
-        if digest in self._rotated:
-            owner = self._rotated[digest][0]
+        owner = await session_store.rotated_owner(digest)
+        if owner:
             await _log_audit_event("refresh_token_reuse", user_id=owner, ip=ip)
             await self.revoke_sessions(owner, "refresh_token_reuse")
             return {"error": "Refresh token revoked"}
-        if digest not in self._refresh_tokens:
+        # Taking the session out is the rotation: of two requests racing with one token, one gets nothing.
+        session = await session_store.consume(digest)
+        if session is None:
             return {"error": "Refresh token revoked"}
-        expiry = self._refresh_tokens[digest][1]
-        if expiry < now:
-            await self._forget_refresh(refresh_token)
+        user_id, expiry = session
+        if expiry < time.time():
             return {"error": "Refresh token expired"}
-        user = self._users.get(payload["sub"])
-        if not user or not user.is_active:
+        await session_store.add_rotated(digest, user_id, expiry)
+        user = await self._user(payload["sub"])
+        if not user or not user.is_active or user.id != user_id:
             return {"error": "User not found or inactive"}
-        # Rotate on use, so a stolen copy of the token works at most once.
-        await self._forget_refresh(refresh_token)
-        self._rotated[digest] = (user.id, expiry)
         return {"tokens": await self._issue(user)}
 
     async def logout(self, refresh_token: str) -> dict:
-        await self._forget_refresh(refresh_token)
+        from app.core.accounts import session_store
+
+        await session_store.remove(_token_hash(refresh_token))
         return {"logged_out": True}
 
     async def get_user(self, user_id: str) -> Optional[dict]:
-        await self._ensure_loaded()
-        user = self._users.get(user_id)
+        user = await self._user(user_id)
         if not user:
             return None
         record = user.to_dict()
@@ -450,8 +412,7 @@ class UserManager:
         return record
 
     async def update_profile(self, user_id: str, updates: dict) -> dict:
-        await self._ensure_loaded()
-        user = self._users.get(user_id)
+        user = await self._user(user_id)
         if not user:
             return {"error": "User not found"}
         allowed_fields = {"display_name", "avatar_url", "date_of_birth", "gender", "height", "weight", "units"}
@@ -463,8 +424,7 @@ class UserManager:
 
     async def change_password(self, user_id: str, current_password: str, new_password: str) -> dict:
         """Other devices are signed out; this one gets a fresh token pair."""
-        await self._ensure_loaded()
-        user = self._users.get(user_id)
+        user = await self._user(user_id)
         if not user or not verify_password(current_password, user.password_hash):
             return {"error": "Invalid credentials"}
         pw_check = validate_password_strength(new_password)
@@ -481,12 +441,11 @@ class UserManager:
         from app.core.config import settings
         from app.core.mailer import send_mail
 
-        await self._ensure_loaded()
-        user = self._users.get(self._email_index.get(email.strip().lower(), ""))
-        if not user or not user.is_active:
+        user = await self.find(email.strip().lower())
+        if not user or not user.is_active or user.email != email.strip().lower():
             await _log_audit_event("password_reset_unknown_email", email=email, ip=ip)
             return False
-        for key in [k for k, v in dict.items(_reset_tokens) if v["user_id"] == user.id]:
+        for key in [k for k, v in _reset_tokens.peek_items() if v["user_id"] == user.id]:
             del _reset_tokens[key]
         token = secrets.token_urlsafe(32)
         _reset_tokens[_token_hash(token)] = {"user_id": user.id,
@@ -499,38 +458,39 @@ class UserManager:
             "has not changed."))
 
     def reset_link_valid(self, token: str) -> bool:
-        link = dict.get(_reset_tokens, _token_hash(token))
+        link = _reset_tokens.peek(_token_hash(token))
         return bool(link) and link["expires_at"] > time.time()
 
     async def reset_password(self, token: str, new_password: str, ip: str = "") -> dict:
-        await self._ensure_loaded()
         digest = _token_hash(token)
         if not self.reset_link_valid(token):
             return {"error": "This link has expired or was already used"}
         pw_check = validate_password_strength(new_password)
         if not pw_check["valid"]:
             return {"error": "Weak password", "details": pw_check["errors"]}
-        user = self._users.get(_reset_tokens.pop(digest)["user_id"])
+        user = await self._user(_reset_tokens.pop(digest)["user_id"])
         if not user or not user.is_active:
             return {"error": "This link has expired or was already used"}
         user.password_hash = hash_password(new_password)
-        self._failed_attempts.pop(user.email, None)
-        self._lockouts.pop(user.email, None)
+        _login_failures.pop(user.email, None)
         await self._persist(user)
         await _log_audit_event("password_reset", user_id=user.id, ip=ip)
         await self.revoke_sessions(user.id, "password_reset")
         return {"reset": True}
 
+    async def all_users(self) -> list["User"]:
+        from app.core.accounts import account_store
+
+        return [User.from_dict(r) for r in await account_store.load_all()]
+
     async def list_users(self, limit: int = 50) -> list[dict]:
-        await self._ensure_loaded()
         return [
             {**_public(u), "is_active": u.is_active, "created_at": u.created_at}
-            for u in list(self._users.values())[:limit]
+            for u in (await self.all_users())[:limit]
         ]
 
     async def suspend_user(self, user_id: str) -> dict:
-        await self._ensure_loaded()
-        user = self._users.get(user_id)
+        user = await self._user(user_id)
         if not user:
             return {"error": "User not found"}
         user.is_active = False
@@ -541,14 +501,10 @@ class UserManager:
     async def delete_user(self, user_id: str) -> dict:
         from app.core.accounts import account_store
 
-        await self._ensure_loaded()
-        user = self._users.get(user_id)
+        user = await self._user(user_id)
         if not user:
             return {"error": "User not found"}
         await self.revoke_sessions(user_id, "erased")
-        self._email_index.pop(user.email, None)
-        self._username_index.pop(user.username, None)
-        del self._users[user_id]
         await account_store.delete(user_id)
         from app.core import durable
         from app.core.storage import storage
@@ -561,8 +517,7 @@ class UserManager:
         """Erase after a grace period; the password proves it is the owner, not someone holding the phone."""
         from app.core import privacy
 
-        await self._ensure_loaded()
-        user = self._users.get(user_id)
+        user = await self._user(user_id)
         if not user or not verify_password(password, user.password_hash):
             return {"error": "Invalid credentials"}
         due = privacy.request_deletion(user_id)
@@ -570,11 +525,10 @@ class UserManager:
         return {"deletion_due_at": due, "grace_minutes": privacy.DELETION_GRACE_SECONDS // 60}
 
 
-def _durable_reset_tokens():
-    from app.core.durable import durable_dict
-    return durable_dict("app.core.auth.reset_tokens")
-
+from app.core.durable import durable_dict  # noqa: E402
 
 # sha256(token) -> {"user_id", "expires_at"}
-_reset_tokens = _durable_reset_tokens()
+_reset_tokens = durable_dict("app.core.auth.reset_tokens")
+# email -> {"attempts": [timestamps], "locked_until"}; in the store, so a lockout holds across workers
+_login_failures = durable_dict("app.core.auth.login_failures")
 user_manager = UserManager()

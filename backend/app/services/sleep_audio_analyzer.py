@@ -210,4 +210,4 @@ class SleepAudioAnalyzerService:
 
 from app.core.durable import shared  # noqa: E402
 
-sleep_audio_analyzer_service = shared("app.services.sleep_audio_analyzer.sleep_audio_analyzer_service", SleepAudioAnalyzerService())
+sleep_audio_analyzer_service = shared("app.services.sleep_audio_analyzer.sleep_audio_analyzer_service", SleepAudioAnalyzerService(), state=("sessions",))

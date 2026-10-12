@@ -76,7 +76,7 @@ def _open(record: dict, passphrase: Optional[str]) -> dict:
 
 
 def _active_share(share_id: str, record_id: str, caller: str) -> Optional[dict]:
-    share = dict.get(_shares, share_id)
+    share = _shares.peek(share_id)
     if (not share or share["record_id"] != record_id or share["recipient_id"] != caller
             or share["status"] != "active" or share["expires_at"] < time.time()
             or share["access_count"] >= share["max_accesses"]):
@@ -85,7 +85,7 @@ def _active_share(share_id: str, record_id: str, caller: str) -> Optional[dict]:
 
 
 def decrypt(caller: str, record_id: str, passphrase: Optional[str] = None, share_id: Optional[str] = None) -> dict:
-    record = dict.get(_records, record_id)
+    record = _records.peek(record_id)
     if not record:
         raise LookupError("Record not found")
     share = None
@@ -101,21 +101,21 @@ def decrypt(caller: str, record_id: str, passphrase: Optional[str] = None, share
 
 
 def list_records(user_id: str) -> list:
-    return [_meta(r) for r in dict.values(_records) if r["user_id"] == user_id]
+    return [_meta(r) for _, r in _records.peek_items() if r["user_id"] == user_id]
 
 
 def delete(user_id: str, record_id: str) -> bool:
-    record = dict.get(_records, record_id)
+    record = _records.peek(record_id)
     if not record or record["user_id"] != user_id:
         return False
     del _records[record_id]
-    for sid in [s["id"] for s in dict.values(_shares) if s["record_id"] == record_id]:
+    for sid in [s["id"] for _, s in _shares.peek_items() if s["record_id"] == record_id]:
         del _shares[sid]
     return True
 
 
 def share(owner_id: str, record_id: str, recipient_id: str, expiry_hours: int = 24, max_accesses: int = 10) -> dict:
-    record = dict.get(_records, record_id)
+    record = _records.peek(record_id)
     if not record or record["user_id"] != owner_id:
         raise LookupError("Record not found")
     if recipient_id == owner_id:
@@ -130,7 +130,7 @@ def share(owner_id: str, record_id: str, recipient_id: str, expiry_hours: int = 
 
 
 def revoke_share(owner_id: str, share_id: str) -> bool:
-    share = dict.get(_shares, share_id)
+    share = _shares.peek(share_id)
     if not share or share["owner_id"] != owner_id:
         return False
     share["status"] = "revoked"
@@ -139,6 +139,6 @@ def revoke_share(owner_id: str, share_id: str) -> bool:
 
 
 def shares_for(user_id: str) -> dict:
-    mine = [dict(s) for s in dict.values(_shares) if s["owner_id"] == user_id]
-    received = [dict(s) for s in dict.values(_shares) if s["recipient_id"] == user_id and s["status"] == "active"]
+    mine = [dict(s) for _, s in _shares.peek_items() if s["owner_id"] == user_id]
+    received = [dict(s) for _, s in _shares.peek_items() if s["recipient_id"] == user_id and s["status"] == "active"]
     return {"given": mine, "received": received}

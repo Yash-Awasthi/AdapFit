@@ -68,8 +68,6 @@ async def replay(todo: dict) -> None:
     from app.core import durable, privacy
     from app.core.auth import user_manager
 
-    await user_manager.load()
-    await durable.load_all()
     for uid, event in todo.items():
         if event == "account_erased":
             await user_manager.delete_user(uid)
