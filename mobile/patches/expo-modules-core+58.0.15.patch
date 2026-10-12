@@ -1,8 +1,7 @@
 diff --git a/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt b/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
-index 9ba0bfb..00fa93c 100644
 --- a/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
 +++ b/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
-@@ -57,6 +57,11 @@ class RNHeadlessAppLoader @DoNotStrip constructor() : HeadlessAppLoader {
+@@ -58,6 +58,11 @@
        val reactContext = appRecords[appScopeKey] ?: return false
        val reactHost = (reactContext.applicationContext as ReactApplication).reactHost
          ?: throw IllegalStateException("Your application does not have a valid reactHost")

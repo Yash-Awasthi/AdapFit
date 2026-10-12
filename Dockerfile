@@ -7,6 +7,8 @@ COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /bin/uv
 RUN apt-get update && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends libegl1 libgles2 \
     && rm -rf /var/lib/apt/lists/*
+# uv installs the app; the base image's pip only adds its vendored packages to the scan.
+RUN python -m pip uninstall -y pip
 
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never \
     UV_PROJECT_ENVIRONMENT=/opt/venv PATH="/opt/venv/bin:$PATH"

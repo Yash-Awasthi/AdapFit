@@ -102,7 +102,7 @@ export default function HealthEquityScreen() {
   if (!community) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <StatusBar barStyle="light-content" />
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <LinearGradient colors={['#6366F1', '#8B5CF6', '#0F1629']} style={styles.hero}>
             <Text style={[typography.body.sm, { color: 'rgba(255,255,255,0.7)' }]}>Health Equity</Text>
@@ -139,7 +139,7 @@ export default function HealthEquityScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

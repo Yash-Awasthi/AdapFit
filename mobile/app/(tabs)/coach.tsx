@@ -48,7 +48,7 @@ export default function BriefingScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={TINT} />}>
         <LinearGradient colors={[TINT, '#4338CA', colors.bg.deep]} style={styles.hero}>

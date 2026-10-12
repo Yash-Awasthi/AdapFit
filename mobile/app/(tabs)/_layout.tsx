@@ -103,12 +103,12 @@ export default function TabLayout() {
           options={{
             title: tab.title,
             tabBarAccessibilityLabel: tab.title,
-            tabBarIcon: ({ color, focused }) => (
+            tabBarIcon: ({ focused }) => (
               <TabIcon
                 icon={tab.icon}
                 activeIcon={tab.activeIcon}
                 label={tab.title}
-                color={color}
+                color={focused ? colors.primaryLight : colors.text.muted}
                 focused={focused}
               />
             ),

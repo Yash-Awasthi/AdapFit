@@ -248,8 +248,8 @@ const styles = StyleSheet.create({
   headerActionLabel: { fontSize: 13, fontWeight: '600', color: colors.primary },
 
   // Bottom Sheet
-  bottomSheetOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10000 },
-  bottomSheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  bottomSheetOverlay: { ...StyleSheet.absoluteFill, zIndex: 10000 },
+  bottomSheetBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)' },
   bottomSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.bg.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   bottomSheetHandle: { alignItems: 'center', paddingVertical: spacing.md },
   bottomSheetHandleBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.surface.divider },

@@ -6,6 +6,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, Animated, Dimensions, Platform, ActivityIndicator,
+  type ScrollViewInstance,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,7 +35,7 @@ interface ScreenWrapperProps {
   emptyTitle?: string;
   emptyMessage?: string;
   emptyAction?: { label: string; onPress: () => void };
-  scrollRef?: React.RefObject<ScrollView>;
+  scrollRef?: React.RefObject<ScrollViewInstance | null>;
   contentContainerStyle?: any;
   statusBarColor?: string;
 }

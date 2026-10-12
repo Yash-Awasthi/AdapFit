@@ -1,20 +1,10 @@
 {
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "jsx": "react-jsx",
-    "lib": ["ES2020"],
-    "skipLibCheck": true,
-    "allowJs": true,
-    "noEmit": true,
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
     "isolatedModules": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
@@ -23,6 +13,5 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ],
-  "exclude": ["node_modules", "**/*.check.ts"],
-  "extends": "expo/tsconfig.base"
+  "exclude": ["node_modules", "**/*.check.ts", "android", "ios"]
 }

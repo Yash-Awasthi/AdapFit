@@ -145,7 +145,7 @@ function ThreadModal({ post, userId, onClose, onChanged }: {
             </View>
           )}
           ListEmptyComponent={
-            loading ? <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} /> : null
+            loading ? <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} /> : undefined
           }
         />
 
