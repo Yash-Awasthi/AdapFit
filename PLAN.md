@@ -44,13 +44,13 @@ The map below is a draft for your review. Nothing moves until you approve it.
 
 Steps:
 
-1. Review and correct the map above.
-2. Rebuild `mobile/app/(tabs)/_layout.tsx` with five tabs, one per section, plus More.
-3. Add one landing screen per section that lists its screens. Care's landing is the searchable list of programs.
-4. Make Today the entry point: the decision and "why" first, then links into the other sections.
-5. Remove or fix dead links so every screen is reachable from exactly one section.
+1. Review and correct the map above. Done 2026-10-16: approved as drafted.
+2. Rebuild `mobile/app/(tabs)/_layout.tsx` with five tabs, one per section, plus More. Done 2026-10-16.
+3. Add one landing screen per section that lists its screens. Care's landing is the searchable list of programs. Done 2026-10-16: the map lives in `mobile/src/navigation/sections.ts`.
+4. Make Today the entry point: the decision and "why" first, then links into the other sections. Done 2026-10-16.
+5. Remove or fix dead links so every screen is reachable from exactly one section. Done 2026-10-16: no dead links found; `npm run check:sections` (also in CI) fails if a screen is unlisted, listed twice, or linked but missing.
 
-Done when: all existing screens are reachable from the five sections and `npx tsc --noEmit` passes.
+Done when: all existing screens are reachable from the five sections and `npx tsc --noEmit` passes. Done 2026-10-16.
 
 ## Phase 3: build and test on your phone
 
@@ -72,7 +72,7 @@ Done when: all existing screens are reachable from the five sections and `npx ts
    - Form checker with a person exercising.
    - Voice log with a spoken workout.
 7. Open each screen in the five sections once. Fix crashes, empty states with no explanation, and layout faults (content scrolling over the status bar, the large empty area above Start in Record a route, Filter by Muscle tight against Quick actions).
-8. Remove the unused `react-native-vision-camera-worklets` dependency (no frame processors are used), then rebuild.
+8. Remove the unused `react-native-vision-camera-worklets` dependency (no frame processors are used), then rebuild. Removed 2026-10-16; rebuild pending.
 9. Add a clearly flagged demo-data option only if empty screens make the app unusable without wearable data. Not decided; ask before building.
 
 Done when: the core loop works on the phone against the new server, and every screen opens without a crash.
