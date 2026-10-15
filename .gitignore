@@ -42,3 +42,8 @@ backend/app/data/pose_landmarker_full.task
 
 # Local audit venv
 .venv-audit/
+
+# Local Neon link
+.neon
+neon.ts
+mobile/apk/

@@ -3,7 +3,7 @@
 # into DATABASE_URL when Render asks. Free instances sleep after 15 idle minutes.
 services:
   - type: web
-    name: adapfit-staging
+    name: adapfit
     runtime: docker
     plan: free
     region: singapore
@@ -23,6 +23,8 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: LLM_DAILY_CALLS
+        value: "10"
       - key: SENTRY_DSN
         sync: false
       - key: JWT_SECRET_KEY
