@@ -234,7 +234,9 @@ export default function WorkoutScreen() {
       </View>
 
       {/* Muscle Group Filter */}
-      <SectionHeaderPremium icon="barbell" iconColor={colors.health.heart} title="Filter by Muscle" />
+      <View style={{ marginTop: spacing.xl }}>
+        <SectionHeaderPremium icon="barbell" iconColor={colors.health.heart} title="Filter by Muscle" />
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
         <View style={styles.filterRow}>
           {MUSCLE_GROUPS.map(mg => (

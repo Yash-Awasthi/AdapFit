@@ -66,6 +66,24 @@ def test_a_dead_infrared_channel_is_an_error_not_a_reading(service):
     assert "error" in service.estimate_spo2(red_avg=0.6, infrared_avg=0)
 
 
+def test_a_camera_pulse_reaches_the_summary_without_claiming_a_rhythm(service):
+    assert service.record_pulse(bpm=71, source="camera")["recorded"] is True
+    summary = service.get_vitals_summary()
+    assert summary["heart_rate"] == {"value": 71, "rhythm": "unknown", "source": "camera"}
+    assert service.get_ecg_history() == []
+
+
+def test_a_pulse_outside_the_human_range_is_refused(service):
+    assert "error" in service.record_pulse(bpm=15, source="camera")
+    assert service.get_vitals_summary()["heart_rate"]["value"] is None
+
+
+def test_state_saved_before_pulse_logging_still_loads(service):
+    del service._pulse_readings
+    assert service.get_vitals_summary()["heart_rate"]["value"] is None
+    service.record_pulse(bpm=60, source="camera")
+
+
 def test_the_summary_reports_nothing_rather_than_a_placeholder(service):
     summary = service.get_vitals_summary()
     assert summary["heart_rate"]["value"] is None

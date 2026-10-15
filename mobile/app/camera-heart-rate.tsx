@@ -22,6 +22,7 @@ import {
 import { scheduleOnRN } from 'react-native-worklets';
 import { colors, typography, spacing } from '../src/theme';
 import { api } from '../src/services/api';
+import { postJson } from '../src/services/http';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -400,8 +401,13 @@ export default function CameraHeartRateScreen() {
                     <Ionicons name="refresh" size={20} color={colors.primary} />
                     <Text style={[typography.label.md, { color: colors.primary }]}>Measure Again</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.saveButton} onPress={() => {
-                    Alert.alert('Saved', `Heart rate of ${bpm} BPM has been saved.`);
+                  <TouchableOpacity style={styles.saveButton} onPress={async () => {
+                    const saved = await postJson<{ recorded?: boolean }>('/vitals/pulse', { bpm, source: 'camera' });
+                    if (!saved?.recorded) {
+                      Alert.alert('Not saved', 'The reading could not be saved. Check your connection and try again.');
+                      return;
+                    }
+                    Alert.alert('Saved', `Heart rate of ${bpm} BPM is in Vital Signs.`);
                     router.back();
                   }}>
                     <Ionicons name="checkmark" size={20} color="#FFF" />

@@ -145,6 +145,19 @@ def test_completing_the_same_workout_twice_logs_its_load_once():
     assert len(history) == 1
 
 
+def test_a_finished_workout_lists_as_completed_with_its_rpe():
+    w = c.post("/api/v1/workouts", json={"user_id": "core-list", "target_date": "2026-06-05"}).json()
+    c.patch(f"/api/v1/workouts/{w['workout_id']}", json={
+        "user_id": "core-list", "actual_duration_minutes": 35, "session_rpe": 6, "logged_exercises": [],
+        "completed_at": "2026-06-05T18:00:00+00:00"})
+    listed = next(x for x in c.get("/api/v1/workouts?user_id=core-list").json()["items"]
+                  if x["workout_id"] == w["workout_id"])
+    assert listed["completed"] is True
+    assert listed["session_rpe"] == 6
+    assert listed["actual_duration_minutes"] == 35
+    assert str(listed["completed_at"]).startswith("2026-06-05")
+
+
 def test_a_sore_body_area_excludes_its_muscles():
     r = exercise_service.get_fallback_routine(ReadinessState.MODERATE, sore_muscles=["legs"], target_duration=75, seed="x")
     legs = {"Quadriceps", "Quads", "Hamstrings", "Glutes", "Calves", "Inner_thighs"}

@@ -2,61 +2,17 @@
 # Start from a fresh install (e2e/run.sh does that); some phones refuse to clear app data over adb.
 # Health, location and microphone prompts are left for a person; this flow never touches them.
 appId: com.adapfit.app
-env:
-  PASSWORD: Walkpass123
 ---
-- evalScript: ${output.suffix = String(Date.now())}
-- launchApp
-- tapOn: Create Account
-- tapOn: John Doe
-- inputText: E2E Runner
-- tapOn: you@example.com
-- inputText: e2e${output.suffix}@example.com
-- tapOn: johndoe
-- inputText: e2e${output.suffix}
-- hideKeyboard
-- scrollUntilVisible:
-    element: Min 8 characters
-- tapOn: Min 8 characters
-- inputText: ${PASSWORD}
-- hideKeyboard
-- scrollUntilVisible:
-    element: Repeat password
-- tapOn: Repeat password
-- inputText: ${PASSWORD}
-- hideKeyboard
-- scrollUntilVisible:
-    element: YYYY-MM-DD
-- tapOn: YYYY-MM-DD
-- inputText: 2000-01-15
-- hideKeyboard
-- scrollUntilVisible:
-    element: Store and use my health and fitness data
-- tapOn: Store and use my health and fitness data
-# At the bottom of the form the title has scrolled away, so this is the button.
-- scrollUntilVisible:
-    element: Already have an account?
-- tapOn: Create Account
-
-# Onboarding
-- extendedWaitUntil:
-    visible: Fitness
-    timeout: 90000
-- tapOn: Fitness
-- tapOn: Continue
-- tapOn: Male
-- tapOn: Continue
-- tapOn: Phone Only
-- tapOn: Continue
-- tapOn: Moderately Active
-- tapOn: Start Using AdapFit
+- runFlow: subflows/signup.yaml
 
 # Morning check-in
 - extendedWaitUntil:
     visible: Check in
     timeout: 30000
 - tapOn: Check in
-- tapOn: Sleep hours 7
+- tapOn: Sleep Hours 7
+- scrollUntilVisible:
+    element: Submit Check-in
 - tapOn: Submit Check-in
 - assertVisible: Today's Recovery
 - assertNotVisible: No check-in

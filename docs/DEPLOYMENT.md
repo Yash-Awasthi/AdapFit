@@ -101,3 +101,10 @@ settings live in `app.json` and `mobile/plugins/`. Bump `expo.android.versionCod
 in `app.json` for every upload.
 The build writes several GB under `mobile/node_modules/*/android/build`;
 delete those folders afterwards.
+
+On Windows the native build creates paths longer than 260 characters. It needs
+`LongPathsEnabled=1` (HKLM\SYSTEM\CurrentControlSet\Control\FileSystem), CMake
+4.1 or newer from the SDK manager (its ninja handles long paths) set as
+`cmake.dir` in `android/local.properties` after prebuild, and a short checkout
+path such as `C:\b\m`: a copy is fine, a `subst` drive is not (codegen sees two
+roots).

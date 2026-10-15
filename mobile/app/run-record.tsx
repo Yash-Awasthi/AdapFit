@@ -182,7 +182,7 @@ const s = StyleSheet.create({
   value: { fontSize: 22, fontWeight: '700', color: colors.text.primary },
   label: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
   note: { fontSize: 12, color: colors.text.muted, textAlign: 'center', marginTop: spacing.lg, lineHeight: 17 },
-  actions: { position: 'absolute', bottom: 48, left: spacing.lg, right: spacing.lg, alignItems: 'center', gap: 16 },
+  actions: { marginTop: spacing.xl, alignItems: 'center', gap: 16 },
   button: { alignSelf: 'stretch', backgroundColor: colors.primary, paddingVertical: 18, borderRadius: radius.lg, alignItems: 'center' },
   stop: { backgroundColor: colors.health.danger },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '800' },

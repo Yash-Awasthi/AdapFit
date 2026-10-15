@@ -1,0 +1,22 @@
+# A check-in that reports pain gives a rest day, whatever the other answers say.
+appId: com.adapfit.app
+---
+- runFlow: subflows/signup.yaml
+- extendedWaitUntil:
+    visible: Check in
+    timeout: 30000
+- tapOn: Check in
+- tapOn: Sleep Hours 7
+- scrollUntilVisible:
+    element: legs
+- tapOn: legs
+- scrollUntilVisible:
+    element: I have pain \(not just soreness\)
+- tapOn: I have pain \(not just soreness\)
+- scrollUntilVisible:
+    element: Submit Check-in
+- tapOn: Submit Check-in
+- extendedWaitUntil:
+    visible: Rest today
+    timeout: 30000
+- assertVisible: Rest is part of the plan, not a missed day.

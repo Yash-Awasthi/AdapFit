@@ -159,6 +159,14 @@ async def complete_workout(workout_id: str, req: WorkoutCompleteRequest):
 
 @router.get("")
 async def list_workouts(user_id: str, days: int = 14):
-    """List workout history."""
+    """List workout history, each plan merged with its completion log if it was finished."""
     workouts = await storage.get_workouts(user_id, days)
-    return {"user_id": user_id, "items": workouts, "count": len(workouts)}
+    logs = {l.get("workout_id"): l for l in await storage.get_workout_logs(user_id, workout_metrics.HISTORY_ENTRIES)}
+    items = []
+    for w in workouts:
+        log = logs.get(w.get("workout_id"))
+        if log:
+            w = {**w, "completed": True, "session_rpe": log.get("session_rpe"),
+                 "actual_duration_minutes": log.get("actual_duration_minutes"), "completed_at": log.get("completed_at")}
+        items.append(w)
+    return {"user_id": user_id, "items": items, "count": len(items)}
