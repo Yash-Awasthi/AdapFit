@@ -8,6 +8,18 @@ What works and how it was checked, as of 2026-09-29. Three kinds of evidence, st
 
 A feature marked "server only" has a working server side and tests, but its screen has not been opened on the phone yet.
 
+## Checked 2026-10-16 (new server, release 2.1.0)
+
+Against https://adapfit.onrender.com (Render, Neon Postgres), with no phone:
+
+- Database: `verify_postgres` passed on Neon (accounts, check-ins, baselines, sealed feature state, re-read in a new process).
+- Core loop through the API the app calls: a check-in with pain gives REST and a mobility session; sore legs are left out of the plan; finishing a workout twice logs it once; the workout list shows it completed, with its RPE, on the day it was done; a camera pulse saved from the heart-rate screen appears in Vital Signs.
+- Every GET the app's screens make (95 paths, parametrised ones with sample values) answered 200 for a new account. The AI coach endpoints were left out to spare the model quota.
+- Backend tests (1,134 passed, 1 skipped), type check, lint, the screen map check and the npm audit gate all pass, locally and in CI.
+- The release APK opens to the sign-in screen on an Android emulator; sign-up and onboarding pass there under Maestro.
+
+Still needs a person with the phone: the full journey by hand, camera heart rate with a fingertip, GPS outdoors, the form checker, voice log, Health Connect deletion, and opening each of the five sections' screens once.
+
 ## Checked on the phone
 
 | Feature | How it was checked | Result |
