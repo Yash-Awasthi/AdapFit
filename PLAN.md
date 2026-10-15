@@ -82,10 +82,10 @@ Done when: the core loop works on the phone against the new server, and every sc
 
 ## Phase 4: release APK and share
 
-1. Build the signed release APK. Keep the keystore backed up outside the repository. Built 2026-10-16: `mobile/apk/adapfit-release-arm64.apk`, 68.5 MB, arm64. Keystore backup pending.
+1. Build the signed release APK. Keep the keystore backed up outside the repository. Built 2026-10-16: version 2.1.0 (versionCode 2), arm64, signed with a new key, so an older AdapFit install must be removed first. Keystore backup pending.
 2. Check the app size and startup on the phone.
 3. Install on a second phone from the file to confirm a clean install, sign-up and core loop.
-4. Share the APK (GitHub release or a direct link) with a short install note: enable install from unknown sources, Health Connect permission, the server may take up to a minute to wake on the free plan.
+4. Share the APK (GitHub release or a direct link) with a short install note: enable install from unknown sources, Health Connect permission, the server may take up to a minute to wake on the free plan. Done 2026-10-16: GitHub release v2.1.0 with the APK and the install note.
 5. Collect feedback from the first few users in one place.
 
 Done when: someone other than you installs the APK and finishes the core loop.

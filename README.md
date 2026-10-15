@@ -1,9 +1,9 @@
-# 🏋️ AdapFit — AI-Powered Adaptive Fitness & Recovery Engine
+# AdapFit — AI-Powered Adaptive Fitness & Recovery Engine
 
 > **An intelligent health companion that answers: "What should I do today, and why?"**
 
-[![CI](https://github.com/Yash-Awasthi/adapfit/actions/workflows/ci.yml/badge.svg)](https://github.com/Yash-Awasthi/adapfit/actions/workflows/ci.yml)
-[![release](https://img.shields.io/github/v/release/Yash-Awasthi/adapfit)](https://github.com/Yash-Awasthi/adapfit/releases/latest)
+[![CI](https://github.com/Yash-Awasthi/AdapFit/actions/workflows/ci.yml/badge.svg)](https://github.com/Yash-Awasthi/AdapFit/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/Yash-Awasthi/AdapFit)](https://github.com/Yash-Awasthi/AdapFit/releases/latest)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-teal.svg)](https://fastapi.tiangolo.com)
@@ -696,7 +696,7 @@ ZFIT/
 
 ## 🗺️ Roadmap
 
-Current status and what comes next: [PLAN.md](PLAN.md). Android test build (arm64): see [Releases](https://github.com/Yash-Awasthi/adapfit/releases/latest).
+Current status and what comes next: [PLAN.md](PLAN.md). Android test build (arm64): see [Releases](https://github.com/Yash-Awasthi/AdapFit/releases/latest).
 
 - [ ] Wearable BLE sync (Health Connect integration)
 - [ ] Real-time WebSocket updates for live coaching
