@@ -1,6 +1,6 @@
 # Product scope
 
-Decided 2026-09-28. Everything in `todo.md` works inside these limits.
+Decided 2026-09-28. Everything in `PLAN.md` works inside these limits.
 
 ## Positioning
 

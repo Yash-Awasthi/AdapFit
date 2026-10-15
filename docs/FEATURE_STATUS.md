@@ -58,4 +58,4 @@ This is an MVP, not a production release. Known gaps the owner chose to leave:
 - The form checker and camera heart rate have been opened on the phone but not used properly. The form checker now uses the front camera by default with a switch, and a 5-second countdown before each capture. The heart-rate screen explains why it uses the camera, and no longer calls an uncovered lens a good signal. Neither has been checked against a person exercising or a real fingertip, and heart-rate readings are not saved to Vital Signs.
 - The app is English only.
 - Health Connect deletion on the phone, Bluetooth strap, voice log, GPS distance and the two-account features (Family, Community, Forums) were not exercised.
-- Firebase push, legal placeholders and the uptime monitor wait on the owner (see todo.md).
+- Firebase push, legal placeholders and the uptime monitor wait on the owner (see PLAN.md).
