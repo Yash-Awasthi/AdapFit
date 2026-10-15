@@ -24,6 +24,10 @@ import { SwipeableCard } from '../../src/components/GestureSystem';
 
 import { FloatingActionButton } from '../../src/components/NavigationHelpers';
 import { TodayDecision } from '../../src/components/TodayDecision';
+import { SectionGrid, SectionShortcuts } from '../../src/components/SectionLanding';
+import { SECTIONS } from '../../src/navigation/sections';
+
+const todayItems = SECTIONS[0].items;
 
 import { useApis } from '../../src/hooks/useApi';
 import { localDay } from '../../src/utils/date';
@@ -195,6 +199,10 @@ export default function HomeScreen() {
       </LinearGradient>
 
       <TodayDecision />
+
+      <View style={styles.section}>
+        <SectionShortcuts />
+      </View>
 
       {/* Quick Actions Row */}
       <View style={styles.section}>
@@ -390,6 +398,11 @@ export default function HomeScreen() {
           color={colors.health.sleep}
           icon="moon"
         />
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeaderPremium icon="today" iconColor={colors.primary} title="Everything in Today" />
+        <SectionGrid items={todayItems} />
       </View>
 
       {/* Tips */}

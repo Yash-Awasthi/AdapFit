@@ -1,8 +1,7 @@
 /**
- * Tab layout.
- *
- * Five primary destinations. Everything else is reachable through the More
- * catalog, which is where the previous seven-tab bar was crushing its labels.
+ * Tab layout: the five sections plus More. Each section's landing screen lists
+ * its screens (src/navigation/sections.ts); scripts/check-sections.mjs proves
+ * every screen is listed once.
  */
 import { Tabs } from "expo-router";
 import { View, Text, StyleSheet, Platform } from "react-native";
@@ -12,14 +11,16 @@ import { colors, spacing } from "../../src/theme";
 import { BackButton } from "../../src/components/BackButton";
 
 const TABS = [
-  { name: "index", title: "Home", icon: "home", activeIcon: "home" },
-  { name: "workout", title: "Train", icon: "barbell-outline", activeIcon: "barbell" },
-  { name: "content-feed", title: "Watch", icon: "play-circle-outline", activeIcon: "play-circle" },
-  { name: "chat", title: "Coach", icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
+  { name: "index", title: "Today", icon: "sunny-outline", activeIcon: "sunny" },
+  { name: "body-section", title: "Body", icon: "barbell-outline", activeIcon: "barbell" },
+  { name: "mind-section", title: "Mind", icon: "bulb-outline", activeIcon: "bulb" },
+  { name: "care-section", title: "Care", icon: "medkit-outline", activeIcon: "medkit" },
+  { name: "community-section", title: "Community", icon: "people-outline", activeIcon: "people" },
   { name: "menu", title: "More", icon: "grid-outline", activeIcon: "grid" },
 ] as const;
 
 const HIDDEN_SCREENS = [
+  "workout", "content-feed", "chat",
   "dashboard", "health-hub", "trends",
   "telemedicine", "forums", "analytics", "vital-signs",
   "family", "health-calendar", "recipes", "exercises", "wellness", "sleep",
@@ -133,7 +134,8 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabItem: { alignItems: "center", justifyContent: "center", width: 64, gap: 2 },
+  // Six tabs must fit a 360 dp screen.
+  tabItem: { alignItems: "center", justifyContent: "center", width: 58, gap: 2 },
   tabIcon: {
     width: 40,
     height: 28,
