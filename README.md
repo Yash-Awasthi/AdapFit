@@ -696,7 +696,7 @@ ZFIT/
 
 ## 🗺️ Roadmap
 
-Current status and what comes next: [ROADMAP.md](ROADMAP.md). Android test build (arm64): see [Releases](https://github.com/Yash-Awasthi/adapfit/releases/latest).
+Current status and what comes next: [PLAN.md](PLAN.md). Android test build (arm64): see [Releases](https://github.com/Yash-Awasthi/adapfit/releases/latest).
 
 - [ ] Wearable BLE sync (Health Connect integration)
 - [ ] Real-time WebSocket updates for live coaching
@@ -718,7 +718,6 @@ Current status and what comes next: [ROADMAP.md](ROADMAP.md). Android test build
 - **[API Reference](backend/docs/API.md)** — Detailed API documentation
 - **[Database Schema](backend/docs/schema.sql)** — PostgreSQL schema
 - **[Contributing Guide](CONTRIBUTING.md)** — Development guidelines
-- **[How to Run](START.md)** — Quick start instructions
 
 ---
 
