@@ -1,7 +1,7 @@
 """Vital Signs API — ECG, SpO2, Body Temperature"""
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Literal, Optional
 from app.services.vital_signs import vital_signs_service
 
 router = APIRouter()
@@ -62,6 +62,17 @@ async def record_ecg(request: ECGRecordRequest):
         request.heart_rate, request.rhythm, request.pr_interval_ms,
         request.qrs_duration_ms, request.qt_interval_ms, request.abnormalities,
     )
+
+
+class PulseRequest(BaseModel):
+    bpm: int
+    source: Literal["camera", "strap", "manual"]
+
+
+@router.post("/pulse")
+async def record_pulse(request: PulseRequest):
+    """A measured pulse. It carries no rhythm, so it is never stored as an ECG."""
+    return vital_signs_service.record_pulse(request.bpm, request.source)
 
 
 @router.get("/spo2/history")

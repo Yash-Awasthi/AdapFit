@@ -61,7 +61,21 @@ class VitalSignsService:
         self._ecg_readings: list[ECGReading] = []
         self._spo2_readings: list[SpO2Reading] = []
         self._temperature_readings: list[TemperatureReading] = []
+        self._pulse_readings: list[dict] = []
         self._measurement_session: dict = {}
+
+    # === Pulse ===
+
+    def _pulses(self) -> list[dict]:
+        # Stored state is restored without __init__, so state saved before pulse logging lacks the list.
+        return self.__dict__.setdefault("_pulse_readings", [])
+
+    def record_pulse(self, bpm: int, source: str) -> dict:
+        """A pulse with no rhythm: a camera or strap counts beats but sees no ECG."""
+        if not 30 <= bpm <= 230:
+            return {"error": "Pulse outside the range a person can have"}
+        self._pulses().append({"timestamp": time.time(), "bpm": bpm, "source": source})
+        return {"recorded": True, "bpm": bpm, "source": source}
 
     # === ECG ===
 
@@ -208,11 +222,16 @@ class VitalSignsService:
         latest_ecg = self._ecg_readings[-1] if self._ecg_readings else None
         latest_spo2 = self._spo2_readings[-1] if self._spo2_readings else None
         latest_temp = self._temperature_readings[-1] if self._temperature_readings else None
+        latest_pulse = self._pulses()[-1] if self._pulses() else None
+        if latest_pulse and (not latest_ecg or latest_pulse["timestamp"] > latest_ecg.timestamp):
+            heart_rate = {"value": latest_pulse["bpm"], "rhythm": "unknown", "source": latest_pulse["source"]}
+        else:
+            heart_rate = {"value": latest_ecg.heart_rate if latest_ecg else None, "rhythm": latest_ecg.rhythm if latest_ecg else "unknown"}
         return {
-            "heart_rate": {"value": latest_ecg.heart_rate if latest_ecg else None, "rhythm": latest_ecg.rhythm if latest_ecg else "unknown"},
+            "heart_rate": heart_rate,
             "spo2": {"value": latest_spo2.spo2_percent if latest_spo2 else None, "classification": latest_spo2.classification if latest_spo2 else "unknown"},
             "temperature": {"value": latest_temp.temperature_celsius if latest_temp else None, "classification": latest_temp.classification if latest_temp else "unknown"},
-            "total_readings": len(self._ecg_readings) + len(self._spo2_readings) + len(self._temperature_readings),
+            "total_readings": len(self._ecg_readings) + len(self._spo2_readings) + len(self._temperature_readings) + len(self._pulses()),
         }
 
 

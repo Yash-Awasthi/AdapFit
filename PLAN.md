@@ -55,8 +55,8 @@ Done when: all existing screens are reachable from the five sections and `npx ts
 ## Phase 3: build and test on your phone
 
 1. Point the app at the new Render URL. Done 2026-10-16.
-2. Install and type-check: `cd mobile`, `npm ci`, `npx tsc --noEmit`, `node scripts/audit-gate.mjs`.
-3. `android/` is no longer in git. If an old `android\` folder still exists, move `android\keystore.properties` and `android\app\adapfit-release.keystore` up to `mobile\` first (set `storeFile=adapfit-release.keystore`). Then `npx expo prebuild -p android --clean` and `npx expo run:android`.
+2. Install and type-check: `cd mobile`, `npm ci`, `npx tsc --noEmit`, `node scripts/audit-gate.mjs`. Done 2026-10-16.
+3. `android/` is no longer in git. If an old `android\` folder still exists, move `android\keystore.properties` and `android\app\adapfit-release.keystore` up to `mobile\` first (set `storeFile=adapfit-release.keystore`). Then `npx expo prebuild -p android --clean` and `npx expo run:android`. Done 2026-10-16: the old key was not found, so a new release key was made (the app is not on Play); prebuild and the release build pass (Windows needs the long-path setup in `docs/DEPLOYMENT.md`). Install on the phone pending.
 4. Walk the core loop and confirm each of these:
    - Sign-up, onboarding, check-in.
    - Check-in with the pain toggle on gives a REST decision and a mobility session.
@@ -64,22 +64,25 @@ Done when: all existing screens are reachable from the five sections and `npx ts
    - Home decision, generate workout, sets, rest timer (uses each exercise's prescribed rest), finish.
    - Finishing records the workout once, with the RPE from the completion screen.
    - A workout finished offline and synced later shows on the day it was done.
-5. Run the Maestro flow `mobile/e2e/core-journey.yaml`. Fix selectors it cannot find. Add flows for check-in edge cases and sign-out.
+
+   Checked 2026-10-16 against the live server through the API the app calls: pain gives REST and a mobility session, sore legs are left out, a repeated finish is logged once, and the workout list shows it completed with its RPE on the day it was done (the list ignored completions before; fixed). On the phone itself it is still unwalked.
+5. Run the Maestro flow `mobile/e2e/core-journey.yaml`. Fix selectors it cannot find. Add flows for check-in edge cases and sign-out. Flows added 2026-10-16 (`checkin-pain.yaml`, `sign-out.yaml`) and the selectors updated for the shortened onboarding; sign-up and onboarding pass on an emulator, the full flows still need a run on a device.
 6. Phone-sensor and Health Connect checks:
-   - Camera heart rate with a real fingertip: torch fires, a plausible BPM appears. Save readings to Vital Signs (not done today). Watch logcat for dropped frames; `FRAME_RESOLUTION` is 100x100, stride 64 bytes.
+   - Camera heart rate with a real fingertip: torch fires, a plausible BPM appears. Save readings to Vital Signs (done 2026-10-16 through `POST /vitals/pulse`; needs a push to reach the server). Watch logcat for dropped frames; `FRAME_RESOLUTION` is 100x100, stride 64 bytes.
    - Health Connect sync, and a record deleted on the phone disappearing from the server (needs a record the owner can delete, from an app that writes to Health Connect).
    - GPS distance on a short outdoor walk.
    - Form checker with a person exercising.
    - Voice log with a spoken workout.
 7. Open each screen in the five sections once. Fix crashes, empty states with no explanation, and layout faults (content scrolling over the status bar, the large empty area above Start in Record a route, Filter by Muscle tight against Quick actions).
-8. Remove the unused `react-native-vision-camera-worklets` dependency (no frame processors are used), then rebuild. Removed 2026-10-16; rebuild pending.
-9. Add a clearly flagged demo-data option only if empty screens make the app unusable without wearable data. Not decided; ask before building.
+   Fixed 2026-10-16: the large empty area in Record a route and the tight Filter by Muscle header. The other screens still need opening on a device.
+8. Remove the unused `react-native-vision-camera-worklets` dependency (no frame processors are used), then rebuild. Removed and rebuilt 2026-10-16.
+9. Add a clearly flagged demo-data option only if empty screens make the app unusable without wearable data. Decided 2026-10-16: not built; every screen has manual entry, and invented data would break the "measured or missing" rule.
 
 Done when: the core loop works on the phone against the new server, and every screen opens without a crash.
 
 ## Phase 4: release APK and share
 
-1. Build the signed release APK. Keep the keystore backed up outside the repository.
+1. Build the signed release APK. Keep the keystore backed up outside the repository. Built 2026-10-16: `mobile/apk/adapfit-release-arm64.apk`, 68.5 MB, arm64. Keystore backup pending.
 2. Check the app size and startup on the phone.
 3. Install on a second phone from the file to confirm a clean install, sign-up and core loop.
 4. Share the APK (GitHub release or a direct link) with a short install note: enable install from unknown sources, Health Connect permission, the server may take up to a minute to wake on the free plan.

@@ -1,0 +1,20 @@
+# Sign out from More > Privacy returns to the sign-in screen, and the app stays signed out after a relaunch.
+appId: com.adapfit.app
+---
+- runFlow: subflows/signup.yaml
+- extendedWaitUntil:
+    visible: Check in
+    timeout: 30000
+- tapOn: More
+- scrollUntilVisible:
+    element: Privacy
+- tapOn: Privacy
+- scrollUntilVisible:
+    element: Sign out and clear this device
+- tapOn: Sign out and clear this device
+- extendedWaitUntil:
+    visible: Create Account
+    timeout: 15000
+- stopApp
+- launchApp
+- assertVisible: Create Account

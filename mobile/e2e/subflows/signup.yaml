@@ -1,0 +1,67 @@
+# Creates a fresh account and finishes onboarding. Shared by the flows in e2e/.
+appId: com.adapfit.app
+env:
+  PASSWORD: Walkpass123
+---
+- evalScript: ${output.suffix = String(Date.now())}
+- launchApp
+- extendedWaitUntil:
+    visible: Create Account
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn:
+    text: Create Account
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: John Doe
+    timeout: 15000
+- tapOn: John Doe
+- inputText: E2E Runner
+- tapOn: you@example.com
+- inputText: e2e${output.suffix}@example.com
+- tapOn: johndoe
+- inputText: e2e${output.suffix}
+- hideKeyboard
+- scrollUntilVisible:
+    element: Min 8 characters
+- tapOn: Min 8 characters
+- inputText: ${PASSWORD}
+- hideKeyboard
+- scrollUntilVisible:
+    element: Repeat password
+- tapOn: Repeat password
+- inputText: ${PASSWORD}
+- hideKeyboard
+- scrollUntilVisible:
+    element: YYYY-MM-DD
+- tapOn: YYYY-MM-DD
+- inputText: 2000-01-15
+- hideKeyboard
+- scrollUntilVisible:
+    element: Store and use my health and fitness data
+- tapOn: Store and use my health and fitness data
+# At the bottom of the form the title has scrolled away, so this is the button.
+- scrollUntilVisible:
+    element: Already have an account.*
+- tapOn: Create Account
+
+# Onboarding
+- extendedWaitUntil:
+    visible: Fitness
+    timeout: 90000
+- tapOn: Fitness
+- scrollUntilVisible:
+    element: Continue
+- tapOn: Continue
+- tapOn: Male
+- scrollUntilVisible:
+    element: Continue
+- tapOn: Continue
+- tapOn: Phone Only
+- scrollUntilVisible:
+    element: Continue
+- tapOn: Continue
+- tapOn: Moderately Active
+- scrollUntilVisible:
+    element: Start Using AdapFit
+- tapOn: Start Using AdapFit
