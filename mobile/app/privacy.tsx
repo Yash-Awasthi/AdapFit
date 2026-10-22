@@ -167,7 +167,7 @@ export default function PrivacyScreen() {
       )}
 
       <Text style={ns.section}>Your data</Text>
-      <TouchableOpacity style={ns.card} onPress={() => router.push('/(tabs)/data-export' as any)}>
+      <TouchableOpacity style={ns.card} onPress={() => router.push('/data-export' as any)}>
         <Ionicons name="download-outline" size={20} color={colors.primary} />
         <Text style={[ns.cardTitle, ns.rowText]}>Export everything</Text>
       </TouchableOpacity>

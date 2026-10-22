@@ -1,14 +1,14 @@
 /**
  * Tab layout: the five sections plus More. Each section's landing screen lists
  * its screens (src/navigation/sections.ts); scripts/check-sections.mjs proves
- * every screen is listed once.
+ * every screen is listed once. Detail screens are pushed from the (screens)
+ * stack, so opening a tile keeps the tab underneath and Back returns to it.
  */
 import { Tabs } from "expo-router";
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../src/theme";
-import { BackButton } from "../../src/components/BackButton";
 
 const TABS = [
   { name: "index", title: "Today", icon: "sunny-outline", activeIcon: "sunny" },
@@ -18,36 +18,6 @@ const TABS = [
   { name: "community-section", title: "Community", icon: "people-outline", activeIcon: "people" },
   { name: "menu", title: "More", icon: "grid-outline", activeIcon: "grid" },
 ] as const;
-
-const HIDDEN_SCREENS = [
-  "workout", "content-feed", "chat",
-  "dashboard", "health-hub", "trends",
-  "telemedicine", "forums", "analytics", "vital-signs",
-  "family", "health-calendar", "recipes", "exercises", "wellness", "sleep",
-  "nutrition", "health", "stats", "periodization",
-  "achievements", "settings", "personal-info", "dev-tools",
-  "hrv", "habits", "care", "conditions", "everyday", "body", "mental-health", "medication", "emergency",
-  "community", "workouts", "devices", "coach", "voice-health", "longevity",
-  "ambient", "data-export", "diabetes", "chronic-pain",
-  "accessibility-settings",
-  "skin-health", "circadian", "posture", "respiratory",
-  "medical-imaging", "remote-monitoring",
-  "genomics", "cardiac-rehab", "addiction-recovery",
-  "health-equity", "health-savings", "precision-nutrition",
-];
-
-/** Only meaningful when the profile records a female gender. */
-const FEMALE_SCREENS = ["cycle", "fertility", "pregnancy"];
-
-const screenHeaderStyle = {
-  headerShown: true,
-  headerTitle: "",
-  headerTransparent: true,
-  headerShadowVisible: false,
-  headerStyle: { backgroundColor: "transparent" },
-  headerTintColor: colors.text.primary,
-  headerLeft: () => <BackButton />,
-};
 
 function TabIcon({ icon, activeIcon, label, color, focused }: {
   icon: string; activeIcon: string; label: string; color: string; focused: boolean;
@@ -115,19 +85,6 @@ export default function TabLayout() {
             ),
           }}
         />
-      ))}
-
-      {HIDDEN_SCREENS.map((name) => (
-        <Tabs.Screen key={name} name={name} options={{ href: null, ...screenHeaderStyle }} />
-      ))}
-
-      {/*
-        These routes stay registered so a saved deep link still resolves after
-        a profile change. What gates them is the More catalog, which only
-        lists them when useFemaleFeatures() is true.
-      */}
-      {FEMALE_SCREENS.map((name) => (
-        <Tabs.Screen key={name} name={name} options={{ href: null, ...screenHeaderStyle }} />
       ))}
     </Tabs>
   );

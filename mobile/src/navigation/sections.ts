@@ -1,4 +1,4 @@
-﻿// The five sections of the app and the screens each one lists. Plain data, so
+// The five sections of the app and the screens each one lists. Plain data, so
 // scripts/check-sections.mjs can load it with Node and prove every screen is reachable.
 import type { ComponentProps } from 'react';
 import type { Ionicons } from '@expo/vector-icons';
@@ -126,3 +126,16 @@ export const MORE: SectionItem[] = [
 
 /** Screens reached from inside a flow (sign-in, a running workout) rather than from a list. */
 export const FLOW_SCREENS = ['login', 'register', 'onboarding', 'workout-detail', 'workout-active', 'workout-complete'];
+
+/**
+ * The tab landing that lists a route. A screen opened from a deep link has no
+ * history to pop, so Back sends it here instead of dropping the user on Today.
+ */
+export function sectionForRoute(pathname: string): string {
+  const route = pathname.replace(/\/+$/, '') || '/';
+  const entries = [
+    ...SECTIONS.flatMap((s) => s.items.map((i) => ({ route: i.route, tab: s.tab }))),
+    ...MORE.map((i) => ({ route: i.route, tab: '/menu' })),
+  ];
+  return entries.find((e) => e.route === route)?.tab ?? '/menu';
+}

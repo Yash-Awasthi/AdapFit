@@ -45,7 +45,7 @@ export default function WorkoutActive() {
   // Redirect back if this screen is opened without an active session
   // (deep link, stale nav state, or app restart mid-workout).
   useEffect(() => {
-    if (!activeWorkout) router.replace('/(tabs)/workout');
+    if (!activeWorkout) router.replace('/workout');
   }, [activeWorkout, router]);
 
   useEffect(() => {
