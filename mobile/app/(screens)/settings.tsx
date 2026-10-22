@@ -95,7 +95,7 @@ export default function SettingsScreen() {
           <Text style={s.exportText}>Consent, sign out, delete account</Text>
           <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
         </TouchableOpacity>
-        <TouchableOpacity style={s.exportBtn} onPress={() => router.push('/(tabs)/data-export' as any)}>
+        <TouchableOpacity style={s.exportBtn} onPress={() => router.push('/data-export' as any)}>
           <Ionicons name="download-outline" size={18} color={theme.primary} />
           <Text style={s.exportText}>Export my data</Text>
           <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />

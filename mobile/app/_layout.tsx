@@ -94,6 +94,7 @@ function RootStack() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(screens)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false, animation: "fade" }} />
         <Stack.Screen name="register" options={{ headerShown: false, animation: "slide_from_right" }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, animation: "fade" }} />
@@ -105,7 +106,7 @@ function RootStack() {
       </Stack>
       <ConnectionBanner />
       <StatusBarScrim />
-      {profile && segments[0] !== "sleep-sounds" && (
+      {profile && !segments.includes("sleep-sounds") && (
         <View style={{ position: "absolute", top: 96, right: 12 }} pointerEvents="none">
           <SyncStatusBadge />
         </View>

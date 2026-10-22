@@ -213,6 +213,10 @@ export default function CameraHeartRateScreen() {
       Alert.alert('No Camera', 'No back camera is available on this device.');
       return;
     }
+    if (!device.hasTorch) {
+      Alert.alert('No Flash', 'This device has no rear flash, so the camera cannot read a pulse. Use a chest strap or the manual entry instead.');
+      return;
+    }
 
     setState('calibrating');
     roiPixels.current = [];
@@ -249,6 +253,10 @@ export default function CameraHeartRateScreen() {
     frameCountRef.current = 0;
   }, []);
 
+  // The camera is only mounted while measuring: mounting it sets a torch mode, and a device
+  // without a flash throws from that call even when the mode is 'off'.
+  const cameraActive = state === 'calibrating' || state === 'measuring';
+
   const confidenceLabel = confidence >= 0.7 ? 'High' : confidence >= 0.4 ? 'Medium' : 'Low';
   const confidenceColor = confidence >= 0.7 ? colors.health.success : confidence >= 0.4 ? '#F59E0B' : '#EF4444';
   const stateColor = state === 'measuring' ? colors.health.heart : state === 'complete' ? colors.health.success : colors.primary;
@@ -259,22 +267,22 @@ export default function CameraHeartRateScreen() {
 
       {/* Camera Preview */}
       <View style={styles.cameraContainer}>
-        {hasPermission && device ? (
+        {hasPermission && device && cameraActive ? (
           <Camera
             style={styles.camera}
             device={device}
-            isActive={state === 'measuring' || state === 'calibrating'}
+            isActive
             outputs={state === 'measuring' ? [frameOutput] : []}
-            torchMode={state === 'measuring' || state === 'calibrating' ? 'on' : 'off'}
+            torchMode={device.hasTorch ? 'on' : 'off'}
           />
-        ) : (
+        ) : !hasPermission || !device ? (
           <View style={styles.cameraPlaceholder}>
             <Ionicons name="camera" size={64} color={colors.text.muted} />
             <Text style={[typography.body.md, { color: colors.text.muted, marginTop: 12 }]}>
               Camera access required
             </Text>
           </View>
-        )}
+        ) : null}
 
         {/* Overlay with measurement UI */}
         <LinearGradient

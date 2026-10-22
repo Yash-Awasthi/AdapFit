@@ -5,6 +5,9 @@ import app from '../../app.json';
 /** Send one crash report; never throws, since it runs while the app is already failing. */
 export function reportError(error: unknown, fatal = false): void {
   const e = error instanceof Error ? error : new Error(String(error));
+  // Kept in the release build on purpose: it is the only trace of a caught
+  // render error that survives on a device without a debugger attached.
+  console.error(`[crash] ${e.message}`, e.stack);
   fetch(apiUrl('/api/v1/client-errors'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

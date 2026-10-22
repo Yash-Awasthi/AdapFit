@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { SECTIONS, MORE, FLOW_SCREENS } from '../src/navigation/sections.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const screens = [join(root, 'app'), join(root, 'app', '(tabs)')]
+const screens = [join(root, 'app'), join(root, 'app', '(tabs)'), join(root, 'app', '(screens)')]
   .flatMap((dir) => readdirSync(dir).filter((f) => f.endsWith('.tsx') && f !== '_layout.tsx'))
   .map((f) => f.replace(/\.tsx$/, ''));
 
