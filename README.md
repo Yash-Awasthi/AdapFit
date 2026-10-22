@@ -20,6 +20,14 @@ Not a dashboard of raw numbers. Every screen answers: *What should I do today, a
 
 ---
 
+## 📸 Screenshots
+
+<a href="docs/screenshots/showcase.jpg"><img src="docs/screenshots/showcase.jpg" width="100%" alt="AdapFit app screens: onboarding, Today, check-in, Body, Care, Mind and Community"></a>
+
+<a href="docs/screenshots/web-dashboard.jpg"><img src="docs/screenshots/web-dashboard.jpg" width="100%" alt="AdapFit web dashboard with steps, heart rate, sleep, nutrition and cycle panels"></a>
+
+---
+
 ## ✨ Highlights
 
 | Domain | Features |
