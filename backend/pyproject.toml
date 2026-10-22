@@ -16,7 +16,7 @@ dependencies = [
     "numpy==2.5.4",
     "opencv-contrib-python-headless==5.0.0.93",
     "mediapipe==1.1.0",
-    "pillow==12.3.0",
+    "pillow==13.0.0",
     "sentry-sdk[fastapi]==2.72.0",
     "yt-dlp>=2026.8.19",
     "defusedxml==0.7.1",
